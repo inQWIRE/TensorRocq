@@ -18,7 +18,7 @@ Section Tensor.
 
   Definition Tensor {F : Type} `{FieldF : Field F} 
     (n m : nat) (A : Type) := 
-    (Vector.t A n * Vector.t A m) -> F.
+    Vector.t A n -> Vector.t A m -> F.
 
   Definition PackedTensor {F : Type} `{FieldF : Field F} (A : Type) :=
     {n : nat & {m : nat & Tensor n m A}}.

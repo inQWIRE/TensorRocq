@@ -1,9 +1,11 @@
 Require Import TensorCore.FieldSum.
 Require Import Bool.
+Require Import Btauto.
+Require Import TensorCore.Tensor.
 Require Import QuantumLib.Complex.
 Require Import Vector.
 Import VectorNotations.
-Require Import Btauto.
+
 
 Section ZX.
 
@@ -39,10 +41,10 @@ Proof.
     - simpl. rewrite IHbs1. rewrite andb_assoc. reflexivity.
 Qed.
 
-Definition zsp {n m : nat} (phase: R) : Tensor Complex.C n m  :=
+Definition zsp {n m : nat} (phase: R) : Tensor n m bool :=
   fun bs cs =>
-    (if allb false bs && allb false cs then 1 else 0) +
-    (if allb true bs && allb true cs then Cexp phase else 0).
+    (if allb false bs && allb false cs then C1 else C0) +
+    (if allb true bs && allb true cs then Cexp phase else C0).
 
 Lemma sum_spider_1_l {n m : nat} (p: R) 
   (bs : Vector.t bool n) (cs : Vector.t bool m) :
