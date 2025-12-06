@@ -6,945 +6,6 @@ From stdpp Require Import pretty.
 
 Require Import Aux_stdpp.
 
-(* Require Import TensorExprToRocq. *)
-
-(* 
-  Require Import string_name ident_name.
-
-  Class IdentNameAsString (name : ident_name) (str : string) := 
-    ident_name_as_string {}.
-  Global Arguments ident_name_as_string {name} str : assert.
-
-  Import Ltac2.Ltac2.
-
-  Ltac2 get_ident_name (c : constr) : ident option :=
-    match Constr.Unsafe.kind c with 
-    | Constr.Unsafe.Lambda b _ => 
-      Constr.Binder.name b
-    | _ => None
-    end.
-
-  Ltac2 get_id_name (c : constr) : ident :=
-    match Constr.Unsafe.kind c with 
-    | Constr.Unsafe.Var n => n
-    | _ => Option.get (Ident.of_string "H")
-    end.
-
-  From Ltac2 Require Import Notations.
-
-  Ltac2 solve_ident_name_as_string' () : unit :=
-    lazy_match! goal with
-    (* The [H] here becomes the default name if the binder is anonymous. We use
-      [H] with the idea that an unnamed and unused binder is likely to be a
-      proposition. *)
-    | [|- IdentNameAsString ?x _] =>
-      let str := Option.map_default Ident.to_string "" 
-        (get_ident_name x) in 
-      let coqstr := IdentToString.string_to_coq_string str in
-      ltac1:(coqstr |- notypeclasses refine (ident_name_as_string coqstr)) 
-        (Ltac1.of_constr coqstr)
-    | [|- _] => 
-      Message.print (Message.of_string "FAILED");
-      ltac1:(fail "solve_ident_name_as_string': goal should be `IdentNameAsString`")
-    end.
-
-  Ltac solve_ident_name_as_string :=
-    ltac2:(solve_ident_name_as_string'()).
-
-  Global Hint Extern 1 (IdentNameAsString _ _) => solve_ident_name_as_string : 
-    typeclass_instances.
-
-  Notation "'ident_name_to_string' idn" :=
-    (ltac:(let r := eval cbv in 
-      ltac:( let x := fresh in evar (x : string);
-      let x := eval unfold x in x in 
-      assert (IdentNameAsString idn x) by apply _;
-      exact x) in exact r)) (at level 10).
-
-  Notation "'ident_to_string' id" :=
-    (ident_name_to_string (λ id:unit, id)) 
-    (at level 10, only parsing).
-
-  Notation "'ident_to_string2' id" :=
-    (ltac2:(let r := Message.to_string (HypercamlInterface.print_preterm id) in 
-      let rc := IdentToString.string_to_coq_string r in
-      exact $rc)) (id ident, at level 10).
-
-
-  Declare Custom Entry string.
-
-  Notation "x" := (ident_to_string2 x) 
-    (x ident, in custom string at level 0, only parsing).
-
-  (* Notation "'[str' x ']'" := x
-    (x custom string at level 0, at level 0). *)
-
-
-*)
-
-
-
-
-
-(* FIXME: Move to Aux_stdpp *)
-Lemma bind_is_Some {A B} (f : A -> option B) (mx : option A) : 
-  is_Some (mx ≫= f) <-> is_Some mx /\ forall x, mx = Some x -> is_Some (f x).
-Proof.
-  destruct mx.
-  - cbn.
-    naive_solver.
-  - cbn.
-    rewrite 2 is_Some_alt.
-    firstorder.
-Qed.
-
-Ltac f_equal_let :=
-  let H := fresh in 
-  match goal with 
-  | |- (let '_ := ?x in _) = (let '_ := ?y in _) => 
-    enough (H : x = y) by now first [rewrite H | rewrite <- H]
-  | |- (let _ := ?x in _) = (let _ := ?y in _) => 
-    enough (H : x = y) by now first [rewrite H | rewrite <- H]
-  end.
-
-
-Lemma lookup_insert_case `{FinMap K M} {A} (m : M A) (i j : K) (x : A) : 
-  <[i:=x]> m !! j = if decide (i = j) then Some x else m !! j.
-Proof.
-  case_decide; now simplify_map_eq.
-Qed.
-
-Lemma NoDup_fmap_iff {A B} (f : A -> B) (l : list A) : 
-  NoDup (f <$> l) <->
-  NoDup l /\
-  forall a a', a ∈ l -> a' ∈ l -> f a = f a' -> a = a'.
-Proof.
-  split; [|intros []; now apply NoDup_fmap_2_strong].
-  intros Hmap.
-  split; [now apply NoDup_fmap_1 in Hmap|].
-  intros a a' (ia & Hia)%elem_of_list_lookup (ia' & Hia')%elem_of_list_lookup.
-  intros Hfas.
-  enough (ia = ia') by congruence.
-  apply (NoDup_lookup (f <$> l) _ _ (f a) Hmap);
-  rewrite list_lookup_fmap;
-  [now rewrite Hia|].
-  now rewrite Hia', Hfas.
-Qed.
-
-Lemma fsts_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) : 
-  (prod_map f g <$> l).*1 = f <$> (l.*1).
-Proof.
-  rewrite <- 2 list_fmap_compose.
-  reflexivity.
-Qed.
-
-Lemma snds_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) : 
-  (prod_map f g <$> l).*2 = g <$> (l.*2).
-Proof.
-  rewrite <- 2 list_fmap_compose.
-  reflexivity.
-Qed.
-
-  
-
-Lemma disjoint_difference_l
-  `{Set_ A C} `{!RelDecision (@elem_of A C _)} (X Y Z : C) : 
-  X ∖ Y ## Z <-> X ∩ Z ⊆ Y. 
-Proof.
-  split; [set_solver|].
-  intros HXZ x.
-  set_solver.
-Qed.
-
-Lemma disjoint_difference_symm
-  `{Set_ A C} (X Y Z : C) : 
-  X ∖ Y ## Z <-> X ## Z ∖ Y.
-Proof.
-  set_solver.
-Qed.
-
-
-Lemma not_elem_of_drop_iff {A} (l : list A) a i :
-  a ∉ drop i l <->
-  (forall j a', i <= j -> l !! j = Some a' -> a' <> a).
-Proof.
-  rewrite elem_of_list_lookup.
-  setoid_rewrite lookup_drop.
-  split.
-  - intros Hnex j a' Hij Hlook ->.
-    apply Hnex.
-    exists (j - i).
-    rewrite <- Hlook.
-    f_equal; lia.
-  - intros Hlook (j & Hj).
-    apply (Hlook (i + j) a); [lia|easy|easy].
-Qed.
-
-Lemma not_elem_of_drop_S_iff {A} (l : list A) a i :
-  a ∉ drop (S i) l <->
-  (forall j a', i < j -> l !! j = Some a' -> a' <> a).
-Proof.
-  apply not_elem_of_drop_iff.
-Qed.
-
-
-Lemma list_nil_iff {A} (l : list A) : l = [] <-> l ≡ [].
-Proof.
-  split; [now intros ->|].
-  intros Hl.
-  destruct l; set_solver.
-Qed.
-
-Lemma NoDup_list_eq_singleton_iff {A} (l : list A) a : NoDup l ->
-  l = [a] <-> l ≡ [a].
-Proof.
-  intros Hdup.
-  split; [intros ->; set_solver|].
-  intros Hl.
-  destruct l as [|a' l]; [set_solver|].
-  rewrite NoDup_cons in Hdup.
-  f_equal; [set_solver|].
-  apply list_nil_iff.
-  intros x.
-  split; [|easy].
-  intros Hx.
-  assert (x ∈ [a]) as ->%elem_of_list_singleton by now rewrite <- Hl; right.
-  enough (a' = a) by now subst.
-  apply elem_of_list_singleton.
-  now rewrite <- Hl; left.
-Qed.
-
-Lemma NoDup_list_eq_singleton_iff' {A} (l : list A) a : NoDup l ->
-  l = [a] <-> a ∈ l /\ (forall b, b ∈ l -> b = a).
-Proof.
-  intros Hdup.
-  rewrite NoDup_list_eq_singleton_iff by easy.
-  set_solver.
-Qed.
-
-Lemma last_filter_Some `{P : A -> Prop} `{∀ a, Decision (P a)} l a :
-  last (filter P l) = Some a <-> exists i, l !! i = Some a /\ P a /\ forall j a', i < j -> 
-    l !! j = Some a' -> ~ P a'.
-Proof.
-  split.
-  1: {
-    revert a;
-    induction l as [|a' l IHl]; [easy|]; intros a.
-    cbn.
-    case_decide as HPa'.
-    - rewrite last_cons.
-      destruct (last (filter P l)) as [a''|] eqn:Hlf.
-      + intros [= ->].
-        specialize (IHl a eq_refl) as (i & Hi & HPa & Higt).
-        exists (S i).
-        split; [apply Hi|].
-        split; [easy|].
-        intros [|j] ab Hij; [lia|].
-        apply Higt; lia.
-      + intros [= ->].
-        exists 0.
-        split; [easy|].
-        split; [easy|].
-        intros [|j] a' Hj; [lia|].
-        cbn.
-        intros Hlj HPa.
-        rewrite last_None in Hlf.
-        apply (elem_of_nil a').
-        rewrite <- Hlf.
-        apply elem_of_list_filter.
-        split; [easy|].
-        now apply elem_of_list_lookup_2 in Hlj.
-    - intros (i & Hi & HPa & Hgt)%IHl.
-      exists (S i).
-      split; [easy|].
-      split; [easy|].
-      intros [|j] a'' Hj; [lia|].
-      cbn.
-      apply Hgt; lia.
-  }
-  1:{
-    intros (i & Hi & HPa & Hnotin).
-    revert l Hi Hnotin;
-    induction i; intros l Hi Hnotin.
-    - destruct l; [easy|].
-      cbn in Hi.
-      injection Hi; intros ->.
-      cbn.
-      rewrite decide_True by easy.
-      rewrite last_cons.
-      rewrite (fun H => proj2 (last_None _) H); [easy|].
-      apply list_nil_iff.
-      intros x.
-      rewrite elem_of_nil.
-      split; [|easy].
-      rewrite elem_of_list_filter.
-      rewrite elem_of_list_lookup.
-      intros (Px & j & Hj).
-      specialize (Hnotin (S j) x ltac:(lia) Hj).
-      easy.
-    - destruct l as [|a' l]; [easy|].
-      cbn.
-      cbn in Hi.
-      case_decide; [|apply IHi; [easy|]; intros j ? ?; apply (Hnotin (S j)); lia].
-      rewrite last_cons.
-      destruct (last (filter P l)) as [lst|] eqn:Hlst.
-      + rewrite <- Hlst.
-        apply IHi; [easy|].
-        intros j ? ?; apply (Hnotin (S j)); lia.
-      + exfalso.
-        apply last_None in Hlst.
-        apply (filter_nil_not_elem_of _ _ _ Hlst HPa).
-        now apply elem_of_list_lookup_2 in Hi.
-  }
-Qed.
-
-
-Definition finv {A B C} `{Elements A C}
-  `{EqDecision B} `{Inhabited A}
-  (dom : C) (f : A -> B) : B -> A :=
-  fun b => 
-    default inhabitant (
-      head (filter (fun a => f a = b) (elements dom))
-    ).
-
-Lemma finv_right_inverse {A B C} `{FinSet A C} `{Inhabited A} `{EqDecision B}
-  (dom : C) (f : A -> B) b : (exists a, a ∈ dom /\ f a = b) ->
-    f (finv dom f b) = b.
-Proof.
-  intros (a & Hadom & Hfa).
-  unfold finv.
-  destruct (head (filter (λ a, f a = b) (elements dom))) as [a'|] eqn:Hfilt.
-  - apply head_Some_elem_of, elem_of_list_filter in Hfilt.
-    easy.
-  - exfalso.
-    apply head_None in Hfilt.
-    rewrite <- (elem_of_nil a), <- Hfilt.
-    apply elem_of_list_filter; set_solver.
-Qed.
-
-Lemma finv_double_left_inverse {A B C} `{FinSet A C} `{Inhabited A} `{EqDecision B}
-  (dom : C) (f : A -> B) a : a ∈ dom ->
-    f (finv dom f (f a)) = f a.
-Proof.
-  intros Hadom.
-  apply finv_right_inverse; eauto.
-Qed.
-
-Lemma finv_left_inverse {A B C} `{FinSet A C} `{Inhabited A} `{EqDecision B}
-  (dom : C) (f : A -> B) a : a ∈ dom -> 
-    (forall a a', a ∈ dom -> a' ∈ dom -> f a = f a' -> a = a') ->
-    finv dom f (f a) = a.
-Proof.
-  intros Hadom Hfinj.
-  unfold finv.
-  replace (filter (λ a', f a' = f a) (elements dom)) with [a]; [easy|].
-  symmetry.
-  apply NoDup_list_eq_singleton_iff'; [apply NoDup_filter, NoDup_elements|].
-  split; [now apply elem_of_list_filter; split; [|apply elem_of_elements]|].
-  intros b (Hfb & Hbdom%elem_of_elements)%elem_of_list_filter.
-  auto.
-Qed.
-
-
-
-Lemma app_inj_len_l {A} (l m l' m' : list A) : 
-  length l = length l' -> 
-  l ++ m = l' ++ m' -> 
-  l = l' /\ m = m'.
-Proof.
-  intros Hlen Heq.
-  apply (f_equal (take (length l))) in Heq as Heql.
-  rewrite take_app_length, Hlen, take_app_length in Heql.
-  subst l'.
-  split; [easy|].
-  now apply app_inv_head in Heq.
-Qed.
-
-Lemma app_inj_len_r {A} (l m l' m' : list A) : 
-  length m = length m' -> 
-  l ++ m = l' ++ m' -> 
-  l = l' /\ m = m'.
-Proof.
-  intros Hlen Heq.
-  specialize (f_equal length Heq).
-  simpl_list.
-  intros Hlens.
-  apply app_inj_len_l; easy + lia.
-Qed.
-
-
-
-Lemma list_to_set_concat {A C} `{Set_ A C} (l : list (list A)) : 
-  list_to_set (concat l) ≡@{C} ⋃ (list_to_set <$> l).
-Proof.
-  induction l; [reflexivity|].
-  now cbn; rewrite list_to_set_app, IHl.
-Qed.
-
-Lemma list_to_set_concat_L {A C} `{Set_ A C} `{!LeibnizEquiv C} (l : list (list A)) : 
-  list_to_set (concat l) =@{C} ⋃ (list_to_set <$> l).
-Proof.
-  unfold_leibniz.
-  apply list_to_set_concat.
-Qed.
-
-
-
-Lemma NoDup_list_bind {A B} (f : A -> list B) l : 
-  NoDup l -> 
-    (forall a, a ∈ l -> NoDup (f a)) ->
-    (forall a a' b, a ∈ l -> a' ∈ l -> a <> a' -> 
-      b ∈ f a -> b ∉ f a') ->
-  NoDup (l ≫= f).
-Proof.
-  intros Hdup Hfdup Hinj.
-  induction Hdup; [constructor|].
-  cbn.
-  apply NoDup_app.
-  split; [now apply Hfdup; left|].
-  split; [|apply IHHdup; set_solver].
-  intros b Hbx.
-  rewrite elem_of_list_bind.
-  intros (y & Hby & Hy).
-  revert Hbx Hby.
-  apply Hinj; set_solver.
-Qed.
-
-
-
-Lemma map_img_list_to_map `{FinMap K M} `{Set_ A SA} 
-  (l : list (K * A)) : 
-  NoDup l.*1 ->
-  map_img (list_to_map l :> M A) ≡@{SA} list_to_set l.*2.
-Proof.
-  intros Hl.
-  rewrite map_img_alt.
-  now rewrite map_to_list_to_map by easy.
-Qed.
-
-Lemma map_img_list_to_map_L `{FinMap K M} `{Set_ A SA} `{!LeibnizEquiv SA}
-  (l : list (K * A)) : 
-  NoDup l.*1 ->
-  map_img (list_to_map l :> M A) =@{SA} list_to_set l.*2.
-Proof.
-  unfold_leibniz.
-  apply map_img_list_to_map.
-Qed.
-
-
-
-
-Fixpoint list_decomps_aux {A} (pre l : list A) : list (list A * A * list A) :=
-  match l with 
-  | [] => []
-  | a :: l => 
-    (pre, a, l) :: list_decomps_aux (pre ++ [a]) l
-  end.
-
-Definition list_decomps {A} (l : list A) : list (list A * A * list A) :=
-  list_decomps_aux [] l.
-  
-
-Lemma elem_of_list_decomps_aux {A} (pre l : list A) : 
-  forall hd a tl, (hd, a, tl) ∈ list_decomps_aux pre l <->
-    hd ++ [a] ++ tl = pre ++ l /\
-    length (pre) <= length (hd).
-Proof.
-  revert pre; induction l; intros pre hd b tl.
-  - cbn.
-    split; [easy|].
-    intros (Heq%(f_equal length) & Hlen).
-    revert Heq.
-    simpl_list.
-    cbn.
-    lia.
-  - cbn.
-    rewrite elem_of_cons.
-    rewrite IHl.
-    split.
-    + intros [[= -> -> ->] | [Heq Hlen]]; [easy|].
-      rewrite <- app_assoc in Heq.
-      split; [apply Heq|].
-      rewrite <- Hlen.
-      simpl_list; cbn; lia.
-    + intros [Heq Hlen].
-      destruct_decide (decide (length pre = length hd)) as Hleneq.
-      * left.
-        apply app_inj_len_l in Heq; [|easy].
-        now destruct Heq as [-> [= -> ->]].
-      * right.
-        rewrite <- app_assoc.
-        split; [easy|].
-        simpl_list; cbn; lia.
-Qed.
-
-Lemma elem_of_list_decomps {A} (l : list A) : 
-  forall hd a tl, (hd, a, tl) ∈ list_decomps l <->
-    hd ++ [a] ++ tl = l.
-Proof.
-  intros hd a tl.
-  unfold list_decomps.
-  rewrite elem_of_list_decomps_aux.
-  naive_solver lia.
-Qed.
-
-(* FIXME: Move *)
-Lemma exists_pair {A B} (P : A * B -> Prop) : 
-  (exists ab, P ab) <-> exists a, exists b, P (a, b).
-Proof.
-  split.
-  - intros [[] ?]; eauto.
-  - intros (?&?&?); eauto.
-Qed.
-
-Definition list_removals {A} (l : list A) : list (A * list A) :=
-  (λ '(hd, a, tl), (a, hd ++ tl)) <$> list_decomps l.
-
-Lemma elem_of_list_removals {A} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_removals l <-> exists hd tl, hd_tl = hd ++ tl /\ 
-    hd ++ [a] ++ tl = l.
-Proof.
-  unfold list_removals.
-  rewrite elem_of_list_fmap.
-  rewrite 2 exists_pair.
-  setoid_rewrite pair_eq.
-  setoid_rewrite elem_of_list_decomps.
-  naive_solver.
-Qed.
-
-
-Lemma elem_of_list_removals_perm {A} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_removals l -> l ≡ₚ a :: hd_tl.
-Proof.
-  rewrite elem_of_list_removals.
-  intros (hd & tl & -> & <-).
-  quote_Permutation.
-  apply rlist.eval_Permutation.
-  cbn.
-  compute_done.
-Qed.
-
-Definition list_select `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) : list (A * list A) :=
-  filter (fun a_rst => P (fst a_rst)) (list_removals l).
-
-
-Lemma elem_of_list_select {A} `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_select P l <-> P a /\ exists hd tl, hd_tl = hd ++ tl /\ 
-    hd ++ [a] ++ tl = l.
-Proof.
-  unfold list_select.
-  rewrite elem_of_list_filter.
-  now rewrite elem_of_list_removals.
-Qed.
-
-
-Lemma elem_of_list_select_perm {A} `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_select P l -> l ≡ₚ a :: hd_tl.
-Proof. 
-  intros [_ (? & ? & -> & <-)]%elem_of_list_select.
-  solve_Permutation.
-Qed. 
-
-
-Definition gmap_map `{Countable A} (m : gmap A A) : A -> A :=
-  fun a => default a (m !! a).
-
-Lemma gmap_map_correct `{Countable A} (m : gmap A A) a b : 
-  m !! a = Some b -> gmap_map m a = b.
-Proof.
-  unfold gmap_map.
-  now intros ->.
-Qed.
-
-Lemma gmap_map_idemp `{Countable A} (m : gmap A A) a : 
-  a ∉ dom m -> gmap_map m a = a.
-Proof.
-  intros Ha.
-  unfold gmap_map.
-  unfold default.
-  case_match eqn:Heq; [|reflexivity].
-  now apply elem_of_dom_2 in Heq.
-Qed.
-
-
-
-Lemma elem_of_from_option_list_singleton {A} (a : A) (ma : option A) : 
-  a ∈ from_option (λ x, [x]) [] ma <->
-  ma = Some a.
-Proof.
-  destruct ma; cbn; set_solver.
-Qed.
-
-
-Lemma filter_with_iff_neg_Permutation {A} {P Q : A -> Prop} 
-  `{∀ a, Decision (P a)} `{∀ a, Decision (Q a)} l : 
-  (∀ a, P a <-> ~ Q a) -> 
-  filter P l ++ filter Q l ≡ₚ l.
-Proof.
-  intros HPQ.
-  induction l; [easy|].
-  cbn.
-  case_decide.
-  - rewrite decide_False by now apply HPQ.
-    cbn.
-    now rewrite IHl.
-  - case_decide; [|exfalso; naive_solver].
-    rewrite <- IHl at 3.
-    solve_Permutation.
-Qed.
-
-Lemma filter_with_neg_Permutation {A} {P : A -> Prop} 
-  `{∀ a, Decision (P a)} l : 
-  filter P l ++ filter (λ a, ~ P a) l ≡ₚ l.
-Proof.
-  rewrite Permutation_app_comm.
-  now apply filter_with_iff_neg_Permutation.
-Qed.
-
-Lemma filter_neg_with_Permutation {A} {P : A -> Prop} 
-  `{∀ a, Decision (P a)} l : 
-  filter (λ a, ~ P a) l ++ filter P l ≡ₚ l.
-Proof.
-  now apply filter_with_iff_neg_Permutation.
-Qed.
-
-
-
-Lemma fmap_Permuation_iff_exists {A B} (f : A -> B) (l : list A) l' : 
-  f <$> l ≡ₚ l' <-> 
-  exists l'', l ≡ₚ l'' /\ f <$> l'' = l'.
-Proof.
-  split.
-  - revert l'; induction l as [|a l IHl]; intros l'.
-    + cbn.
-      intros ->%Permutation_nil.
-      eauto.
-    + cbn.
-      intros Hperm.
-      assert (Hal' : f a ∈ l') by now rewrite <- Hperm; left.
-      apply elem_of_list_split in Hal' as Ha'l'.
-      destruct Ha'l' as (fl'1 & fl'2 & Heq).
-      subst l'.
-      specialize (IHl (fl'1 ++ fl'2) (Permutation_cons_app_inv _ _ Hperm)).
-      destruct IHl as (l'' & Hl & Hfl'').
-      apply fmap_app_inv in Hfl'' as (l'1 & l'2 & Hl'1 & Hl'2 & Hl'').
-      exists (l'1 ++ a :: l'2).
-      split; [rewrite Hl; subst; solve_Permutation|].
-      rewrite fmap_app; cbn.
-      congruence.
-  - intros (? & Hperm & Heq).
-    now rewrite Hperm, <- Heq.
-Qed.
-
-
-Lemma size_map_img_le_size_dom `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} (m : M A) : 
-  size (map_img m :> SA) <= size (dom m).
-Proof.
-  induction m using map_first_key_ind.
-  - now rewrite map_img_empty, dom_empty, 2 size_empty.
-  - rewrite dom_insert.
-    assert (Hid : i ∉ dom m) by (now apply not_elem_of_dom).
-    rewrite size_union by set_solver.
-    rewrite size_singleton.
-    transitivity (1 + size (map_img m :> SA))%nat; [|lia].
-    etransitivity; [eapply subseteq_size; apply map_img_insert_subseteq|].
-    rewrite size_union_alt, size_singleton.
-    apply Nat.add_le_mono_l.
-    apply subseteq_size, subseteq_difference_l; reflexivity.
-Qed.
-
-Lemma map_dom_img_lt_card_iff `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (map_img m :> SA) < size (dom m) <-> 
-  exists i j a, m !! i = Some a /\ m !! j = Some a /\ i <> j.
-Proof.
-  split.
-  - induction m using map_first_key_ind; 
-    [now rewrite dom_empty, map_img_empty, 2 size_empty|].
-    rewrite dom_insert, map_img_insert_notin by easy.
-    assert (Hid : i ∉ dom m) by (now apply not_elem_of_dom).
-    destruct_decide (decide (x ∈@{SA} map_img m)) as Hx.
-    + apply elem_of_map_img_1 in Hx as (j & Hj).
-      intros _.
-      exists i, j, x.
-      enough (i <> j) by now 
-      rewrite lookup_insert, lookup_insert_ne.
-      intros ->.
-      now apply elem_of_dom_2 in Hj.
-    + rewrite 2 (size_union {[_]}) by set_solver.
-      rewrite 2 size_singleton.
-      intros (j & k & a & Hj & Hk & Hjk)%Nat.succ_lt_mono%IHm.
-      exists j, k, a.
-      rewrite lookup_insert_ne by (intros ->; now apply elem_of_dom_2 in Hj).
-      rewrite lookup_insert_ne by (intros ->; now apply elem_of_dom_2 in Hk).
-      easy.
-  - intros (i & j & a & Hi & Hj & Hij).
-    rewrite <- (insert_delete m i a Hi).
-    rewrite map_img_insert_notin, dom_insert by apply lookup_delete.
-    rewrite <- (insert_delete (delete i m) j a) by now rewrite lookup_delete_ne.
-    rewrite map_img_insert_notin, dom_insert by apply lookup_delete.
-    rewrite (union_assoc _), (union_idemp _).
-    rewrite size_union_alt, 
-      (size_union {[i]}), (size_union {[j]}), 3 size_singleton by set_solver.
-    eapply Nat.le_lt_trans; [apply -> Nat.succ_le_mono; 
-      apply subseteq_size, subseteq_difference_l; reflexivity|].
-    pose proof (size_map_img_le_size_dom (delete j (delete i m)) (SA:=SA)).
-    lia.
-Qed.
-
-Lemma map_dom_img_eq_card_iff_inj `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (dom m) = size (map_img m :> SA) <-> 
-  forall i j a, m !! i = Some a -> m !! j = Some a -> i = j.
-Proof.
-  split.
-  - intros Hsize.
-    assert (Hn : ~ size (map_img m :> SA) < size (dom m)) by lia.
-    rewrite map_dom_img_lt_card_iff in Hn.
-    intros i j a Hi Hj.
-    apply dec_stable.
-    intros Hij.
-    apply Hn.
-    naive_solver.
-  - intros Hinj.
-    specialize (size_map_img_le_size_dom m (SA:=SA)).
-    enough (~ size (map_img m :> SA) < size (dom m)) by lia.
-    rewrite map_dom_img_lt_card_iff.
-    naive_solver.
-Qed.
-
-Lemma map_dom_img_eq_card_iff_NoDup `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (dom m) = size (map_img m :> SA) <-> 
-  NoDup (map_to_list m).*2.
-Proof.
-  rewrite map_dom_img_eq_card_iff_inj.
-  rewrite NoDup_alt.
-  setoid_rewrite list_lookup_fmap.
-  setoid_rewrite fmap_Some.
-  split.
-  - intros Hinj i j a.
-    intros ([k a'] & Hk & Ha') ([k' a''] & Hk' & Ha'').
-    cbn in Ha', Ha''.
-    subst a' a''.
-    apply elem_of_list_lookup_2 in Hk as Hka.
-    apply elem_of_list_lookup_2 in Hk' as Hk'a.
-    rewrite elem_of_map_to_list in * |-.
-    assert (k = k') by eauto.
-    subst k'.
-    now apply (NoDup_lookup _ _ _ (k,a) (NoDup_map_to_list m)).
-  - intros HNoDup.
-    intros k k' a Hka Hk'a.
-    apply elem_of_map_to_list in Hka as Hka'.
-    apply elem_of_map_to_list in Hk'a as Hk'a'.
-    apply elem_of_list_lookup_1 in Hka' as [i Hi].
-    apply elem_of_list_lookup_1 in Hk'a' as [j Hj].
-    enough (i = j) by congruence.
-    apply (HNoDup _ _ a); eexists (_, a); eauto.
-Qed.
-
-(* TODO: Can we remove this? *)
-Lemma NoDup_equiv_Permutation {A} (l l' : list A) : 
-  NoDup l -> NoDup l' -> l ≡ l' -> l ≡ₚ l'.
-Proof.
-  apply NoDup_Permutation.
-Qed.
-
-
-Lemma elem_of_list_fmap_prod_map {A B C D} 
-  (f : A -> C) (g : B -> D) (l : list (A * B)) cd : 
-  cd ∈ prod_map f g <$> l <-> 
-  exists a b, (a, b) ∈ l /\ f a = cd.1 /\ g b = cd.2.
-Proof.
-  destruct cd as [c d].
-  rewrite elem_of_list_fmap.
-  rewrite exists_pair.
-  cbn.
-  naive_solver.
-Qed.
-
-Lemma fsts_prod_swap {A B} (l : list (A * B)) : 
-  (prod_swap <$> l).*1 = l.*2.
-Proof.
-  induction l as [|[]]; cbn; f_equal; easy.
-Qed.
-
-Lemma snds_prod_swap {A B} (l : list (A * B)) : 
-  (prod_swap <$> l).*2 = l.*1.
-Proof.
-  induction l as [|[]]; cbn; f_equal; easy.
-Qed.
-
-Lemma lookup_list_to_map_gen `{FinMap K M} {A} 
-  (l : list (K * A)) k : 
-    (list_to_map l :> M A) !! k = snd <$> head (filter (λ kv, kv.1 = k) l).
-Proof.
-  induction l as [|[k' a'] l IHl].
-  - cbn.
-    now rewrite lookup_empty.
-  - cbn.
-    rewrite lookup_insert_case.
-    case_decide; [reflexivity|].
-    apply IHl.
-Qed.
-
-Lemma list_to_map_eq_fold_right `{FinMap K M} {A} 
-  (l : list (K * A)) : (list_to_map l :> M A) = foldr (λ p, <[p.1:=p.2]>) ∅ l.
-Proof.
-  induction l; cbn; f_equal; congruence.
-Qed.
-
-
-Lemma gmap_map_inj_on `{Countable A} (m : gmap A A) (X : gset A) : 
-  (forall i j a, m !! i = Some a -> m !! j = Some a -> i = j) -> 
-  X ⊆ dom m -> 
-  forall a b, a ∈ X -> b ∈ X -> gmap_map m a = gmap_map m b -> a = b.
-Proof.
-  intros Hinj HX a b [ma Hma]%HX%elem_of_dom [mb Hmb]%HX%elem_of_dom.
-  rewrite (gmap_map_correct _ _ _ Hma), (gmap_map_correct _ _ _ Hmb).
-  intros ->.
-  eauto.
-Qed.
-
-
-Lemma list_to_set_equiv `{SemiSet A C} (l l' : list A) : 
-  list_to_set l ≡@{C} list_to_set l' <-> l ≡ l'.
-Proof.
-  rewrite set_equiv.
-  setoid_rewrite elem_of_list_to_set.
-  reflexivity.
-Qed.
-
-Lemma list_to_set_subseteq `{SemiSet A C} (l l' : list A) : 
-  list_to_set l ⊆@{C} list_to_set l' <-> l ⊆ l'.
-Proof.
-  unfold subseteq, set_subseteq_instance, list_subseteq.
-  setoid_rewrite elem_of_list_to_set.
-  reflexivity.
-Qed.
-
-
-Notation "'unfold' x" := (ltac:(let x' := eval unfold x in x in 
-  exact (eq_refl : x = x'))) (at level 10, only parsing).
-
-
-Lemma decide_not `{HNP : Decision (~ P)} `{HP : Decision P} {A} (x y : A) : 
-  (if @decide (~ P) HNP then x else y) = 
-  (if @decide P HP then y else x).
-Proof.
-  now do 2 case_decide.
-Qed.
-
-
-
-Local Notation gset_to_Pset s := 
-  (list_to_set (C:=Pset) $ strings.string_to_pos <$> elements s).
-
-
-Lemma elem_of_gset_string_to_Pset (s : gset string) p : 
-  p ∈@{Pset} gset_to_Pset s <->
-  exists y, y ∈ s /\ p = encode y.
-Proof.
-  rewrite elem_of_list_to_set, elem_of_list_fmap.
-  setoid_rewrite elem_of_elements.
-  naive_solver.
-Qed.
-
-Lemma elem_of_gset_string_to_Pset' (s : gset string) (x : string) :
-  encode x ∈ gset_to_Pset s <-> x ∈ s.
-Proof.
-  rewrite elem_of_gset_string_to_Pset.
-  naive_solver.
-Qed.
-
-Lemma gset_to_Pset_inj (s s' : gset string) : 
-  gset_to_Pset s = gset_to_Pset s' -> s = s'.
-Proof.
-  intros Heq.
-  apply set_eq; intros x.
-  by rewrite <- 2 elem_of_gset_string_to_Pset', Heq.
-Qed.
-
-
-Lemma list_bind_ext_strong {A B} (f g : A -> list B) (l : list A) :
-  (forall a, a ∈ l -> f a = g a) ->
-  l ≫= f = l ≫= g.
-Proof.
-  induction l; [reflexivity|];
-  intros Hfg.
-  cbn.
-  rewrite Hfg by now left.
-  f_equal.
-  apply IHl; intros; apply Hfg; now right.
-Qed.
-
-Lemma caps_eq_r_weaken `{FinSet A SA} (X Y Z Z' : SA) : 
-  Z ⊆ Z' -> X ∩ Z' ≡ Y ∩ Z' -> X ∩ Z ≡ Y ∩ Z.
-Proof.
-  set_solver.
-Qed.
-
-Lemma caps_eq_r_weaken_L `{FinSet A SA} `{!LeibnizEquiv SA} (X Y Z Z' : SA) : 
-  Z ⊆ Z' -> X ∩ Z' = Y ∩ Z' -> X ∩ Z = Y ∩ Z.
-Proof.
-  unfold_leibniz.
-  apply caps_eq_r_weaken.
-Qed.
-
-
-Lemma guard_is_Some `{Decision P} {A} (x : A) : 
-  is_Some (guard P ≫= λ _, Some x) <-> P.
-Proof.
-  case_guard; cbn; [done|]; by split; [intros ?%is_Some_None|].
-Qed.
-
-Lemma list_fmap_filter_inv 
-  `(f : A -> B) (g : B -> A) `{!Cancel eq g f} 
-  {P : A -> Prop} `{∀ a, Decision (P a)} l : 
-  f <$> filter P l =@{list B} filter (P ∘ g) (f <$> l).
-Proof.
-  induction l; [done|].
-  cbn.
-  rewrite (decide_ext (P (g _)) (P a)) by 
-    now rewrite (cancel g f).
-  unfold filter in *.
-  rewrite <- IHl.
-  by case_decide.
-Qed.
-
-Lemma list_filter_fmap 
-  `(f : A -> B)
-  {P : B -> Prop} `{∀ a, Decision (P a)} l : 
-  filter P (f <$> l) =@{list B} f <$> filter (P ∘ f) l.
-Proof.
-  induction l; [done|].
-  cbn.
-  by case_decide;
-  unfold filter in *;
-  rewrite IHl.
-Qed.
-
-Lemma list_filter_iff_strong {A} (P1 P2 : A -> Prop)
-  `{∀ a, Decision (P1 a)} `{∀ a, Decision (P2 a)} (l : list A) : 
-  (∀ a, a ∈ l -> P1 a <-> P2 a) ->
-  filter P1 l = filter P2 l.
-Proof.
-  unfold filter.
-  induction l; [done|].
-  intros HP.
-  cbn.
-  unfold filter.
-  erewrite decide_ext by now apply HP; left.
-  rewrite IHl by now intros; apply HP; right.
-  reflexivity.
-Qed.
 
 
 Section TensorExpr. 
@@ -953,12 +14,51 @@ Section TensorExpr.
 Definition Ty := nat.
 Definition Idx := string.
 
+
+(* Some auxiliary functions *)
+
+Definition fresh_var (var : Idx) (avoid : gset Idx) : Idx :=
+  if decide (var ∈ avoid) then fresh avoid else var.
+
+Lemma fresh_var_fresh var avoid : 
+  fresh_var var avoid ∉ avoid.
+Proof.
+  unfold fresh_var.
+  case_decide.
+  - apply is_fresh.
+  - assumption.
+Qed.
+
+Lemma fresh_var_id var avoid : var ∉ avoid -> 
+  fresh_var var avoid = var.
+Proof.
+  unfold fresh_var.
+  intros HF.
+  by apply decide_False.
+Qed.
+
+Definition relabel_var (old new : Idx) : Idx -> Idx :=
+  fun x => if decide (x = old) then new else x.
+
+
+
+
+
 Inductive tensorexpr :=
   | tone : tensorexpr  
   | tabstract (absidx : Idx) (lower : list Idx) (upper : list Idx)
   | tproduct (l r : tensorexpr)
   | tsum (reg : Idx) (ty : Ty) (summand : tensorexpr).
 
+
+Definition tabstract' (abs : Idx * list Idx * list Idx) : tensorexpr :=
+  let '(abs, lower, upper) := abs in tabstract abs lower upper.
+
+Fixpoint tproducts (tes : list tensorexpr) : tensorexpr :=
+  match tes with
+  | [] => tone
+  | te :: tes => tproduct te (tproducts tes)
+  end.
 
 Fixpoint relabel_te (f : Idx -> Idx) (te : tensorexpr) : tensorexpr :=
   match te with 
@@ -989,12 +89,21 @@ Fixpoint relabel_bound_aux (f : Idx -> Idx) (bound : gset Idx)
 
 Definition relabel_bound (f : Idx -> Idx) (te : tensorexpr) :=
   relabel_bound_aux f ∅ te.
-(* 
-(* General relabeling based on some state *)
-Fixpoint relabel_gen {A} (f : A -> Idx -> Idx) 
-  (init : A) *)
 
-(* Fixpoint relabel_one_free (old new : Idx) *)
+Fixpoint relabel_one_until_binder (var var' : Idx) (te : tensorexpr) :=
+  match te with 
+  | tone => tone
+  | tabstract idx lower upper => 
+    tabstract idx (relabel_var var var' <$> lower)
+      (relabel_var var var' <$> upper)
+  | tproduct l r => 
+    tproduct (relabel_one_until_binder var var' l) 
+      (relabel_one_until_binder var var' r)
+  | tsum reg ty smd => 
+    if decide (reg = var) then tsum reg ty smd 
+      else tsum reg ty (relabel_one_until_binder var var' smd)
+  end.
+
 
 Fixpoint te_varset (te : tensorexpr) : gset Idx :=
   match te with 
@@ -1014,7 +123,6 @@ Fixpoint te_free_varset (te : tensorexpr) : gset Idx :=
     te_free_varset summand ∖ {[ reg ]}
   end.
 
-
 Fixpoint te_bound_varset (te : tensorexpr) : gset Idx :=
   match te with 
   | tone => ∅
@@ -1023,6 +131,16 @@ Fixpoint te_bound_varset (te : tensorexpr) : gset Idx :=
   | tsum reg ty summand => 
       {[ reg ]} ∪ te_bound_varset summand
   end.
+
+Fixpoint te_absset (te : tensorexpr) : gset Idx :=
+  match te with 
+  | tone => ∅
+  | tabstract idx _ _ => {[ idx ]}
+  | tproduct l r => te_absset l ∪ te_absset r
+  | tsum reg ty summand => 
+    te_absset summand
+  end.
+
 
 Lemma te_varset_bound_free_decomp te : 
   te_varset te = te_bound_varset te ∪ te_free_varset te.
@@ -1038,14 +156,7 @@ Proof.
   + set_solver.
 Qed.
 
-Fixpoint te_absset (te : tensorexpr) : gset Idx :=
-  match te with 
-  | tone => ∅
-  | tabstract idx _ _ => {[ idx ]}
-  | tproduct l r => te_absset l ∪ te_absset r
-  | tsum reg ty summand => 
-    te_absset summand
-  end.
+
 
 
 
@@ -1053,7 +164,6 @@ Record tensorlist := mk_tl {
   tl_sums : list (Ty * Idx);
   tl_abstracts : list (Idx * list Idx * list Idx)
 }.
-
 
 Lemma tl_ext tl tl' : 
   tl.(tl_sums) = tl'.(tl_sums) -> 
@@ -1063,14 +173,14 @@ Proof.
   destruct tl, tl'; cbn; congruence.
 Qed.
 
-Fixpoint tproducts (tes : list tensorexpr) : tensorexpr :=
-  match tes with
-  | [] => tone
-  | te :: tes => tproduct te (tproducts tes)
-  end.
+Definition tl_cons_sum ty var (tl : tensorlist) : tensorlist :=
+  mk_tl ((ty, var) :: tl.(tl_sums)) (tl.(tl_abstracts)).
 
-Definition tabstract' (abs : Idx * list Idx * list Idx) : tensorexpr :=
-  let '(abs, lower, upper) := abs in tabstract abs lower upper.
+Fixpoint tl_app_sums sums tl :=
+  match sums with 
+  | [] => tl
+  | (ty, var) :: sums => tl_cons_sum ty var (tl_app_sums sums tl)
+  end.
 
 Fixpoint tensorexpr_of_tensorlist_aux sums abs : tensorexpr :=
   match sums with 
@@ -1081,32 +191,66 @@ Fixpoint tensorexpr_of_tensorlist_aux sums abs : tensorexpr :=
 Definition tensorexpr_of_tensorlist (tl : tensorlist) : tensorexpr :=
   tensorexpr_of_tensorlist_aux (tl.(tl_sums)) (tl.(tl_abstracts)).
 
-
 Coercion tensorexpr_of_tensorlist : tensorlist >-> tensorexpr.
 
 
-Definition fresh_var (var : Idx) (avoid : gset Idx) : Idx :=
-  if decide (var ∈ avoid) then fresh avoid else var.
+Definition tlone : tensorlist := mk_tl [] [].
 
-Lemma fresh_var_fresh var avoid : 
-  fresh_var var avoid ∉ avoid.
+Lemma tlone_correct : tlone =@{tensorexpr} tone.
 Proof.
-  unfold fresh_var.
-  case_decide.
-  - apply is_fresh.
-  - assumption.
+  reflexivity.
 Qed.
 
-Lemma fresh_var_id var avoid : var ∉ avoid -> 
-  fresh_var var avoid = var.
-Proof.
-  unfold fresh_var.
-  intros HF.
-  by apply decide_False.
-Qed.
 
-Definition relabel_var (old new : Idx) : Idx -> Idx :=
-  fun x => if decide (x = old) then new else x.
+Definition tensorlist_perm_eq (tl tl' : tensorlist) :=
+  tl.(tl_sums) ≡ₚ tl'.(tl_sums) /\
+  tl.(tl_abstracts) ≡ₚ tl'.(tl_abstracts).
+
+
+(* Variable sets for [tensorlist]s *)
+
+Definition abstracts_vars (abs : list (Idx * list Idx * list Idx)) : gset Idx :=
+  list_to_set (concat ((fun '(_, lower, upper) => lower ++ upper) 
+    <$> abs)).
+
+Definition tl_free_varset (tl : tensorlist) : gset Idx :=
+  (abstracts_vars tl.(tl_abstracts)) ∖ list_to_set (tl.(tl_sums).*2).
+
+Definition tl_varset (tl : tensorlist) : gset Idx :=
+  (abstracts_vars tl.(tl_abstracts)) ∪ list_to_set (tl.(tl_sums).*2).
+
+Definition tl_bound_varset (tl : tensorlist) : gset Idx :=
+  list_to_set tl.(tl_sums).*2.
+
+Definition tl_used_varset (tl : tensorlist) : gset Idx :=
+  abstracts_vars tl.(tl_abstracts).
+
+Definition tl_used_bound_vars tl : list (Ty * Idx) :=
+  filter (λ x, x.2 ∈ tl_used_varset tl) tl.(tl_sums).
+
+Definition tl_unused_bound_vars tl : list (Ty * Idx) :=
+  filter (λ x, x.2 ∉ tl_used_varset tl) tl.(tl_sums).
+
+
+
+
+
+
+Definition tl_cons_unused_sum ty (tl : tensorlist) : tensorlist :=
+  tl_cons_sum ty (fresh (tl_used_varset tl)) tl.
+
+Fixpoint tl_app_unused_sums (tys : list Ty) (tl : tensorlist) : tensorlist :=
+  match tys with 
+  | [] => tl
+  | ty :: tys => tl_cons_unused_sum ty (tl_app_unused_sums tys tl)
+  end.
+
+
+
+Definition tl_type_map (tl : tensorlist) : gmap Idx Ty :=
+  list_to_map (prod_swap <$> reverse tl.(tl_sums)).
+  
+(** Relabeling in [tensorlist]s *)
 
 Definition relabel_one_in_sums (old new : Idx) (sums : list (Ty * Idx)) : 
   list (Ty * Idx) :=
@@ -1124,8 +268,49 @@ Definition relabel_one_in_abs (old new : Idx)
   (prod_map (prod_map id (fmap (FMap:=list_fmap) (relabel_var old new))) 
     (fmap (FMap:=list_fmap) (relabel_var old new))) <$> abs.
 
-Definition tl_cons_sum ty var (tl : tensorlist) : tensorlist :=
-  mk_tl ((ty, var) :: tl.(tl_sums)) (tl.(tl_abstracts)).
+
+Definition relabel_abs (f : Idx -> Idx) (abs : Idx * list Idx * list Idx) :=
+  let '(idx, lower, upper) := abs in 
+  (idx, f <$> lower, f <$> upper).
+
+Definition relabel_tl_bound (f : Idx -> Idx) (tl : tensorlist) : tensorlist :=
+  let bound := tl_bound_varset tl in 
+  mk_tl (prod_map id f <$> tl.(tl_sums))
+    (relabel_abs (relabel_bound_Idx f bound) <$> tl.(tl_abstracts)).
+
+
+
+Fixpoint make_sums_free avoid (sums : list (Ty * Idx)) : list (Ty * Idx) :=
+  match sums with 
+  | [] => []
+  | (ty, var) :: sums' => 
+    let free_sums' := make_sums_free avoid sums' in 
+    let used := list_to_set (free_sums'.*2) in 
+    let var' := if decide (var ∈ used) then fresh_var var (avoid ∪ used) else var in 
+    (ty, var') :: free_sums'
+  end.
+
+Definition tl_dedup_sums (tl : tensorlist) : tensorlist :=
+  mk_tl (make_sums_free (tl_varset tl) (tl.(tl_sums))) (tl.(tl_abstracts)).
+
+
+Fixpoint make_sums_free' (avoid : gset Idx) (sums : list (Ty * Idx)) : 
+  list (Ty * Idx) * gset Idx :=
+  match sums with 
+  | [] => ([], ∅)
+  | (ty, var) :: sums' =>
+    let '(free_sums', used) := make_sums_free' avoid sums' in 
+    let var' :=
+      if decide (var ∈ used) then fresh_var var (avoid ∪ used) 
+        else var in 
+    ((ty, var') :: free_sums', {[var']} ∪ used)
+  end.
+
+Definition tl_dedup_sums' (tl : tensorlist) : tensorlist :=
+  mk_tl (make_sums_free' (tl_varset tl) tl.(tl_sums)).1 tl.(tl_abstracts).
+
+
+
 
 Fixpoint tl_times_aux_base_r (avoid : gset Idx)
   (labs : list (Idx * list Idx * list Idx))
@@ -1183,6 +368,205 @@ Definition tl_times_aux (avoid : gset Idx)
   tensorlist :=
   tl_times_aux_l avoid lsums labs rsums rabs (length lsums) eq_refl.
 
+Definition tl_times (l r : tensorlist) : tensorlist :=
+  let avoid := (tl_varset l) ∪ (tl_varset r) in
+  tl_times_aux avoid (l.(tl_sums)) (l.(tl_abstracts))
+    (r.(tl_sums)) (r.(tl_abstracts)).
+
+(** Converting a [tensorexpr] to a [tensorlist] *)
+
+Fixpoint tensorlist_of_tensorexpr (te : tensorexpr) : tensorlist :=
+  match te with 
+  | tone => tlone
+  | tabstract idx lower upper => mk_tl [] [(idx, lower, upper)]
+  | tproduct l r => tl_times (tensorlist_of_tensorexpr l) (tensorlist_of_tensorexpr r)
+  | tsum var ty smd => 
+    tl_cons_sum ty var (tensorlist_of_tensorexpr smd)
+  end.
+
+
+
+(* Matching on [tensorlist]s *)
+
+
+Fixpoint extend_map_of_abstract_pair (lbound rbound : gset Idx)
+  (m : gmap Idx Idx) (l r : list Idx) : option (gmap Idx Idx) :=
+  match l, r with 
+  | [], [] => Some m
+  | hl :: l, hr :: r => 
+    if decide (hl ∉ lbound) then 
+      if decide (hl = hr /\ hr ∉ rbound) then 
+        extend_map_of_abstract_pair lbound rbound m l r
+      else None
+    else
+      if decide (hr ∉ rbound) then None else
+      match m !! hl with 
+      | Some mhl => 
+        if decide (mhl = hr) then 
+          extend_map_of_abstract_pair lbound rbound m l r
+        else None
+      | None => 
+        extend_map_of_abstract_pair lbound rbound (<[hl := hr]> m) l r
+      end
+  | _, _ => None
+  end.
+
+Fixpoint extend_match_of_abstract_tensors 
+  (lbound rbound : gset Idx) (m : gmap Idx Idx)
+  (labs rabs : list (Idx * list Idx * list Idx)) : option (gmap Idx Idx) :=
+  match labs with 
+  | [] => match rabs with
+    | [] => Some m
+    | _ => None
+    end
+  | (fl, lowl, upl) :: labs => 
+    head ('((_, lowr, upr), rrest) ← list_select (fun '(fr, _, _) => fl = fr) rabs;
+      from_option (λ x, [x]) [] 
+        (m' ← extend_map_of_abstract_pair lbound rbound m lowl lowr;
+         m'' ← extend_map_of_abstract_pair lbound rbound m' upl upr;
+         extend_match_of_abstract_tensors lbound rbound m'' labs rrest)
+      )
+  end.
+
+Definition match_tensorlist (tl tl' : tensorlist) : option (gmap Idx Idx) :=
+  extend_match_of_abstract_tensors (tl_bound_varset tl) (tl_bound_varset tl')
+    ∅ (tl.(tl_abstracts)) (tl'.(tl_abstracts)).
+
+
+(** Reducing [tensorlist]s by removing unused / overridden sums
+TODO: Rename to 'reduce_tl_aux*' *)
+
+(* Extract from a tensorlist (in the auxiliary function represented by its data)
+  (1) a list of the _relevant_ sums (i.e., not overwritten by later 
+    sums _and_ appearing in the abstract terms)
+  (2) a list of the types of the irrelevant sums (i.e., those later 
+    overwritten by a sum or not used in the abstract terms)
+  (3) the set of free variables of the tensorlist *)
+Fixpoint canonify_tl_aux (sums : list (Ty * Idx)) 
+  (abs : list (Idx * list Idx * list Idx)) : 
+    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
+    list Ty * (* The types of irrelevant binders *)
+    gset Idx (* tl_free_varset (mk_tl sums abs) *) :=
+  match sums with 
+  | [] => ([], [], abstracts_vars abs) (* no sums; all vars are free *)
+  | (ty, var) :: sums => 
+    let '(sums', irrel', free') := canonify_tl_aux sums abs in 
+    if bool_decide (var ∈ free') then 
+      (* This sum is relevant! *)
+      ((ty, var) :: sums', irrel', free' ∖ {[var]})
+    else
+      (* This sum is irrelevant! *)
+      (sums', ty :: irrel', free')
+  end.
+
+Fixpoint canonify_tl_aux' (sums : list (Ty * Idx)) 
+  (abs : gset Idx) : 
+    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
+    list Ty * (* The types of irrelevant binders *)
+    gset Idx (* tl_free_varset (mk_tl sums abs) *) :=
+  match sums with 
+  | [] => ([], [], abs) (* no sums; all vars are free *)
+  | (ty, var) :: sums => 
+    let '(sums', irrel', free') := canonify_tl_aux' sums abs in 
+    if bool_decide (var ∈ free') then 
+      (* This sum is relevant! *)
+      ((ty, var) :: sums', irrel', free' ∖ {[var]})
+    else
+      (* This sum is irrelevant! *)
+      (sums', ty :: irrel', free')
+  end.
+
+
+Fixpoint canonify_tl_aux'' (sums : list (Ty * Idx)) 
+  (abs : list (Idx * list Idx * list Idx)) : 
+    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
+    list Ty * (* The types of irrelevant binders *)
+    Pset (* tl_free_varset (mk_tl sums abs) *) :=
+  match sums with 
+  | [] => ([], [], list_to_set $ encode <$> ('(_, low, up) ← abs; low ++ up)) (* no sums; all vars are free *)
+  | (ty, var) :: sums => 
+    let '(sums', irrel', free') := canonify_tl_aux'' sums abs in 
+    if bool_decide (encode var ∈ free') then 
+      (* This sum is relevant! *)
+      ((ty, var) :: sums', irrel', free' ∖ {[encode var]})
+    else
+      (* This sum is irrelevant! *)
+      (sums', ty :: irrel', free')
+  end.
+
+
+Fixpoint canonify_tl_aux''' (sums : list (Ty * Idx)) 
+  (abs : Pset) : 
+    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
+    list Ty * (* The types of irrelevant binders *)
+    Pset (* tl_free_varset (mk_tl sums abs) *) :=
+  match sums with 
+  | [] => ([], [], abs) (* no sums; all vars are free *)
+  | (ty, var) :: sums => 
+    let '(sums', irrel', free') := canonify_tl_aux''' sums abs in 
+    if bool_decide (encode var ∈ free') then 
+      (* This sum is relevant! *)
+      ((ty, var) :: sums', irrel', free' ∖ {[encode var]})
+    else
+      (* This sum is irrelevant! *)
+      (sums', ty :: irrel', free')
+  end.
+
+Definition canonify_tl (tl : tensorlist) := 
+  canonify_tl_aux tl.(tl_sums) tl.(tl_abstracts).
+
+
+
+
+
+Local Open Scope lazy_bool_scope.
+
+Definition tensorlist_eqb (tl tl' : tensorlist) : bool :=
+  let 'mk_tl sums abs := tl in 
+  let 'mk_tl sums' abs' := tl' in 
+  bool_decide (sums.*1 ≡ₚ sums'.*1) &&&
+  let '(usedsums, tys, _) := canonify_tl_aux'' sums abs in 
+  let '(usedsums', tys', _) := canonify_tl_aux'' sums' abs' in 
+  bool_decide (length tys = length tys') &&&
+  match 
+    match_tensorlist (mk_tl usedsums abs) (mk_tl usedsums' abs') with
+  | None => false
+  | Some m => 
+    let tym := tl_type_map (mk_tl usedsums abs) in 
+    let tym' := tl_type_map (mk_tl usedsums' abs') in 
+    bool_decide (map_Forall (fun v v' => 
+      tym !! v = 
+      tym' !! v') m)
+  end.
+
+
+
+
+
+
+
+Lemma tensorexpr_of_tensorlist_aux_eq_fold_right sums abs : 
+  tensorexpr_of_tensorlist_aux sums abs = 
+  fold_right (fun '(ty, var) => tsum var ty) (
+      tproducts (tabstract' <$> abs)
+    ) sums.
+Proof.
+  induction sums; [reflexivity|cbn; case_match; congruence].
+Qed.
+
+Lemma tensorexpr_of_tensorlist_eq_fold_right tl : 
+  tensorexpr_of_tensorlist tl = 
+  fold_right (fun '(ty, var) => tsum var ty) (
+      tproducts (tabstract' <$> tl.(tl_abstracts))
+    ) tl.(tl_sums).
+Proof.
+  apply tensorexpr_of_tensorlist_aux_eq_fold_right.
+Qed.
+
+
+
+
+
 
 
 Lemma tl_times_aux_l_eq_lsums avoid lsums lsums' labs rsums rabs 
@@ -1226,13 +610,6 @@ Proof.
 Qed.
 
 
-Definition abstracts_vars (abs : list (Idx * list Idx * list Idx)) : gset Idx :=
-  list_to_set (concat ((fun '(_, lower, upper) => lower ++ upper) 
-    <$> abs)).
-
-Definition tl_free_varset (tl : tensorlist) : gset Idx :=
-  (abstracts_vars tl.(tl_abstracts)) ∖ list_to_set (tl.(tl_sums).*2).
-
 Lemma tl_free_varset_correct tl : 
   tl_free_varset tl = te_free_varset tl.
 Proof.
@@ -1253,9 +630,6 @@ Proof.
 Qed.
 
 
-Definition tl_varset (tl : tensorlist) : gset Idx :=
-  (abstracts_vars tl.(tl_abstracts)) ∪ list_to_set (tl.(tl_sums).*2).
-
 Lemma tl_varset_correct tl : 
   tl_varset tl = te_varset tl.
 Proof.
@@ -1273,11 +647,6 @@ Proof.
     rewrite <- IHsums.
     set_solver.
 Qed.
-
-Definition tl_times (l r : tensorlist) : tensorlist :=
-  let avoid := (tl_varset l) ∪ (tl_varset r) in
-  tl_times_aux avoid (l.(tl_sums)) (l.(tl_abstracts))
-    (r.(tl_sums)) (r.(tl_abstracts)).
 
 
 Lemma te_bound_varset_subseteq te : 
@@ -1338,63 +707,12 @@ Proof.
 Qed.
 
 
-Definition tlone : tensorlist := mk_tl [] [].
-
-Lemma tlone_correct : tlone =@{tensorexpr} tone.
-Proof.
-  reflexivity.
-Qed.
-
-Fixpoint tensorlist_of_tensorexpr (te : tensorexpr) : tensorlist :=
-  match te with 
-  | tone => tlone
-  | tabstract idx lower upper => mk_tl [] [(idx, lower, upper)]
-  | tproduct l r => tl_times (tensorlist_of_tensorexpr l) (tensorlist_of_tensorexpr r)
-  | tsum var ty smd => 
-    tl_cons_sum ty var (tensorlist_of_tensorexpr smd)
-  end.
 
 
-Fixpoint relabel_one_until_binder (var var' : Idx) (te : tensorexpr) :=
-  match te with 
-  | tone => tone
-  | tabstract idx lower upper => 
-    tabstract idx (relabel_var var var' <$> lower)
-      (relabel_var var var' <$> upper)
-  | tproduct l r => 
-    tproduct (relabel_one_until_binder var var' l) 
-      (relabel_one_until_binder var var' r)
-  | tsum reg ty smd => 
-    if decide (reg = var) then tsum reg ty smd 
-      else tsum reg ty (relabel_one_until_binder var var' smd)
-  end.
 
 
-Fixpoint make_sums_free avoid (sums : list (Ty * Idx)) : list (Ty * Idx) :=
-  match sums with 
-  | [] => []
-  | (ty, var) :: sums' => 
-    let free_sums' := make_sums_free avoid sums' in 
-    let used := list_to_set (free_sums'.*2) in 
-    let var' := if decide (var ∈ used) then fresh_var var (avoid ∪ used) else var in 
-    (ty, var') :: free_sums'
-  end.
-
-Definition tl_dedup_sums (tl : tensorlist) : tensorlist :=
-  mk_tl (make_sums_free (tl_varset tl) (tl.(tl_sums))) (tl.(tl_abstracts)).
 
 
-Definition tl_bound_varset (tl : tensorlist) : gset Idx :=
-  list_to_set tl.(tl_sums).*2.
-
-Definition relabel_abs (f : Idx -> Idx) (abs : Idx * list Idx * list Idx) :=
-  let '(idx, lower, upper) := abs in 
-  (idx, f <$> lower, f <$> upper).
-
-Definition relabel_tl_bound (f : Idx -> Idx) (tl : tensorlist) : tensorlist :=
-  let bound := tl_bound_varset tl in 
-  mk_tl (prod_map id f <$> tl.(tl_sums))
-    (relabel_abs (relabel_bound_Idx f bound) <$> tl.(tl_abstracts)).
 
 Lemma te_bound_varset_tproducts tes : 
   te_bound_varset (tproducts tes) = 
@@ -1434,24 +752,6 @@ Proof.
   apply Hx.
 Qed.
 
-Lemma tensorexpr_of_tensorlist_aux_eq_fold_right sums abs : 
-  tensorexpr_of_tensorlist_aux sums abs = 
-  fold_right (fun '(ty, var) => tsum var ty) (
-      tproducts (tabstract' <$> abs)
-    ) sums.
-Proof.
-  induction sums; [reflexivity|cbn; case_match; congruence].
-Qed.
-
-
-Lemma tensorexpr_of_tensorlist_eq_fold_right tl : 
-  tensorexpr_of_tensorlist tl = 
-  fold_right (fun '(ty, var) => tsum var ty) (
-      tproducts (tabstract' <$> tl.(tl_abstracts))
-    ) tl.(tl_sums).
-Proof.
-  apply tensorexpr_of_tensorlist_aux_eq_fold_right.
-Qed.
 
 Lemma helper_relabel_bound_aux_tl f bound sums abs :
   relabel_bound_aux f bound (mk_tl sums abs) = 
@@ -1494,9 +794,6 @@ Proof.
   reflexivity.
 Qed.
 
-Definition tensorlist_perm_eq (tl tl' : tensorlist) :=
-  tl.(tl_sums) ≡ₚ tl'.(tl_sums) /\
-  tl.(tl_abstracts) ≡ₚ tl'.(tl_abstracts).
 
 
 
@@ -1823,48 +1120,6 @@ Qed.
 
 
 
-Fixpoint extend_map_of_abstract_pair (lbound rbound : gset Idx)
-  (m : gmap Idx Idx) (l r : list Idx) : option (gmap Idx Idx) :=
-  match l, r with 
-  | [], [] => Some m
-  | hl :: l, hr :: r => 
-    if decide (hl ∉ lbound) then 
-      if decide (hl = hr /\ hr ∉ rbound) then 
-        extend_map_of_abstract_pair lbound rbound m l r
-      else None
-    else
-      if decide (hr ∉ rbound) then None else
-      match m !! hl with 
-      | Some mhl => 
-        if decide (mhl = hr) then 
-          extend_map_of_abstract_pair lbound rbound m l r
-        else None
-      | None => 
-        extend_map_of_abstract_pair lbound rbound (<[hl := hr]> m) l r
-      end
-  | _, _ => None
-  end.
-
-Fixpoint extend_match_of_abstract_tensors 
-  (lbound rbound : gset Idx) (m : gmap Idx Idx)
-  (labs rabs : list (Idx * list Idx * list Idx)) : option (gmap Idx Idx) :=
-  match labs with 
-  | [] => match rabs with
-    | [] => Some m
-    | _ => None
-    end
-  | (fl, lowl, upl) :: labs => 
-    head ('((_, lowr, upr), rrest) ← list_select (fun '(fr, _, _) => fl = fr) rabs;
-      from_option (λ x, [x]) [] 
-        (m' ← extend_map_of_abstract_pair lbound rbound m lowl lowr;
-         m'' ← extend_map_of_abstract_pair lbound rbound m' upl upr;
-         extend_match_of_abstract_tensors lbound rbound m'' labs rrest)
-      )
-  end.
-
-Definition match_tensorlist (tl tl' : tensorlist) : option (gmap Idx Idx) :=
-  extend_match_of_abstract_tensors (tl_bound_varset tl) (tl_bound_varset tl')
-    ∅ (tl.(tl_abstracts)) (tl'.(tl_abstracts)).
 
 
 Lemma extend_map_of_abstract_pair_dom_img_strong {lbound rbound m l r m'} : 
@@ -2269,8 +1524,6 @@ Proof.
   apply (extend_match_of_abstract_tensors_dom' Heq Hdom).
 Qed.
 
-Definition tl_used_varset (tl : tensorlist) : gset Idx :=
-  abstracts_vars tl.(tl_abstracts).
 
 Lemma match_tensorlist_spec_aux_dom {m tl tl'} : 
   match_tensorlist tl tl' = Some m ->
@@ -2373,18 +1626,8 @@ Proof.
 Qed.
 
 
-Definition tl_used_bound_vars tl : list (Ty * Idx) :=
-  filter (λ x, x.2 ∈ tl_used_varset tl) tl.(tl_sums).
-
-Definition tl_unused_bound_vars tl : list (Ty * Idx) :=
-  filter (λ x, x.2 ∉ tl_used_varset tl) tl.(tl_sums).
 
 
-Fixpoint tl_app_sums sums tl :=
-  match sums with 
-  | [] => tl
-  | (ty, var) :: sums => tl_cons_sum ty var (tl_app_sums sums tl)
-  end.
 
 Lemma tl_app_sums_eq_fold sums tl :
   tl_app_sums sums tl = fold_right (uncurry tl_cons_sum) tl sums.
@@ -2475,14 +1718,6 @@ Proof.
   apply filter_neg_with_Permutation.
 Qed.
 
-Definition tl_cons_unused_sum ty (tl : tensorlist) : tensorlist :=
-  tl_cons_sum ty (fresh (tl_used_varset tl)) tl.
-
-Fixpoint tl_app_unused_sums (tys : list Ty) (tl : tensorlist) : tensorlist :=
-  match tys with 
-  | [] => tl
-  | ty :: tys => tl_cons_unused_sum ty (tl_app_unused_sums tys tl)
-  end.
 
 Lemma tl_app_unused_sums_abstracts tys tl : 
   (tl_app_unused_sums tys tl).(tl_abstracts) = tl.(tl_abstracts).
@@ -2545,8 +1780,6 @@ Local Notation NoDup_vars tl := (NoDup tl.(tl_sums).*2) (only parsing).
 
 
 
-Definition tl_type_map (tl : tensorlist) : gmap Idx Ty :=
-  list_to_map (prod_swap <$> reverse tl.(tl_sums)).
 
 Lemma lookup_tl_type_map_Some tl var ty : 
   NoDup_vars tl ->
@@ -2721,7 +1954,7 @@ Proof.
     fmap_app, NoDup_app in Hdup'; apply Hdup').
   eassert (Hndm : _) by 
   now eapply (match_tensorlist_correct_aux_map_NoDup_prod_map tl m); eauto.
-  apply NoDup_equiv_Permutation; 
+  apply NoDup_Permutation; 
   [now apply NoDup_fmap_1 in Hndm|now apply NoDup_fmap_1 in Hudup'|].
   intros [ty var].
   rewrite elem_of_list_fmap_prod_map.
@@ -2830,7 +2063,7 @@ Lemma elements_tl_bound_used_varset tl :
   elements (tl_bound_varset tl ∩ tl_used_varset tl) ≡ₚ (tl_used_bound_vars tl).*2.
 Proof.
   intros Hdup.
-  apply NoDup_equiv_Permutation; [apply NoDup_elements| 
+  apply NoDup_Permutation; [apply NoDup_elements| 
   rewrite tl_sums_used_unused_decomp, fmap_app, NoDup_app in Hdup; apply Hdup|].
   intros x.
   now rewrite elem_of_vars_tl_used_bound_vars, elem_of_elements.
@@ -2841,7 +2074,7 @@ Lemma elements_tl_bound_unused_varset tl :
   elements (tl_bound_varset tl ∖ tl_used_varset tl) ≡ₚ (tl_unused_bound_vars tl).*2.
 Proof.
   intros Hdup.
-  apply NoDup_equiv_Permutation; [apply NoDup_elements| 
+  apply NoDup_Permutation; [apply NoDup_elements| 
   rewrite tl_sums_used_unused_decomp, fmap_app, NoDup_app in Hdup; apply Hdup|].
   intros x.
   now rewrite elem_of_vars_tl_unused_bound_vars, elem_of_elements.
@@ -2962,17 +2195,6 @@ Qed.
 
 
 
-Fixpoint make_sums_free' (avoid : gset Idx) (sums : list (Ty * Idx)) : 
-  list (Ty * Idx) * gset Idx :=
-  match sums with 
-  | [] => ([], ∅)
-  | (ty, var) :: sums' =>
-    let '(free_sums', used) := make_sums_free' avoid sums' in 
-    let var' :=
-      if decide (var ∈ used) then fresh_var var (avoid ∪ used) 
-        else var in 
-    ((ty, var') :: free_sums', {[var']} ∪ used)
-  end.
 
 Lemma make_sums_free'_spec avoid sums : 
   list_to_set sums.*2 ⊆ avoid ->
@@ -2986,9 +2208,6 @@ Proof.
   rewrite IHsums.
   reflexivity.
 Qed.
-
-Definition tl_dedup_sums' (tl : tensorlist) : tensorlist :=
-  mk_tl (make_sums_free' (tl_varset tl) tl.(tl_sums)).1 tl.(tl_abstracts).
 
 Lemma tl_dedup_sums'_correct tl : 
   tl_dedup_sums' tl = tl_dedup_sums tl.
@@ -3027,84 +2246,6 @@ Qed.
 
 
 
-(* Extract from a tensorlist (in the auxiliary function represented by its data)
-  (1) a list of the _relevant_ sums (i.e., not overwritten by later 
-    sums _and_ appearing in the abstract terms)
-  (2) a list of the types of the irrelevant sums (i.e., those later 
-    overwritten by a sum or not used in the abstract terms)
-  (3) the set of free variables of the tensorlist *)
-Fixpoint canonify_tl_aux (sums : list (Ty * Idx)) 
-  (abs : list (Idx * list Idx * list Idx)) : 
-    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
-    list Ty * (* The types of irrelevant binders *)
-    gset Idx (* tl_free_varset (mk_tl sums abs) *) :=
-  match sums with 
-  | [] => ([], [], abstracts_vars abs) (* no sums; all vars are free *)
-  | (ty, var) :: sums => 
-    let '(sums', irrel', free') := canonify_tl_aux sums abs in 
-    if bool_decide (var ∈ free') then 
-      (* This sum is relevant! *)
-      ((ty, var) :: sums', irrel', free' ∖ {[var]})
-    else
-      (* This sum is irrelevant! *)
-      (sums', ty :: irrel', free')
-  end.
-
-Fixpoint canonify_tl_aux' (sums : list (Ty * Idx)) 
-  (abs : gset Idx) : 
-    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
-    list Ty * (* The types of irrelevant binders *)
-    gset Idx (* tl_free_varset (mk_tl sums abs) *) :=
-  match sums with 
-  | [] => ([], [], abs) (* no sums; all vars are free *)
-  | (ty, var) :: sums => 
-    let '(sums', irrel', free') := canonify_tl_aux' sums abs in 
-    if bool_decide (var ∈ free') then 
-      (* This sum is relevant! *)
-      ((ty, var) :: sums', irrel', free' ∖ {[var]})
-    else
-      (* This sum is irrelevant! *)
-      (sums', ty :: irrel', free')
-  end.
-
-
-Fixpoint canonify_tl_aux'' (sums : list (Ty * Idx)) 
-  (abs : list (Idx * list Idx * list Idx)) : 
-    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
-    list Ty * (* The types of irrelevant binders *)
-    Pset (* tl_free_varset (mk_tl sums abs) *) :=
-  match sums with 
-  | [] => ([], [], list_to_set $ encode <$> ('(_, low, up) ← abs; low ++ up)) (* no sums; all vars are free *)
-  | (ty, var) :: sums => 
-    let '(sums', irrel', free') := canonify_tl_aux'' sums abs in 
-    if bool_decide (encode var ∈ free') then 
-      (* This sum is relevant! *)
-      ((ty, var) :: sums', irrel', free' ∖ {[encode var]})
-    else
-      (* This sum is irrelevant! *)
-      (sums', ty :: irrel', free')
-  end.
-
-
-Fixpoint canonify_tl_aux''' (sums : list (Ty * Idx)) 
-  (abs : Pset) : 
-    list (Ty * Idx) * (* The relevent (used and non-overwritten) sums *)
-    list Ty * (* The types of irrelevant binders *)
-    Pset (* tl_free_varset (mk_tl sums abs) *) :=
-  match sums with 
-  | [] => ([], [], abs) (* no sums; all vars are free *)
-  | (ty, var) :: sums => 
-    let '(sums', irrel', free') := canonify_tl_aux''' sums abs in 
-    if bool_decide (encode var ∈ free') then 
-      (* This sum is relevant! *)
-      ((ty, var) :: sums', irrel', free' ∖ {[encode var]})
-    else
-      (* This sum is irrelevant! *)
-      (sums', ty :: irrel', free')
-  end.
-
-Definition canonify_tl (tl : tensorlist) := 
-  canonify_tl_aux tl.(tl_sums) tl.(tl_abstracts).
 
 Lemma canonify_tl_aux_spec sums abs : 
   canonify_tl_aux sums abs = 
@@ -3424,25 +2565,6 @@ Proof.
 Qed.
 
 
-Local Open Scope lazy_bool_scope.
-
-Definition tensorlist_eqb (tl tl' : tensorlist) : bool :=
-  let 'mk_tl sums abs := tl in 
-  let 'mk_tl sums' abs' := tl' in 
-  bool_decide (sums.*1 ≡ₚ sums'.*1) &&&
-  let '(usedsums, tys, _) := canonify_tl_aux'' sums abs in 
-  let '(usedsums', tys', _) := canonify_tl_aux'' sums' abs' in 
-  bool_decide (length tys = length tys') &&&
-  match 
-    match_tensorlist (mk_tl usedsums abs) (mk_tl usedsums' abs') with
-  | None => false
-  | Some m => 
-    let tym := tl_type_map (mk_tl usedsums abs) in 
-    let tym' := tl_type_map (mk_tl usedsums' abs') in 
-    bool_decide (map_Forall (fun v v' => 
-      tym !! v = 
-      tym' !! v') m)
-  end.
 
 
 
@@ -3612,21 +2734,6 @@ Notation "var : 'V' ty ; smd" :=
     smd custom tensorexpr at level 60,
     right associativity).
 
-(* Notation "smd" :=
-  (smd) 
-  (in custom tensorexpr_sum at level 0, 
-    smd custom tensorexpr at level 60,
-    right associativity). *)
-
-(* 
-Notation "∑ var :: 'V' ty , smd" :=
-  (tsum var ty smd) 
-  (in custom tensorexpr at level 60, 
-    ty constr at level 0,
-    var constr at level 0,
-    smd custom tensorexpr at level 60,
-    right associativity, only printing). *)
-
 Notation "1" := tone 
   (in custom tensorexpr at level 0).
 
@@ -3638,7 +2745,7 @@ Declare Custom Entry tensorlist.
 
 Declare Custom Entry tensorlist_summand.
 
-Notation "var : 'V' ty" :=
+Notation "var  :  'V'  ty" :=
   ((ty, var))
   (in custom tensorlist_summand at level 10,
     ty constr at level 0,
@@ -3649,21 +2756,12 @@ Declare Custom Entry tensorlist_abstracts.
 Declare Custom Entry tensorlist_abstract.
 
 
-Notation "f lower upper" :=
+Notation "f  lower  upper" :=
   (f, lower, upper)
   (in custom tensorlist_abstract at level 10, 
     f custom string at level 0,
     lower custom tensorexpr_args at level 0,
     upper custom tensorexpr_args at level 0).
-
-
-Notation "f @ lower upper" :=
-  (f, lower, upper)
-  (in custom tensorlist_abstract at level 10, 
-    f constr,
-    lower custom tensorexpr_args at level 0,
-    upper custom tensorexpr_args at level 0, only printing).
-
 
 Notation "x  *  ..  *  y" :=
   (cons x .. (cons y nil) ..)
@@ -3689,1789 +2787,3 @@ Notation "'[tl' x ']'" := x
 
 
 End TensorExprNotations.
-
-
-
-
-
-Section TensorExprSemantics.
-
-
-Import Relation_Definitions.
-
-Import Setoid.
-
-Context `{SR : SemiRing R rO rI radd rmul req}.
-
-Notation "0" := rO.
-Notation "1" := rI.
-Notation "x '==' y" := (req x y) (at level 70). 
-Infix "+" := radd. 
-Infix "*" := rmul.
-
-Add Ring R : SR.(RSRth)
-  (setoid SR.(Req_equiv) SR.(Req_ext)).
-
-Let Req_equivalence : Equivalence req := Req_equiv.
-Local Existing Instance Req_equivalence.
-
-Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
-Local Existing Instance Radd_proper.
-
-Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
-Local Existing Instance Rmul_proper.
-
-
-Context (V : Ty -> Type).
-Context `{Vsum : forall n, Summable (V n)}.
-
-Existing Instance Vsum.
-
-Fixpoint V_n_args (args : list Ty) (A : Type) : Type :=
-  match args with 
-  | [] => A
-  | n :: args => V n -> V_n_args args A
-  end.
-
-(* A bundled function with its argument types *)
-Definition Vfunc := {args : list Ty & V_n_args args R}.
-
-Definition Vval := {n : Ty & V n}.
-
-Definition Vval_get (n : Ty) (v : Vval) : option (V n) :=
-  match v with 
-  | existT n' val => 
-    match decide (n = n') with 
-    | left H => Some (eq_rect_r V val H)
-    | right _ => None
-    end
-  end.
-
-Definition Vconst (f : Vfunc) : option R :=
-  match f with 
-  | existT [] c => Some c
-  | existT _ _ => None
-  end.
-
-Definition Vapply (f : Vfunc) (v : Vval) : option Vfunc :=
-  match f with 
-  | existT (n :: args) f => 
-      (fun v => existT (P:=fun a => V_n_args a R) args (f v)) <$> (Vval_get n v)
-  | existT [] _ => None
-  end.
-
-Fixpoint Vapplys (f : Vfunc) (vs : list Vval) : option R :=
-  match vs with 
-  | [] => Vconst f
-  | v :: vs => 
-      f ← Vapply f v;
-      Vapplys f vs
-  end.
-
-
-
-
-Definition varcontext := gmap Idx Vval.
-
-Definition vartypecontext := gmap Idx Ty.
-
-Definition vartype_of_var_context (vars : varcontext) : vartypecontext :=
-  projT1 <$> vars.
-
-Definition abscontext := gmap string Vfunc.
-
-Definition abstypecontext := gmap string (list Ty).
-
-Definition abstype_of_abs_context (abs : abscontext) : abstypecontext :=
-  projT1 <$> abs.
-
-Coercion vartype_of_var_context : varcontext >-> vartypecontext.
-Coercion abstype_of_abs_context : abscontext >-> abstypecontext.
-
-
-Definition mk_Vval {n} (v : V n) : Vval := existT n v.
-
-(* TODO: Extract (and remove?) *)
-Fixpoint well_typed (abs : abstypecontext) (types : vartypecontext) 
-  (te : tensorexpr) : bool :=
-  match te with 
-  | tone => true
-  | tabstract absidx lower upper =>
-    match abs !! absidx with 
-    | None => false
-    | Some args => bool_decide (Some <$> args = ((types !!.) <$> (lower ++ upper)))
-    end
-  | tproduct l r => well_typed abs types l && well_typed abs types r
-  | tsum var ty summand => 
-    well_typed abs (<[var := ty]> types) summand
-  end.
-
-
-Fixpoint semantics (abs : abscontext) (vars : varcontext) 
-  (te : tensorexpr) : option R :=
-  match te with 
-  | tone => Some rI
-  | tabstract absidx lower upper =>
-      args ← join_list ((vars !!.) <$> (lower ++ upper));
-      fval ← abs !! absidx;
-      Vapplys fval args
-  | tproduct l r => 
-      lval ← semantics abs vars l;
-      rval ← semantics abs vars r;
-      Some (rmul lval rval)
-  | tsum v n summand =>
-      Some (sum_of (fun x : V n => 
-        default rO (semantics abs (<[v := mk_Vval x]> vars) summand)))
-  end.
-
-Definition abstract_semantics (abs : abscontext) (vars : varcontext)
-  (absidx : Idx) (lower : list Idx) (upper : list Idx) : R :=
-  default rO (args ← join_list ((vars !!.) <$> (lower ++ upper));
-      fval ← abs !! absidx;
-      Vapplys fval args).
-
-
-Lemma abstract_semantics_ext abs vars abs' vars' 
-  idx lower upper idx' lower' upper' :
-  abs !! idx = abs' !! idx' -> 
-  (vars !!.) <$> (lower ++ upper) = (vars' !!.) <$> (lower' ++ upper') ->
-  abstract_semantics abs vars idx lower upper = 
-  abstract_semantics abs' vars' idx' lower' upper'.
-Proof.
-  intros Hidx Hargs.
-  unfold abstract_semantics.
-  now rewrite Hidx, Hargs.
-Qed.
-
-Fixpoint total_semantics (abs : abscontext) (vars : varcontext) (te : tensorexpr) : R :=
-  match te with 
-  | tone => rI
-  | tabstract absidx lower upper =>
-      abstract_semantics abs vars absidx lower upper
-  | tproduct l r => 
-      rmul (total_semantics abs vars l) (total_semantics abs vars r)
-  | tsum v n summand => 
-      sum_of (fun x : V n => 
-        total_semantics abs (<[v := mk_Vval x]> vars) summand)
-  end.
-
-
-Definition tl_total_semantics abs vars (tl : tensorlist) : R :=
-  total_semantics abs vars (tensorexpr_of_tensorlist tl).
-
-Lemma Vconst_is_Some (f : Vfunc) : is_Some (Vconst f) <-> projT1 f = [].
-Proof.
-  unfold Vconst.
-  destruct f as [args f].
-  cbn.
-  destruct args; split; easy || now intros ?%is_Some_None.
-Qed.
-
-Lemma Vval_get_is_Some n (v : Vval) : is_Some (Vval_get n v) <-> 
-  projT1 v = n.
-Proof.
-  unfold Vval_get.
-  destruct v as [n' v].
-  cbn.
-  case_decide; try subst; try easy;
-  split; [now intros ?%is_Some_None|congruence].
-Qed.
-
-Arguments Vval_get : simpl never.
-
-Lemma Vapply_is_Some f v : is_Some (Vapply f v) <->
-  head (projT1 f) = Some (projT1 v).
-Proof.
-  unfold Vapply.
-  destruct f as [args f], v as [n v].
-  cbn.
-  destruct args; [split; cbn; easy || now intros ?%is_Some_None|].
-  rewrite fmap_is_Some, Vval_get_is_Some.
-  cbn.
-  firstorder congruence.
-Qed.
-
-Lemma Vapplys_is_Some f vs : is_Some (Vapplys f vs) <-> 
-  projT1 f = projT1 <$> vs.
-Proof.
-  destruct f as [args f].
-  cbn.
-  revert f vs; induction args as [|arg args IHargs]; intros f vs.
-  - destruct vs; split; now try intros ?%is_Some_None.
-  - destruct vs; [split; now try intros ?%is_Some_None|].
-    cbn.
-    rewrite option_fmap_bind.
-    unfold compose.
-    rewrite bind_is_Some, Vval_get_is_Some.
-    setoid_rewrite IHargs.
-    split.
-    + intros [Hproj Hargs].
-      rewrite <- Hproj.
-      apply Vval_get_is_Some in Hproj.
-      destruct Hproj as [? ?].
-      f_equal; eauto.
-    + now intros [= Harg Hargs].
-Qed.
-
-Lemma wt_abstract_is_Some (vars : varcontext) (abs : abscontext) absidx lower upper :
-  well_typed abs vars (tabstract absidx lower upper) = true ->
-  is_Some (semantics abs vars (tabstract absidx lower upper)).
-Proof.
-  cbn.
-  unfold abstype_of_abs_context, vartype_of_var_context.
-  setoid_rewrite lookup_fmap.
-  fold Vval Vfunc abscontext varcontext.
-  destruct (abs !! absidx) as [f|] eqn:Hfeq; [|easy].
-  cbn.
-  rewrite bool_decide_eq_true.
-  generalize (lower ++ upper) as args.
-  clear lower upper.
-  intros args.
-  intros Hfargs.
-  rewrite bind_is_Some.
-  split.
-  - rewrite join_list_is_Some.
-    rewrite elem_of_list_fmap.
-    intros (var & Hvar%eq_sym & Hvar_args).
-    apply elem_of_list_lookup_1 in Hvar_args as Hvar'.
-    destruct Hvar' as [i Hi].
-    apply (f_equal (.!! i)) in Hfargs as Hfi.
-    revert Hfi.
-    rewrite 2 list_lookup_fmap, Hi.
-    cbn.
-    setoid_rewrite lookup_fmap.
-    setoid_rewrite Hvar.
-    cbn.
-    destruct (projT1 f !! i) as [fi|] eqn:Hfi; [easy|].
-    assert (Hi' : is_Some (args !! i)) by now rewrite Hi.
-    assert (Hfi' : ~ is_Some (projT1 f !! i)) by now rewrite Hfi; intros ?%is_Some_None.
-    rewrite lookup_lt_is_Some in Hi'.
-    setoid_rewrite lookup_lt_is_Some in Hfi'.
-    specialize (f_equal length Hfargs).
-    simpl_list.
-    lia.
-  - intros argvs.
-    rewrite join_list_Some.
-    intros Hargvs.
-    rewrite Vapplys_is_Some.
-    eapply list_eq_same_length; [|reflexivity|].
-    1: {
-      specialize (f_equal length Hfargs).
-      specialize (f_equal length Hargvs).
-      simpl_list.
-      now intros ->.
-    }
-    intros i fi argin Hi Hfi.
-    rewrite list_lookup_fmap.
-    rewrite fmap_Some.
-    intros (argvi & Hargvi & ->).
-    apply (f_equal (.!! i)) in Hargvs as Hargi.
-    rewrite 2 list_lookup_fmap in Hargi.
-    setoid_rewrite Hargvi in Hargi.
-    cbn in Hargi.
-    apply fmap_Some in Hargi as (argi & Hargi & Hvars_argi).
-    apply (f_equal (.!! i)) in Hfargs as Hfi'.
-    rewrite 2 list_lookup_fmap in Hfi'.
-    rewrite Hfi in Hfi'.
-    rewrite Hargi in Hfi'.
-    cbn in Hfi'.
-    apply (inj Some) in Hfi'.
-    setoid_rewrite lookup_fmap in Hfi'.
-    setoid_rewrite <- Hvars_argi in Hfi'.
-    cbn in Hfi'.
-    congruence.
-Qed.
-
-Lemma wt_semantics_is_Some (vars : varcontext) (abs : abscontext) te : 
-  well_typed abs vars te = true ->
-  is_Some (semantics abs vars te).
-Proof.
-  revert vars; induction te; intros vars.
-  - easy.
-  - apply wt_abstract_is_Some.
-  - cbn.
-    rewrite andb_true_iff.
-    intros [Hl%IHte1 Hr%IHte2].
-    destruct Hl as [? ->].
-    destruct Hr as [? ->].
-    easy.
-  - now destruct reg.
-Qed.
-
-
-Lemma total_semantics_spec abs vars te : 
-  total_semantics abs vars te == default rO (semantics abs vars te).
-Proof.
-  revert vars; induction te; intros vars; [reflexivity|reflexivity|cbn..].
-  - rewrite IHte1, IHte2.
-    destruct (semantics abs vars te1) as [tv1|],
-      (semantics abs vars te2) as [tv2|]; cbn; ring. 
-  - apply sum_of_ext.
-    intros x.
-    apply IHte.
-Qed.
-
-Definition teq : relation tensorexpr :=
-  fun te1 te2 => forall abs vars, 
-  total_semantics abs vars te1 == total_semantics abs vars te2.
-
-Lemma teq_refl : Reflexive teq.
-Proof. easy. Qed.
-
-Lemma teq_symm : Symmetric teq.
-Proof. easy. Qed.
-
-Lemma teq_trans : Transitive teq.
-Proof. 
-  unfold teq. 
-  pose proof (Req_equivalence.(Equivalence_Transitive)) as ?. 
-  eauto.
-Qed.
-
-#[global]
-Add Parametric Relation : tensorexpr teq
-  reflexivity proved by teq_refl
-  symmetry proved by teq_symm
-  transitivity proved by teq_trans
-  as teq_setoid.
-
-Infix "=t=" := teq (at level 70).
-
-
-Add Parametric Morphism : tproduct with signature
-  teq ==> teq ==> teq as tproduct_mor.
-Proof.
-  intros l l' Hl r r' Hr abs vars.
-  cbn.
-  f_equiv; [apply Hl|apply Hr].
-Qed.
-
-Add Parametric Morphism var ty : (tsum var ty) with signature
-  teq ==> teq as tsum_mor.
-Proof.
-  intros smd smd' Hsmd abs vars.
-  cbn.
-  f_equiv; intros x.
-  apply Hsmd.
-Qed.
-
-Lemma tproduct_tone_l te : teq (tproduct tone te) te.
-Proof.
-  intros abs vars; cbn; ring.
-Qed.
-
-Lemma tproduct_tone_r te : teq (tproduct te tone) te.
-Proof.
-  intros abs vars; cbn; ring.
-Qed.
-
-Lemma tproduct_assoc te1 te2 te3 : 
-  teq (tproduct te1 (tproduct te2 te3))
-  (tproduct (tproduct te1 te2) te3).
-Proof.
-  intros abs vars; cbn; ring.
-Qed.
-
-Lemma tproduct_comm te1 te2 : 
-  teq (tproduct te1 te2)
-    (tproduct te2 te1).
-Proof.
-  intros abs vars; cbn; ring.
-Qed.
-
-
-Add Parametric Morphism : tproducts with signature
-  Permutation ==> teq as tproducts_perm_mor.
-Proof.
-  intros tes tes' Hperm.
-  induction Hperm; [reflexivity|..|etransitivity; eauto].
-  - cbn; now f_equiv.
-  - cbn.
-    rewrite 2 tproduct_assoc.
-    f_equiv.
-    apply tproduct_comm.
-Qed.
-
-
-Add Parametric Relation : tensorlist tensorlist_perm_eq 
-  reflexivity proved by ltac:(split; reflexivity)
-  symmetry proved by ltac:(unfold tensorlist_perm_eq; split; now symmetry)
-  transitivity proved by ltac:(unfold tensorlist_perm_eq; intros ???[][];
-     split; etransitivity; eauto)
-  as tensorlist_perm_eq_setoid.
-
-Add Parametric Morphism : abstracts_vars with signature
-  Permutation ==> eq as abstracts_vars_perm_mor.
-Proof.
-  unfold abstracts_vars.
-  now intros ? ? ->.
-Qed.
-
-Add Parametric Morphism : tl_free_varset with signature
-  tensorlist_perm_eq ==> eq as tl_free_varset_perm_mor.
-Proof.
-  intros tl tl' [Hsums Habs].
-  unfold tl_free_varset.
-  now rewrite Hsums, Habs.
-Qed.
-
-Add Parametric Morphism : tl_bound_varset with signature
-  tensorlist_perm_eq ==> eq as tl_bound_varset_perm_mor.
-Proof.
-  intros tl tl' [Hsums Habs].
-  unfold tl_bound_varset.
-  now rewrite Hsums.
-Qed.
-
-Add Parametric Morphism : tl_varset with signature
-  tensorlist_perm_eq ==> eq as tl_varset_perm_mor.
-Proof.
-  intros tl tl' [Hsums Habs].
-  unfold tl_varset.
-  now rewrite Hsums, Habs.
-Qed.
-
-
-(* 
-(* A generic function for constructing a value by traversing a tensorexpr, 
-  keeping some state as we go. Products are processed left-to-right *)
-Fixpoint traverse_te_gen {A B : Type}
-  (on_abs : A -> Idx -> list typedvar -> list typedvar -> A * B)
-    (* From state A, process an abstract tensor *)
-  (on_prod : A -> B -> B -> A * B)
-    (* From state A _after having processed the left and right multiplicands_,
-      process a product *)
-  (on_sum_register : A -> typedvar -> A)
-    (* From state A, get a new state based on the summed register *)
-  (on_sum : A * B -> A * B)
-    (* *)
-  (state : A) (te : tensorexpr) : A * B :=
-  match te with 
-  | tabstract idx lower upper => on_abs state idx lower upper
-  | tproduct l r => 
-    let '(state, lB) := traverse_te_gen on_abs on_prod on_sum_register state l in 
-    let '(state, rB) := traverse_te_gen on_abs on_prod on_sum_register state r in 
-    on_prod state lB rB
-  | tsum reg summand => 
-    let state := on_sum_register state reg in 
-    traverse_te_gen on_abs on_prod on_sum_register state summand
-
-
-(* A generic function for traversing a tensorexpr, keeping some state as we go *)
-Fixpoint traverse_te_gen {A : Type} 
-  (add_binder : A -> typedvar -> A) 
-  (add_lower : A -> typedvar -> A)
-  (add_upper : A -> typedvar -> A)
-  (add_abstract : A -> Idx -> A)
-  () *)
-
-
-Lemma total_semantics_absset_indep abs abs' vars
-  te :
-  (forall a, a ∈ te_absset te -> abs !! a = abs' !! a) ->
-  total_semantics abs vars te == total_semantics abs' vars te.
-Proof.
-  revert vars; induction te; cbn; intros var Habs.
-  - easy.
-  - unfold abstract_semantics; now rewrite Habs by now clear; set_solver.
-  - f_equiv; [apply IHte1 | apply IHte2]; intros ? Hmem; apply Habs;
-    clear -Hmem; set_solver.
-  - apply sum_of_ext; intros x.
-    apply IHte.
-    easy.
-Qed.
-
-Lemma total_semantics_free_varset_indep abs vars vars' te :
-  (forall v, v ∈ te_free_varset te -> vars !! v = vars' !! v) -> 
-  total_semantics abs vars te == total_semantics abs vars' te.
-Proof.
-  revert vars vars'; induction te; intros vars vars' Hvar.
-  - reflexivity.
-  - cbn in *.
-    (* setoid_rewrite elem_of_singleton in Habs. *)
-    setoid_rewrite elem_of_list_to_set in Hvar.
-    unfold abstract_semantics.
-    f_equiv.
-    do 2 f_equal.
-    apply map_ext_in.
-    intros a Ha%elem_of_list_In%Hvar.
-    now destruct a.
-  - cbn in *.
-    f_equiv;
-    [apply IHte1 | apply IHte2]; 
-    intros; apply Hvar;
-    [now apply elem_of_union_l | now apply elem_of_union_r].
-  - cbn in *.
-    apply sum_of_ext.
-    intros x.
-    apply IHte.
-    intros v Hv.
-    destruct_decide (decide (v = reg)) as Htveq.
-    + subst.
-      cbn.
-      now simpl_map.
-    + specialize (Hvar v ltac:(set_solver)).
-      cbn.
-      setoid_rewrite lookup_insert_ne; [|easy..].
-      easy.
-Qed.
-
-Lemma te_relabel_semantics abs vars vars' f te : 
-  (forall v, v ∈ te_varset te -> vars !! v = vars' !! (f v)) -> 
-  (forall v v', v ∈ te_varset te -> v' ∈ te_varset te ->
-    f v = f v' -> v = v') ->
-  (* (forall tv, tv ∈ te_varset te -> (f tv).1 = tv.1) ->  *)
-  total_semantics abs vars' (relabel_te f te) ==
-  total_semantics abs vars te.
-Proof. 
-  revert vars vars'; induction te; intros vars vars' Hvar Hfinj.
-  - reflexivity.
-  - cbn in *.
-    (* setoid_rewrite elem_of_singleton in Habs. *)
-    setoid_rewrite elem_of_list_to_set in Hvar.
-    unfold abstract_semantics.
-    f_equiv.
-    do 2 f_equal.
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext.
-    intros i a Ha%elem_of_list_lookup_2%Hvar.
-    cbn; now rewrite Ha.
-  - cbn in *.
-    f_equiv;
-    (apply IHte1 || apply IHte2);
-    intros; (apply Hvar || apply Hfinj);
-    now (assumption + apply elem_of_union_l + apply elem_of_union_r).
-  - cbn in *.
-    apply sum_of_ext.
-    intros x.
-    apply IHte; [|intros ? ? Hm1 Hm2; apply Hfinj; clear -Hm1 Hm2; set_solver].
-    intros v Hv.
-    destruct_decide (decide (reg = v)) as Hvreg.
-    + subst.
-      now setoid_rewrite lookup_insert.
-    + setoid_rewrite lookup_insert_ne; [apply Hvar; clear -Hv; set_solver|easy|].
-      intros Hfeq; apply Hvreg.
-      revert Hfeq.
-      apply Hfinj; clear -Hv; set_solver.
-Qed.
-
-
-Lemma te_relabel_bound_aux_semantics abs vars vars' f te bound :
-  (forall v, v ∈ bound -> vars !! v = vars' !! (f v)) -> 
-  (forall v, v ∈ te_varset te ∖ bound -> vars !! v = vars' !! v) -> 
-  (forall v v', v ∈ bound ∪ te_bound_varset te -> v' ∈ bound ∪ te_bound_varset te ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ te_bound_varset te -> f v ∉ te_varset te ∖ ({[v]} ∪ bound)) ->
-  (* (forall tv, tv ∈ te_varset te ∖  -> (f tv).1 = tv.1) ->  *)
-  total_semantics abs vars' (relabel_bound_aux f bound te) ==
-  total_semantics abs vars te.
-Proof.
-  revert bound vars vars'; induction te; intros bound vars vars' 
-    Hbound Hfree Hfinj Hffree.
-  - reflexivity.
-  - cbn in *.
-    unfold abstract_semantics.
-    f_equiv.
-    do 2 f_equal.
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext.
-    intros i a Ha%elem_of_list_lookup_2. 
-    cbn. 
-    unfold relabel_bound_Idx.
-    case_decide as Habound; [symmetry; now apply Hbound|].
-    specialize (Hfree a). 
-    rewrite elem_of_difference, elem_of_list_to_set in Hfree.
-    now specialize (Hfree ltac:(auto)).
-  - cbn in *.
-    f_equiv;
-    (apply IHte1 || apply IHte2);
-    intros; try (apply Hbound || apply Hfree || apply Hfinj); 
-    try first [assumption | now apply elem_of_union_l | now apply elem_of_union_r];
-    clear Hbound Hfree Hfinj IHte1 IHte2; set_solver.
-  - cbn in *.
-    apply sum_of_ext.
-    intros x.
-    apply IHte.
-    + intros v Hv.
-      destruct_decide (decide (reg = v)) as Hvreg; 
-      [subst; now setoid_rewrite lookup_insert|].
-      rewrite elem_of_union, elem_of_singleton in Hv.
-      assert (Hvbound : v ∈ bound) by naive_solver.
-      setoid_rewrite lookup_insert_ne; [apply Hbound; clear -Hvbound; set_solver|easy|].
-      intros Hfeq; apply Hvreg.
-      revert Hfeq.
-      apply Hfinj; clear -Hvbound; set_solver.
-    + intros v [Hv [Hvnreg%not_elem_of_singleton Hvnbound]%not_elem_of_union]%elem_of_difference.
-      setoid_rewrite lookup_insert_ne; [|easy|].
-      * apply Hfree; clear -Hv Hvnbound; set_solver.
-      * intros <-.
-        specialize (Hffree reg).
-        specialize (Hffree ltac:(set_solver)).
-        set_solver.
-    + set_solver.
-    + set_solver.
-Qed.
-
-Lemma te_relabel_bound_semantics abs vars f te : 
-  (forall v v', v ∈ te_bound_varset te -> v' ∈ te_bound_varset te ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ te_bound_varset te -> f v ∉ te_varset te ∖ {[v]}) ->
-  total_semantics abs vars (relabel_bound f te) ==
-  total_semantics abs vars te.
-Proof.
-  intros Hfinj Hffree.
-  apply te_relabel_bound_aux_semantics.
-  - set_solver.
-  - easy.
-  - set_solver.
-  - set_solver.
-Qed.
-
-Lemma relabel_bound_correct f te : 
-  (forall v v', v ∈ te_bound_varset te -> v' ∈ te_bound_varset te ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ te_bound_varset te -> f v ∉ te_varset te ∖ {[v]}) ->
-  teq (relabel_bound f te) te.
-Proof.
-  intros Hinj Hfree abs vars.
-  now apply te_relabel_bound_semantics.
-Qed.
-
-
-
-Lemma te_base_alpha_equiv_one vold vnew te :
-  vnew ∉ te_varset te ∖ {[vold]} ->
-  teq (relabel_bound (fun x => if decide (x = vold) then vnew else x) te)
-  te.
-Proof.
-  intros Hvnew.
-  pose proof (te_bound_varset_subseteq te) as Hsub.
-  apply relabel_bound_correct; intros; repeat case_decide; subst; 
-    congruence || set_solver.
-Qed.
-
-
-Lemma tsum_distr_l_free_in var ty smd te : 
-  var ∉ te_free_varset te ->
-  teq (tproduct (tsum var ty smd) te)
-    (tsum var ty (tproduct smd te)).
-Proof.
-  intros Hvar abs vars.
-  cbn.
-  rewrite sum_of_distr_l.
-  apply sum_of_ext; intros x.
-  f_equiv.
-  apply total_semantics_free_varset_indep.
-  intros v Hv.
-  now setoid_rewrite lookup_insert_ne; [|congruence].
-Qed.
-
-Lemma tsum_distr_r_free_in var ty smd te : 
-  var ∉ te_free_varset te ->
-  teq (tproduct te (tsum var ty smd))
-    (tsum var ty (tproduct te smd)).
-Proof.
-  intros Hvar.
-  rewrite tproduct_comm, (tproduct_comm te smd).
-  now apply tsum_distr_l_free_in.
-Qed.
-
-
-
-
-
-
-Lemma tl_total_semantics_sumless_abs_app abs vars labs rabs : 
-  tl_total_semantics abs vars (mk_tl [] (labs ++ rabs)) == 
-  tl_total_semantics abs vars (mk_tl [] labs) * tl_total_semantics abs vars (mk_tl [] rabs).
-Proof.
-  cbn.
-  induction labs as [|[[idx lower] upper] labs IHlabs]; [cbn; ring|].
-  cbn.
-  rewrite IHlabs.
-  ring.
-Qed.
-
-
-Lemma mk_tl_sumless_app_r labs rabs : mk_tl [] (labs ++ rabs) =t= 
-  tproduct (mk_tl [] labs) (mk_tl [] rabs).
-Proof.
-  intros ? ?; apply tl_total_semantics_sumless_abs_app.
-Qed.
-
-Lemma tl_cons_sum_teq ty var tl : 
-  tl_cons_sum ty var tl =t= tsum var ty tl.
-Proof.
-  reflexivity.
-Qed.
-
-(* Definition  *)
-
-Lemma tsum_var_change var var' ty te :
-  var' ∉ te_varset te ∖ {[var]} ->
-  (* te_relabel_bound_semantics *)
-  tsum var ty te =t= tsum var' ty 
-  (relabel_te (relabel_var var var') te).
-Proof.
-  intros Hvar'.
-  rewrite <- (te_base_alpha_equiv_one var var') by (cbn; set_solver).
-  cbn.
-  rewrite union_empty_r_L.
-  rewrite decide_True by easy.
-  intros abs vars.
-  cbn.
-  apply sum_of_ext; intros x.
-  transitivity (total_semantics abs (<[var:=mk_Vval x]> vars) te); [|symmetry].
-  - apply te_relabel_bound_aux_semantics.
-    + intros ? ->%elem_of_singleton.
-      rewrite decide_True by easy.
-      now setoid_rewrite lookup_insert.
-    + intros v [Hv Hvnvar%not_elem_of_singleton]%elem_of_difference.
-      setoid_rewrite lookup_insert_ne; try easy.
-      intros <-.
-      set_solver.
-    + intros v v' Hv Hv'.
-      pose proof (te_bound_varset_subseteq te).
-      case_decide as Hvvar; case_decide as Hvvar'; set_solver.
-    + intros v Hv.
-      case_decide as Hvvar; set_solver.
-  - apply te_relabel_semantics.
-    + intros v Hv.
-      unfold relabel_var.
-      case_decide as Hvvar.
-      * subst. now setoid_rewrite lookup_insert.
-      * setoid_rewrite lookup_insert_ne; try easy.
-        set_solver.
-    + intros v v' Hv Hv'.
-      unfold relabel_var. 
-      case_decide as Hvvar; case_decide as Hvvar'; set_solver.
-Qed.
-
-
-Lemma elem_of_te_varset_relabel f te var : 
-  var ∈ te_varset (relabel_te f te) ↔
-  exists var', var' ∈ te_varset te /\ f var' = var.
-Proof.
-  induction te.
-  - cbn.
-    set_solver.
-  - cbn.
-    set_solver.
-  - cbn.
-    rewrite elem_of_union.
-    rewrite IHte1, IHte2.
-    clear IHte1 IHte2.
-    set_solver.
-  - cbn.
-    rewrite elem_of_union.
-    rewrite IHte.
-    clear IHte.
-    set_solver.
-Qed.
-
-
-Lemma tl_times_aux_base_r_correct avoid labs rsums rabs len_rsums prf : 
-  abstracts_vars labs ⊆ avoid ->
-  tl_varset (mk_tl rsums rabs) ⊆ avoid -> 
-  tl_times_aux_base_r avoid labs rsums rabs len_rsums prf =t=
-  tproduct (mk_tl [] labs) (mk_tl rsums rabs).
-Proof.
-  cbn.
-  revert avoid labs rabs rsums prf;
-  induction len_rsums as [|len_rsums IHrsums];
-  intros avoid labs rabs rsums prf.
-  - destruct rsums as [|]; [|easy].
-    intros _ _. 
-    cbn in prf. 
-    cbn [ tl_times_aux_base_r ].
-    now rewrite mk_tl_sumless_app_r.
-  - destruct rsums as [|[ty var] rsums]; [easy|].
-    intros Hav_l Hav_r.
-    cbn in prf.
-    cbn [ tl_times_aux_base_r tensorexpr_of_tensorlist_aux ].
-    rewrite tl_cons_sum_teq.
-    rewrite (tsum_var_change var (fresh_var var avoid)).
-    2:{
-      rewrite fold_tensorexpr_of_tensorlist_aux.
-      rewrite <- tl_varset_correct.
-      apply (not_elem_of_weaken _ _ _ (fresh_var_fresh var avoid)).
-      clear -Hav_r.
-      cbn in *; set_solver.
-    }
-    rewrite tsum_distr_r_free_in.
-    2:{
-      rewrite <- abstract_vars_correct.
-      revert Hav_l.
-      apply not_elem_of_weaken, fresh_var_fresh.
-    }
-    rewrite IHrsums.
-    2: {
-      rewrite Hav_l.
-      apply union_subseteq_l.
-    }
-    2: {
-      rewrite tl_varset_correct.
-      rewrite relabel_one_in_correct.
-      rewrite tl_varset_correct in Hav_r.
-      cbn in *.
-      intros x.
-      rewrite elem_of_te_varset_relabel.
-      intros (v & Hv & <-).
-      unfold relabel_var.
-      case_decide; subst; [|set_solver +Hav_r Hv].
-      destruct_decide (decide (fresh_var var avoid = var)) as Hfr; 
-      set_solver +Hav_r Hv Hfr.
-    }
-    rewrite fold_tensorexpr_of_tensorlist_aux.
-    now rewrite relabel_one_in_correct.
-Qed.
-
-
-Lemma tl_times_aux_l_correct avoid lsums labs rsums rabs len_lsums prf : 
-  tl_varset (mk_tl lsums labs) ⊆ avoid ->
-  tl_varset (mk_tl rsums rabs) ⊆ avoid -> 
-  tl_times_aux_l avoid lsums labs rsums rabs len_lsums prf =t=
-  tproduct (mk_tl lsums labs) (mk_tl rsums rabs).
-Proof.
-  cbn.
-  revert avoid lsums labs rabs rsums prf;
-  induction len_lsums as [|len_lsums IHlsums];
-  intros avoid lsums labs rabs rsums prf.
-  - destruct lsums as [|]; [|easy].
-    intros Hl Hr.
-    apply tl_times_aux_base_r_correct; [|easy].
-    unfold tl_varset in Hl. 
-    cbn -[abstracts_vars] in Hl.
-    now rewrite union_empty_r_L in Hl.
-  - destruct lsums as [|[ty var] lsums]; [easy|].
-    intros Hav_l Hav_r.
-    cbn in prf.
-    cbn [ tl_times_aux_l tensorexpr_of_tensorlist_aux ].
-    rewrite tl_cons_sum_teq.
-    rewrite (tsum_var_change var (fresh_var var avoid)).
-    2:{
-      rewrite fold_tensorexpr_of_tensorlist_aux.
-      rewrite <- tl_varset_correct.
-      apply (not_elem_of_weaken _ _ _ (fresh_var_fresh var avoid)).
-      clear -Hav_l.
-      cbn in *; set_solver.
-    }
-    rewrite tsum_distr_l_free_in.
-    2:{
-      rewrite tl_varset_correct in Hav_r.
-      specialize (te_free_varset_subseteq (mk_tl rsums rabs)).
-      apply not_elem_of_weaken.
-      revert Hav_r.
-      apply not_elem_of_weaken, fresh_var_fresh.
-    }
-    rewrite IHlsums.
-    2: {
-      rewrite tl_varset_correct.
-      rewrite relabel_one_in_correct.
-      rewrite tl_varset_correct in Hav_l.
-      cbn in *.
-      intros x.
-      rewrite elem_of_te_varset_relabel.
-      intros (v & Hv & <-).
-      unfold relabel_var.
-      case_decide; subst; [|set_solver +Hav_l Hv].
-      destruct_decide (decide (fresh_var var avoid = var)) as Hfr; 
-      set_solver +Hav_l Hv Hfr.
-    }
-    2: {
-      rewrite Hav_r.
-      apply union_subseteq_l.
-    }
-    rewrite fold_tensorexpr_of_tensorlist_aux.
-    now rewrite relabel_one_in_correct.
-Qed.
-
-
-
-Lemma tl_times_aux_correct avoid lsums labs rsums rabs : 
-  tl_varset (mk_tl lsums labs) ⊆ avoid ->
-  tl_varset (mk_tl rsums rabs) ⊆ avoid -> 
-  tl_times_aux avoid lsums labs rsums rabs =t=
-  tproduct (mk_tl lsums labs)
-    ((mk_tl rsums rabs)).
-Proof.
-  intros Hav_l Hav_r.
-  now apply tl_times_aux_l_correct.
-Qed.
-
-Lemma tl_times_correct l r : 
-  tl_times l r =t= tproduct l r.
-Proof.
-  apply tl_times_aux_correct.
-  - apply union_subseteq_l.
-  - apply union_subseteq_r.
-Qed.
-
-
-
-Lemma tensorlist_of_tensorexpr_correct te : 
-  tensorlist_of_tensorexpr te =t= te.
-Proof.
-  induction te.
-  - reflexivity.
-  - cbn.
-    now rewrite tproduct_tone_r.
-  - cbn.
-    now rewrite tl_times_correct, IHte1, IHte2.
-  - cbn.
-    f_equiv.
-    apply IHte.
-Qed.
-
-
-Lemma tsum_comm var ty var' ty' te :
-  (var = var' -> ty = ty') ->
-  tsum var ty (tsum var' ty' te) =t=
-  tsum var' ty' (tsum var ty te).
-Proof.
-  destruct_decide (decide (var = var')) as Hvars.
-  1:{ 
-    subst.
-    now intros ->.
-  }
-  intros _.
-  intros abs vars.
-  cbn.
-  rewrite sum_of_comm.
-  apply sum_of_ext; intros x.
-  apply sum_of_ext; intros y.
-  f_equiv.
-  now apply insert_commute.
-Qed.
-
-(* TODO: General relabeling function taking bound context.
-  Also, can there be a framework for knowing the used context? *)
-
-Lemma tensorlist_sums_perm_NoDup_eq sums sums' abs : 
-  NoDup sums.*2 -> sums ≡ₚ sums' -> 
-  mk_tl sums abs =t= mk_tl sums' abs.
-Proof.
-  cbn. 
-  intros Hsums Heq.
-  induction Heq.
-  - reflexivity.
-  - cbn in *.
-    destruct x.
-    f_equiv.
-    apply IHHeq.
-    now rewrite NoDup_cons in Hsums.
-  - cbn.
-    destruct x, y.
-    apply tsum_comm.
-    cbn in Hsums.
-    rewrite NoDup_cons, not_elem_of_cons in Hsums.
-    destruct Hsums as [[? _] _].
-    easy.
-  - rewrite IHHeq1, IHHeq2; [easy| |easy].
-    now rewrite <- Heq1.
-Qed.
-
-
-Lemma te_relabel_one_until_binder_semantics abs vars vars' var var' te : 
-  (vars' !! var' = vars !! var) ->
-  (forall a, a ≠ var -> a ≠ var' -> vars' !! a = vars !! a) ->
-  var' ∉ te_varset te ∖ {[var]} ->
-  total_semantics abs vars' (relabel_one_until_binder var var' te) ==
-  total_semantics abs vars te.
-Proof.
-  revert vars vars'; induction te; intros vars vars' Hvar Hvars Hvar'.
-  - reflexivity.
-  - cbn in *.
-    unfold abstract_semantics.
-    f_equiv.
-    do 2 f_equal.
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext.
-    intros _ a Ha%elem_of_list_lookup_2. 
-    cbn.
-    unfold relabel_var.
-    case_decide; [now subst|].
-    apply Hvars; set_solver. 
-  - cbn in *.
-    f_equiv;
-    (apply IHte1 || apply IHte2); set_solver.
-  - cbn.
-    case_decide as Hreg; [subst|]; cbn.
-    apply sum_of_ext.
-    intros x.
-    + apply total_semantics_free_varset_indep.
-      intros v Hv. 
-      destruct_decide (decide (var = v)); [subst; now setoid_rewrite lookup_insert|].
-      setoid_rewrite lookup_insert_ne; [|easy..].
-      apply Hvars; try easy.
-      clear IHte.
-      apply te_free_varset_subseteq in Hv.
-      cbn in Hvar'.
-      set_solver.
-    + apply sum_of_ext; intros x.
-      apply IHte.
-      3: now clear -Hvar'; cbn in *; set_solver.
-      * setoid_rewrite lookup_insert_ne; [auto| |easy].
-        now clear -Hvar' Hreg; cbn in *; set_solver.
-      * intros a Havar Havar'.
-        destruct_decide (decide (reg = a)); [subst; now setoid_rewrite lookup_insert|].
-        setoid_rewrite lookup_insert_ne; [|easy..].
-        auto.
-Qed.
-
-Lemma tsum_relabel_one_until_binder var var' ty te : 
-  var' ∉ te_varset te ∖ {[var]} -> 
-  tsum var' ty (relabel_one_until_binder var var' te) =t=
-  tsum var ty te.
-Proof.
-  intros Hvar' abs vars.
-  cbn.
-  apply sum_of_ext; intros x.
-  apply te_relabel_one_until_binder_semantics.
-  - now setoid_rewrite lookup_insert.
-  - intros; now setoid_rewrite lookup_insert_ne.
-  - easy.
-Qed.
-
-
-Lemma tsum_overwrite_irrel var var' ty ty' te : 
-  var' ∉ te_free_varset te -> 
-  tsum var ty (tsum var ty' te) =t=
-  tsum var' ty (tsum var ty' te).
-Proof.
-  intros Hvar' abs vars.
-  cbn.
-  apply sum_of_ext; intros x.
-  apply sum_of_ext; intros y.
-  setoid_rewrite insert_insert.
-  apply total_semantics_free_varset_indep.
-  setoid_rewrite lookup_insert_case.
-  intros v Hv.
-  case_decide; [easy|].
-  setoid_rewrite lookup_insert_ne; [easy|set_solver].
-Qed.
-
-
-
-
-
-
-
-
-
-
-
-Lemma make_sums_free_correct_helper ty var var' sums abs : 
-  var ∈ sums.*2 -> var' ∉ abstracts_vars abs ∪ list_to_set sums.*2 ->
-  mk_tl ((ty, var) :: sums) abs =t= mk_tl ((ty, var') :: sums) abs.
-Proof.
-  induction sums as [|[ty' v] sums IHsums]; [easy|].
-  cbn.
-  rewrite elem_of_cons.
-  destruct_decide (decide (var = v)) as Hvar.
-  - subst v.
-    intros _ Hvar'.
-    apply tsum_overwrite_irrel.
-    rewrite fold_tensorexpr_of_tensorlist_aux, <- tl_free_varset_correct.
-    unfold tl_free_varset.
-    cbn -[abstracts_vars].
-    set_solver.
-  - intros [|Hvarin] Hvar'; [easy|].
-    rewrite 2(tsum_comm _ _ v) by (easy || set_solver).
-    f_equiv.
-    apply IHsums; [easy|].
-    set_solver.
-Qed.
-
-Lemma make_sums_free_correct avoid sums abs : 
-  tl_varset (mk_tl sums abs) ⊆ avoid -> 
-  mk_tl (make_sums_free avoid sums) abs =t= mk_tl sums abs.
-Proof.
-  intros Hav.
-  induction sums as [|[ty var] sums IHsums]; [easy|].
-  cbn [make_sums_free].
-  case_decide as Hvar.
-  2: {
-    cbn.
-    f_equiv.
-    apply IHsums; cbn in *; clear -Hav; set_solver.
-  }
-  rewrite <- (make_sums_free_correct_helper ty var
-    (fresh_var _ _)).
-  - cbn.
-    f_equiv.
-    apply IHsums; cbn in *; clear -Hav; set_solver.
-  - now rewrite elem_of_list_to_set in Hvar.
-  - apply (not_elem_of_weaken _ _ _ (fresh_var_fresh _ _)).
-    set_solver +Hav.
-Qed. 
-
-Lemma tl_dedup_sums_correct tl : 
-  tl_dedup_sums tl =t= tl.
-Proof.
-  now apply make_sums_free_correct.
-Qed.
-
-
-
-
-Lemma tensorlist_abs_perm_eq sums abs abs' : 
-  abs ≡ₚ abs' -> 
-  mk_tl sums abs =t= mk_tl sums abs'.
-Proof.
-  intros Habs.
-  induction sums; [|cbn; case_match; f_equiv; assumption].
-  cbn.
-  now rewrite Habs.
-Qed.
-
-
-Lemma tensorlist_perm_eq_correct tl tl' : 
-  NoDup tl.(tl_sums).*2 ->
-  tensorlist_perm_eq tl tl' -> tl =t= tl'.
-Proof.
-  intros Hsums [Hsumsp Habsp].
-  destruct tl as [sums abs], tl' as [sums' abs'].
-  cbn -[tensorexpr_of_tensorlist] in *.
-  transitivity (mk_tl sums abs').
-  - now apply tensorlist_abs_perm_eq.
-  - now apply tensorlist_sums_perm_NoDup_eq.
-Qed.
-
-
-Lemma tl_relabel_tl_bound_aux_semantics abs vars vars' f bound tl :
-  (forall v, v ∈ bound ∖ tl_bound_varset tl -> vars !! v = vars' !! (f v)) -> 
-  (forall v, v ∈ tl_free_varset tl ∖ bound -> vars !! v = vars' !! v) -> 
-  (forall v v', v ∈ bound ∪ tl_bound_varset tl -> v' ∈ bound ∪ tl_bound_varset tl ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ bound ∪ tl_bound_varset tl -> f v ∉ tl_free_varset tl ∖ bound) ->
-  tl_bound_varset tl ⊆ bound ->
-  (* (forall tv, tv ∈ tl_varset tl ∖  -> (f tv).1 = tv.1) ->  *)
-  total_semantics abs vars' (mk_tl (prod_map id f <$> tl_sums tl)
-    (relabel_abs (relabel_bound_Idx f bound) <$> tl_abstracts tl)) ==
-  total_semantics abs vars tl.
-Proof.
-  rename abs into cabs.
-  rename vars into cvars.
-  rename vars' into cvars'.
-  destruct tl as [sums abs].
-  cbn.
-  revert bound cvars cvars'; 
-  induction sums as [|[ty var] sums IHsums]; 
-  intros bound cvars cvars' Hbound Hfree Hfinj Hffree.
-  - cbn in *.
-    intros _.
-    induction abs as [|[[idx lower] upper] abs IHabs]; [easy|].
-    cbn.
-    f_equiv.
-    2: {
-      apply IHabs.
-      - intros v Hv.
-        apply Hfree.
-        clear -Hv.
-        unfold tl_free_varset in *.
-        cbn in *.
-        set_solver.
-      - intros v Hv%Hffree.
-        clear -Hv.
-        unfold tl_free_varset in *.
-        cbn in *.
-        set_solver.
-    }
-    erewrite abstract_semantics_ext; [reflexivity..|].
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply map_ext_in.
-    intros v Hv.
-    symmetry.
-    cbn.
-    unfold relabel_bound_Idx.
-    case_decide as Hvbd.
-    + apply Hbound; set_solver.
-    + apply Hfree.
-      unfold tl_free_varset.
-      cbn.
-      clear -Hv Hvbd.
-      apply elem_of_list_In in Hv.
-      set_solver.
-  - cbn.
-    intros Hsubs.
-    apply sum_of_ext; intros x.
-    apply IHsums.
-    + intros v Hv.
-      setoid_rewrite lookup_insert_case.
-      case_decide as Hvvar.
-      * subst.
-        now rewrite decide_True by easy.
-      * rewrite decide_False; [apply Hbound; clear -Hv Hvvar; set_solver|].
-        intros Hfeq; apply Hvvar.
-        revert Hfeq.
-        apply Hfinj; cbn; clear -Hv; set_solver.
-    + intros v Hv.
-      setoid_rewrite lookup_insert_case.
-      assert (Hvvar : var ≠ v) by (clear -Hsubs Hv; set_solver).
-      rewrite decide_False by easy.
-      rewrite decide_False; [apply Hfree; clear -Hvvar Hv; 
-      unfold tl_free_varset in *; cbn; set_solver|].
-      specialize (Hffree var ltac:(clear; set_solver)).
-      clear -Hffree Hvvar Hsubs Hv.
-      unfold tl_free_varset in *; cbn in *; set_solver.
-    + clear -Hfinj; intros ? ? ? ?; apply Hfinj; clear Hfinj; set_solver.
-    + clear -Hffree Hsubs; intros v Hv.
-      specialize (Hffree v ltac:(clear -Hv; set_solver)).
-      clear Hv.
-      unfold tl_free_varset in *.
-      cbn in *.
-      set_solver.
-    + clear -Hsubs.
-      set_solver.
-Qed.
-
-
-Lemma tl_relabel_bound_semantics abs vars f tl : 
-  (forall v v', v ∈ tl_bound_varset tl -> v' ∈ tl_bound_varset tl ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ tl_bound_varset tl -> f v ∉ tl_free_varset tl) ->
-  total_semantics abs vars (relabel_bound f tl) ==
-  total_semantics abs vars tl.
-Proof.
-  intros Hfinj Hffree.
-  rewrite <- relabel_tl_bound_correct.
-  apply tl_relabel_tl_bound_aux_semantics.
-  - clear; set_solver.
-  - reflexivity.
-  - clear -Hfinj; intros ? ? ? ?; apply Hfinj; clear Hfinj; set_solver.
-  - intros v.
-    specialize (Hffree v).
-    specialize (tl_varset_bound_free_disjoint tl).
-    set_solver +Hffree.
-  - reflexivity.
-Qed.
-
-Lemma relabel_tl_bound_correct_teq f tl : 
-  (forall v v', v ∈ tl_bound_varset tl -> v' ∈ tl_bound_varset tl ->
-    f v = f v' -> v = v') ->
-  (forall v, v ∈ tl_bound_varset tl -> f v ∉ tl_free_varset tl) ->
-  (* NoDup tl.(tl_sums).*2 -> *)
-  teq (relabel_tl_bound f tl) tl.
-Proof.
-  intros Hfinj Hffree abs vars.
-  rewrite relabel_tl_bound_correct.
-  now apply tl_relabel_bound_semantics.
-Qed.
-
-Lemma tensorlist_teq_sufficient_condition_aux_1 (tl tl' : tensorlist) f : 
-    (forall v v', v ∈ tl_bound_varset (tl_dedup_sums tl') -> 
-      v' ∈ tl_bound_varset (tl_dedup_sums tl') -> f v = f v' -> v = v') ->
-    (forall v, v ∈ tl_bound_varset (tl_dedup_sums tl') -> 
-      f v ∉ tl_free_varset (tl_dedup_sums tl')) ->
-    tensorlist_perm_eq (tl_dedup_sums tl)
-      (relabel_tl_bound f (tl_dedup_sums tl')) ->
-  tl =t= tl'.
-Proof.
-  intros Hfinj Hffree Heq.
-  apply tensorlist_perm_eq_correct in Heq; [|now apply tl_dedup_sums_NoDup_vars].
-  rewrite relabel_tl_bound_correct_teq in Heq by easy.
-  now rewrite 2 tl_dedup_sums_correct in Heq.
-Qed.
-
-
-
-
-
-Lemma tensorlist_teq_sufficient_condition_aux_2_conditions 
-  (tl tl' : tensorlist) f : 
-  tl_free_varset tl = tl_free_varset tl' -> 
-    tensorlist_perm_eq (tl_dedup_sums tl)
-      (relabel_tl_bound f (tl_dedup_sums tl')) ->
-  
-  (forall v v', v ∈ tl_bound_varset (tl_dedup_sums tl') -> 
-    v' ∈ tl_bound_varset (tl_dedup_sums tl') -> f v = f v' -> v = v') /\
-  (forall v, v ∈ tl_bound_varset (tl_dedup_sums tl') -> 
-    f v ∉ tl_free_varset (tl_dedup_sums tl')).
-Proof.
-  intros Hfrees Hpermeq.
-  pose proof Hpermeq as [Hsumsp Habsp].
-  cbn -[tl_dedup_sums] in Hsumsp.
-  pose proof (tl_dedup_sums_NoDup_vars tl) as Hdup.
-  rewrite Hsumsp in Hdup.
-  split.
-  - intros v v'.
-    unfold tl_bound_varset.
-    rewrite 2 elem_of_list_to_set.
-    apply NoDup_fmap_iff.
-    now rewrite snds_prod_map in Hdup.
-  - intros v.
-    unfold tl_bound_varset.
-    rewrite elem_of_list_to_set.
-    intros Hv.
-    apply (elem_of_list_fmap_1 f) in Hv as Hfv.
-    rewrite <- (snds_prod_map id) in Hfv.
-    rewrite <- Hsumsp in Hfv.
-    rewrite tl_free_varset_tl_dedup_sums.
-    rewrite <- Hfrees.
-    rewrite <- (elem_of_list_to_set (C:=gset Idx)), fold_tl_bound_varset in Hfv.
-    apply tl_varset_bound_free_disjoint in Hfv.
-    rewrite tl_free_varset_tl_dedup_sums in Hfv.
-    easy.
-Qed.
-
-
-Lemma tensorlist_teq_sufficient_condition_aux_2 (tl tl' : tensorlist) f : 
-  tl_free_varset tl = tl_free_varset tl' -> 
-    tensorlist_perm_eq (tl_dedup_sums tl)
-      (relabel_tl_bound f (tl_dedup_sums tl')) ->
-  tl =t= tl'.
-Proof.
-  intros Hfrees Hpermeq.
-  apply tensorlist_teq_sufficient_condition_aux_2_conditions in Hpermeq
-    as Hconds; [|easy].
-  now apply (tensorlist_teq_sufficient_condition_aux_1 tl tl' f).
-Qed.
-
-
-Lemma tensorlist_teq_sufficient_condition (tl tl' : tensorlist) : 
-  tl_free_varset tl = tl_free_varset tl' ->
-  (exists f : Idx -> Idx, 
-    tensorlist_perm_eq (tl_dedup_sums tl)
-      (relabel_tl_bound f (tl_dedup_sums tl'))) ->
-  tl =t= tl'.
-Proof.
-  intros ? []; eauto using tensorlist_teq_sufficient_condition_aux_2.
-Qed.
-
-
-
-
-
-
-
-
-
-
-Lemma tl_cons_sum_relabel_one_until_binder var var' ty te : 
-  var' ∉ te_varset te ∖ {[var]} -> 
-  tsum var' ty (relabel_one_until_binder var var' te) =t=
-  tsum var ty te.
-Proof.
-  intros Hvar' abs vars.
-  cbn.
-  apply sum_of_ext; intros x.
-  apply te_relabel_one_until_binder_semantics.
-  - now setoid_rewrite lookup_insert.
-  - intros; now setoid_rewrite lookup_insert_ne.
-  - easy.
-Qed.
-
-Lemma tl_sum_unused_irrelevant_base tl ty v v' : 
-  v ∉ tl_used_varset tl -> v' ∉ tl_used_varset tl ->
-  tl_cons_sum ty v tl =t= tl_cons_sum ty v' tl.
-Proof.
-  intros Hv Hv'.
-  intros abs vars.
-  cbn.
-  apply sum_of_ext; intros x.
-  apply total_semantics_free_varset_indep.
-  fold (tensorexpr_of_tensorlist tl).
-  intros v'' Hv''.
-  rewrite <- tl_free_varset_correct in Hv''.
-  assert (tl_free_varset tl ⊆ tl_used_varset tl) by now clear; set_solver.
-  setoid_rewrite lookup_insert_ne; [easy|..]; intros ->; set_solver.
-Qed.
-
-
-Lemma tl_unused_to_front_of_NoDup tl : NoDup tl.(tl_sums).*2 ->
-  mk_tl (tl_unused_bound_vars tl ++ 
-    tl_used_bound_vars tl) tl.(tl_abstracts) =t= tl.
-Proof.
-  intros Hdup.
-  symmetry.
-  apply tensorlist_perm_eq_correct; [easy|].
-  split; [|reflexivity].
-  cbn.
-  unfold tl_unused_bound_vars, tl_used_bound_vars.
-  now rewrite filter_neg_with_Permutation.
-Qed.
-
-
-
-
-Lemma tl_app_sums_Permutation_NoDup tl sums sums' :
-  sums ≡ₚ sums' -> NoDup sums.*2 ->
-  (* Forall (.∉ tl_used_varset tl) (sums.*2) -> *)
-  tl_app_sums sums tl =t= tl_app_sums sums' tl.
-Proof.
-  intros Hperm.
-  induction Hperm;
-  repeat match goal with 
-    | x : Ty * Idx |- _ => 
-      let ty := fresh "ty" in 
-      let var := fresh "var" in 
-      destruct x as [ty var]
-   end.
-  - reflexivity.
-  - cbn.
-    intros Hdup%NoDup_cons.
-    f_equiv.
-    now apply IHHperm.
-  - cbn.
-    intros [[Hne _]%not_elem_of_cons _]%NoDup_cons.
-    now apply tsum_comm.
-  - intros Hdup.
-    pose proof Hdup as Hdup'.
-    rewrite Hperm1 in Hdup'.
-    etransitivity; eauto.
-Qed.
-
-
-Lemma tl_cons_sum_mor {ty : Ty} {var : Idx} {tl tl' : tensorlist} :
-  tl =t= tl' -> tl_cons_sum ty var tl =t= tl_cons_sum ty var tl'.
-Proof.
-  cbn.
-  now intros ->.
-Qed.
-
-Lemma tl_app_sums_mor {sums} {tl tl' : tensorlist} :
-  tl =t= tl' -> tl_app_sums sums tl =t= tl_app_sums sums tl'.
-Proof.
-  induction sums as [|[ty var] sums IHsums]; 
-  [easy|now intros ?%IHsums; apply tl_cons_sum_mor].
-Qed.
-
-Lemma tl_app_sums_Permutation tl sums sums' :
-  sums ≡ₚ sums' ->
-  Forall (.∉ tl_used_varset tl) (sums.*2) ->
-  tl_app_sums sums tl =t= tl_app_sums sums' tl.
-Proof.
-  intros Hperm.
-  induction Hperm;
-  repeat match goal with 
-    | x : Ty * Idx |- _ => 
-      let ty := fresh "ty" in 
-      let var := fresh "var" in 
-      destruct x as [ty var]
-   end.
-  - reflexivity.
-  - cbn.
-    intros Hall.
-    decompose_Forall_hyps.
-    f_equiv.
-    now apply IHHperm.
-  - intros Hall.
-    decompose_Forall_hyps.
-    destruct_decide (decide (var = var0)) as Htyeq.
-    2: {
-      now apply tsum_comm.
-    }
-    subst var0.
-    pose proof (is_fresh ({[var]} ∪ tl_used_varset tl)) as Hvar'.
-    set (var' := fresh ({[var]} ∪ tl_used_varset tl)) in *.
-    rewrite (tl_sum_unused_irrelevant_base _ _ var var') by 
-      (cbn; rewrite tl_app_sums_eq_app; set_solver).
-    transitivity (tl_cons_sum ty0 var (tl_cons_sum ty var' (tl_app_sums l tl)));
-    [apply tsum_comm; intros ->; set_solver|].
-    apply tl_cons_sum_mor.
-    apply tl_sum_unused_irrelevant_base;
-    rewrite tl_used_varset_tl_app_sums; easy || set_solver.
-  - intros Hall.
-    pose proof Hall as Hall'.
-    rewrite Hperm1 in Hall'.
-    etransitivity; eauto.
-Qed.
-
-
-
-
-
-
-Lemma tl_unused_at_front_indep tl sums sums' : (* NoDup tl.(tl_sums).*2 -> *)
-  NoDup sums.*2 ->
-  sums.*1 ≡ₚ sums'.*1 ->
-  Forall (.∉ tl_used_varset tl) (sums.*2) -> 
-  Forall (.∉ tl_used_varset tl) (sums'.*2) ->
-  tl_app_sums sums tl =t= tl_app_sums sums' tl.
-Proof.
-  intros Hdup.
-  intros (sumsp & Hsums_p & Hsums')%fmap_Permuation_iff_exists.
-  intros Hall Hall'.
-  rewrite (tl_app_sums_Permutation _ _ _ Hsums_p) by easy.
-  rewrite Hsums_p in Hdup, Hall.
-  clear sums Hsums_p.
-  revert sums' Hsums' Hall';
-  induction sumsp as [|[ty var] sumsp IHsumsp].
-  - intros _ ->%eq_sym%fmap_nil_inv; reflexivity.
-  - intros [|[ty' var'] sums']; [easy|].
-    cbn [fmap list_fmap fst].
-    intros [= <- Hsums'] Hall'.
-    cbn in Hdup, Hall, Hall'.
-    apply NoDup_cons in Hdup as [Hvarnp Hdup].
-    apply Forall_cons in Hall as [Hvar Hall].
-    apply Forall_cons in Hall' as [Hvar' Hall'].
-    cbn [ tl_app_sums ].
-    rewrite (tl_sum_unused_irrelevant_base _ _ _ var') by 
-      (rewrite tl_used_varset_tl_app_sums; set_solver).
-    apply tl_cons_sum_mor.
-    now apply IHsumsp.
-Qed.
-
-Lemma tl_unused_at_front_indep' tl tl' sums sums' : (* NoDup tl.(tl_sums).*2 -> *)
-  NoDup sums.*2 ->
-  sums.*1 ≡ₚ sums'.*1 ->
-  Forall (.∉ tl_used_varset tl) (sums.*2) -> 
-  Forall (.∉ tl_used_varset tl') (sums'.*2) ->
-  tl =t= tl' ->
-  tl_app_sums sums tl =t= tl_app_sums sums' tl'.
-Proof.
-  intros Hdup.
-  intros (sumsp & Hsums_p & Hsums')%fmap_Permuation_iff_exists.
-  intros Hall Hall' Heq.
-  rewrite (tl_app_sums_Permutation _ _ _ Hsums_p) by easy.
-  rewrite Hsums_p in Hdup, Hall.
-  clear sums Hsums_p.
-  revert sums' Hsums' Hall';
-  induction sumsp as [|[ty var] sumsp IHsumsp].
-  - intros _ ->%eq_sym%fmap_nil_inv _; apply Heq.
-  - intros [|[ty' var'] sums']; [easy|].
-    cbn [fmap list_fmap fst].
-    intros [= <- Hsums'] Hall'.
-    cbn in Hdup, Hall, Hall'.
-    apply NoDup_cons in Hdup as [Hvarnp Hdup].
-    apply Forall_cons in Hall as [Hvar Hall].
-    apply Forall_cons in Hall' as [Hvar' Hall'].
-    cbn [ tl_app_sums ].
-    pose proof (is_fresh (tl_used_varset tl ∪ tl_used_varset tl')) as Hvar''.
-    set (var'' := fresh (tl_used_varset tl ∪ tl_used_varset tl')) in *.
-    rewrite (tl_sum_unused_irrelevant_base _ _ var var'') by
-      (rewrite tl_used_varset_tl_app_sums; set_solver).
-    rewrite (tl_sum_unused_irrelevant_base _ _ var' var'') by
-      (rewrite tl_used_varset_tl_app_sums; set_solver).
-    apply tl_cons_sum_mor.
-    now apply IHsumsp.
-Qed.
-
-
-
-
-Lemma tl_sum_irrelevant_to_cons_unused ty var tl : 
-  var ∉ tl_used_varset tl -> 
-  tl_cons_sum ty var tl =t= tl_cons_unused_sum ty tl.
-Proof.
-  intros Hvar.
-  apply tl_sum_unused_irrelevant_base; easy + apply is_fresh.
-Qed.
-
-Lemma tl_cons_unused_sum_alt ty tl avoid : 
-  tl_used_varset tl ⊆ avoid -> 
-  tl_cons_sum ty (fresh avoid) tl =t= tl_cons_unused_sum ty tl.
-Proof.
-  intros Hunused.
-  apply tl_sum_irrelevant_to_cons_unused.
-  revert Hunused.
-  apply not_elem_of_weaken, is_fresh.
-Qed.
-
-Lemma tl_cons_unused_sum_mor ty (tl tl' : tensorlist) : tl =t= tl' -> 
-  tl_cons_unused_sum ty tl =t= tl_cons_unused_sum ty tl'.
-Proof.
-  set (avoid := tl_used_varset tl ∪ tl_used_varset tl').
-  intros Heq.
-  rewrite <- 2 (tl_cons_unused_sum_alt _ _ avoid) by 
-    first [apply union_subseteq_l | apply union_subseteq_r].
-  now apply tl_cons_sum_mor.
-Qed.
-
-Lemma tl_app_unused_sums_mor tys (tl tl' : tensorlist) : tl =t= tl' -> 
-  tl_app_unused_sums tys tl =t= tl_app_unused_sums tys tl'.
-Proof.
-  intros Heq.
-  induction tys; [assumption|now apply tl_cons_unused_sum_mor].
-Qed.
-
-
-
-
-
-
-
-
-
-
-
-Lemma match_tensorlist_correct_aux_map_conditions tl tl' (m : gmap Idx Idx) : 
-  NoDup_vars tl -> NoDup_vars tl' ->
-  dom m = tl_bound_varset tl ∩ tl_used_varset tl -> 
-  map_img m = tl_bound_varset tl' ∩ tl_used_varset tl' -> 
-  size (dom m) = size (map_img m :> gset Idx) ->
-  tl_free_varset tl = tl_free_varset tl' -> 
-  map_Forall (fun v v' => tl_type_map tl !! v = tl_type_map tl' !! v') m ->
-  (tl_unused_bound_vars tl).*1 ≡ₚ (tl_unused_bound_vars tl').*1 ->
-  relabel_abs (relabel_bound_Idx (gmap_map m) (tl_bound_varset tl)) <$>
-	tl_abstracts tl ≡ₚ tl_abstracts tl' ->
-  tl =t= tl'.
-Proof.
-  intros Hdup Hdup' Hdom Himg Hinj Hfrees Htypes Hunused Hmabs.
-  pose proof Hinj as Hsize.
-  rewrite map_dom_img_eq_card_iff_inj in Hinj.
-  rewrite <- (tl_unused_to_front_of_NoDup _ Hdup).
-  rewrite <- (tl_unused_to_front_of_NoDup _ Hdup').
-  rewrite 2 mk_tl_app_sums_aux, <- 2 tl_app_sums_eq_fold.
-  assert (NoDup (tl_used_bound_vars tl).*2) as Hudup by 
-    (now rewrite tl_sums_used_unused_decomp, 
-    fmap_app, NoDup_app in Hdup; apply Hdup).
-  assert (NoDup (tl_used_bound_vars tl').*2) as Hudup' by 
-    (now rewrite tl_sums_used_unused_decomp, 
-    fmap_app, NoDup_app in Hdup'; apply Hdup').
-  assert (NoDup (tl_unused_bound_vars tl).*2) as Huudup by 
-    (now rewrite tl_sums_used_unused_decomp, 
-    fmap_app, NoDup_app in Hdup; apply Hdup).
-  assert (NoDup (tl_unused_bound_vars tl').*2) as Huudup' by 
-    (now rewrite tl_sums_used_unused_decomp, 
-    fmap_app, NoDup_app in Hdup'; apply Hdup').
-  apply tl_unused_at_front_indep';
-  [assumption|assumption|
-    apply Forall_forall; now intros ? 
-    Hdiff%elem_of_vars_tl_unused_bound_vars
-      %elem_of_difference..|].
-  rewrite <- (relabel_tl_bound_correct_teq (gmap_map m)).
-  - unfold relabel_tl_bound.
-    cbn -[tensorexpr_of_tensorlist].
-    rewrite list_to_set_vars_tl_used_bound_vars.
-    assert (NoDup (prod_map id (gmap_map m) <$> tl_used_bound_vars tl).*2) as Hndm
-      by now apply match_tensorlist_correct_aux_map_NoDup_prod_map.
-    apply tensorlist_perm_eq_correct; [easy|].
-    split.
-    + cbn.
-      now apply match_tensorlist_correct_aux_map_used_bound.
-    + cbn.
-      rewrite <- Hmabs.
-      erewrite list_fmap_ext; [reflexivity|].
-      intros _ [[abs low] up] Habs%elem_of_list_lookup_2.
-      apply relabel_abs_ext.
-      cbn.
-      apply list_fmap_ext.
-      intros _ v Hv%elem_of_list_lookup_2.
-      unfold relabel_bound_Idx.
-      apply decide_ext.
-      enough (v ∈ tl_used_varset tl) by (rewrite elem_of_intersection; tauto).
-      apply elem_of_tl_used_varset'.
-      eauto.
-  - apply gmap_map_inj_on; [easy|]. 
-    cbn.
-    now rewrite list_to_set_vars_tl_used_bound_vars, Hdom.
-  - intros v.
-    cbn.
-    rewrite list_to_set_vars_tl_used_bound_vars.
-    rewrite <- Hdom.
-    intros [mv Hmv]%elem_of_dom.
-    rewrite (gmap_map_correct _ _ _ Hmv).
-    apply (elem_of_map_img_2 (SA:=gset Idx)) in Hmv as Hmvimg.
-    rewrite Himg in Hmvimg.
-    rewrite tl_free_varset_tl_used_bound_vars, Hfrees.
-    apply elem_of_intersection in Hmvimg as [Hmvbound _].
-    now apply tl_varset_bound_free_disjoint in Hmvbound.
-Qed.
-
-
-
-
-Lemma match_tensorlist_correct_aux_map_conditions' tl tl' (m : gmap Idx Idx) : 
-  NoDup_vars tl -> NoDup_vars tl' ->
-  match_tensorlist tl tl' = Some m ->
-  (* dom m = tl_bound_varset tl ∩ tl_used_varset tl ->  *)
-  (* map_img m = tl_bound_varset tl' ∩ tl_used_varset tl' ->  *)
-  NoDup (map_to_list m).*2 ->
-  (* size (dom m) = size (map_img m :> gset Idx) -> *)
-  (* tl_free_varset tl = tl_free_varset tl' ->  *)
-  map_Forall (fun v v' => tl_type_map tl !! v = tl_type_map tl' !! v') m ->
-  tl.(tl_sums).*1 ≡ₚ tl'.(tl_sums).*1 ->
-  (* (tl_unused_bound_vars tl).*1 ≡ₚ (tl_unused_bound_vars tl').*1 -> *)
-  (* relabel_abs (relabel_bound_Idx (gmap_map m) (tl_bound_varset tl)) <$>
-	tl_abstracts tl ≡ₚ tl_abstracts tl' -> *)
-  tl =t= tl'.
-Proof.
-  intros Hdup Hdup' Heq.
-  apply mk_is_Some in Heq as Hsome.
-  apply match_tensorlist_spec_aux_dom in Heq as Hdom.
-  apply match_tensorlist_spec_aux_img in Heq as Himg.
-  intros Hsize.
-  rewrite <- (map_dom_img_eq_card_iff_NoDup (SA:=gset Idx)) in Hsize.
-  apply match_tensorlist_spec_aux_free in Hsome as Hfrees.
-  intros Htypes Hunused.
-  apply match_tensorlist_spec_aux_2 in Heq as Hmabs.
-  apply (match_tensorlist_correct_aux_map_unused tl tl' m) in Hunused; 
-    [|easy..].
-  now apply (match_tensorlist_correct_aux_map_conditions _ _ m).
-Qed.
-
-
-Lemma match_tensorlist_correct_aux_map_conditions_length tl tl' (m : gmap Idx Idx) : 
-  NoDup_vars tl -> NoDup_vars tl' ->
-  match_tensorlist tl tl' = Some m ->
-  (* dom m = tl_bound_varset tl ∩ tl_used_varset tl ->  *)
-  (* map_img m = tl_bound_varset tl' ∩ tl_used_varset tl' ->  *)
-  (* size (dom m) = size (map_img m :> gset Idx) -> *)
-  (* tl_free_varset tl = tl_free_varset tl' ->  *)
-  map_Forall (fun v v' => tl_type_map tl !! v = tl_type_map tl' !! v') m ->
-  tl.(tl_sums).*1 ≡ₚ tl'.(tl_sums).*1 ->
-  length (tl_used_bound_vars tl) = length (tl_used_bound_vars tl') ->
-  (* (tl_unused_bound_vars tl).*1 ≡ₚ (tl_unused_bound_vars tl').*1 -> *)
-  (* relabel_abs (relabel_bound_Idx (gmap_map m) (tl_bound_varset tl)) <$>
-	tl_abstracts tl ≡ₚ tl_abstracts tl' -> *)
-  tl =t= tl'.
-Proof.
-  intros Hdup Hdup' Heq.
-  apply mk_is_Some in Heq as Hsome.
-  apply match_tensorlist_spec_aux_dom in Heq as Hdom.
-  apply match_tensorlist_spec_aux_img in Heq as Himg.
-  intros Htypes Hperm Hlen.
-  apply (match_tensorlist_correct_aux_map_inj tl tl' m) in Hlen; [|easy..].
-  apply match_tensorlist_spec_aux_free in Hsome as Hfrees.
-  apply match_tensorlist_spec_aux_2 in Heq as Hmabs.
-  apply (match_tensorlist_correct_aux_map_unused tl tl' m) in Hperm; [|easy..].
-  now apply (match_tensorlist_correct_aux_map_conditions _ _ m).
-Qed.
-
-
-Lemma tl_dedup_sums_inj tl tl' : 
-  tl_dedup_sums tl =t= tl_dedup_sums tl' -> 
-  tl =t= tl'.
-Proof. 
-  now rewrite 2 tl_dedup_sums_correct. 
-Qed.
-
-
-
-
-Lemma tensorlist_eqb_correct tl tl' :
-  tensorlist_eqb tl tl' = true -> 
-  tl =t= tl'.
-Proof.
-  intros Htl.
-  apply Is_true_true in Htl as Htl'.
-  apply tensorlist_eqb_spec_aux_1 in Htl' as
-    (Htys & Hunused & Hsome).
-  revert Hsome.
-  destruct (match_tensorlist _ _) as [m|] eqn:Hm;
-    [|by intros ?%is_Some_None].
-  cbn -[ tl_type_map ].
-  rewrite guard_is_Some.
-  intros Htypes.
-  apply tl_dedup_sums_inj.
-  apply (match_tensorlist_correct_aux_map_conditions' _ _ m);
-  [apply tl_dedup_sums_NoDup_vars|apply tl_dedup_sums_NoDup_vars|try easy..].
-  - apply (map_dom_img_eq_card_iff_NoDup (SA:=gset Idx)).
-    apply (match_tensorlist_correct_aux_map_inj (tl_dedup_sums tl)
-      (tl_dedup_sums tl'));
-    [apply tl_dedup_sums_NoDup_vars|apply tl_dedup_sums_NoDup_vars|
-    now apply match_tensorlist_spec_aux_dom in Hm|
-    now apply match_tensorlist_spec_aux_img in Hm|].
-    specialize (Permutation_length Htys).
-    rewrite <- (tl_dedup_sums_types tl), <- (tl_dedup_sums_types tl').
-    rewrite 2 length_fmap.
-    rewrite 2 tl_sums_used_unused_decomp.
-    simpl_list.
-    rewrite Hunused.
-    lia.
-  - by rewrite 2 tl_dedup_sums_types.
-Qed.
-
-End TensorExprSemantics.
