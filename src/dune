@@ -1,4 +1,6 @@
-(include_subdirs qualified)
-(coq.theory
-  (name TensRocq)
-  (package rocq-tensors))
+(library
+ (name hypercaml_interface)
+ (public_name rocq-tensors.hypercaml_interface)
+ (libraries coq-core.plugins.ltac2 
+;  hypercaml yojson
+ ))
