@@ -411,6 +411,17 @@ Fixpoint extend_map_of_abstract_pair (lbound rbound : gset Idx)
   | _, _ => None
   end.
 
+Definition list_first_omap {A B} (f : A -> option B) : list A -> option B :=
+  fix list_first_omap l :=
+  match l with 
+  | [] => None
+  | a :: l => 
+    match f a with 
+    | Some b => Some b
+    | None => list_first_omap l
+    end
+  end.
+
 Fixpoint extend_match_of_abstract_tensors 
   (lbound rbound : gset Idx) (m : gmap Idx Idx)
   (labs rabs : list (Idx * list Idx * list Idx)) : option (gmap Idx Idx) :=
@@ -420,12 +431,17 @@ Fixpoint extend_match_of_abstract_tensors
     | _ => None
     end
   | (fl, lowl, upl) :: labs => 
-    head ('((_, lowr, upr), rrest) ← list_select (fun '(fr, _, _) => fl = fr) rabs;
+    list_first_omap (fun '((_, lowr, upr), rrest) => 
+      m' ← extend_map_of_abstract_pair lbound rbound m lowl lowr;
+         m'' ← extend_map_of_abstract_pair lbound rbound m' upl upr;
+         extend_match_of_abstract_tensors lbound rbound m'' labs rrest)
+      (list_select (fun '(fr, _, _) => fl = fr) rabs)
+    (* head ('((_, lowr, upr), rrest) ← list_select (fun '(fr, _, _) => fl = fr) rabs;
       from_option (λ x, [x]) [] 
         (m' ← extend_map_of_abstract_pair lbound rbound m lowl lowr;
          m'' ← extend_map_of_abstract_pair lbound rbound m' upl upr;
          extend_match_of_abstract_tensors lbound rbound m'' labs rrest)
-      )
+      ) *)
   end.
 
 Definition match_tensorlist (tl tl' : tensorlist) : option (gmap Idx Idx) :=
@@ -1332,6 +1348,42 @@ Proof.
   now intros ? ? ->.
 Qed.
 
+Lemma list_first_omap_eq_head_bind {A B} (f : A -> option B) l : 
+  list_first_omap f l = 
+  head (x ← l; from_option (λ x, [x]) [] (f x)).
+Proof.
+  induction l; [done|].
+  cbn.
+  rewrite IHl.
+  destruct (f a); reflexivity.
+Qed.
+
+Lemma extend_match_of_abstract_tensors_alt lbound rbound m labs rabs : 
+  extend_match_of_abstract_tensors lbound rbound m labs rabs =
+  match labs with 
+  | [] => match rabs with
+    | [] => Some m
+    | _ => None
+    end
+  | (fl, lowl, upl) :: labs => 
+    head ('((_, lowr, upr), rrest) ← list_select (fun '(fr, _, _) => fl = fr) rabs;
+      from_option (λ x, [x]) [] 
+        (m' ← extend_map_of_abstract_pair lbound rbound m lowl lowr;
+         m'' ← extend_map_of_abstract_pair lbound rbound m' upl upr;
+         extend_match_of_abstract_tensors lbound rbound m'' labs rrest)
+      )
+  end.
+Proof.
+  destruct labs as [|[[]]]; [done|].
+  cbn.
+  rewrite list_first_omap_eq_head_bind.
+  f_equiv.
+  apply list_bind_ext; [|easy].
+  by intros [[[]]].
+Qed.
+
+
+
 Lemma extend_match_of_abstract_tensors_dom_img_strong {lbound rbound m labs rabs mres} : 
   extend_match_of_abstract_tensors lbound rbound m labs rabs = Some mres ->
   dom mres = dom m ∪ (lbound ∩ abstracts_vars labs) /\
@@ -1341,6 +1393,7 @@ Proof.
   induction labs as [|[[fl lowl] upl] labs IHlabs];
   intros rabs m mres;
   [destruct rabs; [|easy]; now intros [= <-]; set_solver|].
+  rewrite extend_match_of_abstract_tensors_alt.
   cbn.
   intros Heq.
   apply head_Some_elem_of in Heq as Hmem.
@@ -1378,6 +1431,7 @@ Proof.
   induction labs as [|[[fl lowl] upl] labs IHlabs];
   intros rabs m mres;
   [destruct rabs; [|easy]; now intros [= <-]; set_solver|].
+  rewrite extend_match_of_abstract_tensors_alt.
   cbn.
   intros Heq.
   apply head_Some_elem_of in Heq as Hmem.
@@ -1452,6 +1506,7 @@ Proof.
   induction labs as [|[[fl lowl] upl] labs IHlabs];
   intros rabs m mres;
   [destruct rabs; [|easy]; now intros ? [= <-]; set_solver|].
+  rewrite extend_match_of_abstract_tensors_alt.
   cbn.
   intros Hdom Heq.
   apply head_Some_elem_of in Heq as Hmem.
@@ -1484,6 +1539,7 @@ Proof.
   induction labs as [|[[fl lowl] upl] labs IHlabs];
   intros rabs m mres;
   [destruct rabs; [|easy]; now intros ? [= <-]; set_solver|].
+  rewrite extend_match_of_abstract_tensors_alt.
   cbn.
   intros Hdom Heq.
   apply head_Some_elem_of in Heq as Hmem.
@@ -2489,6 +2545,7 @@ Proof.
   intros rabs m;
   [reflexivity|].
   intros Hlbound Hrbound.
+  rewrite 2 extend_match_of_abstract_tensors_alt.
   cbn [extend_match_of_abstract_tensors].
   f_equal.
   apply list_bind_ext_strong.
@@ -2654,7 +2711,7 @@ Notation NoDup_vars tl := (NoDup tl.(tl_sums).*2) (only parsing).
 
 Module TensorExprNotations.
 
-Import StringCustomNotation.
+Export StringCustomNotation.
 
 Declare Custom Entry tensorexpr.
 
@@ -2675,31 +2732,18 @@ Notation "'()'" :=
   (@nil Idx)
   (in custom tensorexpr_args at level 0).
 
-
-(* Notation "'(' x , .. , y ') " :=
-  (@cons Idx x .. (@cons Idx y nil) ..)
-  (in custom tensorexpr_args at level 0,
-  x constr, y constr, only printing). *)
-
-Notation "f lower upper" :=
+Notation "f  lower  upper" :=
   (tabstract f lower upper)
   (in custom tensorexpr at level 10, 
     f custom string at level 0,
     lower custom tensorexpr_args at level 0,
     upper custom tensorexpr_args at level 0).
-(* 
-Notation "f @ lower upper" :=
-  (tabstract f lower upper)
-  (in custom tensorexpr at level 10, 
-    f constr,
-    lower custom tensorexpr_args at level 0,
-    upper custom tensorexpr_args at level 0, only printing). *)
 
 Notation "'(' te ')'" := 
     (te) (in custom tensorexpr at level 0, 
     te custom tensorexpr at level 200).
 
-Notation "l * r" :=
+Notation "l  *  r" :=
   (tproduct l r) 
   (in custom tensorexpr at level 50, left associativity).
 
@@ -2710,7 +2754,7 @@ Notation "∑' smd" :=
   (in custom tensorexpr at level 60, 
     smd custom tensorexpr_sum at level 60).
 
-Notation "var : 'V' ty , smd" :=
+Notation "var  :  'V'  ty ,  smd" :=
   (tsum var ty smd) 
   (in custom tensorexpr_sum at level 60, 
     var custom string at level 0,
@@ -2718,7 +2762,7 @@ Notation "var : 'V' ty , smd" :=
     smd custom tensorexpr_sum at level 60,
     right associativity).
 
-Notation "∑ var : 'V' ty , smd" :=
+Notation "∑  var  :  'V'  ty ,  smd" :=
   (tsum var ty smd) 
   (in custom tensorexpr at level 60, 
     var custom string at level 0,

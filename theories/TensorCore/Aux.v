@@ -22,6 +22,16 @@ Proof.
     now exists (exist P x p).
 Qed.
 
+Lemma exists_sigT {A} {P : A -> Type} {Q : sigT P -> Prop}: 
+  (exists x : sigT P, Q x) <-> exists x p, Q (@existT A P x p).
+Proof.
+  split.
+  - intros ((x & p) & q).
+    eauto.
+  - intros (x & p & q).
+    now exists (@existT A P x p).
+Qed.
+
 Lemma exists_and_sig {A} {P Q R : A -> Prop} : 
   (exists x : {a : A | P a /\ Q a}, R (proj1_sig x)) <-> 
     exists (x : {a : A | P a}), Q (proj1_sig x) /\ R (proj1_sig x).

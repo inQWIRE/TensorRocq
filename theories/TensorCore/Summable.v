@@ -31,85 +31,6 @@ Class Summable (A : Type) := sum_over {
 #[global] Arguments sum_over {_} _ : assert.
 
 
-Fixpoint Rlist_sum `{SR : SemiRing R rO rI radd rmul req} (l : list R) : R :=
-  match l with 
-  | [] => rO
-  | r :: l => radd r (Rlist_sum l) 
-  end.
-
-Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req} : 
-  Rlist_sum with signature PermutationA req ==> req as Rlist_sum_perm_mor.
-Proof.
-  set (HR := Req_equiv : Equivalence req).
-  set (HRadd := SR.(Req_ext).(SRadd_ext)).
-  intros l l' Hl.
-  induction Hl; cbn.
-  - reflexivity.
-  - now f_equiv.
-  - now rewrite 2 radd_assoc, (radd_comm y).
-  - etransitivity; eauto.
-Qed.
-
-  
-
-Section Rlist_sum.
-
-Context `{SR : SemiRing R rO rI radd rmul req}.
-
-Notation "0" := rO.
-Notation "1" := rI.
-Notation "x '==' y" := (req x y) (at level 70). 
-Infix "+" := radd. 
-Infix "*" := rmul.
-
-Add Ring R : SR.(RSRth)
-  (setoid SR.(Req_equiv) SR.(Req_ext)).
-
-Let Req_equivalence : Equivalence req := Req_equiv.
-Local Existing Instance Req_equivalence.
-
-Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
-Local Existing Instance Radd_proper.
-
-Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
-Local Existing Instance Rmul_proper.
-
-
-
-Lemma Rlist_sum_fold_right l :
-  Rlist_sum l = fold_right radd rO l.
-Proof.
-  induction l; cbn; congruence.
-Qed.
-
-Lemma Rlist_sum_nil : Rlist_sum [] = 0.
-Proof. 
-  reflexivity.
-Qed.
-
-Lemma Rlist_sum_cons a l : 
-  Rlist_sum (a :: l) = a + Rlist_sum l.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma Rlist_sum_app l l' : 
-  Rlist_sum (l ++ l') == Rlist_sum l + Rlist_sum l'.
-Proof.
-  induction l as [|r l IHl]; cbn; [ring|ring [IHl]].
-Qed.
-
-Lemma Rlist_sum_concat ls : 
-  Rlist_sum (concat ls) == Rlist_sum (map Rlist_sum ls).
-Proof.
-  induction ls; [reflexivity|cbn].
-  now rewrite Rlist_sum_app, IHls.
-Qed.
-
-
-End Rlist_sum.
-
-Generalizable Variables A B C D.
 
 (* The sum of a function over a summable domain [A]. 
   We require the codomain to be a SemiRing so that 
@@ -355,8 +276,8 @@ Qed.
 (* TODO: Is there an existing function for this? *)
 Fixpoint vec_elements `(l : list A) (n : nat) : list (Vector.t A n) :=
   match n with
-  | 0 => [Vector.nil A]
-  | S n' => flat_map (fun a => map (Vector.cons A a n') (vec_elements l n')) l
+  | 0 => [@Vector.nil A]
+  | S n' => flat_map (fun a => map (@Vector.cons A a n') (vec_elements l n')) l
   end.
 
 Lemma ForallPairs_cons `(R : relation A) a (l : list A) : 
@@ -412,8 +333,8 @@ Lemma vec_elements_NoDup `(l : list A) (n : nat) :
   NoDup l -> NoDup (vec_elements l n).
 Proof.
   revert n.
-  assert (Haux : l <> [] -> forall x y n, map (Vector.cons A x n) (vec_elements l n) =
-   map (Vector.cons A y n) (vec_elements l n) <-> x = y). 1:{
+  assert (Haux : l <> [] -> forall x y n, map (@Vector.cons A x n) (vec_elements l n) =
+   map (@Vector.cons A y n) (vec_elements l n) <-> x = y). 1:{
     intros Hl x y n.
     split; [|now intros ->].
     apply (vec_elements_nonempty _ n) in Hl.
@@ -495,6 +416,91 @@ Qed.
 #[export]
 Instance Summable_vec `{Summable A} n : Summable (Vector.t A n) :=
   sum_over (vec_elements sum_elements n).
+
+Section fin_fun.
+
+(* Import Fin. *)
+
+Local Notation "'!S' f" := (fun i => f (Fin.FS i)) (only parsing, at level 10).
+
+Local Definition fin_S_inv {n} (P : Fin.t (S n) -> Type)
+  (H0 : P Fin.F1) (HS : forall i, P (Fin.FS i)) (i : Fin.t (S n)) : P i.
+Proof.
+  revert P H0 HS.
+  refine match i with Fin.F1 => fun _ H0 _ => H0 
+  | Fin.FS i => fun _ _ HS => HS i end.
+Defined.
+
+Fixpoint fin_fun_elements_aux {n} : forall (f : Fin.t n -> Type) 
+  (Sf : forall i, list (f i)), list (forall i, f i) := 
+  match n with 
+  | 0 => fun f Sf => [Fin.case0 f]
+  | S n' =>
+    fun f Sf =>
+    let l := 
+      fin_fun_elements_aux (!S f) (!S Sf) in
+    flat_map (fun x => map (fin_S_inv f x) l) (Sf (Fin.F1))
+  end.
+
+
+Lemma fin_fun_elements_aux_ina_gen {n} (f : Fin.t n -> Type) Sf 
+  (Rf : forall i, relation (f i)) g : 
+  InA (forall_relation Rf) g (fin_fun_elements_aux f Sf) <->
+  forall i, (InA (Rf i) (g i) (Sf i)).
+Proof.
+  rewrite InA_altdef.
+  induction n.
+  - cbn.
+    rewrite Exists_cons, Exists_nil.
+    split; intros _; [|left]; exact (Fin.case0 _).
+  - cbn.
+    rewrite Exists_flat_map.
+    split.
+    + intros (x & Hx & HgS)%Exists_exists.
+      (* pose proof HgS as Hx'. *)
+      rewrite Exists_exists in HgS.
+      destruct HgS as (g' & (gS' & <- & HgS')%in_map_iff & Hgg').
+      specialize (Hgg' Fin.F1) as Hxeq.
+      cbn in Hxeq.
+      apply fin_S_inv. 
+      * rewrite InA_altdef, Exists_exists. 
+        eauto. 
+      * apply IHn.
+        rewrite Exists_exists.
+        exists gS'.
+        split; [easy|].
+        intros i; apply Hgg'.
+    + intros Hg.
+      rewrite Exists_exists.
+      pose proof (Hg Fin.F1) as 
+        (g1' & Hg1' & Hg1g1')%InA_altdef%Exists_exists.
+      exists g1'.
+      split; [auto|].
+      rewrite Exists_exists.
+      specialize (IHn (!S f) (!S Sf) (!S Rf) (!S g)).
+      apply proj2 in IHn.
+      specialize (IHn (!S Hg)).
+      rewrite Exists_exists in IHn.
+      destruct IHn as (gS' & HgS' & HgSgS').
+      eexists.
+      split; [apply in_map; eassumption|].
+      hnf.
+      now apply fin_S_inv.
+Qed.
+
+Lemma fin_fun_elements_aux_ina_eq {n} (f : Fin.t n -> Type) Sf g : 
+  InA (fun f g => forall x, f x = g x) g (fin_fun_elements_aux f Sf) <->
+  forall i, (In (g i) (Sf i)).
+Proof.
+  setoid_rewrite (fin_fun_elements_aux_ina_gen f Sf (fun _ => eq)).
+  apply forall_iff.
+  intros i.
+  split; [|apply In_InA, _].
+  now intros (_ & Hgi & <-)%InA_altdef%Exists_exists.
+Qed.
+
+End fin_fun.
+
 
 #[export] 
 Instance Summable_prod `{Summable A, Summable B} : Summable (A * B) :=

@@ -45,7 +45,7 @@ Proof.
   destruct b; destruct c; lca.
 Qed.
 
-Section ZX.
+(* Section ZX. *)
 
 Ltac split_sums :=
     repeat progress (
@@ -218,4 +218,4 @@ Proof.
   reflexivity.
 Qed.
 
-End ZX.
+(* End ZX. *)

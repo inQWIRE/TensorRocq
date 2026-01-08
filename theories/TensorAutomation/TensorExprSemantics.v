@@ -106,6 +106,8 @@ Coercion abstype_of_abs_context : abscontext >-> abstypecontext.
 
 Definition mk_Vval {n} (v : V n) : Vval := existT n v.
 
+Definition mk_Vfunc args (f : V_n_args args R) : Vfunc := existT args f.
+
 (* TODO: Extract (and remove?) *)
 Fixpoint well_typed (abs : abstypecontext) (types : vartypecontext) 
   (te : tensorexpr) : bool :=
@@ -1755,6 +1757,26 @@ Proof.
     rewrite Hunused.
     lia.
   - by rewrite 2 tl_dedup_sums_types.
+Qed.
+
+Lemma tensorlist_eqb_correct_apply abs vars tl tl' :
+  tensorlist_eqb tl tl' = true ->
+  total_semantics abs vars tl ==
+  total_semantics abs vars tl'.
+Proof.
+  intros Heq%tensorlist_eqb_correct.
+  apply Heq.
+Qed.
+
+Lemma tensorexpr_eqb_correct_apply abs vars te te' : 
+  tensorlist_eqb (tensorlist_of_tensorexpr te)
+    (tensorlist_of_tensorexpr te') = true ->
+  total_semantics abs vars te ==
+  total_semantics abs vars te'.
+Proof.
+  intros Heq%tensorlist_eqb_correct.
+  rewrite 2 tensorlist_of_tensorexpr_correct in Heq.
+  apply Heq.
 Qed.
 
 End TensorExprSemantics.

@@ -818,6 +818,15 @@ Qed.
 Notation "'unfold' x" := (ltac:(let x' := eval unfold x in x in 
   exact (eq_refl : x = x'))) (at level 10, only parsing).
 
+Notation "'unfold' x 'in' y" := (ltac:(let y' := eval unfold x in y in 
+  exact (eq_refl : y = y'))) (at level 10, only parsing).
+
+
+Notation "'unfolded' x" := (ltac:(let x' := eval unfold x in x in 
+  exact x')) (at level 10, only parsing).
+
+Notation "'unfolded' x 'in' y" := (ltac:(let y' := eval unfold x in y in 
+  exact y')) (at level 10, only parsing).
 
 Lemma decide_not `{HNP : Decision (~ P)} `{HP : Decision P} {A} (x y : A) : 
   (if @decide (~ P) HNP then x else y) = 
@@ -929,3 +938,256 @@ Proof.
   rewrite IHl by now intros; apply HP; right.
   reflexivity.
 Qed.
+
+
+
+
+Module pfin.
+
+Local Open Scope positive_scope.
+
+
+Inductive pfin : positive -> Set :=
+  | PFO_H {p} : pfin (p~0)
+  | PFO_O {p} : pfin p -> pfin (p~0)
+  | PFO_I {p} : pfin p -> pfin (p~0)
+  | PFI_H {p} : pfin (p~1)
+  | PFI_SH {p} : pfin (p~1)
+  | PFI_SO {p} : pfin p -> pfin (p~1)
+  | PFI_SI {p} : pfin p -> pfin (p~1).
+
+Declare Scope pfin_scope.
+Bind Scope pfin_scope with pfin.
+Delimit Scope pfin_scope with pfin.
+
+Local Open Scope pfin_scope.
+
+Fixpoint pfin_to_pos {p} (i : pfin p) : positive :=
+  match i with
+  | PFO_H => 1
+  | PFO_O i => (pfin_to_pos i)~0
+  | PFO_I i => (pfin_to_pos i)~1
+  | PFI_H => 1
+  | PFI_SH => 2
+  | PFI_SO i => Pos.succ (pfin_to_pos i)~0
+  | PFI_SI i => Pos.succ (pfin_to_pos i)~1
+  end.
+
+
+Lemma pfin_to_pos_lt {p} (i : pfin p) : 
+  pfin_to_pos i < p.
+Proof.
+  induction i; cbn; lia.
+Qed.
+
+Definition pfin_1_inv (P : pfin 1 -> Type) (i : pfin 1) : P i :=
+  match i with | PFO_H | PFO_O _ | PFO_I _ 
+  | PFI_H | PFI_SH | PFI_SO _ | PFI_SI _ => 
+    fun devil => False_rect (@ID) devil end.
+
+Definition pfin_xO_inv {p} (P : pfin p~0 -> Type) (H1 : P PFO_H) 
+  (HxO : forall i, P (PFO_O i)) (HxI : forall i, P (PFO_I i)) : 
+  forall i, P i :=
+  fun i => 
+  match i as i' in pfin p return 
+    forall (P : pfin p -> Type),
+    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with 
+    | p~0 => fun P i => _ -> _ -> _ -> P i
+    | _ => fun P _ => True
+    end P i' with
+  | PFO_H => fun P H1 _ _ => H1
+  | PFO_O i => fun P _ HxO _ => HxO i
+  | PFO_I i => fun P _ _ HxI => HxI i
+  | PFI_H 
+  | PFI_SH
+  | PFI_SO _ 
+  | PFI_SI _ => fun _ => Logic.I
+  end P H1 HxO HxI.
+
+Definition pfin_xI_inv {p} (P : pfin p~1 -> Type) (H1 : P PFI_H)
+  (H2 : P PFI_SH)
+  (HxO : forall i, P (PFI_SO i)) (HxI : forall i, P (PFI_SI i)) : 
+  forall i, P i :=
+  fun i => 
+  match i as i' in pfin p return 
+    forall (P : pfin p -> Type),
+    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with 
+    | p~1 => fun P i => _ -> _ -> _ -> _ -> P i
+    | _ => fun P _ => True
+    end P i' with
+  | PFI_H => fun P H1 _ _ _ => H1
+  | PFI_SH => fun P _ H2 _ _ => H2
+  | PFI_SO i => fun P _ _ HxO _ => HxO i
+  | PFI_SI i => fun P _ _ _ HxI => HxI i
+  | PFO_H 
+  | PFO_O _ 
+  | PFO_I _ => fun _ => Logic.I
+  end P H1 H2 HxO HxI.
+
+Definition PFI_S {p} (i : pfin p~0) : pfin p~1 :=
+  pfin_xO_inv _ PFI_SH PFI_SO PFI_SI i.
+
+Definition pfin_xI_inv' {p} (P : pfin p~1 -> Type) 
+  (H1 : P PFI_H) (HS : forall i, P (PFI_S i)) i : P i :=
+  pfin_xI_inv P H1 (HS PFO_H) (fun i => HS (PFO_O i)) 
+    (fun i => HS (PFO_I i)) i.
+
+Definition pfin_rect' (P : forall p, pfin p -> Type) 
+  (HO_1 : forall p, P p~0 PFO_H) (HI_1 : forall p, P p~1 PFI_H)
+  (HxO : forall p i, P p i -> P p~0 (PFO_O i))
+  (HxI : forall p i, P p i -> P p~0 (PFO_I i))
+  (HS : forall p i, P p~0 i -> P p~1 (PFI_S i)) : forall p i, P p i :=
+  fix go p :=
+  match p with 
+  | 1 => pfin_1_inv _
+  | p~0 => pfin_xO_inv (P p~0) (HO_1 _) 
+    (fun i => HxO _ _ (go _ i)) (fun i => HxI _ _ (go _ i))
+  | p~1 => pfin_xI_inv' (P p~1) (HI_1 _) 
+    (fun i => HS _ _ (pfin_xO_inv (P p~0) (HO_1 _) 
+    (fun i => HxO _ _ (go _ i)) (fun i => HxI _ _ (go _ i)) i)) 
+  end.
+
+Definition pfin_1 {p} : pfin (Pos.succ p) :=
+  match p with 
+  | 1 => PFO_H
+  | p~0 => PFI_H
+  | p~1 => PFO_H
+  end.
+
+Fixpoint pfin_S {p} : pfin p -> pfin (Pos.succ p) :=
+  match p with 
+  | 1 => pfin_1_inv _
+  | p~0 => PFI_S
+  | p~1 => pfin_xI_inv _ (PFO_O pfin_1) (PFO_I pfin_1)
+    (fun i => PFO_O (pfin_S i)) (fun i => PFO_I (pfin_S i))
+  end.
+
+Lemma pfin_1_to_pos {p} : pfin_to_pos (@pfin_1 p) = 1.
+Proof.
+  now destruct p.
+Qed.
+
+Lemma pfin_S_to_pos {p} (i : pfin p) :
+  pfin_to_pos (pfin_S i) = Pos.succ (pfin_to_pos i).
+Proof.
+  induction i; cbn; rewrite 1?pfin_1_to_pos; lia.
+Qed.
+
+
+Local Lemma lt_xI_xO_inv {i p} : i~1 < p~0 -> i < p.
+Proof.
+  lia.
+Qed.
+
+Local Lemma lt_SxI_xI_inv {i p} : Pos.succ i~1 < p~1 -> i < p.
+Proof.
+  lia.
+Qed.
+
+Fixpoint pos_to_pfin (i p : positive) : i < p -> pfin p :=
+  match p with 
+  | xH => fun H => False_rect (pfin 1) (Pos.nlt_1_r i H)
+  | p~0 => match i with 
+    | xH => fun _ => PFO_H
+    | i~0 => fun H => PFO_O (pos_to_pfin i p H)
+    | i~1 => fun H => PFO_I (pos_to_pfin i p 
+      (lt_xI_xO_inv H))
+    end
+  | p~1 => 
+    Pos.peano_rect (fun i => i < p~1 -> pfin p~1)
+      (fun _ => PFI_H)
+      (fun i _ => 
+      match i with 
+      | xH => fun _ => PFI_SH
+      | i~0 => fun H => PFI_SO (pos_to_pfin i p H)
+      | i~1 => fun H => PFI_SI (pos_to_pfin i p (lt_SxI_xI_inv H))
+      end) i
+  end.
+
+Lemma pfin_to_pos_to_pfin {p} (i : pfin p) H : 
+  pos_to_pfin (pfin_to_pos i) p H = i.
+Proof.
+  induction i; cbn; rewrite 1?Pos.peano_rect_succ, 1?IHi; 
+    try reflexivity.
+Qed.
+
+Lemma pos_to_pfin_to_pos i p H : 
+  pfin_to_pos (pos_to_pfin i p H) = i.
+Proof.
+  revert i H; induction p; intros i H; [destruct i..|lia]; 
+  cbn; rewrite ?IHp; try reflexivity.
+  destruct i using Pos.peano_case; [reflexivity|].
+  rewrite Pos.peano_rect_succ.
+  change (Pos.succ (i~0)) with i~1.
+  cbn.
+  rewrite IHp.
+  reflexivity.
+Qed.
+
+
+Fixpoint pos_to_pfin_opt (i p : positive) : option (pfin p) :=
+  match p with 
+  | xH => None
+  | p~0 => match i with 
+    | xH => Some (PFO_H)
+    | i~0 => PFO_O <$> (pos_to_pfin_opt i p)
+    | i~1 => PFO_I <$> (pos_to_pfin_opt i p)
+    end
+  | p~1 => 
+    Pos.peano_rect (fun i => option (pfin p~1))
+      (Some PFI_H)
+      (fun i _ => 
+      match i with 
+      | xH => Some PFI_SH
+      | i~0 => PFI_SO <$> (pos_to_pfin_opt i p)
+      | i~1 => PFI_SI <$> (pos_to_pfin_opt i p)
+      end) i
+  end.
+
+
+Lemma pos_to_pfin_opt_is_Some i p : 
+  is_Some (pos_to_pfin_opt i p) <-> i < p.
+Proof.
+  revert i; induction p; intros i; cbn.
+  - destruct i using Pos.peano_case.
+    + cbn.
+      split; [lia|auto].
+    + rewrite Pos.peano_rect_succ.
+      destruct i; [cbn; rewrite 1?fmap_is_Some, IHp; lia..|].
+      split; [lia|auto].
+  - destruct i; [cbn; rewrite 1?fmap_is_Some, IHp; lia..|].
+    split; [lia|auto].
+  - split; [intros []%is_Some_None|lia].
+Qed.
+
+Lemma pos_to_pfin_opt_correct i p H : 
+  pos_to_pfin_opt i p = Some (pos_to_pfin i p H).
+Proof.
+  revert i H; induction p; intros i H; cbn.
+  - destruct i using Pos.peano_case; [reflexivity|].
+    rewrite 2 Pos.peano_rect_succ.
+    now destruct i; [cbn; erewrite IHp..|].
+  - now destruct i; [cbn; erewrite IHp..|].
+  - lia.
+Qed.
+
+End pfin.
+
+Module pvec.
+
+#[universes(template)]
+Inductive pvec (A : Type) : positive -> Type := 
+  | pvnil : pvec A 1
+  | pvxO {p} (aH : A) (pO : pvec A p) (pI : pvec A p) : pvec A p~0
+  | pvxI {p} (aH aSH : A) (pO : pvec A p) (pI : pvec A p) : pvec A p~1.
+
+(* 
+Inductive pfin : positive -> Set :=
+  | PFO_H {p} : pfin (p~0)
+  | PFO_O {p} : pfin p -> pfin (p~0)
+  | PFO_I {p} : pfin p -> pfin (p~0)
+  | PFI_H {p} : pfin (p~1)
+  | PFI_SH {p} : pfin (p~1)
+  | PFI_SO {p} : pfin p -> pfin (p~1)
+  | PFI_SI {p} : pfin p -> pfin (p~1). *)
+End pvec.

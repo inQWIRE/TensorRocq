@@ -1,17 +1,22 @@
+(* We make variables generalizable so that the unbundled 
+  definition of SemiRing is usable as 
+  [`{SR : SemiRing R rO rI radd rmul req}]. 
+  Additionally, it is not practical to declare only these
+  variables generalizable, as this causes an error when 
+  all variables are later declared generalizable (such as
+  in stdpp). *)
+#[global]
+Generalizable All Variables.
+
 Require Export Aux.
 Require Ring_theory.
 Require Integral_domain.
 Require List.
-Require Permutation.
 Require SetoidList.
+Require SetoidPermutation.
 Require Import Ring.
 Import Morphisms Setoid.
 
-(* We make these variables generalizable so that the unbundled 
-  definition of SemiRing is usable as 
-  [`{SR : SemiRing R rO rI radd rmul req}]*)
-#[global]
-Generalizable Variables R rO rI radd rmul req.
 
 (** A semiring is a structure with associative and commutative 
   addition and multiplication, which are also distributive. It
@@ -101,3 +106,160 @@ Lemma distr_r r s t : r * (s + t) == r * s + r * t.
 Proof. rewrite 3(rmul_comm r). apply distr_l. Qed.
 
 End SemiRing.
+
+Import List ListNotations SetoidPermutation.
+
+Fixpoint Rlist_sum `{SR : SemiRing R rO rI radd rmul req} (l : list R) : R :=
+  match l with 
+  | [] => rO
+  | r :: l => radd r (Rlist_sum l) 
+  end.
+
+Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req} : 
+  Rlist_sum with signature PermutationA req ==> req as Rlist_sum_perm_mor.
+Proof.
+  set (HR := Req_equiv : Equivalence req).
+  set (HRadd := SR.(Req_ext).(SRadd_ext)).
+  intros l l' Hl.
+  induction Hl; cbn.
+  - reflexivity.
+  - now f_equiv.
+  - now rewrite 2 radd_assoc, (radd_comm y).
+  - etransitivity; eauto.
+Qed.
+
+Fixpoint Rlist_prod `{SR : SemiRing R rO rI radd rmul req} (l : list R) : R :=
+  match l with 
+  | [] => rI
+  | r :: l => rmul r (Rlist_prod l) 
+  end.
+
+Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req} : 
+  Rlist_prod with signature PermutationA req ==> req as Rlist_prod_perm_mor.
+Proof.
+  set (HR := Req_equiv : Equivalence req).
+  set (HRmul := SR.(Req_ext).(SRmul_ext)).
+  intros l l' Hl.
+  induction Hl; cbn.
+  - reflexivity.
+  - now f_equiv.
+  - now rewrite 2 rmul_assoc, (rmul_comm y).
+  - etransitivity; eauto.
+Qed.
+
+  
+
+Section Rlist_sum.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70). 
+Infix "+" := radd. 
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+
+
+Lemma Rlist_sum_fold_right l :
+  Rlist_sum l = fold_right radd rO l.
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma Rlist_sum_nil : Rlist_sum [] = 0.
+Proof. 
+  reflexivity.
+Qed.
+
+Lemma Rlist_sum_cons a l : 
+  Rlist_sum (a :: l) = a + Rlist_sum l.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma Rlist_sum_app l l' : 
+  Rlist_sum (l ++ l') == Rlist_sum l + Rlist_sum l'.
+Proof.
+  induction l as [|r l IHl]; cbn; [ring|ring [IHl]].
+Qed.
+
+Lemma Rlist_sum_concat ls : 
+  Rlist_sum (concat ls) == Rlist_sum (map Rlist_sum ls).
+Proof.
+  induction ls; [reflexivity|cbn].
+  now rewrite Rlist_sum_app, IHls.
+Qed.
+
+
+End Rlist_sum.
+
+
+Section Rlist_prod.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70). 
+Infix "+" := radd. 
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+
+
+Lemma Rlist_prod_fold_right l :
+  Rlist_prod l = fold_right rmul rI l.
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma Rlist_prod_nil : Rlist_prod [] = 1.
+Proof. 
+  reflexivity.
+Qed.
+
+Lemma Rlist_prod_cons a l : 
+  Rlist_prod (a :: l) = a * Rlist_prod l.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma Rlist_prod_app l l' : 
+  Rlist_prod (l ++ l') == Rlist_prod l * Rlist_prod l'.
+Proof.
+  induction l as [|r l IHl]; cbn; [ring|ring [IHl]].
+Qed.
+
+Lemma Rlist_prod_concat ls : 
+  Rlist_prod (concat ls) == Rlist_prod (map Rlist_prod ls).
+Proof.
+  induction ls; [reflexivity|cbn].
+  now rewrite Rlist_prod_app, IHls.
+Qed.
+
+
+End Rlist_prod.

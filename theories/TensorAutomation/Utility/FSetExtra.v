@@ -74,6 +74,20 @@ Ltac2 equal (v_eq : 'v -> 'v -> bool) :
       | _, _ => false
       end)) m m' true).
 
+(* TODO: Add to others *)
+Ltac2 find_inv_opt (eqv : 'v -> 'v -> bool) (v : 'v) 
+  (m : ('k, 'v) FMap.t) : 'k option :=
+  Option.map fst (List.find_opt (fun (_k', v') => eqv v' v) (bindings m)).
+
+(* TODO: Add to others *)
+Ltac2 of_list (t : 'k FSet.Tags.tag) (l : ('k * 'v) list) : ('k, 'v) FMap.t :=
+  List.fold_right (fun (k, v) => FMap.add k v) l (FMap.empty t).
+
+(* TODO: Add to others *)
+Ltac2 kmap (f : 'k1 -> 'k2) (t : 'k2 FSet.Tags.tag) (m : ('k1, 'v) FMap.t) : 
+  ('k2, 'v) FMap.t :=
+  of_list t (List.map (fun (k, v) => (f k, v)) (bindings m)).
+
 End FMap.
 
 
