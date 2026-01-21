@@ -1,5 +1,12 @@
 (* Extra bits for stdpp *)
 From stdpp Require Import decidable.
+Require Import Aux.
+
+From stdpp Require Import prelude.
+
+
+From stdpp Require Import strings fin_maps pmap gmap hlist.
+From stdpp Require Import pretty.
 
 Lemma exists_dsig {A} {P Q : A -> Prop} `{forall x, Decision (P x)} : 
   (exists x : dsig P, Q (`x)) <-> exists x, P x /\ Q x.
@@ -23,7 +30,6 @@ Proof.
   now rewrite <- exists_dsig.
 Qed.
 
-From stdpp Require Import prelude.
 
 
 Fixpoint join_list {A} (l : list (option A)) : option (list A) :=
@@ -74,8 +80,6 @@ Proof.
 Qed.
 
 
-From stdpp Require Import strings fin_maps pmap gmap hlist.
-From stdpp Require Import pretty.
 
 (* FIXME: Move to Aux_stdpp *)
 Lemma bind_is_Some {A B} (f : A -> option B) (mx : option A) : 
@@ -537,6 +541,15 @@ Lemma elem_of_list_select_perm {A} `(P : A -> Prop)
 Proof. 
   intros [_ (? & ? & -> & <-)]%elem_of_list_select.
   solve_Permutation.
+Qed.
+
+
+Lemma elem_of_list_select_perm_Prop {A} `(P : A -> Prop)
+  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
+  (a, hd_tl) ∈ list_select P l -> P a /\ l ≡ₚ a :: hd_tl.
+Proof. 
+  intros [? (? & ? & -> & <-)]%elem_of_list_select.
+  split; [easy|solve_Permutation].
 Qed. 
 
 
@@ -1191,3 +1204,624 @@ Inductive pfin : positive -> Set :=
   | PFI_SO {p} : pfin p -> pfin (p~1)
   | PFI_SI {p} : pfin p -> pfin (p~1). *)
 End pvec.
+
+
+
+(* A predicate saying a map to a domain [D] has types specified by
+  the map [mT], according to the typing function [ty : D -> T]. A
+  canonical example is [D = {t : T & P t}] for some dependent type
+  [P], whence [ty = projT1]. *)
+Definition map_is_typed {K D T MD MT} `{Lookup K D MD, Lookup K T MT}
+  (ty : D -> T) (mT : MT) (mD : MD) : Prop :=
+  forall k, ty <$> mD !! k = mT !! k.
+
+Definition map_is_subtyped {K D T MD MT} `{Lookup K D MD, Lookup K T MT}
+  (ty : D -> T) (mT : MT) (mD : MD) : Prop :=
+  forall k t, mT !! k = Some t -> ty <$> mD !! k = Some t.
+
+Lemma map_is_typed_alt {K D T M} `{∀ A, Lookup K A (M A)}
+  (ty : D -> T) (mT : M T) (mD : M D) :
+  map_is_typed ty mT mD <-> map_relation (λ _ t d, ty d = t)
+    (λ _ _, False) (λ _ _, False) mT mD.
+Proof.
+  unfold map_relation, map_is_typed.
+  apply forall_iff; intros k.
+  destruct (mD !! k), (mT !! k); naive_solver.
+Qed.
+
+Lemma map_is_subtyped_alt {K D T M} `{∀ A, Lookup K A (M A)}
+  (ty : D -> T) (mT : M T) (mD : M D) :
+  map_is_subtyped ty mT mD <-> map_relation (λ _ t d, ty d = t)
+    (λ _ _, False) (λ _ _, True) mT mD.
+Proof.
+  unfold map_relation, map_is_subtyped.
+  apply forall_iff; intros k.
+  unfold option_relation.
+  destruct (mD !! k), (mT !! k); naive_solver.
+Qed.
+
+
+
+Section typed_map.
+
+Context {D T} `{FinMapDom K M SK} (ty : D -> T).
+
+(* Local Notation map_is_typed := (@map_is_typed K D T (M D) (M T) _ _ ty). *)
+
+Implicit Types (mD : M D) (mT : M T).
+
+Lemma map_is_typed_dom mD mT :
+  map_is_typed ty mT mD -> dom mD ≡ dom mT.
+Proof.
+  set_unfold.
+  setoid_rewrite elem_of_dom.
+  intros Hrw k.
+  rewrite <- (Hrw k).
+  now rewrite fmap_is_Some.
+Qed.
+
+Lemma map_is_typed_domL `{!LeibnizEquiv SK} mD mT :
+  map_is_typed ty mT mD -> dom mD = dom mT.
+Proof.
+  unfold_leibniz.
+  apply map_is_typed_dom.
+Qed.
+
+Lemma map_is_typed_iff_fmap_eq mD mT :
+  map_is_typed ty mT mD <-> ty <$> mD = mT.
+Proof.
+  rewrite (map_eq_iff _ mT).
+  apply forall_iff; intros k.
+  now rewrite lookup_fmap.
+Qed.
+
+Lemma map_is_typed_empty_l mD : map_is_typed ty (∅ :> M T) mD <-> mD = ∅.
+Proof.
+  rewrite map_is_typed_iff_fmap_eq.
+  apply fmap_empty_iff.
+Qed.
+
+Lemma map_is_typed_empty_r mT : map_is_typed ty mT (∅ :> M D) <-> mT = ∅.
+Proof.
+  rewrite map_is_typed_iff_fmap_eq.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma map_is_typed_insert_l k t mT mD :
+  mT !! k = None ->
+  map_is_typed ty (<[k := t]> mT) mD <->
+  ty <$> mD !! k = Some t /\
+  map_is_typed ty mT (delete k mD).
+Proof.
+  rewrite 2 map_is_typed_iff_fmap_eq.
+  intros Hk.
+  split.
+  - intros (d & mD' & -> & HmD't & -> & ->)%(fmap_insert_inv _ _ _ _ _ Hk).
+    rewrite lookup_insert.
+    split; [reflexivity|].
+    now rewrite delete_insert by done.
+  - intros [HmDk <-].
+    rewrite fmap_delete.
+    rewrite insert_delete; [easy|].
+    now rewrite lookup_fmap.
+Qed.
+
+Lemma map_is_typed_insert_l_gen k t mT mD :
+  map_is_typed ty (<[k := t]> mT) mD <->
+  ty <$> mD !! k = Some t /\
+  map_is_typed ty (delete k mT) (delete k mD).
+Proof.
+  destruct (mT !! k) as [mTk|] eqn:HmTk;
+    [|now rewrite map_is_typed_insert_l, (delete_notin mT)].
+  rewrite <- map_is_typed_insert_l by apply lookup_delete.
+  f_equiv.
+  now rewrite insert_delete_insert.
+Qed.
+
+Lemma map_is_typed_insert_l' k t mT mD :
+  mT !! k = None ->
+  map_is_typed ty (<[k := t]> mT) mD <->
+  exists d mD', ty d = t /\ mD = <[k := d]> mD' /\
+    mD' !! k = None /\
+    map_is_typed ty mT mD'.
+Proof.
+  intros HmTk.
+  rewrite map_is_typed_insert_l by easy.
+  split.
+  - destruct (mD !! k) as [d|] eqn:Hd; [|easy].
+    cbn.
+    intros [[= <-] Hty].
+    exists d, (delete k mD).
+    now rewrite insert_delete, lookup_delete by auto.
+  - intros (d & mD' & <- & -> & HmD'k & Hty).
+    now rewrite delete_insert, lookup_insert by auto.
+Qed.
+
+Lemma map_is_typed_insert_r k d mT mD :
+  mD !! k = None ->
+  map_is_typed ty mT (<[k := d]> mD) <->
+  mT !! k = Some (ty d) /\
+  map_is_typed ty (delete k mT) mD.
+Proof.
+  rewrite 2 map_is_typed_iff_fmap_eq.
+  intros Hk.
+  split.
+  - rewrite fmap_insert.
+    intros <-.
+    rewrite delete_insert by now rewrite lookup_fmap, Hk.
+    now split; [rewrite lookup_insert|].
+  - rewrite fmap_insert.
+    intros [HmTk ->].
+    now apply insert_delete.
+Qed.
+
+Lemma map_is_typed_insert_2 k d t mT mD :
+  ty d = t ->
+  map_is_typed ty mT mD ->
+  map_is_typed ty (<[k:=t]> mT) (<[k:=d]> mD).
+Proof.
+  intros Ht Hty k'.
+  rewrite 2 lookup_insert_case.
+  case_decide; [now f_equal/=|].
+  apply Hty.
+Qed.
+
+(* Lemma map_is_subtyped_iff_restriction_is_typed mT mD :
+  map_is_subtyped ty mT mD <->
+  map_is_typed ty mT (filter (λ kv, is_Some (mT !! kv.1)) mD).
+Proof.
+  unfold map_is_subtyped, map_is_typed.
+  setoid_rewrite map_lookup_filter.
+  cbn.
+  split.
+  -  *)
+
+
+(* Lemma map_is_subtyped_iff_submap_is_typed mT mD :
+  map_is_subtyped ty mT mD <->
+  exists mD', mD' ⊆ mD /\ map_is_typed ty mT mD'.
+Proof.
+  split.
+  -  *)
+
+Lemma map_is_typed_None k mT mD :
+  map_is_typed ty mT mD ->
+  mT !! k = None <-> mD !! k = None.
+Proof.
+  intros <-%map_is_typed_iff_fmap_eq.
+  rewrite lookup_fmap.
+  apply fmap_None.
+Qed.
+
+
+Lemma map_is_typed_None_l k mT mD :
+  map_is_typed ty mT mD ->
+  mT !! k = None -> mD !! k = None.
+Proof.
+  apply map_is_typed_None.
+Qed.
+
+Lemma map_is_typed_None_r k mT mD :
+  map_is_typed ty mT mD ->
+  mD !! k = None -> mT !! k = None.
+Proof.
+  apply map_is_typed_None.
+Qed.
+
+End typed_map.
+
+
+
+Definition and2pair {A B} (ab : A /\ B) : A * B :=
+  match ab with
+  | conj a b => (a, b)
+  end.
+(* Enable using .1 and .2 notations for proj1 and proj2 *)
+Coercion and2pair : and >-> prod.
+
+Definition map_inverses `{Lookup A B MA, Lookup B A MB}
+  (ma : MA) (mb : MB) : Prop :=
+  forall a b, ma !! a = Some b <-> mb !! b = Some a.
+
+Lemma map_inverses_insert_fresh `{FinMap A MA, FinMap B MB}
+  (ma : MA B) (mb : MB A) a b :
+  map_inverses ma mb ->
+  ma !! a = None -> mb !! b = None ->
+  map_inverses (<[a := b]> ma) (<[b := a]> mb).
+Proof.
+  intros Hab Hma Hmb a' b'.
+  rewrite 2 lookup_insert_case.
+  generalize (Hab a' b').
+  case_decide as Ha; case_decide as Hb; subst; easy || naive_solver.
+Qed.
+
+(* TODO: Extend to gmap *)
+Fixpoint Pmap_ne_dom_subseteqb 
+  {A B} (ma : Pmap_ne A) (mb : Pmap_ne B) : bool :=
+  match ma with 
+  | PNode001 mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match mbr with
+    | PNodes mbr => Pmap_ne_dom_subseteqb mar mbr
+    | _ => false
+    end)
+  | PNode010 a => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match b with
+    | Some _ => true
+    | _ => false
+    end)
+  | PNode011 a mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match b, mbr with
+    | Some _, PNodes mbr => Pmap_ne_dom_subseteqb mar mbr
+    | _, _ => false
+    end) 
+  | PNode100 mal => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match mbl with
+    | PNodes mbl => Pmap_ne_dom_subseteqb mal mbl
+    | _ => false
+    end)
+  | PNode101 mal mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match mbl, mbr with
+    | PNodes mbl, PNodes mbr => 
+      if Pmap_ne_dom_subseteqb mal mbl then 
+        Pmap_ne_dom_subseteqb mar mbr
+      else false
+    | _, _ => false
+    end) 
+  | PNode110 mal a => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match mbl, b with
+    | PNodes mbl, Some _ => Pmap_ne_dom_subseteqb mal mbl
+    | _, _ => false
+    end) 
+  | PNode111 mal a mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    match mbl, b, mbr with
+    | PNodes mbl, Some _, PNodes mbr => 
+      if Pmap_ne_dom_subseteqb mal mbl then 
+        Pmap_ne_dom_subseteqb mar mbr
+      else false
+    | _, _, _ => false
+    end) 
+  end.
+
+Definition Pmap_dom_subseteqb 
+  {A B} (ma : Pmap A) (mb : Pmap B) : bool :=
+  match ma with 
+  | PEmpty => true
+  | PNodes ma => match mb with 
+    | PNodes mb => Pmap_ne_dom_subseteqb ma mb
+    | _ => false
+    end
+  end.
+
+
+Lemma forall_positive {P : positive -> Prop} : 
+  (forall p, P p) <-> 
+  P xH /\ (forall p, P (xO p)) /\ (forall p, P (xI p)).
+Proof.
+  split; [auto|].
+  intros (?&?&?) []; auto.
+Qed.
+
+Lemma is_Some_None_iff {A} : @is_Some A None <-> False.
+Proof.
+  split; now intros [].
+Qed.
+
+Lemma is_Some_Some_iff {A} a : @is_Some A (Some a) <-> True.
+Proof.
+  easy.
+Qed.
+
+
+Lemma False_impl {P} : (False -> P) <-> True.
+Proof.
+  easy.
+Qed.
+
+Lemma impl_True {A} : (A -> True) <-> True.
+Proof.
+  easy.
+Qed.
+
+Lemma True_impl {A} : (True -> A) <-> A.
+Proof.
+  tauto.
+Qed.
+
+Lemma lazy_andb_True (b c : bool) : Is_true (if b then c else false) <-> b /\ c.
+Proof.
+  now destruct b, c.
+Qed.
+
+Lemma Pmap_ne_not_empty {A} (m : Pmap_ne A) : ~ (forall p, ~ (is_Some (m !! p))).
+Proof.
+  intros HF.
+  now destruct (pmap.Pmap_ne_lookup_not_None m) as 
+    (p & []%not_eq_None_Some%HF).
+Qed.
+
+Local Lemma Pmap_ne_not_empty_alt {A B} (m : Pmap_ne A) : 
+  ~ (forall p, is_Some (m !! p) -> @is_Some B None).
+Proof.
+  setoid_rewrite is_Some_None_iff.
+  apply Pmap_ne_not_empty.
+Qed.
+
+Lemma Pmap_ne_dom_subseteqb_correct {A B} (ma : Pmap_ne A) (mb : Pmap_ne B) : 
+  Pmap_ne_dom_subseteqb ma mb <-> 
+    forall i, is_Some (ma !! i) -> is_Some (mb !! i).
+Proof.
+  revert mb; induction ma; intros mb; cbn.
+  - rewrite forall_positive; cbn.
+    setoid_rewrite is_Some_None_iff.
+    setoid_rewrite False_impl.
+    destruct mb; cbn; 
+    first [split; [exact (False_rect _)|intros; destruct_and!;
+      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      rewrite IHma; easy].
+  - rewrite forall_positive; cbn.
+    setoid_rewrite is_Some_None_iff.
+    setoid_rewrite False_impl.
+    rewrite is_Some_Some_iff.
+    rewrite is_Some_alt.
+    destruct mb; cbn; easy.
+  - rewrite forall_positive; cbn.
+    setoid_rewrite is_Some_None_iff.
+    setoid_rewrite False_impl.
+    rewrite is_Some_Some_iff.
+    rewrite is_Some_alt.
+    destruct mb; cbn; 
+    (* destruct mb; cbn;  *)
+    first [easy | split; [exact (False_rect _)|intros; destruct_and!;
+      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      rewrite IHma; easy].
+  - rewrite forall_positive; cbn.
+    setoid_rewrite is_Some_None_iff.
+    setoid_rewrite False_impl.
+    destruct mb; cbn; 
+    first [split; [exact (False_rect _)|intros; destruct_and!;
+      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      rewrite IHma; easy].
+  - rewrite forall_positive; cbn.
+    rewrite is_Some_None_iff.
+    rewrite False_impl.
+    destruct mb; cbn;
+    first [split; [exact (False_rect _)|intros; destruct_and!;
+      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      rewrite lazy_andb_True, IHma1, IHma2; tauto].
+  - rewrite forall_positive; cbn.
+    setoid_rewrite is_Some_None_iff.
+    setoid_rewrite False_impl.
+    rewrite is_Some_Some_iff, True_impl, is_Some_alt.
+    destruct mb; cbn;
+    first [easy | split; [exact (False_rect _)|intros; destruct_and!;
+      easy || eapply Pmap_ne_not_empty_alt; eassumption] |
+      rewrite IHma; easy]. 
+  - rewrite forall_positive; cbn.
+    rewrite is_Some_Some_iff, True_impl, is_Some_alt.
+    destruct mb; cbn;
+    first [easy | split; [exact (False_rect _)|intros; destruct_and!;
+      easy || eapply Pmap_ne_not_empty_alt; eassumption] |
+      rewrite lazy_andb_True, IHma1, IHma2; tauto].
+Qed.
+
+
+Lemma Pmap_dom_subseteqb_correct_impl {A B} (ma : Pmap A) (mb : Pmap B) : 
+  Pmap_dom_subseteqb ma mb <-> 
+    forall i, is_Some (ma !! i) -> is_Some (mb !! i).
+Proof.
+  unfold Pmap_lookup, lookup.
+  destruct ma; [split; [now intros ? ? []|easy]|destruct mb]; cbn.
+  - split; [easy|].
+    apply Pmap_ne_not_empty_alt.
+  - apply Pmap_ne_dom_subseteqb_correct.
+Qed.
+
+Lemma Pmap_dom_subseteqb_correct {A B} (ma : Pmap A) (mb : Pmap B) : 
+  Pmap_dom_subseteqb ma mb <-> 
+    dom ma ⊆ dom mb.
+Proof.
+  rewrite Pmap_dom_subseteqb_correct_impl.
+  apply forall_iff; intros p.
+  now rewrite 2 elem_of_dom.
+Qed.
+
+Lemma Pmap_dom_subseteqb_correct' {A B} (ma : Pmap A) (mb : Pmap B) : 
+  if (Pmap_dom_subseteqb ma mb) then
+    dom ma ⊆ dom mb
+  else 
+    ~ dom ma ⊆ dom mb.
+Proof.
+  generalize (Pmap_dom_subseteqb_correct ma mb); now case_match; naive_solver.
+Qed.
+
+
+#[global] Instance Pmap_dom_subseteq_dec {A B} (ma : Pmap A) (mb : Pmap B) : 
+  Decision (dom ma ⊆ dom mb) := 
+  match Pmap_dom_subseteqb ma mb as b return ((if b then _ else _ :> Prop) -> _) with
+  | true => left
+  | false => right
+  end (Pmap_dom_subseteqb_correct' ma mb).
+
+Local Lemma dom_Pset (ma : Pset) : dom (ma.(mapset.mapset_car)) = ma.
+Proof.
+  destruct ma as [ma]; cbn.
+  unfold dom, Pmap_dom, mapset.mapset_dom.
+  f_equal.
+  etransitivity; [|apply map_fmap_id].
+  apply map_fmap_ext.
+  now intros ? [].
+Qed.
+
+Notation Pset_subseteqb ma mb := 
+  (Pmap_dom_subseteqb ma.(mapset.mapset_car) mb.(mapset.mapset_car)).
+
+Lemma Pset_subseteqb_correct (ma : Pset) (mb : Pset) : 
+  Pset_subseteqb ma mb <->
+    ma ⊆ mb.
+Proof.
+  rewrite Pmap_dom_subseteqb_correct.
+  rewrite 2 dom_Pset.
+  reflexivity.
+Qed.
+
+Lemma Pset_subseteqb_correct' (ma : Pset) (mb : Pset) : 
+  if Pset_subseteqb ma mb then
+    ma ⊆ mb
+  else 
+    ~ ma ⊆ mb.
+Proof.
+  (* destruct ma as [ma], mb as [mb].  *)
+  cbn. 
+  pose proof (Pmap_dom_subseteqb_correct' 
+    ma.(mapset.mapset_car) mb.(mapset.mapset_car)) as Hen.
+  rewrite 2 dom_Pset in Hen.
+  apply Hen.
+Qed.
+
+#[global] Instance Pset_subseteq_dec (ma : Pset) (mb : Pset) : 
+  Decision (ma ⊆ mb) := 
+  match Pset_subseteqb ma mb
+    as b return ((if b then _ else _ :> Prop) -> _) with
+  | true => left
+  | false => right
+  end (Pset_subseteqb_correct' ma mb).
+
+
+(*   
+
+Fixpoint Pmap_ne_relation_dec {A B} (P : positive -> A -> B -> Prop)
+  (PA : positive -> A -> Prop) (PB : positive -> B -> Prop) 
+  `{HP : forall i a b, Decision (P i a b)}
+  `{HPA : forall i a, Decision (PA i a)}
+  `{HPB : forall i b, Decision (PB i b)} 
+  (ma : Pmap_ne A) : forall mb : Pmap_ne B, Decision (map_relation P PA PB ma mb) :=
+  match ma with 
+  | PNode001 *)
+
+
+(* FIXME: Move *)
+Lemma list_fmap_id' `(f : A -> A) (l : list A) :
+  (forall a, a ∈ l -> f a = a) ->
+  f <$> l = l.
+Proof.
+  intros Hf.
+  etransitivity; [|apply list_fmap_id].
+  apply list_fmap_ext; intros _ ? ?%elem_of_list_lookup_2.
+  now apply Hf.
+Qed.
+
+Ltac tspecialize_with C tac :=
+  match type of C with
+  | forall _ : ?A, _ =>
+    let H := fresh in
+    assert (H : A); [
+      tac | specialize (C H); clear H
+    ]
+  end.
+
+Tactic Notation "tspecialize" uconstr(C) "by" tactic3(tac) :=
+  tspecialize_with C ltac:(solve [tac]).
+
+Tactic Notation "tspecialize" uconstr(C) :=
+  tspecialize_with C ltac:(idtac).
+
+
+
+Lemma imap_to_zip_with_seq {A B} (f : nat -> A -> B) (l : list A) :
+  imap f l = zip_with f (seq 0 (length l)) l.
+Proof.
+  revert f; induction l; intros f; [reflexivity|].
+  cbn.
+  f_equal.
+  rewrite IHl, <- fmap_S_seq, zip_with_fmap_l.
+  reflexivity.
+Qed.
+
+Lemma fmap_zip_with {A B C D} (f : A -> B -> C) (g : C -> D) l l' :
+  g <$> zip_with f l l' = zip_with (λ a b, g (f a b)) l l'.
+Proof.
+  revert l'; induction l; [reflexivity|].
+  intros []; [reflexivity|].
+  cbn.
+  congruence.
+Qed.
+
+Lemma fmap_lookup_total_seq `{Inhabited A} (l : list A) :
+  (l !!!.) <$> seq 0 (length l) = l.
+Proof.
+  induction l; [reflexivity|].
+  cbn.
+  f_equal.
+  rewrite <- fmap_S_seq, <- list_fmap_compose.
+  apply IHl.
+Qed.
+
+Lemma zip_fmap_l {A B C} (f : A -> B) l (l' : list C) :
+  zip (f <$> l) l' = prod_map f id <$> zip l l'.
+Proof.
+  rewrite fmap_zip_with, zip_with_fmap_l.
+  reflexivity.
+Qed.
+
+Lemma zip_fmap_r {A B C} (f : B -> C) (l : list A) (l' : list B) :
+  zip l (f <$> l') = prod_map id f <$> zip l l'.
+Proof.
+  rewrite fmap_zip_with, zip_with_fmap_r.
+  reflexivity.
+Qed.
+
+Lemma perm_exists_perm_seq {A} (l l' : list A) :
+  l ≡ₚ l' -> exists idxs, idxs ≡ₚ seq 0 (length l) /\
+    imap pair l ≡ₚ zip idxs l'.
+Proof.
+  intros Hperm.
+  induction Hperm.
+  - exists [].
+    cbn.
+    split; reflexivity.
+  - destruct IHHperm as (idxs & Hidxs & Hcorr).
+    exists (0 :: (S <$> idxs))%nat.
+    split.
+    + cbn.
+      rewrite Hidxs.
+      rewrite fmap_S_seq.
+      reflexivity.
+    + cbn.
+      f_equiv.
+      transitivity ((prod_map S id) <$> imap pair l).
+      * rewrite fmap_imap.
+        apply eq_reflexivity.
+        reflexivity.
+      * rewrite Hcorr.
+        rewrite zip_with_fmap_l.
+        rewrite fmap_zip_with.
+        reflexivity.
+  - exists (1 :: 0 :: seq 2 (length l))%nat.
+    split; [solve_Permutation|].
+    cbn.
+    rewrite imap_to_zip_with_seq, <- 2 fmap_S_seq, 2 zip_with_fmap_l.
+    solve_Permutation.
+  - destruct IHHperm1 as (idxs & Hidxs & Hmap),
+      IHHperm2 as (idxs' & Hidxs' & Hmap').
+    exists ((idxs !!!.) <$> idxs').
+    split.
+    + rewrite Hidxs'.
+      replace (length l') with (length idxs). 2:{
+        apply Permutation_length in Hidxs, Hidxs', Hperm1.
+        rewrite length_seq in *.
+        congruence.
+      }
+      rewrite fmap_lookup_total_seq.
+      apply Hidxs.
+    + rewrite Hmap.
+      rewrite zip_fmap_l.
+      rewrite <- Hmap'.
+      rewrite imap_to_zip_with_seq.
+      rewrite <- zip_fmap_l.
+      replace (length l') with (length idxs). 2:{
+        apply Permutation_length in Hidxs, Hidxs', Hperm1.
+        rewrite length_seq in *.
+        congruence.
+      }
+      now rewrite fmap_lookup_total_seq.
+Qed.

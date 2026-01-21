@@ -4,7 +4,7 @@ Require StringCustomNotation.
 From stdpp Require Import strings fin_maps pmap gmap hlist.
 From stdpp Require Import pretty.
 
-Require Import Aux_stdpp.
+Require Import Aux_pos Aux_stdpp.
 Require Import TensorExprDBSyntax.
 
 Require Import Ltac2.Init.
@@ -835,7 +835,7 @@ Ltac2 ctx_get_cmg (ctx : TEContext) : constr :=
     'positive '(Vval $cV) '(Pmap (Vval $cV)) (ctx.(ctx_mg)).
 
 Ltac2 ctx_get_ml_list (ctx : TEContext) : (int * int) list :=
-  (List.mapi (fun idx ty => (Int.add 1 idx, ty)) (List.rev (ctx.(ctx_ml)))).
+  (List.mapi (fun idx ty => (Int.add 1 idx, ty)) ((* List.rev *) (ctx.(ctx_ml)))).
 
 Ltac2 ctx_get_ml_map (ctx : TEContext) : (int, int) FMap.t :=
   FMap.of_list FSet.Tags.int_tag 
@@ -1016,12 +1016,16 @@ Ltac2 red_te_semantics () : unit :=
   Vapplys Vapply Vconst Vval_get
   mk_Vfunc mk_Vval
 
-  decide decide_rel Nat.eq_dec PeanoNat.Nat.eq_dec
+  decide decide_rel Nat.eq_dec PeanoNat.Nat.eq_dec numbers.Nat.eq_dec
     nat_rec nat_rect f_equal_nat f_equal eq_rect_r eq_sym eq_rect
   ];
   red_te_semantics_post ().
 
-Ltac2 te_rewrite_in_lhs (cR : constr) (tH : constr) : unit :=
+
+Ltac2 te_rewrite_in_lhs (cR : constr) (cH : constr) : unit :=
+  
+  let tH := Constr.type cH in 
+  
   let goalctx := empty_TEContext cR in 
   let (goalctx, glhs, grhs) := parse_tensor_equality_aux goalctx (Control.goal()) in 
   let hypctx := {goalctx with ctx_ml := [] } in 
@@ -1030,25 +1034,41 @@ Ltac2 te_rewrite_in_lhs (cR : constr) (tH : constr) : unit :=
   let ctx := {hypctx with ctx_ml := goalml} in 
 
   let cglhs := constr_of_tensorexprdb glhs in 
+  (* let cgrhs := constr_of_tensorexprdb grhs in  *)
   let chlhs := constr_of_tensorexprdb hlhs in 
   let chrhs := constr_of_tensorexprdb hrhs in 
-  let rew_expr := '(match_rewrite_tensorlist (tensorlist_of_tensorexpr $chlhs) 
-    (tensorlist_of_tensorexpr $chrhs) (tensorlist_of_tensorexpr $cglhs)) in 
-  let new_lhs_expr := Std.eval_vm None rew_expr in 
-  lazy_match! new_lhs_expr with 
-  | None => Control.zero (Tactic_failure
+
+  let cSR := ctx.(ctx_SR).(ringSR) in 
+  let cV := ctx_get_cV ctx in 
+  let cVsum := ctx_get_cVsum ctx in 
+  let cabs := ctx_get_cabs ctx in 
+  let cmg := ctx_get_cmg ctx in 
+  let chml := ctx_get_cml_list hypctx in 
+
+  let rew_tactic := '(helper_rewrite_in_lhs' (SR:=$cSR)
+    $cV (Vsum:=$cVsum) $cabs $cmg base.empty $chlhs $chrhs $chml
+      $cglhs _) in 
+  refine '($rew_tactic _ _) >
+  [exact $cH|
+  let sem := Fresh.fresh (Fresh.Free.of_goal()) ident:(sem) in 
+  let rhs := Fresh.fresh (Fresh.Free.of_goal()) ident:(rhs) in 
+
+  Std.intro (Some sem) None;
+  Std.intro (Some rhs) None;
+  intros ? ?;
+  vm_compute; 
+  Std.subst [sem; rhs];
+  red_te_semantics()];
+  lazy_match! goal with 
+  | [|- False] => Control.zero (Tactic_failure
     (Some (Message.of_string "te_rewrite_in_lhs: no rewrite found!")))
-  | Some ?e => 
-    let new_lhs_expr := '(tensorexpr_of_tensorlist $e) in 
-    let new_lhs_expr := Std.eval_vm None new_lhs_expr in
-    let new_lhs := tensorexprdb_of_constr new_lhs_expr in 
-    let new_goal := constr_semantics_of_tensor_equality ctx new_lhs grhs in 
-    enough ($new_goal) by Control.shelve();
-    red_te_semantics()
+  | [|- _] => ()
   end.
 
+Ltac2 te_rewrite_in_rhs (cR : constr) (cH : constr) : unit :=
 
-Ltac2 te_rewrite_in_rhs (cR : constr) (tH : constr) : unit :=
+  let tH := Constr.type cH in 
+  
   let goalctx := empty_TEContext cR in 
   let (goalctx, glhs, grhs) := parse_tensor_equality_aux goalctx (Control.goal()) in 
   let hypctx := {goalctx with ctx_ml := [] } in 
@@ -1056,27 +1076,76 @@ Ltac2 te_rewrite_in_rhs (cR : constr) (tH : constr) : unit :=
   let goalml := goalctx.(ctx_ml) in 
   let ctx := {hypctx with ctx_ml := goalml} in 
 
+  (* let cglhs := constr_of_tensorexprdb glhs in  *)
   let cgrhs := constr_of_tensorexprdb grhs in 
   let chlhs := constr_of_tensorexprdb hlhs in 
   let chrhs := constr_of_tensorexprdb hrhs in 
-  let rew_expr := '(match_rewrite_tensorlist (tensorlist_of_tensorexpr $chlhs) 
-    (tensorlist_of_tensorexpr $chrhs) (tensorlist_of_tensorexpr $cgrhs)) in 
-  let new_rhs_expr := Std.eval_vm None rew_expr in 
-  lazy_match! new_rhs_expr with 
-  | None => Control.zero (Tactic_failure
+
+  let cSR := ctx.(ctx_SR).(ringSR) in 
+  let cV := ctx_get_cV ctx in 
+  let cVsum := ctx_get_cVsum ctx in 
+  let cabs := ctx_get_cabs ctx in 
+  let cmg := ctx_get_cmg ctx in 
+  let chml := ctx_get_cml_list hypctx in 
+
+  let rew_tactic := '(helper_rewrite_in_rhs' (SR:=$cSR)
+    $cV (Vsum:=$cVsum) $cabs $cmg base.empty $chlhs $chrhs $chml
+      $cgrhs _) in 
+  refine '($rew_tactic _ _) >
+  [exact $cH|
+  let sem := Fresh.fresh (Fresh.Free.of_goal()) ident:(sem) in 
+  let lhs := Fresh.fresh (Fresh.Free.of_goal()) ident:(lhs) in 
+
+  Std.intro (Some sem) None;
+  Std.intro (Some lhs) None;
+  intros ? ?;
+  vm_compute; 
+  Std.subst [sem; lhs];
+  red_te_semantics()];
+  lazy_match! goal with 
+  | [|- False] => Control.zero (Tactic_failure
     (Some (Message.of_string "te_rewrite_in_rhs: no rewrite found!")))
-  | Some ?e => 
-    let new_rhs_expr := '(tensorexpr_of_tensorlist $e) in 
-    let new_rhs_expr := Std.eval_vm None new_rhs_expr in
-    let new_rhs := tensorexprdb_of_constr new_rhs_expr in
-    let new_goal := constr_semantics_of_tensor_equality ctx glhs new_rhs in 
-    enough ($new_goal) by Control.shelve();
-    red_te_semantics()
+  | [|- _] => ()
   end.
 
 Ltac2 te_rewrite (cR : constr) (cH : constr) : unit :=
   let tH := Constr.type cH in 
-  first [te_rewrite_in_lhs cR tH | te_rewrite_in_rhs cR tH].
+  
+  let goalctx := empty_TEContext cR in 
+  let (goalctx, glhs, grhs) := parse_tensor_equality_aux goalctx (Control.goal()) in 
+  let hypctx := {goalctx with ctx_ml := [] } in 
+  let (hypctx, hlhs, hrhs) := parse_tensor_equality_aux hypctx tH in 
+  let goalml := goalctx.(ctx_ml) in 
+  let ctx := {hypctx with ctx_ml := goalml} in 
+
+  let cglhs := constr_of_tensorexprdb glhs in 
+  let cgrhs := constr_of_tensorexprdb grhs in 
+  let chlhs := constr_of_tensorexprdb hlhs in 
+  let chrhs := constr_of_tensorexprdb hrhs in 
+
+  let cSR := ctx.(ctx_SR).(ringSR) in 
+  let cV := ctx_get_cV ctx in 
+  let cVsum := ctx_get_cVsum ctx in 
+  let cabs := ctx_get_cabs ctx in 
+  let cmg := ctx_get_cmg ctx in 
+  let chml := ctx_get_cml_list hypctx in 
+
+  let rew_tactic := '(helper_rewrite_in_lhs_or_rhs' (SR:=$cSR)
+    $cV (Vsum:=$cVsum) $cabs $cmg base.empty $chlhs $chrhs $chml
+      $cglhs $cgrhs) in 
+  refine '($rew_tactic _ _) >
+  [exact $cH|
+  let sem := Fresh.fresh (Fresh.Free.of_goal()) ident:(sem) in 
+  Std.intro (Some sem) None;
+  intros ?;
+  vm_compute; 
+  Std.subst [sem];
+  red_te_semantics()];
+  lazy_match! goal with 
+  | [|- False] => Control.zero (Tactic_failure
+    (Some (Message.of_string "te_rewrite: no rewrite found!")))
+  | [|- _] => ()
+  end.
 
 (*
 (* 
@@ -1373,11 +1442,36 @@ assert (@tensorequation_semantics_aux _ _ _ _ _ _ $cSR $cV $cVsum $cabs $cmg []
 
 red_te_semantics().
 
+(* Ltac2 constr_semantics_of_tensor_equality (ctx : TEContext) 
+  (lhs : TensorExprDB) (rhs : TensorExprDB) :=
+  let cSR := ctx.(ctx_SR).(ringSR) in 
+  let cV := ctx_get_cV ctx in 
+  let cVsum := ctx_get_cVsum ctx in 
+  let cabs := ctx_get_cabs ctx in 
+  let cmg := ctx_get_cmg ctx in 
+  let cml := ctx_get_cml_list ctx in 
+  let clhs := constr_of_tensorexprdb lhs in 
+  let crhs := constr_of_tensorexprdb rhs in 
+  (* let cml := ctx_get_cml ctx in  *)
+  '(@tensorequation_semantics_aux _ _ _ _ _ _ $cSR $cV $cVsum $cabs $cmg [] 
+    $clhs $crhs $cml (@empty _ Pmap_empty)).
+
+
+Ltac2 test_parse_tensor_equality (cR : constr) (tH : constr) : unit :=
+  let ctx := empty_TEContext cR in 
+  let (eqctx, lhs, rhs) := parse_tensor_equality_aux ctx tH in 
+  let sem := constr_semantics_of_tensor_equality eqctx lhs rhs in 
+  assert ($tH = $sem). *)
+
 let cR := 'R in 
 let c := '(
-  forall z z', ∑ x : A, ∑ y : B, f x y z * g z' y ==
+  forall z z' (y : B) (y : B), ∑ x : A, ∑ y : B, f x y z * g z' y ==
    ∑ y : B, ∑ x : A, g z' y * f x y z
 ) in 
+test_parse_tensor_equality cR c.
+red_te_semantics().
+reflexivity.
+
 Std.resolve_tc c;
 te_rewrite_in_lhs cR c.
 let tH := c in 

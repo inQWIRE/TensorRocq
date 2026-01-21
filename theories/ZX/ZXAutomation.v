@@ -207,6 +207,15 @@ Tactic Notation "te_rewrite" open_constr(h) :=
   te_rewrite 'C cH) in 
   tac h.
 
+Tactic Notation "te_rewrite_lhs" open_constr(h) :=
+  let tac := ltac2:(h |- let cH := Option.get (Ltac2.Ltac1.to_constr h) in 
+  te_rewrite_in_lhs 'C cH) in 
+  tac h.
+
+Tactic Notation "te_rewrite_rhs" open_constr(h) :=
+  let tac := ltac2:(h |- let cH := Option.get (Ltac2.Ltac1.to_constr h) in 
+  te_rewrite_in_lhs 'C cH) in 
+  tac h.
 
 Notation "lem '!++'" := (
   ltac2:(let res := 
@@ -223,6 +232,19 @@ Notation "lem '!_'" := (
   (at level 10, left associativity, only parsing).
 
 
+(* Ltac2 mk_app (lem : constr) : constr :=
+    '(fun l r => $lem (l ++ r)).
+
+Import ListExtra.Function.
+
+
+Notation "lem '!++_++'" := (
+  ltac2:(let res := 
+    ConstrExtra.Unsafe.map_lambda 
+      (compose mk_app mk_app) (Constr.pretype lem) in 
+    exact $res))
+  (at level 10, left associativity, only parsing). *)
+
 
 
 
@@ -236,15 +258,15 @@ Proof.
   split_sums.
   replace_spiders (∑ bs0 : bvec k, ∑ b, zsp p1 bs1 (b :: bs0 ++ bs2) 
     * zsp p2 (b :: bs0 ++ bs3) bs4).
-  (* setoid_rewrite (fun v l r l' r' => @spider_fusion1 n (k + m) (k + o) p p1 p2 
-    v (l ++ r) (l' ++ r')). *)
-  te_rewrite (@spider_fusion1 n (k + m) (k + o) p p1 p2
-    !_ !++ !++).
+
+  (* setoid_rewrite spider_fusion1. *)
+  te_rewrite_lhs (fun v l r l' r' => @spider_fusion1 n (k + m) (k + o) p p1 p2 
+    v (l ++ r) (l' ++ r')).
+
 
   replace_spiders (∑ bs0 : bvec k, zsp (p1 + p2) (bs0 ++ bs1 ++ bs3) (bs0 ++ bs2 ++ bs4)).
+  (* setoid_rewrite spider_loop. *)
   te_rewrite (@spider_loop (n + o) k (m + p) (p1+p2)
     !++ !++).
   reflexivity.
-  Unshelve. all: admit.
-Admitted.
-
+Qed.
