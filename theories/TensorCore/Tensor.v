@@ -13,3 +13,7 @@ Definition Tensor {R} (n m : nat) (A : Type) :=
 
 Definition PackedTensor {R} (A : Type) :=
   {n : nat & {m : nat & Tensor (R:=R) n m A}}.
+
+Definition DimensionlessTensor {R} (A : Type) :=
+  forall n m,
+    Tensor (R:=R) n m A.
