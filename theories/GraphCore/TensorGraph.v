@@ -1,13 +1,12 @@
 From QuantumLib Require Import Complex.
 Require Import Tensor.
-From stdpp Require Import list fin_maps.
-From stdpp Require Import pmap gmap. 
+From stdpp Require Import list sorting fin_maps.
+From stdpp Require Import pmap gmap.
+Require Import Aux_stdpp.
 Require Import TensorExprDBSyntax TensorExprDBSemantics.
 Require Import ZXCore.
 Require ZifyBool.
 
-Definition enumerate {A} (l : list A) : list (nat * A) :=
-  imap pair l.
 
 Definition bcons (b : bool) (p : positive) : positive :=
   match b with 
@@ -33,17 +32,26 @@ Proof.
   lia.
 Qed.
 
+(* Combine input and output maps to get the local variable map *)
+Definition gmaps_to_Pmap {A} 
+  (minput : gmap nat A) (moutput : gmap nat A) : Pmap A :=
+  (kmap (bcons false ∘ Pos.of_succ_nat) minput ∪ 
+      kmap (bcons true ∘ Pos.of_succ_nat) moutput).
+
+
+
+Notation TensorMap R A := 
+  (gmap nat (@DimensionlessTensor R A)).
+
 Section TensorGraph.
 
 Context {R : Type} {A : Type}.
 
-Definition TensorMap := 
-  gmap nat (DimensionlessTensor (R:=R) A).
 
 Definition EdgeSet := list (nat * nat).
 
 Definition TensorGraph := 
-  (TensorMap * EdgeSet)%type.
+  (TensorMap R A * EdgeSet)%type.
 
 Definition is_key (tg : TensorGraph) (n : nat) : Prop :=
   is_Some (tg.1 !! n).
@@ -96,8 +104,8 @@ Definition mk_external_var (is_output : bool) (e : nat * (nat * nat)) :=
 
 Definition mk_node (tg : TensorGraph)
   (n : nat) : Idx * list var * list var :=
-    let is_input e := snd (snd e) =? n in
-    let is_output e := fst (snd e) =? n in
+    let is_input e := snd (snd e) = n in
+    let is_output e := fst (snd e) = n in
     let i_internal_inputs  := filter is_input (i_internal_edges tg) in
     let i_internal_outputs := filter is_output (i_internal_edges tg) in
     let i_external_inputs  := filter is_input (i_external_edges tg) in
@@ -132,11 +140,12 @@ Definition graph_V : nat -> Type := fun _ => A.
 Definition graph_Vsum `{Summable A} : forall k, Summable (graph_V k) 
   := fun _ => _.
 
+
+
 (* Combine input and output maps to get the local variable map *)
 Definition graph_ml (minput : gmap nat A) (moutput : gmap nat A) : 
   Pmap (Vval graph_V) :=
-  @mk_Vval graph_V 0 <$> (kmap (bcons false ∘ Pos.of_succ_nat) minput ∪ 
-      kmap (bcons true ∘ Pos.of_succ_nat) moutput).
+  @mk_Vval graph_V 0 <$> gmaps_to_Pmap minput moutput. 
 
 Fixpoint graph_tensor_to_V_n_args_aux {n} : forall (t : vec A n -> R),
   V_n_args graph_V (replicate n 0) R :=
@@ -170,7 +179,6 @@ Definition graph_map_semantics `{SR : SemiRing R rO rI radd rmul req} `{!Summabl
 Definition graph_insize (tg : TensorGraph) : nat := size (inputs tg).
 Definition graph_outsize (tg : TensorGraph) : nat := size (outputs tg).
 
-From stdpp Require Import sorting.
 
 Definition sorted_inputs (tg : TensorGraph) : list nat :=
   merge_sort le $ elements (inputs tg).

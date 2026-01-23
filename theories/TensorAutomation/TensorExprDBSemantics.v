@@ -3252,6 +3252,42 @@ Proof.
 Qed.
 
 
+
+
+
+
+
+
+
+
+
+
+Lemma tl_total_semantics_aux_ext_abs mabs mg ml mr sums abs abs' :
+  (forall mr' : Vlist sums, WF_Vlist mr' ->
+  Forall2 (fun '(f, low, up) '(f', low', up') =>
+    abstract_semantics mabs mg ml (rev_append mr' mr) f low up ==
+    abstract_semantics mabs mg ml (rev_append mr' mr) f' low' up')
+    abs abs') ->
+  tl_total_semantics_aux mabs mg ml mr sums abs ==
+  tl_total_semantics_aux mabs mg ml mr sums abs'.
+Proof.
+  intros Heq.
+  rewrite 2 tl_total_semantics_aux_alt_Vlist.
+  apply sum_of_ext'.
+  intros mr' Hmr'%elem_of_Vlist_elements.
+  cbn.
+  apply Rlist_prod_ext.
+  rewrite Forall2_fmap.
+  eapply Forall2_impl; [apply (Heq mr' Hmr')|].
+  now intros [[]] [[]].
+Qed.
+
+
+
+
+
+
+
 (*
 
 Lemma match_rewrite_tensorexpr_correct mabs mg ml telhs terhs univ tetarg :

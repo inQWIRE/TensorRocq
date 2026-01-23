@@ -1595,19 +1595,19 @@ Proof.
   rewrite lengthP_app, lengthP_cons; lia.
 Qed.
 
-Lemma ppermute_posperm_swap_swaps (x1 x2 : A) (l1 l2 l3 : list A) p q : 
+Lemma ppermute_posperm_swap_swaps (x1 x2 : A) (l1 l2 l3 : list A) p q :
   p = lengthP l1 -> q = lengthP l1 + lengthP l2 ->
-  ppermute (posperm_swap p q) (l1 ++ x1 :: l2 ++ x2 :: l3) = 
+  ppermute (posperm_swap p q) (l1 ++ x1 :: l2 ++ x2 :: l3) =
   l1 ++ x2 :: l2 ++ x1 :: l3.
 Proof.
-  Local Ltac simplen := 
+  Local Ltac simplen :=
     rewrite ?length_ppermute;
     (repeat (rewrite ?length_app, ?lengthP_ins, ?lengthP_app; cbn)); cbn.
   pose proof (lengthN_correct l1).
   pose proof (lengthN_correct l2).
   pose proof (lengthN_correct l3).
   intros -> ->.
-  apply (fun H => list_eq_same_length _ _ _ H eq_refl); 
+  apply (fun H => list_eq_same_length _ _ _ H eq_refl);
     [now simplen|].
   rewrite length_ppermute.
   intros i x y Hi.
@@ -1631,7 +1631,7 @@ Proof.
     cbn.
     congruence.
   - replace (pos_to_nat_pred _) with i by lia.
-    destruct_decide (decide (i < length l1)%nat) as Hismall; 
+    destruct_decide (decide (i < length l1)%nat) as Hismall;
     [| rewrite 2 lookup_app_r by lia;
       rewrite 2 lookup_cons_ne_0 by lia;
       destruct_decide (decide (i < length l1 + S (length l2)))%nat as Himed].
@@ -1643,5 +1643,298 @@ Proof.
       congruence.
 Qed.
 
+Lemma ppermute_replicate f n (a : A) :
+  ppermute f (replicate n a) = replicate n a.
+Proof.
+  (* unfold ppermute. *)
+  destruct (ppermute_case f (replicate n a)) as [[Hfbdd Hsome] | [_ Hnone]];
+  [|unfold ppermute; now rewrite Hnone].
+  apply (list_eq_same_length _ _ _ eq_refl); [now rewrite length_ppermute|].
+  intros i x y Hi.
+  rewrite lookup_ppermute_alt_bdd by auto.
+  rewrite 2 lookup_replicate.
+  now intros [-> _] [-> _].
+Qed.
+
+(* FIXME: Move *)
+Lemma and_from_l {P Q} :
+  P /\ (P -> Q) -> P /\ Q.
+Proof.
+  tauto.
+Qed.
+Lemma pos_to_nat_pred_of_nat (i : nat) :
+  pos_to_nat_pred (Pos.of_succ_nat i) = i.
+Proof.
+  lia.
+Qed.
+
+Lemma perm_exists_perm_posperm l l' :
+  l ≡ₚ l' ->
+  exists ps, ps ≡ₚ pseq 1 (lengthN l) /\
+  ppermute (perm_posperm ps) l = l'.
+Proof.
+  intros Hperm.
+  pose proof ((* Permutation_sym *) Hperm) as Hseq.
+  apply perm_exists_perm_seq in Hseq as (idxs & Hidxs & Hl').
+  exists (Pos.of_succ_nat <$> idxs).
+  apply and_from_l;
+  split; [now rewrite pseq_to_seq, lengthN_correct, Hidxs, Hperm|].
+  intros Hidxs_perm.
+  apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite length_ppermute, Hperm|].
+  intros i x y Hi.
+  apply Permutation_length in Hperm as Hlens.
+  apply Permutation_length in Hidxs as Hlens'.
+  rewrite length_seq in Hlens'.
+
+  rewrite lookup_ppermute_alt_bdd by (lia ||
+    apply posperm_bounded, perm_posperm_posperm;
+    rewrite Hidxs_perm;
+    f_equiv; lia).
+  unfold perm_posperm.
+  rewrite list_lookup_total_alt.
+  rewrite list_lookup_fmap.
+  rewrite pos_to_nat_pred_of_nat.
+  destruct (idxs !! i) as [ii|] eqn:Hii;
+  [|now apply lookup_ge_None in Hii; lia].
+  cbn.
+  rewrite pos_to_nat_pred_of_nat.
+  intros Hlii Hl'ii.
+
+  apply elem_of_enumerate in Hlii as Hii'.
+  unfold enumerate in Hii'.
+  rewrite Hl' in Hii'.
+  apply elem_of_list_lookup_1 in Hii' as
+    Hin.
+  destruct Hin as (j & Hj).
+  apply lookup_zip_Some in Hj as [Hj Hl'j].
+  enough (i = j) by congruence.
+  assert (Hdup : NoDup idxs) by now rewrite Hidxs; apply NoDup_seq.
+  eapply NoDup_lookup; eauto.
+Qed.
+
+
+Lemma perm_exists_posperm l l' :
+  l ≡ₚ l' ->
+  exists f, posperm (lengthP l) f /\
+  ppermute f l = l' /\
+  forall i, i < lengthP l ->
+  l !! (f i :> nat) = l' !! (i:>nat).
+Proof.
+  intros (ps & Hps & Hppermute)%perm_exists_perm_posperm.
+  exists (perm_posperm ps).
+  apply and_from_l, conj; [apply perm_posperm_posperm; now rewrite N.pos_pred_succ|].
+  intros Hperm.
+  split; [easy|].
+  intros i Hi.
+  apply (f_equal (.!! i:nat)) in Hppermute.
+  rewrite lookup_ppermute_alt_bdd in Hppermute by
+    first [now apply posperm_bounded|pose proof (lengthN_correct l); lia].
+  now rewrite pos_to_nat_pred_to_pos in Hppermute.
+Qed.
+
 
 End ppermute.
+
+
+Lemma posperm_imap_eq {A} f (l : list A) :
+  posperm (lengthP l) f ->
+  imap pair (ppermute f l) =
+  ppermute f (zip ((λ n : nat, posperm_inv (lengthP l) f (Pos.of_succ_nat n) :> nat) <$> seq 0 (length l))
+    l).
+Proof.
+  intros Hf.
+  apply (list_eq_same_length _ _ (length l));
+  [rewrite length_ppermute, length_zip, length_fmap, length_seq; lia
+  |now rewrite length_imap, length_ppermute|].
+  intros i (k, x) (k', x') Hi.
+  rewrite list_lookup_imap.
+  rewrite lookup_ppermute_alt_bdd by now easy + apply posperm_bounded.
+  rewrite lookup_ppermute_alt_bdd; [|rewrite lengthN_correct_rev|];
+  [|rewrite length_zip, length_fmap, length_seq, Nat.min_id..];
+  [|now rewrite <- lengthN_correct_rev;
+  apply posperm_bounded(* , posperm_inv_posperm *)|easy].
+  rewrite lookup_zip_Some.
+  rewrite list_lookup_fmap.
+  rewrite fmap_Some.
+  intros (? & Heq & [= -> <-]).
+  pose proof (lengthN_correct l).
+  rewrite lookup_seq_lt, Nat.add_0_l by
+    (specialize ((posperm_bounded _ _ Hf) (Pos.of_succ_nat i)); lia).
+
+  rewrite Heq.
+  cbn.
+  intros [[= <-] [= <-]].
+  f_equal.
+  rewrite pos_to_nat_pred_to_pos.
+  rewrite posperm_inv_linv by now easy + lia.
+  lia.
+Qed.
+
+Lemma ppermute_posperm_inv_linv {A} f (l : list A) :
+  posperm (lengthP l) f ->
+  ppermute (posperm_inv (lengthP l) f)
+    (ppermute f l) = l.
+Proof.
+  intros Hf.
+  apply (list_eq_same_length _ _ _ eq_refl); [now rewrite 2!length_ppermute|].
+  intros i x y Hi.
+  rewrite lookup_ppermute_alt_bdd by
+    now rewrite ?lengthN_ppermute, ?length_ppermute;
+      try apply posperm_bounded, posperm_inv_posperm.
+  pose proof (lengthN_correct l).
+  rewrite lookup_ppermute_alt_bdd by (now apply posperm_bounded || now
+    specialize (posperm_bounded _ _ (posperm_inv_posperm _ _ Hf)
+    (Pos.of_succ_nat i)); lia).
+  rewrite pos_to_nat_pred_to_pos.
+  rewrite posperm_inv_rinv by now easy + lia.
+  rewrite pos_to_nat_pred_of_nat; congruence.
+Qed.
+
+
+Lemma ppermute_posperm_inv_rinv {A} f (l : list A) :
+  posperm (lengthP l) f ->
+  ppermute f
+    (ppermute (posperm_inv (lengthP l) f) l) = l.
+Proof.
+  intros Hf.
+  apply (list_eq_same_length _ _ _ eq_refl); [now rewrite 2!length_ppermute|].
+  intros i x y Hi.
+  rewrite lookup_ppermute_alt_bdd by
+    now rewrite ?lengthN_ppermute, ?length_ppermute;
+      try apply posperm_bounded.
+  pose proof (lengthN_correct l).
+  rewrite lookup_ppermute_alt_bdd by (now apply posperm_inv_bounded || now
+    specialize (posperm_bounded _ _ Hf
+    (Pos.of_succ_nat i)); lia).
+  rewrite pos_to_nat_pred_to_pos.
+  rewrite posperm_inv_linv by now easy + lia.
+  rewrite pos_to_nat_pred_of_nat; congruence.
+Qed.
+
+Lemma posperm_inv_posperm_inv f n k : k < n ->
+  posperm n f ->
+  posperm_inv n (posperm_inv n f) k = f k.
+Proof.
+  intros Hk Hf.
+  rewrite posperm_inv_spec by now easy + apply posperm_inv_posperm.
+  split; [now apply posperm_bounded|].
+  now apply posperm_inv_linv.
+Qed.
+
+Lemma posperm_imap_eq' {A} f (l : list A) :
+  posperm (lengthP l) f ->
+  imap pair l =
+  ppermute (posperm_inv (lengthP l) f)
+    (zip ((λ n : nat, f (Pos.of_succ_nat n) :> nat)
+     <$> seq 0 (length l))
+    (ppermute f l)).
+Proof.
+  intros Hf.
+  apply posperm_inv_posperm in Hf as Hf'.
+  rewrite <- (lengthN_ppermute f) in Hf'.
+  apply posperm_imap_eq in Hf'.
+  rewrite lengthN_ppermute, ppermute_posperm_inv_linv in Hf' by easy.
+  rewrite Hf'.
+  f_equal.
+  rewrite length_ppermute.
+  f_equal.
+  pose proof (lengthN_correct l).
+  apply list_fmap_ext; intros _ k Hk%elem_of_list_lookup_2%elem_of_seq.
+  rewrite posperm_inv_posperm_inv by (easy + lia).
+  reflexivity.
+Qed.
+
+Lemma ppermute_zip_with {A B C} f (p : A -> B -> C) (l : list A) (l' : list B) : 
+  length l = length l' -> 
+  ppermute f (zip_with p l l') = 
+  zip_with p (ppermute f l) (ppermute f l').
+Proof.
+  intros Hl.
+  destruct (ppermute_case f l) as [(Hbdd & Hsome) | (Hnbdd & Hnone)]. 2:{
+    unfold ppermute.
+    rewrite ((ppermute_aux_None_iff_not_bdd _ _).2) by 
+      now rewrite lengthN_correct_rev, length_zip_with, <- Hl, 
+        Nat.min_id, <- lengthN_correct_rev.
+    rewrite ((ppermute_aux_None_iff_not_bdd _ _).2) by easy.
+    rewrite ((ppermute_aux_None_iff_not_bdd _ _).2) by
+      now rewrite lengthN_correct_rev, <- Hl, <- lengthN_correct_rev.
+    reflexivity.
+  }
+  apply (fun H => list_eq_same_length _ _ _ H eq_refl); 
+    [now rewrite length_ppermute, ?length_zip_with, ?length_ppermute|].
+  rewrite length_ppermute, length_zip_with, <- Hl, Nat.min_id.
+  intros i x y Hi.
+  rewrite lookup_ppermute_alt_bdd by 
+    now rewrite ?lengthN_correct_rev, length_zip_with, <- Hl, 
+        Nat.min_id, <- ?lengthN_correct_rev.
+  rewrite lookup_zip_with_Some.
+  rewrite lookup_zip_with.
+  rewrite lookup_ppermute_alt_bdd by 
+    now rewrite ?lengthN_correct_rev, <- Hl, <- ?lengthN_correct_rev.
+  rewrite lookup_ppermute_alt_bdd by easy.
+  intros (? & ? & -> & -> & ->).
+  cbn.
+  congruence.
+Qed.
+
+
+Lemma zip_with_ppermute_r {A B C} f (p : A -> B -> C) (l : list A) (l' : list B) : 
+  posperm (lengthP l) f ->
+  length l = length l' -> 
+  zip_with p l (ppermute f l') = 
+  ppermute f (zip_with p (ppermute (posperm_inv (lengthP l) f) l) l').
+Proof.
+  intros Hf Hl.
+  rewrite ppermute_zip_with by now rewrite length_ppermute.
+  now rewrite ppermute_posperm_inv_rinv.
+Qed.
+
+Lemma lengthN_eq {A B} (l : list A) (l' : list B) : 
+  lengthN l = lengthN l' <-> length l = length l'.
+Proof.
+  rewrite 2 lengthN_correct_rev; lia.
+Qed.
+
+Lemma zip_with_ppermute_l {A B C} f (p : A -> B -> C) (l : list A) (l' : list B) : 
+  posperm (lengthP l) f ->
+  length l = length l' -> 
+  zip_with p (ppermute f l) l' = 
+  ppermute f (zip_with p l (ppermute (posperm_inv (lengthP l) f) l')).
+Proof.
+  intros Hf Hl.
+  apply lengthN_eq in Hl as Hl'.
+  rewrite ppermute_zip_with by now rewrite length_ppermute.
+  rewrite Hl'.
+  now rewrite ppermute_posperm_inv_rinv by now rewrite <- Hl'.
+Qed.
+
+
+Lemma zip_with_ppermute_r_permutation {A B C} f (p : A -> B -> C) (l : list A) (l' : list B) : 
+  posperm (lengthP l) f ->
+  length l = length l' -> 
+  zip_with p l (ppermute f l') ≡ₚ
+  zip_with p (ppermute (posperm_inv (lengthP l) f) l) l'.
+Proof.
+  intros Hf Hl.
+  rewrite zip_with_ppermute_r by easy.
+  apply ppermute_permutation.
+  rewrite lengthN_correct_rev, length_zip_with, length_ppermute, <- Hl, 
+    Nat.min_id, <- lengthN_correct_rev.
+  easy.
+Qed.
+
+
+Lemma zip_with_ppermute_l_permutation {A B C} f (p : A -> B -> C) (l : list A) (l' : list B) : 
+  posperm (lengthP l) f ->
+  length l = length l' -> 
+  zip_with p (ppermute f l) l' ≡ₚ
+  zip_with p l (ppermute (posperm_inv (lengthP l) f) l').
+Proof.
+  intros Hf Hl.
+  rewrite zip_with_ppermute_l by easy.
+  apply ppermute_permutation.
+  rewrite lengthN_correct_rev, length_zip_with, length_ppermute, <- Hl, 
+    Nat.min_id, <- lengthN_correct_rev.
+  easy.
+Qed.

@@ -2372,13 +2372,6 @@ Proof.
   apply map_inverses_img.
 Qed.
 
-(* FIXME: Move *)
-Lemma and_from_l {P Q} :
-  P /\ (P -> Q) -> P /\ Q.
-Proof.
-  tauto.
-Qed.
-
 Definition tl_well_typed_aux tc sums abs :=
   let tc' := tc_app_types (reverse sums) tc in
   Forall (fun '(f, low, up) =>
@@ -2626,11 +2619,6 @@ Qed.
 
 
 
-Lemma pos_to_nat_pred_of_nat (i : nat) :
-  pos_to_nat_pred (Pos.of_succ_nat i) = i.
-Proof.
-  lia.
-Qed.
 
 Lemma lookup_list_to_map_imap_to_pos `{FinMap positive M} {A B}
   (f : A -> B) (l : list A) (i : positive) :

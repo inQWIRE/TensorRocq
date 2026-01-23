@@ -1825,3 +1825,15 @@ Proof.
       }
       now rewrite fmap_lookup_total_seq.
 Qed.
+
+
+Definition enumerate {A} (l : list A) : list (nat * A) :=
+  imap pair l.
+
+Lemma elem_of_enumerate {A} (l : list A) n a :
+  (n, a) ∈ enumerate l <-> l !! n = Some a.
+Proof.
+  unfold enumerate.
+  rewrite elem_of_lookup_imap.
+  naive_solver.
+Qed.
