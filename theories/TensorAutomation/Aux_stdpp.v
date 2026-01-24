@@ -1837,3 +1837,68 @@ Proof.
   rewrite elem_of_lookup_imap.
   naive_solver.
 Qed.
+
+
+Lemma default_is_Some_ext_mor_gen {B} {R : relation B} (d d' : B)
+  (mb mb' : option B) : R d d' ->
+  (forall b, mb = Some b -> mb' = None -> R b d') ->
+  (forall b', mb = None -> mb' = Some b' -> R d b') ->
+  (forall b b', mb = Some b -> mb' = Some b' -> R b b') ->
+  R (default d mb) (default d' mb').
+Proof.
+  destruct mb, mb'; cbn; eauto.
+Qed.
+Lemma default_is_Some_ext_mor {B} {R : relation B} (d d' : B)
+  (mb mb' : option B) :
+  (is_Some mb <-> is_Some mb') ->
+  R d d' ->
+  (forall b b', mb = Some b -> mb' = Some b' -> R b b') ->
+  R (default d mb) (default d' mb').
+Proof.
+  intros HSome Hd HR.
+  rewrite 2 is_Some_alt in HSome.
+  destruct mb, mb'; cbn; naive_solver.
+Qed.
+Lemma not_elem_of_list_fmap {A B} (f : A -> B) (l : list A) (b : B) :
+  b ∉ f <$> l <-> forall a, a ∈ l -> f a ≠ b.
+Proof.
+  rewrite elem_of_list_fmap.
+  naive_solver.
+Qed.
+Lemma Permutation_swap_app_app {A} (l1 l2 l3 l4 : list A) :
+  (l1 ++ l2) ++ (l3 ++ l4) ≡ₚ (l1 ++ l3) ++ (l2 ++ l4).
+Proof.
+  solve_Permutation.
+Qed.
+
+
+Lemma Forall_filter {A} (P Q : A -> Prop) `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  Forall Q (filter P l) <-> Forall (fun a => P a -> Q a) l.
+Proof.
+  induction l; [now split; constructor|].
+  cbn.
+  case_decide as HPa.
+  - rewrite 2 Forall_cons, IHl. tauto.
+  - rewrite Forall_cons, IHl. tauto.
+Qed.
+
+Lemma fmap_const {A B} (l : list A) (b : B) :
+  const b <$> l = replicate (length l) b.
+Proof.
+  induction l; cbn; f_equal; assumption.
+Qed.
+
+
+Lemma length_list_filter_ext {A B} (P : A -> Prop) (Q : B -> Prop)
+  `{HP : forall a, Decision (P a)} `{HQ : forall b, Decision (Q b)}
+  (l : list A) (l' : list B) :
+  Forall2 (λ a b, P a <-> Q b) l l' ->
+  length (filter P l) = length (filter Q l').
+Proof.
+  intros Hall.
+  induction Hall; [reflexivity|].
+  cbn.
+  unshelve (erewrite decide_ext by eassumption); [auto|].
+  case_decide; cbn; f_equal; easy.
+Qed.

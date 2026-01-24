@@ -62,3 +62,20 @@ Proof. firstorder. Qed.
 Lemma forall_iff {A} (P Q : A -> Prop) : 
   (forall a, P a <-> Q a) -> (forall a, P a) <-> (forall a, Q a).
 Proof. firstorder. Qed.
+
+
+
+Lemma and_is_True_r {P Q} : Q -> P /\ Q <-> P.
+Proof. tauto. Qed.
+Lemma and_is_True_l {P Q} : P -> P /\ Q <-> Q.
+Proof. tauto. Qed.
+Lemma and_or_distr_r {P Q R} : (P \/ Q) /\ R <-> P /\ R \/ Q /\ R.
+Proof. tauto. Qed.
+Lemma and_or_distr_l {P Q R} : P /\ (Q \/ R) <-> P /\ Q \/ P /\ R.
+Proof. tauto. Qed.
+Lemma iff_True {P} : (P <-> True) <-> P.
+Proof. tauto. Qed.
+Lemma iff_True_1 {P} : P -> (P <-> True).
+Proof. tauto. Qed.
+Lemma iff_True_2 {P} : (P <-> True) -> P.
+Proof. tauto. Qed.

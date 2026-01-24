@@ -17,3 +17,9 @@ Definition PackedTensor {R} (A : Type) :=
 Definition DimensionlessTensor {R} (A : Type) :=
   forall n m,
     Tensor (R:=R) n m A.
+
+Class TensorLike (R : Type) (A : Type) (T  : Type) := {
+  interpretTensor (x : T) : DimensionlessTensor (R:=R) A
+}.
+
+#[global] Hint Mode TensorLike - - + : typeclass_instances.

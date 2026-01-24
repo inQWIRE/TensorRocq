@@ -1,5 +1,7 @@
 Require Export ZArith Lia Aux Aux_stdpp.
+Require ZifyBool.
 From stdpp Require Import prelude numbers list.
+From stdpp Require gmap.
 
 Open Scope positive_scope.
 Open Scope list_scope.
@@ -1937,4 +1939,89 @@ Proof.
   rewrite lengthN_correct_rev, length_zip_with, length_ppermute, <- Hl, 
     Nat.min_id, <- lengthN_correct_rev.
   easy.
+Qed.
+
+
+
+Definition bcons (b : bool) (p : positive) : positive :=
+  match b with
+  | true => xI p
+  | false => xO p
+  end.
+
+#[global]
+Program Instance Op_bcons : ZifyClasses.BinOp
+  (T1:=bool) bcons := {
+  TBOp b p := (2 * p + Z.b2z b)%Z;
+}.
+Next Obligation.
+  cbn.
+  intros [] ?; cbn; lia.
+Qed.
+
+Add Zify BinOp Op_bcons.
+
+#[export] Instance bcons_inj2 : Inj2 (=) (=) (=) bcons.
+Proof.
+  hnf.
+  lia.
+Qed.
+
+
+
+Lemma lengthN_fmap {A B} (f : A -> B) (l : list A) :
+  lengthN (f <$> l) = lengthN l.
+Proof.
+  apply lengthN_eq, length_fmap.
+Qed.
+Lemma ppermute_fmap {A B} p (f : A -> B) (l : list A) :
+  ppermute p (f <$> l) = f <$> ppermute p l.
+Proof.
+  destruct (ppermute_case p l) as [(Hbdd & Hsome) | (Hndbb & Hnone)].
+  - apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite length_fmap, 2 length_ppermute, length_fmap|].
+    intros i x y.
+    rewrite length_fmap, length_ppermute.
+    intros Hi.
+    rewrite lookup_ppermute_alt_bdd by now rewrite ?lengthN_fmap, ?length_fmap.
+    rewrite 2 list_lookup_fmap.
+    rewrite lookup_ppermute_alt_bdd by easy.
+    congruence.
+  - now rewrite 2 ppermute_not_bdd by now rewrite ?lengthN_fmap.
+Qed.
+
+Import gmap pmap.
+
+(* Combine input and output maps to get the local variable map *)
+Definition gmaps_to_Pmap {A}
+  (minput : gmap nat A) (moutput : gmap nat A) : Pmap A :=
+  (kmap (bcons false ∘ Pos.of_succ_nat) minput ∪
+      kmap (bcons true ∘ Pos.of_succ_nat) moutput).
+
+
+
+
+Lemma lookup_gmaps_to_Pmap {A} (mi mo : gmap nat A) p :
+  gmaps_to_Pmap mi mo !! p =
+  match p with
+  | xH => None
+  | p~0 => mi !! (p:>nat)
+  | p~1 => mo !! (p:>nat)
+  end.
+Proof.
+  unfold gmaps_to_Pmap.
+  rewrite lookup_union.
+  destruct p.
+  - rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
+    rewrite option_union_left_id.
+    replace p~1 with ((bcons true ∘ Pos.of_succ_nat) p) by now cbn; lia.
+    rewrite lookup_kmap by apply _.
+    reflexivity.
+  - replace p~0 with ((bcons false ∘ Pos.of_succ_nat) p) by now cbn; lia.
+    rewrite lookup_kmap by apply _.
+    rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
+    rewrite option_union_right_id.
+    reflexivity.
+  - rewrite 2 (lookup_kmap_None _ _ _).2 by now cbn; lia.
+    reflexivity.
 Qed.
