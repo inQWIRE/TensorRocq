@@ -1335,75 +1335,6 @@ Proof.
     firstorder eauto.
 Qed.
 
-(* FIXME: Move to Aux_stdpp *)
-Lemma list_map_fmap :
-  @map = @fmap _ list_fmap.
-Proof. reflexivity. Qed.
-(* TODO: Name here seems backwards, but follows list_fmap_bind... *)
-Lemma list_bind_fmap {A B C} (f : A -> list B) (g : B -> C) l :
-  g <$> (l ≫= f) = l ≫= (λ a, g <$> f a).
-Proof.
-  induction l; [reflexivity|].
-  cbn.
-  now rewrite fmap_app, IHl.
-Qed.
-Lemma list_bind_flat_map :
-  list_bind = flat_map.
-Proof. reflexivity. Qed.
-Lemma list_bind_assoc {A B C} (f : A -> list B) (g : B -> list C) l :
-  (l ≫= f) ≫= g = l ≫= mbind g ∘ f.
-Proof.
-  induction l; [reflexivity|cbn].
-  now rewrite bind_app, IHl.
-Qed.
-Lemma bind_pointwise_Permutation_strong {A B} (f g : A -> list B) l l' :
-  (∀ a, a ∈ l -> f a ≡ₚ g a) ->
-  l ≡ₚ l' ->
-  l ≫= f ≡ₚ l' ≫= g.
-Proof.
-  intros Hfg <-.
-  rewrite <- Forall_forall in Hfg.
-  induction Hfg; cbn; [reflexivity|].
-  f_equiv; auto.
-Qed.
-Lemma list_bind_nil_r {A B} (lA : list A) :
-  lA ≫= (λ _, @nil B) = [].
-Proof.
-  now induction lA.
-Qed.
-Lemma list_bind_nil_r' {A B} (lA : list A) f :
-  (∀ a, a ∈ lA -> f a = @nil B) ->
-  lA ≫= f = [].
-Proof.
-  rewrite <- Forall_forall.
-  intros Hall.
-  induction Hall; [reflexivity|].
-  cbn.
-  now rewrite IHHall, app_nil_r.
-Qed.
-Lemma list_bind_cons_r {A B} l (f : A -> B) (g : A -> list B) :
-  l ≫= (λ x, f x :: g x) ≡ₚ (f <$> l) ++ l ≫= g.
-Proof.
-  induction l; cbn; [|rewrite IHl]; solve_Permutation.
-Qed.
-Lemma list_bind_singleton_r {A B} l (f : A -> B) :
-  l ≫= (λ x, [f x]) = (f <$> l).
-Proof.
-  reflexivity.
-Qed.
-Lemma list_bind_app_r {A B} l (f g : A -> list B) :
-  l ≫= (λ x, f x ++ g x) ≡ₚ (l ≫= f) ++ l ≫= g.
-Proof.
-  induction l; cbn; [|rewrite IHl]; solve_Permutation.
-Qed.
-Lemma list_bind_comm {A B C} (f : A -> B -> list C) l l' :
-  (l ≫= (λ a, l' ≫= λ b, f a b)) ≡ₚ
-  (l' ≫= (λ b, l ≫= λ a, f a b)).
-Proof.
-  induction l; [cbn; now rewrite list_bind_nil_r|cbn].
-  now rewrite list_bind_app_r, IHl.
-Qed.
-
 Lemma Vmap_elements_perm tys tys' :
   NoDup tys.*1 -> tys ≡ₚ tys' ->
   Vmap_elements tys ≡ₚ Vmap_elements tys'.
@@ -1438,13 +1369,7 @@ Proof.
     etransitivity; [apply IHHperm1|]; eauto.
 Qed.
 
-(* FIXME: Move to Summable/Algebra, and make Morphism *)
-Lemma Rlist_sum_perm rs rs' : rs ≡ₚ rs' -> Rlist_sum rs == Rlist_sum rs'.
-Proof.
-  intros Hperm.
-  apply Rlist_sum_perm_mor.
-  now apply SetoidPermutation.Permutation_PermutationA.
-Qed.
+
 
 Lemma sum_of_Vmap_perm tys tys' f : NoDup tys.*1 -> tys ≡ₚ tys' ->
   ∑ m : Vmap tys, f m == ∑ m : Vmap tys', f m.
@@ -1633,18 +1558,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* FIXME: Move to Summable.v *)
-Lemma sum_of_relabel `{Summable A, Summable B} (f : A -> B) (g : B -> R) :
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ b : B, g b == ∑ a : A, g (f a).
-Proof.
-  unfold_sum_of.
-  intros Hperm.
-  apply Rlist_sum_perm.
-  rewrite <- Hperm, list_map_fmap, <- list_fmap_compose.
-  reflexivity.
-Qed.
-
 
 Lemma list_to_map_Vlist_elements_gen f tys :
   (λ mr, list_to_map (imap (fun i v => (f i, v)) mr)) <$>
@@ -1753,55 +1666,7 @@ Proof.
     lia.
 Qed.
 
-(* FIXME: Move to Summable, or algebra *)
-Lemma Rlist_sum_ext (rs rs' : list R) :
-  Forall2 req rs rs' -> Rlist_sum rs == Rlist_sum rs'.
-Proof.
-  intros ?%SetoidList.eqlistA_altdef%SetoidPermutation.eqlistA_PermutationA.
-  now apply Rlist_sum_perm_mor.
-Qed.
-Lemma Rlist_prod_ext (rs rs' : list R) :
-  Forall2 req rs rs' -> Rlist_prod rs == Rlist_prod rs'.
-Proof.
-  intros ?%SetoidList.eqlistA_altdef%SetoidPermutation.eqlistA_PermutationA.
-  now apply Rlist_prod_perm_mor.
-Qed.
 
-
-Lemma sum_of_ext' `{Summable A} (f g : A -> R) :
-  (forall a, a ∈ sum_elements -> f a == g a) ->
-  sum_of f == sum_of g.
-Proof.
-  intros Hfg.
-  unfold_sum_of.
-  apply Rlist_sum_ext.
-  rewrite Forall2_fmap_l, Forall2_fmap_r, (unfold @compose).
-  apply Forall_Forall2_diag.
-  now apply Forall_forall.
-Qed.
-
-Lemma sum_of_relabel'_l2r `{Summable A, Summable B}
-  (f : A -> B) (g : A -> R) (h : B -> R) :
-  (forall a, a ∈ sum_elements -> g a == h (f a)) ->
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ a : A, g a == ∑ b : B, h b.
-Proof.
-  intros Hfh Hf.
-  rewrite (sum_of_relabel f h) by assumption.
-  now apply sum_of_ext'.
-Qed.
-
-
-Lemma sum_of_relabel'_r2l `{Summable A, Summable B}
-  (f : B -> A) (g : A -> R) (h : B -> R) :
-  (forall b, b ∈ sum_elements -> g (f b) == h b) ->
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ a : A, g a == ∑ b : B, h b.
-Proof.
-  intros Hfh Hf.
-  rewrite (sum_of_relabel f g) by assumption.
-  now apply sum_of_ext'.
-Qed.
 
 
 Lemma list_inj_exists_partial_inverse `{EqDecision A, EqDecision B,

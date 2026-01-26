@@ -85,7 +85,7 @@ Proof.
 Qed.
 
 #[export] Program Instance SummedElement_vec `{Summable A}
-  {n} (v : vec A n) (Hv : forall a, a ∈ vec_to_list v -> SummedElement a) : 
+  {n} (v : vec A n) (Hv : forall a, a ∈ vec_to_list v -> SummedElement a) :
   SummedElement v.
 Next Obligation.
   intros A SA n v Hv.
@@ -126,3 +126,57 @@ Next Obligation.
   now apply elem_of_list_cprod.
 Qed.
 
+
+Section SummableWF_theory.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+Lemma SummedElement_iff `{Summable A} (a : A) : SummedElement a <-> a ∈ sum_elements.
+Proof.
+  now split; [intros []|constructor].
+Qed.
+
+Lemma sum_of_unique' `{HA : WFSummable A} (f : A -> R) (a : A) `{Ha : !SummedElement a} :
+  (forall b, SummedElement b -> a <> b -> f b == 0) ->
+  ∑ b : A, f b == f a.
+Proof.
+  destruct HA as [HA].
+  revert HA Ha.
+  setoid_rewrite SummedElement_iff.
+  unfold_sum_of.
+  gen_sum_elem l.
+  intros Hl Ha Hf.
+  induction Hl as [|b l IHl]; [easy|].
+  apply elem_of_cons in Ha as [<- | Ha].
+  - cbn.
+    rewrite Rlist_sum_zeros; [apply radd_0_r|].
+    rewrite Forall_fmap, Forall_forall.
+    cbn.
+    intros b Hb.
+    apply Hf; [now constructor|congruence].
+  - cbn.
+    rewrite Hf, radd_0_l by now constructor || congruence.
+    apply IHHl; [easy|].
+    intros ? ?; apply Hf; now constructor.
+Qed.
+
+
+End SummableWF_theory.

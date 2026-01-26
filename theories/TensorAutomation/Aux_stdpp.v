@@ -1902,3 +1902,73 @@ Proof.
   unshelve (erewrite decide_ext by eassumption); [auto|].
   case_decide; cbn; f_equal; easy.
 Qed.
+
+
+
+Lemma list_map_fmap :
+  @map = @fmap _ list_fmap.
+Proof. reflexivity. Qed.
+(* TODO: Name here seems backwards, but follows list_fmap_bind... *)
+Lemma list_bind_fmap {A B C} (f : A -> list B) (g : B -> C) l :
+  g <$> (l ≫= f) = l ≫= (λ a, g <$> f a).
+Proof.
+  induction l; [reflexivity|].
+  cbn.
+  now rewrite fmap_app, IHl.
+Qed.
+Lemma list_bind_flat_map :
+  list_bind = flat_map.
+Proof. reflexivity. Qed.
+Lemma list_bind_assoc {A B C} (f : A -> list B) (g : B -> list C) l :
+  (l ≫= f) ≫= g = l ≫= mbind g ∘ f.
+Proof.
+  induction l; [reflexivity|cbn].
+  now rewrite bind_app, IHl.
+Qed.
+Lemma bind_pointwise_Permutation_strong {A B} (f g : A -> list B) l l' :
+  (∀ a, a ∈ l -> f a ≡ₚ g a) ->
+  l ≡ₚ l' ->
+  l ≫= f ≡ₚ l' ≫= g.
+Proof.
+  intros Hfg <-.
+  rewrite <- Forall_forall in Hfg.
+  induction Hfg; cbn; [reflexivity|].
+  f_equiv; auto.
+Qed.
+Lemma list_bind_nil_r {A B} (lA : list A) :
+  lA ≫= (λ _, @nil B) = [].
+Proof.
+  now induction lA.
+Qed.
+Lemma list_bind_nil_r' {A B} (lA : list A) f :
+  (∀ a, a ∈ lA -> f a = @nil B) ->
+  lA ≫= f = [].
+Proof.
+  rewrite <- Forall_forall.
+  intros Hall.
+  induction Hall; [reflexivity|].
+  cbn.
+  now rewrite IHHall, app_nil_r.
+Qed.
+Lemma list_bind_cons_r {A B} l (f : A -> B) (g : A -> list B) :
+  l ≫= (λ x, f x :: g x) ≡ₚ (f <$> l) ++ l ≫= g.
+Proof.
+  induction l; cbn; [|rewrite IHl]; solve_Permutation.
+Qed.
+Lemma list_bind_singleton_r {A B} l (f : A -> B) :
+  l ≫= (λ x, [f x]) = (f <$> l).
+Proof.
+  reflexivity.
+Qed.
+Lemma list_bind_app_r {A B} l (f g : A -> list B) :
+  l ≫= (λ x, f x ++ g x) ≡ₚ (l ≫= f) ++ l ≫= g.
+Proof.
+  induction l; cbn; [|rewrite IHl]; solve_Permutation.
+Qed.
+Lemma list_bind_comm {A B C} (f : A -> B -> list C) l l' :
+  (l ≫= (λ a, l' ≫= λ b, f a b)) ≡ₚ
+  (l' ≫= (λ b, l ≫= λ a, f a b)).
+Proof.
+  induction l; [cbn; now rewrite list_bind_nil_r|cbn].
+  now rewrite list_bind_app_r, IHl.
+Qed.

@@ -7,6 +7,7 @@ Require Export Algebra.
 Require Import Ring.
 From stdpp Require Import vector fin.
 From stdpp Require Export base list.
+Require Import Aux_stdpp.
 
 
 (* A typeclass indicating a type can be summed over, hence
@@ -117,7 +118,6 @@ Section SumTheory.
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
-
 Notation "0" := rO.
 Notation "1" := rI.
 Notation "x '==' y" := (req x y) (at level 70). 
@@ -212,6 +212,52 @@ Proof.
   rewrite sum_of_distr_l.
   apply sum_of_ext; intros x.
   now rewrite sum_of_distr_r.
+Qed.
+
+Lemma sum_of_ext' `{Summable A} (f g : A -> R) :
+  (forall a, a ∈ sum_elements -> f a == g a) ->
+  sum_of f == sum_of g.
+Proof.
+  intros Hfg.
+  unfold_sum_of.
+  apply Rlist_sum_ext.
+  rewrite Forall2_fmap_l, Forall2_fmap_r.
+  apply Forall_Forall2_diag.
+  now apply Forall_forall.
+Qed.
+
+Lemma sum_of_relabel `{Summable A, Summable B} (f : A -> B) (g : B -> R) :
+  f <$> sum_elements ≡ₚ sum_elements ->
+  ∑ b : B, g b == ∑ a : A, g (f a).
+Proof.
+  unfold_sum_of.
+  intros Hperm.
+  apply Rlist_sum_perm.
+  rewrite <- Hperm, list_map_fmap, <- list_fmap_compose.
+  reflexivity.
+Qed.
+
+Lemma sum_of_relabel'_l2r `{Summable A, Summable B}
+  (f : A -> B) (g : A -> R) (h : B -> R) :
+  (forall a, a ∈ sum_elements -> g a == h (f a)) ->
+  f <$> sum_elements ≡ₚ sum_elements ->
+  ∑ a : A, g a == ∑ b : B, h b.
+Proof.
+  intros Hfh Hf.
+  rewrite (sum_of_relabel f h) by assumption.
+  now apply sum_of_ext'.
+Qed.
+
+
+Lemma sum_of_relabel'_r2l `{Summable A, Summable B}
+  (f : B -> A) (g : A -> R) (h : B -> R) :
+  (forall b, b ∈ sum_elements -> g (f b) == h b) ->
+  f <$> sum_elements ≡ₚ sum_elements ->
+  ∑ a : A, g a == ∑ b : B, h b.
+Proof.
+  intros Hfh Hf.
+  rewrite (sum_of_relabel f g) by assumption.
+  now apply sum_of_ext'.
 Qed.
 
 End SumTheory.
