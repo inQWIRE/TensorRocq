@@ -3378,11 +3378,6 @@ Proof.
   reflexivity.
 Qed.
 
-Definition permutative_tensor {n m} {A}
-  (t : Tensor n m A) :=
-  forall v v' w w', vec_to_list v ≡ₚ vec_to_list v' ->
-    vec_to_list w ≡ₚ vec_to_list w' ->
-    t v w == t v' w'.
 
 (* FIXME: Move *)
 Notation abstract_semantics' mabs mg ml mr abs :=
@@ -3687,15 +3682,6 @@ Qed.
 
 
 
-
-
-
-(* TODO: Reason about *)
-Definition strongly_permutative_tensor {A}
-  (t : DimensionlessTensor A) : Prop :=
-  forall {n m n' m'} (v : vec A n) (w : vec A m) (v' : vec A n') (w' : vec A m'),
-    vec_to_list v ++ vec_to_list w ≡ₚ vec_to_list v' ++ vec_to_list w' ->
-    t n m v w == t n' m' v' w'.
 
 
 

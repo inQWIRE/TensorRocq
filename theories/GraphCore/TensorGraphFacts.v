@@ -817,6 +817,35 @@ Proof.
     + easy.
 Qed.
 
+
+Lemma graph_semantics_perm_eq_perm_on (tg tg' : TensorGraph) :
+  (forall k t, tg.(nodes) !! k = Some t ->
+    permutative_tensor (R:=R) (interpretTensor t
+      (in_arity tg.(edges) k) (out_arity tg.(edges) k))) ->
+  edges tg ≡ₚ edges tg' ->
+  nodes tg = nodes tg' ->
+  forall mi mo,
+  graph_map_semantics tg mi mo ==
+  graph_map_semantics tg' mi mo.
+Proof.
+  intros Hperm Hes Hns.
+  destruct tg as [ns es], tg' as [ns' es']; cbn -[graph_map_semantics] in *.
+  subst ns'.
+  now apply graph_semantics_perm_eq_aux.
+Qed.
+
+Lemma graph_semantics_perm_eq `{!PermutativeTensorLike TensT}
+  (tg tg' : TensorGraph) :
+  edges tg ≡ₚ edges tg' ->
+  nodes tg = nodes tg' ->
+  forall mi mo,
+  graph_map_semantics tg mi mo ==
+  graph_map_semantics tg' mi mo.
+Proof.
+  apply graph_semantics_perm_eq_perm_on.
+  intros; apply interpretTensorPermutative.
+Qed.
+
 (*
 Lemma graph_semantics_perm_eq_aux (tm : TensorMap R A) es es' :
   es ≡ₚ es' ->
