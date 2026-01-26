@@ -12,25 +12,25 @@ Notation edge := (prod nat nat).
 Notation labedge := (prod nat edge).
 
 (* A graph with nodes labeled by elements of [T] *)
-Record TensorGraph {T : Type} := mk_tg {
-  nodes : gmap nat T;
-  edges : list edge
+Record TensorHyperGraph {T : Type} := mk_tg {
+  nodes : Pmap (T * list positive * list positive);
+  inputs : list positive;
+  outputs : list positive;
 }.
-#[global] Arguments TensorGraph T : clear implicits.
-#[global] Arguments mk_tg {_} (_ _) : assert.
+#[global] Arguments TensorHyperGraph T : clear implicits.
+(* #[global] Arguments mk_tg {_} (_ _) : assert. *)
 
-Definition TensorGraph2pair {T} (tg : TensorGraph T) : 
-  gmap nat T * list edge :=
-  (tg.(nodes), tg.(edges)).
+Definition TensorGraph2triple {T} (tg : TensorHyperGraph T) :=
+  (tg.(nodes), (tg.(inputs), tg.(outputs))).
 
-#[global] Coercion TensorGraph2pair : TensorGraph >-> prod.
+#[global] Coercion TensorGraph2triple : TensorHyperGraph >-> prod.
 
 
 Section TensorGraph.
 
 Context {T : Type}.
 
-Let TensorGraph := (TensorGraph T).
+Let TensorGraph := (TensorHyperGraph T).
 
 Implicit Types tg : TensorGraph.
 
@@ -51,18 +51,15 @@ Definition not_internal tm (e : edge) :=
   ~ is_internal tm e.
 
 
-Definition inputs (tg : TensorGraph) : gset nat :=
+(* Definition inputs (tg : TensorGraph) : gset nat :=
   filter (fun k => ~ is_key tg.1 k) $
     list_to_set tg.2.*1.
 
 Definition outputs (tg : TensorGraph) : gset nat :=
   filter (fun k => ~ is_key tg.1 k) $
-    list_to_set tg.2.*2.
+    list_to_set tg.2.*2. *)
 
-
-
-
-Definition internal_edges tg :=
+(* Definition internal_edges tg :=
   filter (is_internal tg.1) tg.2.
 
 Definition external_edges tg :=
@@ -72,7 +69,7 @@ Definition i_internal_edges tg :=
   enumerate (internal_edges tg).
 
 Definition i_external_edges tg :=
-  enumerate (external_edges tg).
+  enumerate (external_edges tg). *)
 
 Definition is_node_input (k : nat) (e : edge) : Prop :=
   e.2 = k.
@@ -101,42 +98,38 @@ Definition in_arity (es : list edge) (k : nat) :=
 Definition out_arity (es : list edge) (k : nat) :=
   length (filter (is_node_output k) es).
 
-
-
-
-Definition add_vertex (n : nat) (t : T)
+(* Definition add_vertex (n : nat) (t : T)
   (tg : TensorGraph) : TensorGraph :=
-  mk_tg (<[n := t]> tg.1) tg.2.
+  mk_tg (<[n := t]> tg.1) tg.2. *)
 
-Definition add_edge (e : edge)
+(* Definition add_edge (e : edge)
   (tg : TensorGraph) : TensorGraph :=
-  mk_tg tg.1 (e :: tg.2).
+  mk_tg tg.1 (e :: tg.2). *)
 
-Definition empty_graph : TensorGraph := mk_tg ∅ [].
+(* Definition empty_graph : TensorGraph := mk_tg ∅ []. *)
 
-
-
-
-Definition graph_insize (tg : TensorGraph) : nat := size (inputs tg).
-Definition graph_outsize (tg : TensorGraph) : nat := size (outputs tg).
+(* Definition graph_insize (tg : TensorGraph) : nat := size (inputs tg). *)
+(* Definition graph_outsize (tg : TensorGraph) : nat := size (outputs tg). *)
 
 
-Definition sorted_inputs (tg : TensorGraph) : list nat :=
-  merge_sort le $ elements (inputs tg).
+(* Definition sorted_inputs (tg : TensorGraph) : list nat :=
+  merge_sort le $ elements (inputs tg). *)
 
-Definition sorted_outputs (tg : TensorGraph) : list nat :=
-  merge_sort le $ elements (outputs tg).
+(* Definition sorted_outputs (tg : TensorGraph) : list nat :=
+  merge_sort le $ elements (outputs tg). *)
+
+
 
 
 End TensorGraph.
 
 Declare Scope graph_scope.
 Delimit Scope graph_scope with graph.
-Bind Scope graph_scope with TensorGraph.
-Notation "g +[ n := t ]" := (add_vertex n t g) (at level 50, left associativity) : graph_scope.
-Notation "g +{ e }" := (add_edge e g) (at level 50, left associativity) : graph_scope.
-Notation "g +{ e0 ; .. ; en }" := (add_edge en .. (add_edge e0 g) ..) (at level 50, left associativity) : graph_scope.
-Notation "∅G" := empty_graph : graph_scope.
+Bind Scope graph_scope with TensorHyperGraph.
+(* Notation "g +[ n := t ]" := (add_vertex n t g) (at level 50, left associativity) : graph_scope. *)
+(* Notation "g +{ e }" := (add_edge e g) (at level 50, left associativity) : graph_scope. *)
+(* Notation "g +{ e0 ; .. ; en }" := (add_edge en .. (add_edge e0 g) ..) (at level 50, left associativity) : graph_scope. *)
+(* Notation "∅G" := empty_graph : graph_scope. *)
 
 Open Scope graph_scope.
 Open Scope nat.
