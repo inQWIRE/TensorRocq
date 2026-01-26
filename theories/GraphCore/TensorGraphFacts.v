@@ -1,4 +1,3 @@
-From QuantumLib Require Import Complex.
 Require Import Aux_pos.
 Require Import Tensor.
 From stdpp Require Import list fin_maps.
@@ -6,9 +5,11 @@ From stdpp Require Import pmap gmap.
 Require Import TensorExprDBSyntax TensorExprDBSemantics.
 Require Import ZXCore.
 Require ZifyBool.
-Require Import TensorGraph.
+Require Import TensorGraphExpr TensorGraphSemantics.
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
+
+Open Scope nat_scope.
 
 (* FIXME: Move *)
 Lemma forall_var (P : var -> Prop) :
@@ -18,14 +19,110 @@ Proof.
   split; [auto|].
   now intros (?&?&?) [].
 Qed.
+Lemma fmap_to_map_imap `{FinMap K M} `(f : A -> B) (m : M A) :
+  f <$> m =@{M B} map_imap (λ _ a, Some (f a)) m.
+Proof.
+  apply map_eq.
+  intros k.
+  rewrite lookup_fmap, map_lookup_imap.
+  now destruct (m !! k).
+Qed.
+Lemma map_fmap_imap `{FinMap K M} `(f : K -> A -> option B) `(g : B -> C) (m : M A) :
+  g <$> map_imap f m =@{M C} map_imap (λ k a, g <$> (f k a)) m.
+Proof.
+  rewrite fmap_to_map_imap, map_imap_compose.
+  reflexivity.
+Qed.
+
+#[export] Instance from_option_dec {A} (P : Prop) (Q : A -> Prop) (ma : option A) :
+  Decision P -> (forall a, Decision (Q a)) -> Decision (from_option Q P ma) :=
+  fun HP HQ =>
+  match ma with
+  | Some a => (HQ a)
+  | None => HP
+  end.
+
+Lemma filter_snd_imap_pair_compose {A B} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (f : nat -> B) (l : list A) :
+  filter (P ∘ snd) (imap (pair ∘ f) l) =
+  (prod_map f id) <$> filter (P ∘ snd) (imap pair l).
+Proof.
+  revert B f;
+  induction l; intros B f; [reflexivity|].
+  cbn.
+  case_decide as HPa.
+  - cbn.
+    f_equal.
+    rewrite Combinators.compose_assoc, 2 IHl.
+    rewrite <- list_fmap_compose.
+    reflexivity.
+  - rewrite Combinators.compose_assoc, 2 IHl.
+    rewrite <- list_fmap_compose.
+    reflexivity.
+Qed.
+
+Lemma from_option_fmap {A B C} (f : A -> B) (g : B -> C) (d : C) (ma : option A) :
+  from_option g d (f <$> ma) = from_option (g ∘ f) d ma.
+Proof.
+  now destruct ma.
+Qed.
+
+
+Lemma filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  filter (P ∘ snd) (imap pair l) =
+  imap (λ idx v, ((filter (λ i, from_option P False (l !! i)) (seq 0 (length l))) !!! idx, v))
+    (filter P l).
+Proof.
+  induction l; [reflexivity|].
+  cbn.
+  eenough (Hen : _).
+  - case_decide as HPa; [|exact Hen].
+    cbn.
+    f_equal.
+    apply Hen.
+  - rewrite (filter_snd_imap_pair_compose P S).
+    rewrite IHl.
+    rewrite fmap_imap.
+    apply imap_ext.
+    intros i x Hi.
+    cbn.
+    f_equal.
+    rewrite <- fmap_S_seq.
+    symmetry.
+    rewrite (list_filter_fmap S).
+    unfold compose; cbn.
+    apply list_lookup_total_fmap.
+    apply lookup_lt_Some in Hi as Hilt.
+    eapply Nat.lt_le_trans; [apply Hilt|].
+    apply eq_reflexivity.
+    clear.
+    induction l; [reflexivity|].
+    cbn.
+    eenough (Heq : _).
+    + case_decide as HPa; [|exact Heq].
+      cbn.
+      rewrite Heq.
+      reflexivity.
+    + rewrite <- fmap_S_seq, (list_filter_fmap S).
+      rewrite length_fmap.
+      apply IHl.
+Qed.
+
+
+Lemma length_filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  length (filter (P ∘ snd) (imap pair l)) =
+  length (filter P l).
+Proof.
+  now rewrite filter_snd_imap_pair, length_imap.
+Qed.
 
 
 
-
-(* 
 Section TensorGraphFacts.
 
-Context {R : Type} {A : Type}.
+Context `{TensT : TensorLike R A T}.
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
@@ -50,15 +147,17 @@ Local Existing Instance Rmul_proper.
 
 
 
-Let TensorGraph := @TensorGraph R A.
+
+
+
+Let TensorGraph := @TensorGraph T.
 
 Definition graph_tabs (tg : TensorGraph) : abstypecontext :=
-  kmap (Pos.of_succ_nat) $
-    map_imap (fun n (dt : DimensionlessTensor _) =>
-    let node := mk_node tg n in
-    let inarity := length node.1.2 in
-    let outarity := length node.2 in
-    Some (replicate (inarity + outarity) 0)) tg.1.
+  kmap (Pos.of_succ_nat) $ map_imap (fun k (dt : T) =>
+    let inarity := in_arity tg.2 k in
+    let outarity := out_arity tg.2 k in
+    Some (replicate (inarity + outarity) O)
+    ) tg.1.
 
 Definition graph_tl (tg : TensorGraph) : vartypecontext :=
   (gmaps_to_Pmap (set_to_map (fun k => (k, 0)) (inputs tg))
@@ -80,14 +179,32 @@ Proof.
   cbn.
   unfold graph_tabs.
   rewrite lookup_kmap by apply _.
-  rewrite map_lookup_imap, Hn.
+  rewrite map_lookup_imap.
+  cbn.
+  rewrite Hn.
   cbn.
   f_equal.
-  rewrite !length_app, !length_fmap.
-  apply (list_eq_same_length _ _ _ eq_refl).
-  - rewrite !length_fmap, !length_app, !length_fmap, length_replicate.
-    reflexivity.
-  - rewrite !length_fmap, !length_app, !length_fmap.
+  rewrite fmap_const, reverse_replicate.
+  unfold input_edges, output_edges.
+  (* rewrite !length_app, !length_fmap. *)
+  apply (fun H => list_eq_same_length _ _ _ H eq_refl).
+  - unfold node_input_edges, node_output_edges.
+    (* rewrite Permutation_swap_app_app. *)
+
+    rewrite !length_fmap, length_replicate.
+    rewrite !length_app, !length_fmap, <- 3 length_app, length_app.
+    f_equal.
+    + rewrite length_app, 2 length_filter_snd_imap_pair, <- length_app.
+      rewrite <- filter_app.
+      eapply Permutation_length.
+      eapply filter_Permutation.
+      apply filter_with_neg_Permutation.
+    + rewrite length_app, 2 length_filter_snd_imap_pair, <- length_app.
+      rewrite <- filter_app.
+      eapply Permutation_length.
+      eapply filter_Permutation.
+      apply filter_with_neg_Permutation.
+  - rewrite length_fmap, length_replicate.
     intros i x y Hi.
     rewrite list_lookup_fmap.
     destruct (replicate _ _ !! _) as [ri|] eqn:Hri; [|easy].
@@ -96,44 +213,50 @@ Proof.
     intros [= <-].
     intros Hhyp; symmetry; revert Hhyp.
     refine ((Forall_lookup (.= Some 0) _).1 _ i y).
+    clear i Hi.
     rewrite Forall_fmap.
     rewrite 3 Forall_app, 4 ! Forall_fmap.
     unfold compose; cbn.
+    unfold node_input_edges, node_output_edges.
     rewrite 4 Forall_filter.
     unfold i_internal_edges, i_external_edges.
     rewrite app_nil_r.
     split; (split; apply Forall_forall; intros (k, e) Hke%elem_of_enumerate;
       intros [= Hen];
-
-      [rewrite <- fmap_reverse; rewrite list_lookup_fmap;
-        rewrite pos_to_nat_pred_of_nat; cbn;
-        destruct (reverse _  !! k) as [v|] eqn:Hv; [easy|
-        apply lookup_lt_Some in Hke;
-        apply lookup_ge_None in Hv;
-        rewrite length_reverse in Hv; lia]|]);
+      [apply lookup_replicate, (conj eq_refl); cbn;
+        apply lookup_lt_Some in Hke; lia|]);
     unfold graph_tl; rewrite lookup_gmaps_to_Pmap, lookup_set_to_map by easy;
-    [exists e.1|exists e.2]; (split; [|cbn; f_equal; lia]).
-    + unfold inputs.
-      rewrite elem_of_filter, elem_of_list_to_set.
-      apply elem_of_list_lookup_2 in Hke.
-      unfold external_edges in Hke.
-      apply elem_of_list_filter in Hke.
-      pose proof (mk_is_Some _ _ Hn : is_key tg n) as Hkey.
-      unfold not_internal, is_internal in Hke.
-      split; [subst; tauto|].
-      now apply elem_of_list_fmap_1.
-    + unfold outputs.
-      rewrite elem_of_filter, elem_of_list_to_set.
-      apply elem_of_list_lookup_2 in Hke.
-      unfold external_edges in Hke.
-      apply elem_of_list_filter in Hke.
-      pose proof (mk_is_Some _ _ Hn : is_key tg n) as Hkey.
-      unfold not_internal, is_internal in Hke.
-      split; [subst; tauto|].
-      now apply elem_of_list_fmap_1.
+    [exists e.1|exists e.2]; (split; [|cbn; f_equal; lia]);
+    unfold inputs, outputs;
+    rewrite elem_of_filter, elem_of_list_to_set;
+    apply elem_of_list_lookup_2 in Hke;
+    unfold external_edges in Hke;
+    apply elem_of_list_filter in Hke;
+    pose proof (mk_is_Some _ _ Hn : is_key tg.1 n) as Hkey;
+    unfold not_internal, is_internal in Hke;
+    cbn in *;
+    (split; [subst n; tauto|]);
+    now apply elem_of_list_fmap_1.
 Qed.
 
 Context `{Summable A}.
+
+
+
+(* Lemma mk_node_perm_eq lint lext lint' lext' k :
+  lint ≡ₚ lint' ->
+  lext ≡ₚ lext' ->
+  abs_perm_eq (mk_node lint lext k) (mk_node lint' lext' k).
+Proof.
+  intros Hlint Hlext.
+  split; [easy|]; cbn.
+  unfold input_edges, output_edges, node_input_edges, node_output_edges.
+  now rewrite Hlint, Hlext.
+Qed. *)
+
+
+
+(*
 
 Definition num_internals (tg : TensorGraph) : nat :=
   length (filter (is_internal tg) tg.2).
@@ -183,7 +306,7 @@ Proof.
     reflexivity.
 Qed.
 
-
+*)
 
 
 
@@ -300,23 +423,44 @@ Proof.
   cbv delta [mk_node] beta.
 *)
 
-Lemma graph_mabs_perm_eq (tm : TensorMap R A) es es' :
+Add Parametric Morphism : in_arity with signature
+  (≡ₚ) ==> eq ==> eq as in_arity_mor.
+Proof.
+  intros es es' Hes k.
+  unfold in_arity.
+  now rewrite Hes.
+Qed.
+
+Add Parametric Morphism : out_arity with signature
+  (≡ₚ) ==> eq ==> eq as out_arity_mor.
+Proof.
+  intros es es' Hes k.
+  unfold out_arity.
+  now rewrite Hes.
+Qed.
+
+
+Lemma graph_mabs_perm_eq (tm : gmap nat T) es es' :
   es ≡ₚ es' ->
   graph_mabs (mk_tg tm es) = graph_mabs (mk_tg tm es').
 Proof.
   intros Hes.
   unfold graph_mabs.
-  f_equal.
-  cbn [fst mk_tg].
-  apply map_imap_ext.
-  intros k.
-  apply option_fmap_ext.
-  intros dt.
-  f_equal.
-  pose proof (mk_node_perm_eq_lengths tm es es' k Hes) as (-> & ->).
+  cbn [TensorGraph2pair fst snd edges nodes].
+  erewrite map_imap_ext. 2:{
+    intros k.
+    specialize (in_arity_mor _ _ Hes k k eq_refl) as Hiar.
+    rewrite Hiar.
+    specialize (out_arity_mor _ _ Hes k k eq_refl) as Hoar.
+    rewrite Hoar.
+    reflexivity.
+  }
   reflexivity.
 Qed.
 
+
+
+(*
 Definition type {A} (a : A) : Type := A.
 Definition domtype {A B} (f : A -> B) : Type := A.
 Definition codomtype {A B} (f : A -> B) : Type := B.
@@ -359,11 +503,11 @@ Notation "'right_uncompose' fg g" :=
       | _ => Control.throw (Init.Tactic_failure Init.None)
       end
         )) (at level 10, fg at level 0, g at level 0).
-
+*)
 (* Goal True.
 Check (right_uncompose (λ (x : nat * (nat * nat)), x.2.2) (@snd nat (nat * nat))). *)
 
-Lemma graph_semantics_abstracts_is_Some (tm : TensorMap R A) es mi mo k
+(* Lemma graph_semantics_abstracts_is_Some (tm : gmap nat T) es mi mo k
   (mr': Vlist graph_V (replicate (num_internals (mk_tg tm es)) 0))
   (Hmr': WF_Vlist graph_V mr') :
   k ∈ dom tm ->
@@ -544,7 +688,7 @@ Proof.
       rewrite Forall2_lookup in HWF.
       specialize (HWF (length mr' - S n)).
       pose proof Hmr'i as Hmri.
-      rewrite reverse_lookup in Hmri by 
+      rewrite reverse_lookup in Hmri by
         now apply lookup_lt_Some in Hmr'i; rewrite length_reverse in Hmr'i.
       setoid_rewrite Hmri in HWF.
       destruct (replicate _ _ !! _) as [ri|] eqn:Hrep in HWF; [|easy].
@@ -560,111 +704,120 @@ Proof.
       unfold graph_ml.
       rewrite lookup_fmap.
       destruct (_ !! _) in |- *; reflexivity.
-Qed.
-
+Qed. *)
 
 Lemma num_internals_perm_eq tm es es' : es ≡ₚ es' ->
-  num_internals (mk_tg tm es) = num_internals (mk_tg tm es').
+  @num_internals T (mk_tg tm es) = num_internals (mk_tg tm es').
 Proof.
   intros Hes.
   unfold num_internals.
   cbn.
-  rewrite <- Hes at 2.
+  rewrite <- Hes.
   reflexivity.
 Qed.
 
-(* 
-Lemma graph_semantics_perm_eq_aux (tm : TensorMap R A) es es' :
+Lemma graph_tensorlist_semantics_to_named
+  (tg : TensorGraph) mi mo (K : R) :
+  graph_map_semantics tg mi mo ==
+  ntl_total_semantics graph_V (graph_mabs tg) ∅ (graph_ml mi mo)
+  (graph_namedtensorlist_semantics tg (seq 0 (num_internals tg))
+     (seq 0 (num_externals tg))).
+Proof.
+  pose proof (graph_namedtensorlist_semantics_seq_correct tg)
+    as Hcorr.
+  unfold graph_map_semantics.
+  rewrite <- tl2ntl_correct
+    by apply graph_tensorlist_semantics_WF.
+  now rewrite <- Hcorr.
+Qed.
+
+(* FIXME: Move *)
+Definition graph_mabst (tg : TensorGraph) :
+  Pmap {knm & Tensor (R:=R) knm.2.1 knm.2.2 (graph_V knm.1)} :=
+  kmap Pos.of_succ_nat $ map_imap (λ k (dt : T),
+    Some (existT (0, (in_arity tg.(edges) k, out_arity tg.(edges) k))
+          (interpretTensor dt _ _))) tg.(nodes).
+
+Lemma graph_mabs_to_mabst (tg : TensorGraph) :
+  graph_mabs tg =
+  mabs_of_tensor_map graph_V (graph_mabst tg).
+Proof.
+  unfold graph_mabs, mabs_of_tensor_map, graph_mabst.
+  rewrite <- (kmap_fmap _).
+  f_equal.
+  rewrite map_fmap_imap.
+  reflexivity.
+Qed.
+
+Lemma graph_tabst_to_mabst (tg : TensorGraph) :
+  graph_tabst tg = snd ∘ projT1 <$> graph_mabst tg.
+Proof.
+  unfold graph_tabst, graph_mabst.
+  rewrite <- (kmap_fmap _).
+  rewrite map_fmap_imap.
+  reflexivity.
+Qed.
+
+Lemma graph_semantics_perm_eq_aux (tm : gmap nat T) es es' :
+  (forall k t, tm !! k = Some t ->
+    permutative_tensor (R:=R) (req:=req) (interpretTensor t
+      (in_arity es k) (out_arity es k))) ->
   es ≡ₚ es' ->
   forall mi mo,
   graph_map_semantics (mk_tg tm es) mi mo ==
   graph_map_semantics (mk_tg tm es') mi mo.
 Proof.
-  intros Hes mi mo.
-  cbn.
-  rewrite 2 fmap_const.
-  rewrite <- (graph_mabs_perm_eq tm es es' Hes).
+  intros Hperm Hes mi mo.
+  (* rewrite graph_tensorlist_semantics_to_named *)
+  unfold graph_map_semantics.
+  rewrite <- 2 tl2ntl_correct by apply graph_tensorlist_semantics_WF.
+  apply (graph_tensorlist_semantics_perm_eq_pairs_elab tm) in Hes as Hex.
+  destruct Hex as (idxs & idxs' & Hidxs & Hidxs' & Heqmid & Hmideq).
+  etransitivity.
+  - rewrite graph_mabs_to_mabst.
+    eapply ntl_perm_eq'_correct_permutative;
+    [| | apply Heqmid|..].
+    + apply tl2ntl_WF, graph_tensorlist_semantics_WF.
+    + rewrite <- graph_namedtensorlist_semantics_to_aux.
+      apply graph_namedtensorlist_semantics_WF.
+      * rewrite Hidxs; apply NoDup_seq.
+      * rewrite Hidxs, length_seq.
+        now apply num_internals_perm_eq.
+    + cbn.
+      rewrite Forall_fmap, Forall_forall.
+      intros k Hk%(elem_of_list_to_set (C:=gset nat))%dom_alt.
+      cbn.
+      rewrite <- graph_tabst_to_mabst.
+      now apply mk_node_abst_WT'_imap_pair.
+    + cbn.
+      intros f.
+      rewrite <- list_fmap_compose.
+      unfold compose; cbn.
+      rewrite <- (set_map_list_to_set_L (SA:=gset nat)).
+      rewrite <- dom_alt.
+      intros (k & -> & Hk)%elem_of_map.
+      apply elem_of_dom in Hk as [t Ht].
+      intros t'.
+      unfold graph_mabst.
+      rewrite (lookup_kmap _), map_lookup_imap.
+      cbn.
+      rewrite Ht.
+      cbn.
+      intros [= <-].
+      now apply Hperm.
+  - rewrite <- (graph_mabs_perm_eq tm _ _ Hes), <- graph_mabs_to_mabst.
+    eapply ntl_aeq_correct.
+    + rewrite <- graph_namedtensorlist_semantics_to_aux.
+      apply graph_namedtensorlist_semantics_WF.
+      * rewrite Hidxs; apply NoDup_seq.
+      * rewrite Hidxs, length_seq.
+        now apply num_internals_perm_eq.
+    + apply tl2ntl_WF.
+      apply graph_tensorlist_semantics_WF.
+    + easy.
+Qed.
 
-  change (is_internal (mk_tg tm es')) with (is_internal (mk_tg tm es)).
-  rewrite <- Hes at 1.
-  set (l := length _).
-  subst l.
-  rewrite fold_num_internals'.
-
-
-  apply tl_total_semantics_aux_ext_abs.
-
-  intros mr' Hmr'.
-
-  rewrite Forall2_fmap.
-  apply Forall_Forall2_diag.
-  rewrite Forall_forall.
-  intros k Hk.
-  rewrite rev_append_reverse, app_nil_r.
-  cbn.
-
-  apply default_is_Some_ext_mor; [|reflexivity|].
-  - assert (Hkdom : k ∈ dom tm) by now rewrite dom_alt, elem_of_list_to_set.
-
-    rewrite graph_semantics_abstracts_is_Some by easy.
-    rewrite (graph_mabs_perm_eq _ _ _ Hes).
-    rewrite graph_semantics_abstracts_is_Some; [..|easy]. 2:{
-      rewrite <- (num_internals_perm_eq _ _ _ Hes).
-      exact Hmr'.
-    }
-    f_equiv.
-    change (is_key (mk_tg tm es')) with (is_key (mk_tg tm es)).
-    f_equiv; apply forall_iff; intros ?.
-    f_equiv.
-    setoid_rewrite <- Hes.
-
-  f_equal.
-
-
-  induction Hes; [reflexivity|..].
-
-
-  setoid_rewrite fold_num_internals'.
-  rewrite <- Hes at 3.
-  rewrite fold_num_internals'.
-
-  rewrite 2 tl_total_semantics_aux_alt_Vlist.
-  setoid_rewrite rev_append_rev.
-  setoid_rewrite app_nil_r.
-
-
-  pose proof Hes as Hes'.
-
-  apply (filter_Permutation (is_internal (mk_tg tm es))) in Hes' as Hesint.
-
-  apply perm_exists_posperm in Hesint as Hf.
-  destruct Hf as (f & Hfperm & Hfppermute & Hlook).
-
-  eapply sum_of_relabel'_r2l with (ppermute f).
-  2:{
-    unfold sum_elements; cbn.
-    rewrite ppermute_posperm_permutes_Vlist_elements. 2:{
-      now rewrite lengthN_correct_rev, length_replicate, <- lengthN_correct_rev.
-    }
-    rewrite ppermute_replicate.
-    reflexivity.
-  }
-  intros ml Hml%elem_of_Vlist_elements.
-
-  apply tl_total_semantics_aux_ext_base_mr.
-  unshelve (instantiate (1:=_)).
-  unfold Vlist.
-  exact
-
-
-
-  eexists; cbn -[reverse].
-  rewrite !fmap_const.
-  rewrite reverse_replicate, lengthN_correct_rev, length_replicate.
-  replace (N.succ_pos _) with (Pos.of_succ_nat (num_internals (mk_tg tm es)))
-    by lia. *)
-
-(* 
+(*
 Lemma graph_semantics_perm_eq_aux (tm : TensorMap R A) es es' :
   es ≡ₚ es' ->
   forall mi mo,
@@ -693,4 +846,4 @@ Proof.
 
 *)
 
-End TensorGraphFacts. *)
+End TensorGraphFacts.

@@ -2,6 +2,7 @@ Require Import Summable.
 Require StringCustomNotation.
 
 Require Import TensorExprDBSyntax.
+Require Tensor.
 
 Require Import Aux_pos Aux_stdpp.
 
@@ -27,18 +28,9 @@ Proof.
 Qed.
 
 
-
-
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.
 
-(* FIXME: Move *)
-#[export]
-Instance pos_to_nat_pred_inj : Inj (=) (=) pos_to_nat_pred.
-Proof.
-  intros p p'.
-  lia.
-Qed.
 
 Section TensorExprDBSemantics.
 
@@ -1849,60 +1841,7 @@ Proof.
   now rewrite Hidx, Hargs.
 Qed.
 
-Lemma kmap_insert_first_key `{FinMap K1 M1, FinMap K2 M2}
-  (f : K1 -> K2) `(m : M1 A) (i : K1) a :
-    m !! i = None ->
-    map_first_key (<[i:=a]> m) i ->
-    kmap f (<[i:=a]> m) = <[f i:=a]> (kmap f m :> M2 A).
-Proof.
-  intros Hmi Hi.
-  unfold kmap.
-  rewrite map_to_list_insert_first_key by easy.
-  reflexivity.
-Qed.
 
-
-Lemma lookup_kmap_full_gen `{FinMap K1 M1, FinMap K2 M2}
-  (f : K1 -> K2) `(m : M1 A) (i : K1) :
-    map_Forall (λ j _, map_Forall (λ k _, f j = f k -> j = k) m) m ->
-    (forall j, m !! j = None -> map_Forall (λ k _, f k ≠ f j) m) ->
-    (kmap f m :> M2 A) !! f i = m !! i.
-Proof.
-  intros Hinj Hsafe;
-  revert Hinj Hsafe i;
-  induction m as [|i a m Hmi Hfirst IHm] using map_first_key_ind;
-  [now intros; rewrite kmap_empty, 2 lookup_empty|].
-  rewrite 2 map_Forall_insert by easy.
-  intros [[_ Hinj_i] Hinj].
-  setoid_rewrite map_Forall_insert; [|easy].
-  setoid_rewrite lookup_insert_None.
-  intros Hsafe i'.
-  rewrite kmap_insert_first_key by easy.
-  rewrite lookup_insert_case.
-  case_decide as Hfii'.
-  - enough (i = i') by now subst; rewrite lookup_insert.
-    destruct (m !! i') as [mi'|] eqn:Hmi'.
-    + now apply (Hinj_i i' mi' Hmi').
-    + apply dec_stable.
-      intros Hne.
-      specialize (Hsafe _ (conj Hmi' Hne)).
-      easy.
-  - rewrite IHm.
-    + rewrite lookup_insert_ne; [easy|].
-      now intros ->.
-    + apply (map_Forall_impl _ _ _ Hinj).
-      intros j _.
-      rewrite map_Forall_insert by easy.
-      easy.
-    + intros j Hj.
-      destruct_decide (decide (j = i)) as Hji.
-      * subst.
-        intros j x Hmj.
-        symmetry.
-        apply Hinj_i in Hmj as Hfij.
-        now intros ->%Hfij; congruence.
-      * now apply Hsafe.
-Qed.
 
 
 Lemma tl_total_semantics_alt_aux_relabel mabs mg ml mr (f : Idx -> Idx)
@@ -3282,6 +3221,481 @@ Proof.
   now intros [[]] [[]].
 Qed.
 
+(* FIXME: Move to top*)
+Import Tensor.
+
+Let Tensor := (@Tensor R).
+Let DimensionlessTensor := (@DimensionlessTensor R).
+
+Fixpoint tensor_to_V_n_args_aux (k : nat) {n A}
+   : forall (t : vec (V k) n -> A),
+  V_n_args (replicate n k) A :=
+  match n with
+  | O => fun t => t [#]
+  | S n' => fun t =>
+    fun a => tensor_to_V_n_args_aux k (t ∘ vcons a)
+  end.
+
+Definition tensor_to_V_n_args (k : nat)
+  {n m A} (t : vec (V k) n -> vec (V k) m -> A) :=
+  tensor_to_V_n_args_aux k (uncurry t ∘ Vector.splitat n).
+
+Let BTensor := {knm : nat * (nat * nat) &
+  Tensor knm.2.1 knm.2.2 (V knm.1)}.
+
+Local Definition sigT2pair `{P : A -> Type} (ap : sigT P) : A * (P (projT1 ap)) :=
+  (projT1 ap, projT2 ap).
+
+#[local] Coercion sigT2pair : sigT >-> prod.
+
+Definition mabs_of_tensor_map (mabst : Pmap BTensor) : abscontext :=
+  (λ knm_T,
+  mk_Vfunc _ (tensor_to_V_n_args _ (projT2 knm_T))) <$> mabst.
+
+
+Fixpoint Vapplys_replicate_vec {A n k} : V_n_args (replicate n k) A ->
+  vec (V k) n -> A :=
+  match n with
+  | O => fun f _ => f
+  | S n' =>
+    fun f v =>
+    Vapplys_replicate_vec (f (Vector.hd v)) (Vector.tl v)
+  end.
+
+Lemma Vapplys_replicate_vec_correct {n k} (f : V_n_args (replicate n k) R) args :
+  Vapplys (mk_Vfunc _ f) args =
+  kargs ← join_list (Vval_get k <$> args);
+  vargs ← list2vec n kargs;
+  Some (Vapplys_replicate_vec f vargs).
+Proof.
+  unfold mk_Vfunc.
+  revert f args; induction n;
+  intros f args.
+  - destruct args as [|v args]; [reflexivity|].
+    cbn.
+    case_match; [|reflexivity].
+    cbn.
+    destruct (join_list _); reflexivity.
+  - destruct args as [|v args]; [reflexivity|].
+    cbn.
+    case_match; [|reflexivity].
+    cbn.
+    rewrite IHn.
+    rewrite option_bind_assoc.
+    unfold compose.
+    cbn.
+    apply option_bind_ext; [|reflexivity].
+    intros ls.
+    rewrite option_fmap_bind.
+    reflexivity.
+Qed.
+
+
+Lemma Vapplys_replicate_vec_tensor_to_V_n_args_aux {k n A}
+  (t : vec (V k) n -> A) v :
+  Vapplys_replicate_vec (tensor_to_V_n_args_aux k t) v
+  = t v.
+Proof.
+  induction v; [reflexivity|].
+  apply IHv.
+Qed.
+
+Lemma Vapplys_replicate_vec_tensor_to_V_n_args {k n m}
+  (t : vec (V k) n -> vec (V k) m -> R) v :
+  Vapplys_replicate_vec (tensor_to_V_n_args k t) v
+  = uncurry t (Vector.splitat _ v).
+Proof.
+  unfold tensor_to_V_n_args.
+  now rewrite Vapplys_replicate_vec_tensor_to_V_n_args_aux.
+Qed.
+
+
+
+Lemma abstract_semantics_mabs_of_tensor_map_gen mabst mg ml mr f low up :
+  abstract_semantics (mabs_of_tensor_map mabst) mg ml mr f low up =
+  default rO (
+    knm_T ← (mabst !! f :> option BTensor);
+    ins' ← join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
+    outs' ← join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
+    '(ins, outs) ← Vector.splitat _ <$> list2vec (knm_T.1.2.1 + knm_T.1.2.2) (ins' ++ outs');
+    Some ((projT2 (knm_T :> BTensor)) ins outs)
+  ).
+Proof.
+  unfold abstract_semantics.
+  unfold mabs_of_tensor_map.
+  rewrite lookup_fmap.
+  rewrite_strat (outermost option_fmap_bind).
+  rewrite option_bind_comm.
+  change ({knm : Ty * (Ty * Ty) &
+            Tensor knm.2.1 knm.2.2 (V knm.1)}) with BTensor.
+  destruct (mabst !! f) as [knm_T|] eqn:HT; [cbn|reflexivity].
+  rewrite fmap_app, join_list_app.
+  rewrite option_bind_assoc'.
+  rewrite 2 join_list_fmap_mbind.
+  destruct (join_list (_ <$> low)) as [llow|] eqn:Hllow; [cbn|reflexivity].
+  destruct (join_list (_ <$> up)) as [lup|] eqn:Hlup; [cbn|cbn; now rewrite option_bind_None_r].
+  rewrite Vapplys_replicate_vec_correct.
+  rewrite fmap_app, join_list_app, option_bind_assoc'.
+  destruct (join_list (_ <$> llow)) as [klow|] eqn:Hklow; [cbn|reflexivity].
+  destruct (join_list (_ <$> lup)) as [kup|] eqn:Hkup; [cbn|reflexivity].
+  destruct (list2vec _ _) as [args|] eqn:Hargs; [cbn|reflexivity].
+  rewrite Vapplys_replicate_vec_tensor_to_V_n_args.
+  now destruct (Vector.splitat _ _).
+Qed.
+
+Lemma abstract_semantics_mabs_of_tensor_map mabst mg ml mr f low up :
+  snd ∘ projT1 <$> (mabst !! f) = Some (length low, length up) ->
+  abstract_semantics (mabs_of_tensor_map mabst) mg ml mr f low up =
+  default rO (
+    knm_T ← (mabst !! f :> option BTensor);
+    ins' ←
+      join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
+    ins ← list2vec (knm_T.1.2.1) ins';
+    outs' ←
+      join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
+    outs ← list2vec (knm_T.1.2.2) outs';
+    Some ((projT2 (knm_T :> BTensor)) ins outs)
+  ).
+Proof.
+  intros Habst.
+  rewrite abstract_semantics_mabs_of_tensor_map_gen.
+  destruct (mabst !! f) as [[[k nm] T]|] eqn:HT; [cbn|reflexivity].
+  cbn in Habst.
+  revert Habst.
+  intros [= ->].
+  destruct (join_list (_ <$> (_ <$> low))) as [largs|] eqn:Hlargs; [cbn|reflexivity].
+  apply join_list_Some_length in Hlargs as Hlenl.
+  rewrite 2 length_fmap in Hlenl.
+  rewrite (option_bind_comm _ (list2vec _ _)).
+  destruct (join_list (_ <$> (_ <$> up))) as [uargs|] eqn:Huargs; [cbn|reflexivity].
+  apply join_list_Some_length in Huargs as Hlenu.
+  rewrite 2 length_fmap in Hlenu.
+  rewrite (list2vec_app' (eq_sym Hlenl) (eq_sym Hlenu)).
+  cbn.
+  rewrite Vector.splitat_append.
+  rewrite (list2vec_length' (eq_sym Hlenl)).
+  rewrite (list2vec_length' (eq_sym Hlenu)).
+  reflexivity.
+Qed.
+
+Definition permutative_tensor {n m} {A}
+  (t : Tensor n m A) :=
+  forall v v' w w', vec_to_list v ≡ₚ vec_to_list v' ->
+    vec_to_list w ≡ₚ vec_to_list w' ->
+    t v w == t v' w'.
+
+(* FIXME: Move *)
+Notation abstract_semantics' mabs mg ml mr abs :=
+  (abstract_semantics mabs mg ml mr abs.1.1 abs.1.2 abs.2).
+
+
+Lemma abstract_semantics'_abstracts_perm_eq_permutative_tensor
+  (mabst : Pmap BTensor) mg ml mr
+  abs abs' :
+  abst_WT' (snd ∘ projT1 <$> mabst) abs ->
+  (forall t : BTensor, mabst !! abs.1.1 = Some t ->
+    permutative_tensor (projT2 t)) ->
+  abstracts_perm_eq abs abs' ->
+  abstract_semantics' (mabs_of_tensor_map mabst) mg ml mr abs ==
+  abstract_semantics' (mabs_of_tensor_map mabst) mg ml mr abs'.
+Proof.
+  intros HWT Hpermtens Habs.
+  pose proof HWT as HWT'.
+  rewrite Habs in HWT'.
+  rewrite 2 abstract_semantics_mabs_of_tensor_map by
+    now rewrite <- lookup_fmap.
+  destruct abs as ((f, low), up), abs' as ((f', low'), up').
+  cbn in *.
+  destruct Habs as ([= <-] & Hlow & Hup).
+  cbn in Hlow, Hup.
+  destruct (mabst !! f) as [[[k nm] t]|] eqn:Ht in |- *; [cbn|reflexivity].
+  specialize (Hpermtens _ Ht).
+  cbn in Hpermtens.
+
+  (* pose proof (join_list_is_Some (mbind (Vval_get k) <$> (get_var mg ml mr <$> low)))
+    as Hjoinlow.
+  rewrite Hlow in Hjoinlow at 2.
+  rewrite <- join_list_is_Some in Hjoinlow.
+  rewrite 2 is_Some_alt in Hjoinlow. *)
+  pose proof (join_list_Permutation
+    (mbind (Vval_get k) <$> (get_var mg ml mr <$> low))
+    (mbind (Vval_get k) <$> (get_var mg ml mr <$> low'))
+    ltac:(now rewrite Hlow)) as Hlperm%option_Forall2_alt.
+  pose proof (join_list_Permutation
+    (mbind (Vval_get k) <$> (get_var mg ml mr <$> up))
+    (mbind (Vval_get k) <$> (get_var mg ml mr <$> up'))
+    ltac:(now rewrite Hup)) as Huperm%option_Forall2_alt.
+  destruct (join_list (_ <$> (_ <$> low))) as [largs|] eqn:Hlargs;
+  destruct (join_list (_ <$> (_ <$> low'))) as [largs'|] eqn:Hlargs';
+  [cbn|easy..|reflexivity].
+  pose proof (list2vec_Permutation nm.1 _ _ Hlperm) as Hlvperm%option_Forall2_alt.
+  destruct (list2vec _ largs) as [lvargs|] eqn:Hlvargs;
+  destruct (list2vec _ largs') as [lvargs'|] eqn:Hlvargs';
+  [cbn|easy..|reflexivity].
+  destruct (join_list (_ <$> (_ <$> up))) as [uargs|] eqn:Huargs;
+  destruct (join_list (_ <$> (_ <$> up'))) as [uargs'|] eqn:Huargs';
+  [cbn|easy..|reflexivity].
+  pose proof (list2vec_Permutation nm.2 _ _ Huperm) as Huvperm%option_Forall2_alt.
+  destruct (list2vec _ uargs) as [uvargs|] eqn:Huvargs;
+  destruct (list2vec _ uargs') as [uvargs'|] eqn:Huvargs';
+  [cbn|easy..|reflexivity].
+  now apply Hpermtens.
+Qed.
+
+
+Import SetoidList SetoidPermutation list.
+
+Lemma tl_total_semantics_aux_base_eq mabs mg ml mr abs :
+  tl_total_semantics_aux mabs mg ml mr [] abs =
+  Rlist_prod ((λ a, abstract_semantics' mabs mg ml mr a) <$> abs).
+Proof.
+  cbn; f_equal.
+  apply list_fmap_ext; now intros _ [[]] _.
+Qed.
+
+Lemma tl_perm_eq_correct_permutative_aux
+  (mabst : Pmap BTensor) mg ml mr sums abs abs' :
+  PermutationA abstracts_perm_eq abs abs' ->
+  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) abs ->
+  (forall (f : Idx), f ∈ abstracts_indices abs -> forall (t : BTensor),
+    mabst !! f = Some t ->
+    permutative_tensor (projT2 t)) ->
+  tl_total_semantics_aux (mabs_of_tensor_map mabst) mg ml mr sums abs ==
+  tl_total_semantics_aux (mabs_of_tensor_map mabst) mg ml mr sums abs'.
+Proof.
+  intros Habs HWT Hperm.
+  revert mr; induction sums as [|ty sums IHsums]; intros mr;
+  [|now cbn; apply sum_of_ext; intros; apply IHsums].
+  rewrite 2 tl_total_semantics_aux_base_eq.
+  apply Rlist_prod_perm_mor.
+  apply PermutationA_decompose in Habs as (abs'' & Habs_abs'' & Habs''_abs'); [|apply _].
+  etransitivity;
+  [apply Permutation_PermutationA, fmap_Permutation, Habs_abs''; apply _|].
+  unfold abstracts_indices in Hperm.
+  setoid_rewrite Habs_abs'' in Hperm.
+  rewrite Habs_abs'' in HWT.
+  clear abs Habs_abs''.
+  apply eqlistA_PermutationA.
+  induction Habs''_abs'; [reflexivity|].
+  cbn.
+  constructor.
+  - apply abstract_semantics'_abstracts_perm_eq_permutative_tensor;
+    [now apply Forall_cons in HWT | | easy].
+    apply Hperm.
+    set_solver +.
+  - apply IHHabs''_abs'; [now apply Forall_cons in HWT|].
+    intros f Hf.
+    apply Hperm; set_solver +Hf.
+Qed.
+
+
+
+Lemma tl_perm_eq_correct_permutative (mabst : Pmap BTensor) mg ml tl tl' :
+  tl ≡tl≡ₚ tl' ->
+  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) tl.(tl_abstracts) ->
+  (forall (f : Idx), f ∈ abstracts_indices tl.(tl_abstracts) ->
+    forall (t : BTensor), mabst !! f = Some t ->
+    permutative_tensor (projT2 t)) ->
+  tl_total_semantics (mabs_of_tensor_map mabst) mg ml tl ==
+  tl_total_semantics (mabs_of_tensor_map mabst) mg ml tl'.
+Proof.
+  destruct tl as [sums abs], tl' as [sums' abs'].
+  intros [[= <-] Habs].
+  cbn -[abstracts_indices] in *.
+  intros HWT Hperm.
+  now apply tl_perm_eq_correct_permutative_aux.
+Qed.
+
+
+Notation abstract_semantics_alt' mabs mg ml mr abs :=
+  (abstract_semantics_alt mabs mg ml mr abs.1.1 abs.1.2 abs.2).
+
+Definition ntl_total_semantics mabs mg ml ntl :=
+  tl_total_semantics mabs mg ml (ntl2tl ntl).
+
+Lemma tl_total_semantics_alt_aux_eq mabs mg ml mr abs :
+  tl_total_semantics_alt_aux mabs mg ml mr abs =
+  ∑ mr : Vmap mr,
+    abstracts_semantics_alt mabs mg ml mr abs.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma ntl_total_semantics_alt mabs mg ml ntl :
+  WF_ntl ntl ->
+  ntl_total_semantics mabs mg ml ntl ==
+  ∑ mr : Vmap ntl.(ntl_sums),
+  abstracts_semantics_alt mabs mg ml mr ntl.(ntl_abstracts).
+Proof.
+  intros Hwf.
+  unfold ntl_total_semantics.
+  unfold tl_total_semantics.
+  rewrite tl_total_semantics_alt_aux_correct.
+  destruct ntl as [isums abs]; cbn -[reverse abstracts_semantics_alt].
+  specialize (partial_injection_extension (pseq 1 (lengthP isums))
+    (fun p => default p (isums.*1 !! (p:>nat)))) as Hinj.
+  pose proof (lengthN_correct isums).
+  tspecialize Hinj. 1:{
+    intros a b Ha%elem_of_list_In%elem_of_pseq_1
+      Hb%elem_of_list_In%elem_of_pseq_1.
+    rewrite 2 list_lookup_fmap.
+    destruct (isums !! (a:>nat)) as [ia|] eqn:Hia;
+      [|apply lookup_ge_None_1 in Hia; lia].
+    destruct (isums !! (b:>nat)) as [ib|] eqn:Hib;
+      [|apply lookup_ge_None_1 in Hib; lia].
+    cbn.
+    intros Hfsts.
+    hnf in Hwf.
+    cbn -[abstracts_rel_vars] in Hwf.
+    apply pos_to_nat_pred_inj.
+    apply (NoDup_lookup _ _ _ ia.1 (Hwf.1));
+    rewrite list_lookup_fmap;
+    [rewrite Hia|rewrite Hib, Hfsts]; done.
+  }
+  destruct Hinj as (g & Hginj & Hgeq).
+  rewrite Forall_forall in Hgeq.
+  setoid_rewrite elem_of_pseq_1 in Hgeq.
+
+  rewrite (tl_total_semantics_alt_aux_relabel _ _ _ _ g).
+  replace (prod_map _ _ <$> _) with isums. 2:{
+    rewrite fmap_reverse, reverse_involutive.
+    rewrite fmap_imap.
+    rewrite imap_fmap.
+    unfold compose; cbn.
+    apply (fun H => list_eq_same_length _ _ _ H eq_refl);
+      [now rewrite length_imap|].
+    intros i x y Hi.
+    intros Hisi.
+    rewrite list_lookup_imap, Hisi.
+    cbn.
+    rewrite Hgeq by lia.
+    rewrite list_lookup_fmap, pos_to_nat_pred_of_nat.
+    rewrite Hisi.
+    cbn.
+    intros [= <-].
+    now destruct x.
+  }
+  replace (_ <$> _) with abs. 2:{
+    symmetry.
+    rewrite <- list_fmap_compose.
+    apply list_fmap_id'; intros flu Hflu.
+    cbn.
+    rewrite relabel_abs_compose.
+    apply relabel_abs_id_strong; intros [r| |] Hr; [|done..].
+    cbn.
+    specialize (Hwf.2 r) as Hr'.
+    tspecialize Hr' by now apply elem_of_abstracts_rel_vars;
+      destruct flu as [[f l] u]; eauto.
+    rewrite elem_of_list_to_set in Hr'.
+    cbn in Hr'.
+    apply elem_of_list_fmap in Hr' as ((_, ty) & [= <-] & Hr').
+    apply elem_of_list_lookup in Hr' as Hi.
+    destruct Hi as [i Hi].
+    replace (list_to_map _ !! r) with (Some (Pos.of_succ_nat i)). 2:{
+      symmetry.
+      apply elem_of_list_to_map.
+      - rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_to_fmap; apply Hwf.
+      - apply elem_of_lookup_imap.
+        exists i, (r, ty).
+        easy.
+    }
+    cbn.
+    rewrite Hgeq by (apply lookup_lt_Some in Hi; lia).
+    rewrite list_lookup_fmap, pos_to_nat_pred_of_nat, Hi.
+    reflexivity.
+  }
+  reflexivity.
+Qed.
+
+Lemma tl2ntl_correct mabs mg ml tl :
+  WF_tl tl ->
+  ntl_total_semantics mabs mg ml (tl2ntl tl) ==
+  tl_total_semantics mabs mg ml tl.
+Proof.
+  intros Hwf.
+  rewrite ntl_total_semantics_alt by now apply tl2ntl_WF.
+  unfold tl_total_semantics.
+  rewrite tl_total_semantics_alt_aux_correct.
+  now destruct tl.
+Qed.
+
+Lemma ntl2tl_correct mabs mg ml ntl :
+  tl_total_semantics mabs mg ml (ntl2tl ntl) ==
+  ntl_total_semantics mabs mg ml ntl.
+Proof.
+  reflexivity.
+Qed.
+
+
+Lemma ntl_perm_eq_correct_permutative mabst mg ml ntl ntl' :
+  ntl ≡ntl≡ₚ ntl' ->
+  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
+  (forall (f : Idx), f ∈ abstracts_indices ntl.(ntl_abstracts) ->
+    forall (t : BTensor), mabst !! f = Some t ->
+    permutative_tensor (projT2 t)) ->
+  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl ==
+  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl'.
+Proof.
+  intros Heq Hall Hperm.
+  apply ntl2tl_perm_eq in Heq as Heq'.
+  unfold ntl_total_semantics.
+  apply tl_perm_eq_correct_permutative; [easy|..|now rewrite abstracts_indices_ntl2tl].
+  now specialize (ntl2tl_abst_WT'_all2 (snd ∘ projT1 <$> mabst) ntl)
+    as Hiff%Forall2_iff_pred; apply Hiff.
+Qed.
+
+Lemma ntl_aeq_correct mabs mg ml ntl ntl' :
+  WF_ntl ntl -> WF_ntl ntl' ->
+  ntl =ntl= ntl' ->
+  ntl_total_semantics mabs mg ml ntl ==
+  ntl_total_semantics mabs mg ml ntl'.
+Proof.
+  intros Hntl Hntl' Heq.
+  unfold ntl_total_semantics.
+  apply tl_aeq_correct.
+  now apply ntl2tl_aeq.
+Qed.
+
+Lemma ntl_perm_eq'_correct_permutative mabst mg ml ntl ntl' :
+  WF_ntl ntl -> WF_ntl ntl' ->
+  ntl ≡ntl'≡ₚ ntl' ->
+  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
+  (forall (f : Idx), f ∈ abstracts_indices ntl.(ntl_abstracts) ->
+    forall (t : BTensor), mabst !! f = Some t ->
+    permutative_tensor (projT2 t)) ->
+  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl ==
+  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl'.
+Proof.
+  (* ntl_total_semantics_alt *)
+  intros Hntl Hntl' Hpeq'.
+  pose proof Hpeq' as (Heq & Hperm)%(ntl_perm_eq'_NoDup _ _ Hntl.1 Hntl'.1).
+  intros HWT Hpermut.
+  etransitivity;
+  [generalize Heq; apply ntl_aeq_correct; try done|].
+  - split; [apply Hntl'|].
+    etransitivity; [apply Hntl|].
+    pose proof Hpeq' as [Hdom _].
+    apply (f_equal dom) in Hdom.
+    rewrite 2 dom_list_to_map_L in Hdom.
+    rewrite Hdom.
+    done.
+  - now apply ntl_perm_eq_correct_permutative.
+Qed.
+
+
+
+
+
+
+
+
+(* TODO: Reason about *)
+Definition strongly_permutative_tensor {A}
+  (t : DimensionlessTensor A) : Prop :=
+  forall {n m n' m'} (v : vec A n) (w : vec A m) (v' : vec A n') (w' : vec A m'),
+    vec_to_list v ++ vec_to_list w ≡ₚ vec_to_list v' ++ vec_to_list w' ->
+    t n m v w == t n' m' v' w'.
 
 
 
@@ -4234,7 +4648,7 @@ Qed.
 
 
 
-Lemma tensorlist_abs_perm_eq sums abs abs' :
+Lemma tensorlist_abstracts_perm_eq sums abs abs' :
   abs ≡ₚ abs' ->
   mk_tl sums abs =t= mk_tl sums abs'.
 Proof.
@@ -4253,7 +4667,7 @@ Proof.
   destruct tl as [sums abs], tl' as [sums' abs'].
   cbn -[tensorexpr_of_tensorlist] in *.
   transitivity (mk_tl sums abs').
-  - now apply tensorlist_abs_perm_eq.
+  - now apply tensorlist_abstracts_perm_eq.
   - now apply tensorlist_sums_perm_NoDup_eq.
 Qed.
 

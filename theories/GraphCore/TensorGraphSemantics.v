@@ -23,16 +23,12 @@ Definition graph_ml (minput : gmap nat A) (moutput : gmap nat A) :
   Pmap (Vval graph_V) :=
   @mk_Vval graph_V 0 <$> gmaps_to_Pmap minput moutput.
 
-Fixpoint graph_tensor_to_V_n_args_aux {n} : forall (t : vec A n -> R),
-  V_n_args graph_V (replicate n O) R :=
-  match n with
-  | O => fun t => t [#]
-  | S n' => fun t =>
-    fun a => graph_tensor_to_V_n_args_aux (t ∘ vcons a)
-  end.
 
-Definition graph_tensor_to_V_n_args {n m} (t : vec A n -> vec A m -> R) :=
-  graph_tensor_to_V_n_args_aux (uncurry t ∘ Vector.splitat n).
+Definition graph_tensor_to_V_n_args
+  {n m} (t : vec A n -> vec A m -> R) :=
+  tensor_to_V_n_args_aux graph_V 0 (uncurry t ∘ Vector.splitat n).
+
+
 
 Definition graph_mabs `{TensorLike R A T} 
   (tg : TensorGraph) : Pmap (@Vfunc R graph_V) :=
