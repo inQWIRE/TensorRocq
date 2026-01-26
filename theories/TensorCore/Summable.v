@@ -2,12 +2,11 @@ Require Import Setoid.
 Require Import Relation_Definitions.
 Require Import Classes.Morphisms.
 Set Warnings "-stdlib-vector".
-Require Fin Vector.
-Require Import List. 
-Import ListNotations.
 Require Import SetoidList SetoidPermutation. 
 Require Export Algebra.
 Require Import Ring.
+From stdpp Require Import vector fin.
+From stdpp Require Export base list.
 
 
 (* A typeclass indicating a type can be summed over, hence
@@ -38,7 +37,7 @@ Class Summable (A : Type) := sum_over {
   and addition.  *)
 Definition sum_of `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A} 
   (f : A -> R) : R :=
-  Rlist_sum (List.map f sum_elements).
+  Rlist_sum (f <$> sum_elements).
 
 Global Arguments sum_of {_ _ _ _ _ _ _ _ _} (_)%_function_scope : assert.
 
@@ -241,7 +240,7 @@ Qed.
 Fixpoint fin_elements (n : nat) : list (Fin.t n) :=
   match n with
   | 0 => []
-  | S n' => Fin.F1 :: map Fin.FS (fin_elements n')
+  | S n' => Fin.F1 :: (Fin.FS <$> fin_elements n')
   end.
 
 Lemma fin_elements_NoDup n : NoDup (fin_elements n).
@@ -250,10 +249,9 @@ Proof.
   - constructor.
   - cbn. 
     constructor.
-    + rewrite in_map_iff.
+    + rewrite elem_of_list_fmap.
       firstorder discriminate.
-    + apply NoDup_map_NoDup_ForallPairs; [|easy].
-      now intros ? ? ? ? ->%Fin.FS_inj.
+    + now apply (NoDup_fmap _).
 Qed.
 
 Lemma fin_elements_in n (i : Fin.t n) : In i (fin_elements n).
@@ -286,6 +284,7 @@ Lemma ForallPairs_cons `(R : relation A) a (l : list A) :
 Proof.
   rewrite 2 Forall_forall.
   unfold ForallPairs.
+  setoid_rewrite elem_of_list_In.
   cbn.
   firstorder subst; auto.
 Qed.
@@ -349,14 +348,15 @@ Proof.
     easy.
   - cbn.
     rewrite flat_map_concat_map.
-    apply NoDup_concat.
+    apply NoDup_ListNoDup, NoDup_concat.
     + apply Forall_map, Forall_forall.
       intros x Hx.
-      apply NoDup_map_NoDup_ForallPairs; [|easy].
+      apply NoDup_map_NoDup_ForallPairs; [|now apply NoDup_ListNoDup].
       now intros ? ? ? ? []%Vector.cons_inj.
     + apply ForallPairs_not_eq_ForallOrdPairs_NoDup. 
       1:{ 
-        apply NoDup_map_NoDup_ForallPairs; [|easy].
+        apply NoDup_ListNoDup, NoDup_map_NoDup_ForallPairs; 
+          [|now apply NoDup_ListNoDup].
         hnf.
         intros a b Ha Hb.
         apply Haux.
@@ -459,7 +459,7 @@ Proof.
     + intros (x & Hx & HgS)%Exists_exists.
       (* pose proof HgS as Hx'. *)
       rewrite Exists_exists in HgS.
-      destruct HgS as (g' & (gS' & <- & HgS')%in_map_iff & Hgg').
+      destruct HgS as (g' & (gS' & -> & HgS')%elem_of_list_fmap & Hgg').
       specialize (Hgg' Fin.F1) as Hxeq.
       cbn in Hxeq.
       apply fin_S_inv. 
@@ -483,7 +483,7 @@ Proof.
       rewrite Exists_exists in IHn.
       destruct IHn as (gS' & HgS' & HgSgS').
       eexists.
-      split; [apply in_map; eassumption|].
+      split; [apply elem_of_list_fmap_1; eassumption|].
       hnf.
       now apply fin_S_inv.
 Qed.
@@ -496,7 +496,7 @@ Proof.
   apply forall_iff.
   intros i.
   split; [|apply In_InA, _].
-  now intros (_ & Hgi & <-)%InA_altdef%Exists_exists.
+  now intros (_ & Hgi & <-)%InA_altdef%Exists_exists; apply elem_of_list_In.
 Qed.
 
 End fin_fun.
@@ -508,7 +508,7 @@ Instance Summable_prod `{Summable A, Summable B} : Summable (A * B) :=
 
 #[export] 
 Instance Summable_sum `{Summable A, Summable B} : Summable (A + B) :=
-  sum_over (map inl sum_elements ++ map inr sum_elements).
+  sum_over ((inl <$> sum_elements) ++ (inr <$> sum_elements)).
 
 Fixpoint sum_of_fin `{SR : SemiRing R rO rI radd rmul req} {n : nat} 
   (f : Fin.t n -> R) : R :=
@@ -520,9 +520,9 @@ Fixpoint sum_of_fin `{SR : SemiRing R rO rI radd rmul req} {n : nat}
 Fixpoint sum_of_vec `{SR : SemiRing R rO rI radd rmul req} {n : nat} 
   `{Summable A} : (Vector.t A n -> R) -> R :=
     match n with
-    | O => fun f => f (Vector.nil A)
+    | O => fun f => f (Vector.nil)
     | S n' => fun f => ∑ b : A, 
-      sum_of_vec (fun bs => f (Vector.cons  _ b n' bs))
+      sum_of_vec (fun bs => f (Vector.cons b bs))
     end.
 
 (* FIXME: Move to aux *)
@@ -654,7 +654,7 @@ Section Vector.
 Context `{SA : Summable A}.
 
 Lemma sum_of_vec_0 (f : Vector.t A 0 -> R) : 
-  sum_of f == f (Vector.nil A).
+  sum_of f == f (Vector.nil).
 Proof.
   unfold_sum_of.
   cbn.
@@ -662,14 +662,14 @@ Proof.
 Qed.
 
 Lemma sum_of_vec_1 (f : Vector.t A 1 -> R) : 
-  sum_of f == ∑ a, f (Vector.cons A a 0 (Vector.nil _)).
+  sum_of f == ∑ a, f (Vector.cons a (Vector.nil)).
 Proof.
   unfold_sum_of; cbn;
   solve_sum_of_ring.
 Qed.
 
 Lemma sum_of_vec_succ {n} (f : Vector.t A (S n) -> R) : 
-  sum_of f == ∑ a, sum_of (fun v => f (Vector.cons A a n v)).
+  sum_of f == ∑ a, sum_of (fun v => f (Vector.cons a v)).
 Proof.
   rewrite sum_of_defn.
   cbn.
