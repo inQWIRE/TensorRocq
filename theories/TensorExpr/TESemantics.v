@@ -1,7 +1,7 @@
 Require Import Summable.
 Require StringCustomNotation.
 
-Require Import TensorExprDBSyntax.
+Require Import TESyntax.
 Require Tensor.
 
 Require Import Aux_pos Aux_stdpp.
@@ -12,29 +12,220 @@ From stdpp Require Import pretty.
 From stdpp Require Import functions list.
 
 
-(* FIXME: MOve *)
-Add Parametric Relation : tensorlist tensorlist_perm_eq
-  reflexivity proved by ltac:(split; reflexivity)
-  symmetry proved by ltac:(unfold tensorlist_perm_eq; split; now symmetry)
-  transitivity proved by ltac:(unfold tensorlist_perm_eq; intros ???[][];
-     split; etransitivity; eauto)
-  as tensorlist_perm_eq_setoid.
-
-Add Parametric Morphism : abstracts_vars with signature
-  Permutation ==> eq as abstracts_vars_perm_mor.
-Proof.
-  unfold abstracts_vars.
-  now intros ? ? ->.
-Qed.
-
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.
+
+(* FIXME: Move *)
+Lemma sumbool_same {P Q A} (HPQ : {P} + {Q}) (a : A) :
+  (if HPQ then a else a) = a.
+Proof.
+  now destruct HPQ.
+Qed.
+Lemma decide_same `{Decision P} `(a : A) :
+  (if decide P then a else a) = a.
+Proof.
+  apply sumbool_same.
+Qed.
+
+
+Add Parametric Morphism {A B} : relabel_abs with signature
+  pointwise_relation A (@eq B) ==> eq ==>
+  eq as relabel_abs_mor.
+Proof.
+  intros f g Hfg abs.
+  now apply relabel_abs_ext.
+Qed.
+
+Add Parametric Morphism : relabel_bounds with signature
+  pointwise_relation _ eq ==> eq ==>
+  eq as relabel_bound_mor.
+Proof.
+  intros f g Hfg v.
+  now apply relabel_bounds_ext.
+Qed.
+
+
+Add Parametric Morphism A B : (@mbind list list_bind A B) with signature
+  pointwise_relation A eq ==> eq ==> eq as list_bind_mor.
+Proof.
+  intros; apply list_bind_ext; naive_solver.
+Qed.
+
+Lemma list_fmap_to_bind {A B} (f : A -> B) (l : list A) :
+  f <$> l = x ← l; [f x].
+Proof.
+  now rewrite <- list_bind_singleton_r.
+Qed.
+
+
+Lemma list_bind_cprod {A B C} (f : A * B -> list C) l k :
+  cprod l k ≫= f = l ≫= λ x, k ≫= λ y, f (x, y).
+Proof.
+  unfold list_cprod, cprod.
+  rewrite list_bind_assoc.
+  apply list_bind_ext; [|reflexivity].
+  intros a.
+  cbn.
+  rewrite list_fmap_bind.
+  reflexivity.
+Qed.
+
+Lemma list_bind_to_cprod {A B C} (f : A -> B -> list C) l k :
+  (l ≫= λ x, k ≫= λ y, f x y) =
+  cprod l k ≫= uncurry f.
+Proof.
+  rewrite list_bind_cprod; reflexivity.
+Qed.
+
+Lemma lookup_list_to_map_imap_to_pos `{FinMap positive M} {A B}
+  (f : A -> B) (l : list A) (i : positive) :
+  (list_to_map (imap (fun j v => (Pos.of_succ_nat j, f v)) l) :> M B) !! i =
+  f <$> (l !! (i:>nat)).
+Proof.
+  apply option_eq.
+  intros x.
+  rewrite <- elem_of_list_to_map. 2:{
+    rewrite fmap_imap.
+    unfold compose.
+    cbn.
+    rewrite imap_seq_0.
+    apply NoDup_fmap_2; [hnf; lia|].
+    apply NoDup_seq.
+  }
+  rewrite elem_of_lookup_imap.
+  split.
+  - intros (i' & z & [= -> ->] & Heq).
+    now rewrite pos_to_nat_pred_of_nat, Heq.
+  - destruct (l !! (i:>nat)) as [li|] eqn:Heq; [|easy].
+    cbn.
+    intros [= <-].
+    exists (i:>nat).
+    rewrite pos_to_nat_pred_to_pos.
+    eauto.
+Qed.
+
+Definition vec_to_map {A n} (v : vec A n) : Pmap A :=
+  list_to_map (imap (λ i a, (Pos.of_succ_nat i, a)) v).
+
+Lemma lookup_vec_to_map {A n} (v : vec A n) (i : positive) :
+  vec_to_map v !! i =
+  H ← guard (i < n)%nat;
+  Some (v !!! nat_to_fin H).
+Proof.
+  unfold vec_to_map.
+  rewrite lookup_list_to_map_imap_to_pos.
+  apply option_eq; intros a.
+  rewrite option_fmap_id.
+  rewrite <- vlookup_lookup'.
+  split.
+  - intros (H & Hv).
+    case_guard; [|lia].
+    cbn.
+    rewrite <- Hv.
+    do 3 f_equal; apply proof_irrel.
+  - case_guard as H; [|easy].
+    cbn.
+    intros [= <-].
+    now exists H.
+Qed.
+
+Lemma lookup_vec_to_map' {A n} (v : vec A n) (i : fin n) :
+  vec_to_map v !! (Pos.of_succ_nat i) =
+  Some (v !!! i).
+Proof.
+  rewrite lookup_vec_to_map.
+  pose proof (fin_to_nat_lt i) as Hi.
+  case_guard; [|lia].
+  cbn.
+  f_equal.
+  f_equal.
+  apply fin_to_nat_inj.
+  rewrite fin_to_nat_to_fin; lia.
+Qed.
+
+Lemma lookup_vec_to_map_Some {A n} (v : vec A n) (i : positive) a :
+  vec_to_map v !! i = Some a <->
+  exists (H : (i < n)%nat),
+  v !!! nat_to_fin H = a.
+Proof.
+  rewrite lookup_vec_to_map.
+  case_guard; [|cbn; split; [done|now intros []; lia]].
+  cbn.
+  split; [intros [=<-]; eauto|].
+  intros (H' & <-).
+  do 3 f_equal; apply proof_irrel.
+Qed.
+
+
+Lemma lookup_vec_to_map_to_list {A n} (v : vec A n) i :
+  vec_to_map v !! (Pos.of_succ_nat i) =
+  vec_to_list v !! i.
+Proof.
+  apply option_eq; intros a.
+  rewrite lookup_vec_to_map_Some.
+  rewrite <- vlookup_lookup'.
+  split.
+  - intros (H & <-).
+    pose proof H as H'.
+    rewrite pos_to_nat_pred_of_nat in H'.
+    exists H'.
+    f_equal.
+    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
+  - intros (H & <-).
+    pose proof H as H'.
+    rewrite <- (pos_to_nat_pred_of_nat i) in H'.
+    exists H'.
+    f_equal.
+    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
+Qed.
+
+Lemma lookup_vec_to_map_to_list' {A n} (v : vec A n) (i : positive) :
+  vec_to_map v !! i =
+  vec_to_list v !! (i:>nat).
+Proof.
+  rewrite <- (pos_to_nat_pred_to_pos i) at 1.
+  apply lookup_vec_to_map_to_list.
+Qed.
+
+
+Lemma dom_vec_to_map {A n} (v : vec A n) :
+  dom (vec_to_map v) =@{Pset} list_to_set (pseq 1 n).
+Proof.
+  unfold vec_to_map.
+  rewrite dom_list_to_map_L.
+  rewrite fmap_imap.
+  unfold compose; cbn.
+  rewrite imap_seq_0, length_vec_to_list, pseq_to_seq.
+  repeat first [lia|f_equal].
+Qed.
+
+Lemma vec_to_map_inj_iff {A n} (v w : vec A n) :
+  vec_to_map v = vec_to_map w <-> v = w.
+Proof.
+  split; [|now intros ->].
+  intros Hvw.
+  apply vec_eq.
+  intros i.
+  apply (f_equal (.!! (Pos.of_succ_nat i))) in Hvw.
+  rewrite 2 lookup_vec_to_map' in Hvw.
+  congruence.
+Qed.
+
+#[export] Instance vec_to_map_inj {A n} : Inj (@eq (vec A n)) (=) vec_to_map.
+Proof.
+  intros ? ?.
+  apply vec_to_map_inj_iff.
+Qed.
+
+
 
 
 Section TensorExprDBSemantics.
 
 Local Open Scope nat_scope.
+
+Import Tensor.
 
 (* Import Relation_Definitions.
 
@@ -62,69 +253,37 @@ Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
 
-Context (V : Ty -> Type).
-Context `{Vsum : forall n, Summable (V n)}.
+(* FIXME: Move (and can just use flat_map)*)
+Lemma Rlist_sum_bind {A} (f : A -> list R) l :
+  req (Rlist_sum (l ≫= f)) (Rlist_sum ((λ x, Rlist_sum (f x)) <$> l)).
+Proof.
+  induction l; [reflexivity|].
+  cbn.
+  now rewrite Rlist_sum_app, IHl.
+Qed.
 
-Existing Instance Vsum.
 
-Fixpoint V_n_args (args : list Ty) (A : Type) : Type :=
-  match args with
-  | [] => A
-  | n :: args => V n -> V_n_args args A
-  end.
+Context `{SA : Summable A, AEQ : EqDecision A}.
 
-(* A bundled function with its argument types *)
-Definition Vfunc := {args : list Ty & V_n_args args R}.
 
-Definition Vval := {n : Ty & V n}.
 
-Definition Vval_get (n : Ty) (v : Vval) : option (V n) :=
+(* Let Tensor := (@Tensor R). *)
+
+Let DimensionlessTensor := (@DimensionlessTensor R A).
+
+
+Definition Vapplys (f : DimensionlessTensor) (l u : list A) : R :=
+  f (length l) (length u) (list_to_vec l) (list_to_vec u).
+
+Notation varcontext := (Pmap A).
+
+Notation abscontext := (Pmap DimensionlessTensor).
+
+
+Definition get_var (ml : varcontext) (mr : list A) (v : var) : option A :=
   match v with
-  | existT n' val =>
-    match decide (n = n') with
-    | left H => Some (eq_rect_r V val H)
-    | right _ => None
-    end
-  end.
-
-Definition Vconst (f : Vfunc) : option R :=
-  match f with
-  | existT [] c => Some c
-  | existT _ _ => None
-  end.
-
-Definition Vapply (f : Vfunc) (v : Vval) : option Vfunc :=
-  match f with
-  | existT (n :: args) f =>
-      (fun v => existT (P:=fun a => V_n_args a R) args (f v)) <$> (Vval_get n v)
-  | existT [] _ => None
-  end.
-
-Fixpoint Vapplys (f : Vfunc) (vs : list Vval) : option R :=
-  match vs with
-  | [] => Vconst f
-  | v :: vs =>
-      f ← Vapply f v;
-      Vapplys f vs
-  end.
-
-
-
-
-Notation varcontext := (Pmap Vval).
-
-Notation abscontext := (Pmap Vfunc).
-
-
-Definition mk_Vval {n} (v : V n) : Vval := existT n v.
-
-Definition mk_Vfunc args (f : V_n_args args R) : Vfunc := existT args f.
-
-Definition get_var (mg ml : varcontext) (mr : list Vval) (v : var) : option Vval :=
-  match v with
-  | rel r => mr !! (r :> nat)
-  | loc l => ml !! l
-  | glob g => mg !! g
+  | bound r => mr !! (r :> nat)
+  | free l => ml !! l
   end.
 
 (*
@@ -142,220 +301,92 @@ Fixpoint semantics (abs : abscontext) (vars : varcontext)
       Some (rmul lval rval)
   | tsum v n summand =>
       Some (sum_of (fun x : V n =>
-        default rO (semantics abs (<[v := mk_Vval x]> vars) summand)))
+        default rO (semantics abs (<[v := mk_A x]> vars) summand)))
   end. *)
 
-Definition abstract_semantics (mabs : abscontext) mg ml mr
+Definition abstract_semantics (mabs : abscontext) ml mr
   (absidx : Idx) (lower : list var) (upper : list var) : R :=
-  default rO (args ← join_list ((get_var mg ml mr) <$> (lower ++ upper));
+  default rO (largs ← join_list ((get_var ml mr) <$> lower);
+      uargs ← join_list ((get_var ml mr) <$> upper);
       fval ← mabs !! absidx;
-      Vapplys fval args).
+      Some (Vapplys fval largs uargs)).
+
+Notation abstract_semantics' mabs mg ml mr abs :=
+  (abstract_semantics mabs mg ml mr abs.1.1 abs.1.2 abs.2).
 
 
-Lemma abstract_semantics_ext mabs mg ml mr mabs' mg' ml' mr'
+Lemma abstract_semantics_ext mabs ml mr mabs' ml' mr'
   idx lower upper idx' lower' upper' :
   mabs !! idx = mabs' !! idx' ->
-  (get_var mg ml mr) <$> (lower ++ upper) =
-    (get_var mg' ml' mr') <$> (lower' ++ upper') ->
-  abstract_semantics mabs mg ml mr idx lower upper =
-  abstract_semantics mabs' mg' ml' mr' idx' lower' upper'.
+  (get_var ml mr) <$> lower = (get_var ml' mr') <$> lower' ->
+  (get_var ml mr) <$> upper = (get_var ml' mr') <$> upper' ->
+  abstract_semantics mabs ml mr idx lower upper =
+  abstract_semantics mabs' ml' mr' idx' lower' upper'.
 Proof.
-  intros Hidx Hargs.
+  intros Hidx Hl Hu.
   unfold abstract_semantics.
-  now rewrite Hidx, Hargs.
+  now rewrite Hidx, Hl, Hu.
 Qed.
 
-Fixpoint total_semantics_aux mabs mg ml mr (te : tensorexpr) : R :=
+Definition delta_semantics ml mr (l u : var) : R :=
+  default rO (la ← get_var ml mr l;
+    ua ← get_var ml mr u;
+    Some (delta_tensor (n:=1) [# la] [# ua])).
+
+Lemma delta_semantics_ext ml mr ml' mr' l u l' u' :
+  get_var ml mr l = get_var ml' mr' l' ->
+  get_var ml mr u = get_var ml' mr' u' ->
+  delta_semantics ml mr l u =
+  delta_semantics ml' mr' l' u'.
+Proof.
+  intros Hl Hu.
+  unfold delta_semantics.
+  now rewrite Hl, Hu.
+Qed.
+
+Fixpoint total_semantics_aux mabs ml mr (te : tensorexpr) : R :=
   match te with
   | tone => rI
+  | tdelta1 l u =>
+    delta_semantics ml mr l u
   | tabstract absidx lower upper =>
-      abstract_semantics mabs mg ml mr absidx lower upper
+      abstract_semantics mabs ml mr absidx lower upper
   | tproduct l r =>
-      rmul (total_semantics_aux mabs mg ml mr l) (total_semantics_aux mabs mg ml mr r)
-  | tsum n summand =>
-      sum_of (fun x : V n =>
-        total_semantics_aux mabs mg ml (mk_Vval x :: mr) summand)
+      rmul (total_semantics_aux mabs ml mr l)
+        (total_semantics_aux mabs ml mr r)
+  | tsum summand =>
+      sum_of (fun x : A =>
+        total_semantics_aux mabs ml (x :: mr) summand)
   end.
 
-Notation total_semantics mabs mg ml te := (total_semantics_aux mabs mg ml [] te).
+Notation total_semantics mabs ml te := (total_semantics_aux mabs ml [] te).
 
-Fixpoint tl_total_semantics_aux mabs mg ml mr sums abs : R :=
+Fixpoint tl_total_semantics_aux mabs ml mr sums abs delt : R :=
   match sums with
-  | [] => Rlist_prod
-    ((λ '(abs, low, up), abstract_semantics mabs mg ml mr abs low up) <$> abs)
-  | ty :: sums =>
-    sum_of (fun x : V ty =>
-      tl_total_semantics_aux mabs mg ml (mk_Vval x :: mr) sums abs)
+  | 0 => Rlist_prod
+    ((λ '(abs, low, up), abstract_semantics mabs ml mr abs low up) <$> abs) *
+    Rlist_prod ((λ '(l, u), delta_semantics ml mr l u) <$> delt)
+  | S sums =>
+    sum_of (fun x : A =>
+      tl_total_semantics_aux mabs ml (x :: mr) sums abs delt)
   end.
 
-Definition tl_total_semantics mabs mg ml (tl : tensorlist) : R :=
-  tl_total_semantics_aux mabs mg ml [] tl.(tl_sums) tl.(tl_abstracts).
+Notation tl_total_semantics mabs ml tl :=
+  (tl_total_semantics_aux mabs ml [] tl.(tl_sums) tl.(tl_abstracts) tl.(tl_deltas)).
 
 
-Lemma Vconst_is_Some (f : Vfunc) : is_Some (Vconst f) <-> projT1 f = [].
-Proof.
-  unfold Vconst.
-  destruct f as [args f].
-  cbn.
-  destruct args; split; easy || now intros ?%is_Some_None.
-Qed.
-
-Lemma Vval_get_is_Some n (v : Vval) : is_Some (Vval_get n v) <->
-  projT1 v = n.
-Proof.
-  unfold Vval_get.
-  destruct v as [n' v].
-  cbn.
-  case_decide; try subst; try easy;
-  split; [now intros ?%is_Some_None|congruence].
-Qed.
-
-Arguments Vval_get : simpl never.
-
-Lemma Vapply_is_Some f v : is_Some (Vapply f v) <->
-  head (projT1 f) = Some (projT1 v).
-Proof.
-  unfold Vapply.
-  destruct f as [args f], v as [n v].
-  cbn.
-  destruct args; [split; cbn; easy || now intros ?%is_Some_None|].
-  rewrite fmap_is_Some, Vval_get_is_Some.
-  cbn.
-  firstorder congruence.
-Qed.
-
-Lemma Vapplys_is_Some f vs : is_Some (Vapplys f vs) <->
-  projT1 f = projT1 <$> vs.
-Proof.
-  destruct f as [args f].
-  cbn.
-  revert f vs; induction args as [|arg args IHargs]; intros f vs.
-  - destruct vs; split; now try intros ?%is_Some_None.
-  - destruct vs; [split; now try intros ?%is_Some_None|].
-    cbn.
-    rewrite option_fmap_bind.
-    unfold compose.
-    rewrite bind_is_Some, Vval_get_is_Some.
-    setoid_rewrite IHargs.
-    split.
-    + intros [Hproj Hargs].
-      rewrite <- Hproj.
-      apply Vval_get_is_Some in Hproj.
-      destruct Hproj as [? ?].
-      f_equal; eauto.
-    + now intros [= Harg Hargs].
-Qed.
-
-(* Lemma wt_abstract_is_Some (vars : varcontext) (abs : abscontext) absidx lower upper :
-  well_typed abs vars (tabstract absidx lower upper) = true ->
-  is_Some (semantics abs vars (tabstract absidx lower upper)).
-Proof.
-  cbn.
-  unfold abstype_of_abs_context, vartype_of_var_context.
-  setoid_rewrite lookup_fmap.
-  fold Vval Vfunc abscontext varcontext.
-  destruct (abs !! absidx) as [f|] eqn:Hfeq; [|easy].
-  cbn.
-  rewrite bool_decide_eq_true.
-  generalize (lower ++ upper) as args.
-  clear lower upper.
-  intros args.
-  intros Hfargs.
-  rewrite bind_is_Some.
-  split.
-  - rewrite join_list_is_Some.
-    rewrite elem_of_list_fmap.
-    intros (var & Hvar%eq_sym & Hvar_args).
-    apply elem_of_list_lookup_1 in Hvar_args as Hvar'.
-    destruct Hvar' as [i Hi].
-    apply (f_equal (.!! i)) in Hfargs as Hfi.
-    revert Hfi.
-    rewrite 2 list_lookup_fmap, Hi.
-    cbn.
-    setoid_rewrite lookup_fmap.
-    setoid_rewrite Hvar.
-    cbn.
-    destruct (projT1 f !! i) as [fi|] eqn:Hfi; [easy|].
-    assert (Hi' : is_Some (args !! i)) by now rewrite Hi.
-    assert (Hfi' : ~ is_Some (projT1 f !! i)) by now rewrite Hfi; intros ?%is_Some_None.
-    rewrite lookup_lt_is_Some in Hi'.
-    setoid_rewrite lookup_lt_is_Some in Hfi'.
-    specialize (f_equal length Hfargs).
-    simpl_list.
-    lia.
-  - intros argvs.
-    rewrite join_list_Some.
-    intros Hargvs.
-    rewrite Vapplys_is_Some.
-    eapply list_eq_same_length; [|reflexivity|].
-    1: {
-      specialize (f_equal length Hfargs).
-      specialize (f_equal length Hargvs).
-      simpl_list.
-      now intros ->.
-    }
-    intros i fi argin Hi Hfi.
-    rewrite list_lookup_fmap.
-    rewrite fmap_Some.
-    intros (argvi & Hargvi & ->).
-    apply (f_equal (.!! i)) in Hargvs as Hargi.
-    rewrite 2 list_lookup_fmap in Hargi.
-    setoid_rewrite Hargvi in Hargi.
-    cbn in Hargi.
-    apply fmap_Some in Hargi as (argi & Hargi & Hvars_argi).
-    apply (f_equal (.!! i)) in Hfargs as Hfi'.
-    rewrite 2 list_lookup_fmap in Hfi'.
-    rewrite Hfi in Hfi'.
-    rewrite Hargi in Hfi'.
-    cbn in Hfi'.
-    apply (inj Some) in Hfi'.
-    setoid_rewrite lookup_fmap in Hfi'.
-    setoid_rewrite <- Hvars_argi in Hfi'.
-    cbn in Hfi'.
-    congruence.
-Qed.
-
-Lemma wt_semantics_is_Some (vars : varcontext) (abs : abscontext) te :
-  well_typed abs vars te = true ->
-  is_Some (semantics abs vars te).
-Proof.
-  revert vars; induction te; intros vars.
-  - easy.
-  - apply wt_abstract_is_Some.
-  - cbn.
-    rewrite andb_true_iff.
-    intros [Hl%IHte1 Hr%IHte2].
-    destruct Hl as [? ->].
-    destruct Hr as [? ->].
-    easy.
-  - now destruct reg.
-Qed.
-
-
-Lemma total_semantics_spec abs vars te :
-  total_semantics abs vars te == default rO (semantics abs vars te).
-Proof.
-  revert vars; induction te; intros vars; [reflexivity|reflexivity|cbn..].
-  - rewrite IHte1, IHte2.
-    destruct (semantics abs vars te1) as [tv1|],
-      (semantics abs vars te2) as [tv2|]; cbn; ring.
-  - apply sum_of_ext.
-    intros x.
-    apply IHte.
-Qed. *)
 
 (* FIXME: Move to syntax, rename *)
-Definition shiftrel (l : Idx) : var -> var :=
+Definition substbound (l : Idx) : var -> var :=
   fun v => match v with
-  | rel r => Pos.peano_rect _ (loc l) (λ r _, rel r) r
-  | loc l => loc l
-  | glob g => glob g
+  | bound r => Pos.peano_rect _ (free l) (λ r _, bound r) r
+  | free l => free l
   end.
 
-Lemma shiftrel_alt_defn l v :
-  shiftrel l v =
+Lemma shiftbound_alt_defn l v :
+  substbound l v =
   match v with
-  | rel r => if decide (r = xH) then loc l else rel (Pos.pred r)
+  | bound r => if decide (r = xH) then free l else bound (Pos.pred r)
   | _ => v
   end.
 Proof.
@@ -368,9 +399,9 @@ Proof.
     now rewrite Pos.pred_succ.
 Qed.
 
-Definition swaprel (v : var) : var :=
+Definition swapbound (v : var) : var :=
   match v with
-  | rel r => rel match r with
+  | bound r => bound match r with
     | xH => 2
     | 2%positive => 1
     | _ => r
@@ -378,114 +409,95 @@ Definition swaprel (v : var) : var :=
   | _ => v
   end.
 
-
-Lemma pos_add_N_to_nat p n :
-  (pos_add_N p n =@{nat} p + N.to_nat n)%nat.
+Lemma elem_of_te_free_varset_free te l :
+  l ∈ te_free_varset te <-> free l ∈ te_varset te.
 Proof.
-  destruct n; cbn; unfold pos_to_nat_pred; lia.
+  rewrite te_varset_decomp.
+  set_solver.
 Qed.
 
-Lemma pos_sub_N_to_nat p n :
-  (pos_sub_N p n =@{nat} p - N.to_nat n)%nat.
+Lemma elem_of_te_bound_varset_bound te l :
+  l ∈ te_bound_varset te <-> bound l ∈ te_varset te.
 Proof.
-  destruct n; cbn; unfold pos_to_nat_pred; lia.
+  rewrite te_varset_decomp.
+  set_solver.
 Qed.
 
-Lemma pos_pred_to_nat p :
-  Pos.pred p =@{nat} pred p.
-Proof.
-  unfold pos_to_nat_pred; lia.
-Qed.
 
-Lemma pos_add_N_alt p n :
-  pos_add_N p n = Pos.pred (N.succ_pos (Npos p + n)).
-Proof.
-  destruct n; cbn; lia.
-Qed.
-
-Lemma pos_sub_N_alt p n :
-  pos_sub_N p n = Pos.pred (N.succ_pos (Npos p - n)).
-Proof.
-  destruct n; cbn; lia.
-Qed.
-
-Lemma total_semantics_aux_cons_gen mabs mg ml mr mr' te p x :
-  p ∉ te_local_varset te ->
-  total_semantics_aux mabs mg ml (mr ++ x :: mr') te ==
-  total_semantics_aux mabs mg (<[p:=x]> ml) (mr ++ mr')
-    (relabel_te_aux (N.of_nat (length mr)) (shiftrel p) te).
+Lemma total_semantics_aux_cons_gen mabs ml mr mr' te p x :
+  p ∉ te_free_varset te ->
+  total_semantics_aux mabs ml (mr ++ x :: mr') te ==
+  total_semantics_aux mabs (<[p:=x]> ml) (mr ++ mr')
+    (relabel_te_aux (N.of_nat (length mr)) (substbound p) te).
 Proof.
   intros Hp.
-  revert mr;
-  induction te; intros mr.
+  revert mr.
+  enough (Hen : forall mr v, v <> free p ->
+    get_var ml (mr ++ x :: mr') v =
+      get_var (<[p:=x]> ml) (mr ++ mr')
+        (withboundshift (length mr) (substbound p) v));
+  [induction te; intros mr|].
   - reflexivity.
   - cbn.
-    apply eq_reflexivity, abstract_semantics_ext; [reflexivity|].
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-    destruct v as [r|l|g]; [|cbn|reflexivity..].
-    + cbn -[shiftrel].
-      case_decide as Hrlt; [|
-      assert (Hle : length mr <= r) by (unfold pos_to_nat_pred; lia);
-      rewrite shiftrel_alt_defn; case_decide as Hrlen].
-      * cbn.
-        enough (r < length mr) by now
-        rewrite 2 lookup_app_l.
-        unfold pos_to_nat_pred.
-        lia.
-      * cbn.
-        rewrite lookup_insert.
-        rewrite lookup_app_r by lia.
-        enough (r - length mr = O) as Heq by now rewrite Heq.
-        clear -Hrlen.
-        destruct mr; cbn in *; unfold N.of_nat in Hrlen;
-          cbn in Hrlen;
-        unfold pos_to_nat_pred; try lia.
-      * cbn.
-        rewrite pos_add_N_to_nat, Nat2N.id.
-        rewrite pos_pred_to_nat, pos_sub_N_to_nat, Nat2N.id.
-        rewrite 2 lookup_app_r by (clear -Hle; lia).
-        apply (not_inj (H:=pos_to_nat_pred_inj)) in Hrlen as Hlen'.
-        rewrite pos_sub_N_to_nat, Nat2N.id in Hlen'.
-        unfold pos_to_nat_pred at 2 in Hlen'.
-        cbv [Pos.to_nat Pos.iter_op Nat.add pred] in Hlen'.
-        rewrite lookup_cons_ne_0 by easy.
-        f_equal.
-        lia.
-    + symmetry; apply lookup_insert_ne.
-      cbn in Hp.
-      intros ->.
-      apply Hp.
-      rewrite elem_of_list_to_set, elem_of_list_omap.
-      eauto.
+    assert (Hl : l ∈ te_varset (tdelta1 l u)) by now set_solver +.
+    assert (Hu : u ∈ te_varset (tdelta1 l u)) by now set_solver +.
+    rewrite elem_of_te_free_varset_free in Hp.
+    assert (Hlp : l <> free p) by congruence.
+    assert (Hup : u <> free p) by congruence.
+    apply eq_reflexivity, delta_semantics_ext;
+    [exact (Hen mr l Hlp)|exact (Hen mr u Hup)].
+  - cbn.
+    apply eq_reflexivity, abstract_semantics_ext; [reflexivity|..];
+    rewrite <- list_fmap_compose;
+    apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2;
+    apply Hen;
+    cbn;
+    rewrite elem_of_te_free_varset_free in Hp;
+    intros Heq; apply Hp;
+    rewrite <- Heq; set_solver.
   - cbn.
     f_equiv; [apply IHte1|apply IHte2]; cbn in Hp; set_solver +Hp.
   - cbn.
     apply sum_of_ext; intros val.
-    rewrite (IHte Hp (mk_Vval val :: mr)).
-    f_equal.
+    rewrite (IHte Hp (val :: mr)).
     cbn.
     f_equiv.
     f_equal; lia.
+  - intros mr [r|l] Hv.
+    + cbn.
+      case_decide as Hr; [cbn; now rewrite 2 lookup_app_l by lia|].
+      rewrite lookup_app_r by lia.
+      destruct (pos_sub_N r (length mr)) eqn:Hsub using Pos.peano_rect.
+      * cbn.
+        replace (_ - _) with O by lia.
+        cbn.
+        now rewrite lookup_insert.
+      * rewrite lookup_cons_ne_0 by lia.
+        rewrite Pos.peano_rect_succ.
+        cbn.
+        rewrite lookup_app_r by lia.
+        f_equal; lia.
+    + cbn.
+      now rewrite lookup_insert_ne by congruence.
 Qed.
 
 
-Lemma total_semantics_aux_cons mabs mg ml mr' te p x :
-  p ∉ te_local_varset te ->
-  total_semantics_aux mabs mg ml (x :: mr') te ==
-  total_semantics_aux mabs mg (<[p:=x]> ml) mr'
-    (relabel_te (shiftrel p) te).
+Lemma total_semantics_aux_cons mabs ml mr' te p x :
+  p ∉ te_free_varset te ->
+  total_semantics_aux mabs ml (x :: mr') te ==
+  total_semantics_aux mabs (<[p:=x]> ml) mr'
+    (relabel_te (substbound p) te).
 Proof.
-  intros Hp%(total_semantics_aux_cons_gen mabs mg ml [] mr' te p x).
+  intros Hp%(total_semantics_aux_cons_gen mabs ml [] mr' te p x).
   apply Hp.
 Qed.
 
 
-Lemma total_semantics_tsum_alt mabs mg ml te ty :
-  total_semantics mabs mg ml (tsum ty te) ==
-  ∑ x : V ty,
-    total_semantics mabs mg (<[fresh (te_local_varset te):=mk_Vval x]> ml)
-    (relabel_te (shiftrel (fresh (te_local_varset te))) te).
+Lemma total_semantics_tsum_alt mabs ml te :
+  total_semantics mabs ml (tsum te) ==
+  ∑ x : A,
+    total_semantics mabs (<[fresh (te_free_varset te):=x]> ml)
+    (relabel_te (substbound (fresh (te_free_varset te))) te).
 Proof.
   cbn.
   apply sum_of_ext; intros x.
@@ -494,141 +506,87 @@ Proof.
 Qed.
 
 
-Lemma tl_total_semantics_aux_ext_base mabs mabs' mg mg' ml ml' mr mr'
-  abs abs' :
+Lemma tl_total_semantics_aux_ext_base mabs mabs' ml ml' mr mr'
+  abs abs' delt delt' :
   Forall2 (fun flu flu' =>
     mabs !! flu.1.1 = mabs' !! flu'.1.1 /\
-    Forall2 (fun v v' =>
-      get_var mg ml mr v = get_var mg' ml' mr' v')
-      (flu.1.2 ++ flu.2) (flu'.1.2 ++ flu'.2)) abs abs' ->
-  tl_total_semantics_aux mabs mg ml mr [] abs ==
-  tl_total_semantics_aux mabs' mg' ml' mr' [] abs'.
+    Forall2 (fun v v' => get_var ml mr v = get_var ml' mr' v') flu.1.2 flu'.1.2
+    /\ Forall2 (fun v v' => get_var ml mr v = get_var ml' mr' v') flu.2 flu'.2
+    ) abs abs' ->
+  Forall2 (fun lu lu' =>
+    get_var ml mr lu.1 = get_var ml' mr' lu'.1 /\
+    get_var ml mr lu.2 = get_var ml' mr' lu'.2) delt delt' ->
+  tl_total_semantics_aux mabs ml mr 0 abs delt ==
+  tl_total_semantics_aux mabs' ml' mr' 0 abs' delt'.
 Proof.
-  intros Habs.
-  induction Habs as [|flu flu' abs abs' [Hf Hlu] Habs IHabs]; [reflexivity|].
+  intros Habs Hdelt.
   cbn.
-  f_equiv; [|apply IHabs].
-  clear Habs IHabs.
-  destruct flu as [[f low] up], flu' as [[f' low'] up'].
-  apply eq_reflexivity, abstract_semantics_ext; [exact Hf|].
-  cbn in Hlu.
-  revert Hlu.
-  generalize (low ++ up) as lu, (low' ++ up') as lu'.
-  intros lu lu' Hlu.
-  induction Hlu as [|v v' lu lu' Hv Hlu IHlu]; [reflexivity|].
-  cbn.
-  now f_equal.
-Qed.
-
-Lemma tl_total_semantics_aux_ext_base_mr mabs mg ml mr mr'
-  abs abs' :
-  Forall2 (fun flu flu' =>
-    flu.1.1 = flu'.1.1 /\
-    Forall2 (fun v v' =>
-      match v, v' with
-      | rel r, rel r' => mr !! (r :> nat) = mr' !! (r' :> nat)
-      | loc l, loc l' => l = l'
-      | glob g, glob g' => g = g'
-      | _, _ => False
-      end)
-      (flu.1.2 ++ flu.2) (flu'.1.2 ++ flu'.2)) abs abs' ->
-  tl_total_semantics_aux mabs mg ml mr [] abs ==
-  tl_total_semantics_aux mabs mg ml mr' [] abs'.
-Proof.
-  intros Habs.
-  apply tl_total_semantics_aux_ext_base.
-  apply (Forall2_impl _ _ _ _ Habs).
-  intros flu flu' [Hf Hlu].
-  split; [now rewrite Hf|].
-  apply (Forall2_impl _ _ _ _ Hlu).
-  intros [r|l|g] [r'|l'|g']; [|now intros []..].
-  cbn.
-  easy.
-Qed.
-
-
-
-Lemma tl_total_semantics_aux_ext_mr mabs mg ml mr mr'
-  sums abs abs' :
-  Forall2 (fun flu flu' =>
-    flu.1.1 = flu'.1.1 /\
-    Forall2 (fun v v' =>
-      match v, v' with
-      | rel r, rel r' =>
-        if decide (r < length sums \/ r' < length sums) then r = r'
-          else mr !! (pos_sub_N r (length sums) :> nat) =
-            mr' !! (pos_sub_N r' (length sums) :> nat)
-      | loc l, loc l' => l = l'
-      | glob g, glob g' => g = g'
-      | _, _ => False
-      end)
-      (flu.1.2 ++ flu.2) (flu'.1.2 ++ flu'.2)) abs abs' ->
-  tl_total_semantics_aux mabs mg ml mr sums abs ==
-  tl_total_semantics_aux mabs mg ml mr' sums abs'.
-Proof.
-  revert mr mr'.
-  induction sums as [|ty sums IHsums]; intros mr mr' Habs.
-  - apply tl_total_semantics_aux_ext_base_mr.
-    apply (Forall2_impl _ _ _ _ Habs).
-    intros flu flu' [Hf Hlu].
-    split; [now rewrite Hf|].
-    apply (Forall2_impl _ _ _ _ Hlu).
-    intros [r|l|g] [r'|l'|g']; [|now intros []..].
-    rewrite decide_False by now cbn; lia.
-    intros Hl; exact Hl.
-  - cbn.
-    apply sum_of_ext; intros x.
-    apply IHsums.
-    apply (Forall2_impl _ _ _ _ Habs).
-    intros flu flu' [Hf Hlu].
-    split; [now rewrite Hf|].
-    apply (Forall2_impl _ _ _ _ Hlu).
-    intros [r|l|g] [r'|l'|g']; [|now intros []..].
+  f_equiv.
+  - induction Habs as [|flu flu' abs abs' [Hf Hlu] Habs IHabs]; [reflexivity|].
+   cbn.
+    f_equiv; [|apply IHabs].
+    clear Habs IHabs.
+    destruct flu as [[f low] up], flu' as [[f' low'] up'].
+    apply eq_reflexivity, abstract_semantics_ext; [exact Hf|..];
+    now apply list_eq_Forall2, Forall2_fmap.
+  - induction Hdelt as [|lu lu' delt delt' [Hl Hu] Hdelt IHdelt]; [reflexivity|].
     cbn.
-    rewrite 4 pos_sub_N_to_nat.
-    rewrite 2 Nat2N.id.
-    replace (r = r') with (Pos.of_succ_nat r = Pos.of_succ_nat r') by
-      now clear; f_equal; unfold pos_to_nat_pred; lia.
-    generalize (pos_to_nat_pred r), (pos_to_nat_pred r').
-    clear r r'.
-    intros r r'.
-    case_decide as HrS; case_decide as Hr.
-    1,3: now intros ?; f_equal; lia.
-    + intros ?.
-      replace r' with r by lia.
-      replace (r - length sums) with O by lia.
-      reflexivity.
-    + intros Hlook.
-      rewrite 2 lookup_cons_ne_0 by lia.
-      replace (pred (r - length sums)) with (r - S (length sums)) by lia.
-      rewrite Hlook.
-      f_equal; lia.
+    f_equiv; [|easy].
+    destruct lu, lu'; now apply eq_reflexivity, delta_semantics_ext.
 Qed.
 
-(* FIXME: Move *)
-Lemma dif_dist {P Q} {A B} (f : A -> B) (b : {P} + {Q}) (x y : A) :
-  f (if b then x else y) = if b then f x else f y.
+Lemma rmul_comm_double (r0 r1 r2 r3 : R) :
+  (r0 * r1) * (r2 * r3) == (r0 * r2) * (r1 * r3).
 Proof.
-  now destruct b.
+  ring.
 Qed.
 
-Lemma tl_total_semantics_aux_tl_times_aux mabs mg ml mr mr'
-  lsums labs rsums rabs :
-  (∀ p : positive, p ∈ abstracts_rel_vars rabs -> p < length rsums + length mr')%nat ->
-  tl_total_semantics_aux mabs mg ml (mr' ++ mr) (lsums ++ rsums)
-    ((relabel_abs (relabel_rels (λ p,
-      if decide (p < length lsums)%nat then
-        pos_add_N p (length rsums)
-      else pos_add_N p (length mr' + length rsums))) <$> labs) ++
-      (relabel_abs (relabel_rels (λ p,
-      if decide (p < length rsums)%nat then p
-      else pos_add_N p (length lsums))) <$> rabs)) ==
-  tl_total_semantics_aux mabs mg ml mr lsums labs *
-  tl_total_semantics_aux mabs mg ml mr' rsums rabs.
+(* Lemma tl_total_semantics_aux_tl_times_aux mabs ml mr mr'
+  lsums labs ldelt rsums rabs rdelt :
+  (∀ p : positive, p ∈ abstracts_bound_vars rabs -> p < rsums + length mr')%nat ->
+  (∀ p : positive, p ∈ deltas_bound_vars rdelt -> p < rsums + length mr')%nat ->
+  tl_total_semantics_aux mabs ml (mr' ++ mr) (lsums + rsums)
+    ((relabel_abs (relabel_bounds (λ p,
+      if decide (p < lsums)%nat then
+        pos_add_N p rsums
+      else pos_add_N p (length mr' + rsums))) <$> labs) ++
+      (relabel_abs (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
+      else pos_add_N p lsums)) <$> rabs))
+    ((relabel_delt (relabel_bounds (λ p,
+      if decide (p < lsums)%nat then
+        pos_add_N p rsums
+      else pos_add_N p (length mr' + rsums))) <$> ldelt) ++
+      (relabel_delt (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
+      else pos_add_N p lsums)) <$> rdelt)) ==
+  tl_total_semantics_aux mabs ml mr lsums labs ldelt *
+  tl_total_semantics_aux mabs ml mr' rsums rabs rdelt.
 Proof.
-  intros Hrabs.
-  revert mr; induction lsums as [|ty lsums IHlsums]; intros mr.
-  - cbn [app length].
+  intros Hrabs Hrdelt.
+  revert mr; induction lsums as [|lsums IHlsums]; intros mr.
+  - cbn [app length Nat.add N.of_nat pos_add_N].
+    change (if decide (_ < 0) then _ else ?x) with x.
+    erewrite (list_fmap_ext _ _ rabs). 2:{
+      intros; apply relabel_abs_id';
+      intros; apply relabel_bounds_id';
+      intros; apply decide_same.
+    }
+    erewrite (list_fmap_ext _ _ rdelt). 2:{
+      intros; apply relabel_delt_id';
+      intros; apply relabel_bounds_id';
+      intros; apply decide_same.
+    }
+    rewrite 2 list_fmap_id.
+
+
+    (* setoid_rewrite relabel_bounds_ext.
+    setoid_rewrite decide_same.
+    setoid_rewrite relabel_abs_id'.
+    setoid_rewrite relabel_bounds_id'.
+    relabel_bounds_ext
+
+    setoid_rewrite decide_same.
     unfold N.of_nat at 4.
     cbn [pos_add_N].
     rewrite (list_fmap_id' _ rabs). 2:{
@@ -641,59 +599,73 @@ Proof.
     erewrite list_fmap_ext. 2:{
       intros _ abs _.
       apply relabel_abs_ext.
-      apply relabel_rels_ext.
+      apply relabel_bounds_ext.
       intros r.
       rewrite decide_False by lia.
       reflexivity.
     }
-    cbn.
-    revert mr' Hrabs;
-    induction rsums as [|ty rsums IHrsums]; intros mr' Hrabs.
+    cbn. *)
+    revert mr' Hrabs Hrdelt;
+    induction rsums as [|rsums IHrsums]; intros mr' Hrabs Hrdelt.
     + cbn.
-      rewrite fmap_app.
-      rewrite Rlist_prod_app.
+      rewrite rmul_comm_double.
       f_equiv.
-      * apply eq_reflexivity.
-        f_equal.
-        rewrite <- list_fmap_compose.
-        apply list_fmap_ext; intros _ [[f low] up] _.
-        cbn.
-        apply abstract_semantics_ext; [reflexivity|].
-        rewrite <- fmap_app, <- list_fmap_compose.
-        apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-        destruct v; [|reflexivity..].
-        cbn.
-        rewrite pos_add_N_to_nat.
-        unfold N.of_nat at 2; cbn.
-        rewrite N.add_0_r, Nat2N.id.
-        rewrite lookup_app_r by lia.
-        f_equal; lia.
-      * apply eq_reflexivity.
-        f_equal.
-        apply list_fmap_ext; intros _ [[f low] up] Hf%elem_of_list_lookup_2.
-        cbn.
-        apply abstract_semantics_ext; [reflexivity|].
-        apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-        destruct v; [|reflexivity..].
-        cbn.
-        apply lookup_app_l.
-        specialize (Hrabs p).
-        tspecialize Hrabs by now
-          apply elem_of_list_to_set, elem_of_list_bind;
-          exists (f, low, up); split; [|easy];
-          apply elem_of_list_omap; eauto.
-        easy.
+      * rewrite fmap_app.
+        rewrite Rlist_prod_app.
+        f_equiv.
+        --apply eq_reflexivity.
+          f_equal.
+          rewrite <- list_fmap_compose.
+          apply list_fmap_ext; intros _ [[f low] up] _.
+          cbn.
+          apply abstract_semantics_ext; [reflexivity|..].
+          ++rewrite <- list_fmap_compose.
+            apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+            destruct v; [|reflexivity..].
+            cbn.
+            rewrite lookup_app_r by lia;
+            f_equal; lia.
+          ++rewrite <- list_fmap_compose.
+            apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+            destruct v; [|reflexivity..].
+            cbn.
+            rewrite lookup_app_r by lia;
+            f_equal; lia.
+        --apply eq_reflexivity.
+          f_equal.
+          apply list_fmap_ext; intros _ [[f low] up] Hf%elem_of_list_lookup_2.
+          cbn.
+          apply abstract_semantics_ext; [reflexivity|..].
+          ++apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+            destruct v; [|reflexivity..].
+            cbn.
+            apply lookup_app_l.
+            specialize (Hrabs p).
+            tspecialize Hrabs by now
+              apply elem_of_abstracts_bound_vars;
+              set_solver +Hv Hf.
+            easy.
+          ++apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+            destruct v; [|reflexivity..].
+            cbn.
+            apply lookup_app_l.
+            specialize (Hrabs p).
+            tspecialize Hrabs by now
+              apply elem_of_abstracts_bound_vars;
+              set_solver +Hv Hf.
+            easy.
+      *
     + cbn.
       rewrite sum_of_distr_r.
       apply sum_of_ext; intros x.
-      rewrite <- (IHrsums (mk_Vval x :: mr')) by
+      rewrite <- (IHrsums (mk_A x :: mr')) by
         now cbn in Hrabs |- *; intros ? ?%Hrabs; lia.
       (* 2: cbn; intros ? ?%Hrabs; lia. *)
       cbn.
       f_equiv.
       f_equal.
       apply list_fmap_ext; intros _ [[f low] up] _.
-      apply relabel_abs_ext, relabel_rels_ext.
+      apply relabel_abs_ext, relabel_bounds_ext.
       intros r; f_equal; lia.
   - cbn.
     rewrite sum_of_distr_l.
@@ -756,7 +728,7 @@ Proof.
         apply IHlu.
         intros p Hp; apply Hlu.
         cbn.
-        now destruct (v2rel v); [constructor|].
+        now destruct (v2bound v); [constructor|].
       }
 
       destruct v as [r|l|g]; [|reflexivity..].
@@ -776,53 +748,220 @@ Proof.
       rewrite lookup_cons_ne_0 by lia.
       rewrite 2 lookup_app_l by lia.
       f_equal; lia.
-Qed.
+Qed. *)
 
-Lemma fold_tl_semantics_aux_base mabs mg ml mr abst :
+Lemma fold_tl_semantics_aux_base mabs ml mr abst delt :
   Rlist_prod ((λ '(abs, low, up),
-    abstract_semantics mabs mg ml mr abs low up) <$> abst) =
-  tl_total_semantics_aux mabs mg ml mr [] abst.
+    abstract_semantics mabs ml mr abs low up) <$> abst) *
+  Rlist_prod ((λ '(l, u),
+    delta_semantics ml mr l u) <$> delt) =
+  tl_total_semantics_aux mabs ml mr O abst delt.
 Proof.
   reflexivity.
 Qed.
 
+Lemma tl_total_semantics_aux_ext_base_mr mabs ml mr mr'
+  abs abs' delt delt' :
 
-Lemma tl_total_semantics_aux_tl_times_aux' mabs mg ml mr mr'
-  lsums labs rsums rabs :
-  (* (∀ p : positive, p ∈ abstracts_rel_vars rabs -> p < length rsums + length mr')%nat -> *)
-  tl_total_semantics_aux mabs mg ml (mr' ++ mr) (lsums ++ rsums)
-    ((relabel_abs (relabel_rels (λ p,
-      if decide (p < length lsums)%nat then
-        pos_add_N p (length rsums)
-      else pos_add_N p (length mr' + length rsums))) <$> labs) ++
-      (relabel_abs (relabel_rels (λ p,
-      if decide (p < length rsums)%nat then p
+  Forall2 (fun flu flu' =>
+    flu.1.1 = flu'.1.1 /\
+    let P := (fun v v' =>
+      match v, v' with
+      | bound r, bound r' =>
+        mr !! (r :> nat) = mr' !! (r' :> nat)
+      | free l, free l' => l = l'
+      | _, _ => False
+      end) in
+    Forall2 P flu.1.2 flu'.1.2 /\
+    Forall2 P flu.2 flu'.2) abs abs' ->
+  Forall2 (fun lu lu' =>
+    let P := (fun v v' =>
+      match v, v' with
+      | bound r, bound r' =>
+        mr !! (r :> nat) = mr' !! (r' :> nat)
+      | free l, free l' => l = l'
+      | _, _ => False
+      end) in
+    P lu.1 lu'.1 /\ P lu.2 lu'.2) delt delt' ->
+  tl_total_semantics_aux mabs ml mr O abs delt ==
+  tl_total_semantics_aux mabs ml mr' O abs' delt'.
+Proof.
+  intros Habs Hdelt.
+  apply tl_total_semantics_aux_ext_base.
+  - apply (Forall2_impl _ _ _ _ Habs).
+    intros flu flu' [Hf Hlu].
+    split; [now rewrite Hf|].
+    cbv zeta in Hlu.
+    split; [apply (Forall2_impl _ _ _ _ Hlu.1)|
+      apply (Forall2_impl _ _ _ _ Hlu.2)];
+    (intros [r|l] [r'|l']; [|now intros []..]);
+    cbn; easy.
+  - apply (Forall2_impl _ _ _ _ Hdelt).
+    intros [l u] [l' u'] [Hl Hu]; cbn in *.
+    split; unfold get_var; [destruct l, l'|destruct u, u']; cbn; now subst.
+Qed.
+
+
+Lemma tl_total_semantics_aux_ext_mr mabs ml mr mr'
+  sums abs abs' delt delt' :
+  Forall2 (fun flu flu' =>
+    let P := (fun v v' =>
+      match v, v' with
+      | bound r, bound r' =>
+        if decide (r < sums \/ r' < sums) then r = r'
+          else mr !! (pos_sub_N r sums :> nat) =
+            mr' !! (pos_sub_N r' sums :> nat)
+      | free l, free l' => l = l'
+      | _, _ => False
+      end) in
+    flu.1.1 = flu'.1.1 /\
+    Forall2 P flu.1.2 flu'.1.2 /\
+    Forall2 P flu.2 flu'.2) abs abs' ->
+  Forall2 (fun lu lu' =>
+    let P := (fun v v' =>
+      match v, v' with
+      | bound r, bound r' =>
+        if decide (r < sums \/ r' < sums) then r = r'
+          else mr !! (pos_sub_N r sums :> nat) =
+            mr' !! (pos_sub_N r' sums :> nat)
+      | free l, free l' => l = l'
+      | _, _ => False
+      end) in
+    P lu.1 lu'.1 /\ P lu.2 lu'.2) delt delt' ->
+  tl_total_semantics_aux mabs ml mr sums abs delt ==
+  tl_total_semantics_aux mabs ml mr' sums abs' delt'.
+Proof.
+  revert mr mr'.
+  induction sums as [|sums IHsums]; intros mr mr' Habs Hdelt.
+  - apply tl_total_semantics_aux_ext_base_mr.
+    + apply (Forall2_impl _ _ _ _ Habs).
+      intros flu flu' [Hf Hlu].
+      split; [now rewrite Hf|].
+      cbv zeta.
+      split; [apply (Forall2_impl _ _ _ _ Hlu.1)|
+        apply (Forall2_impl _ _ _ _ Hlu.2)];
+      (intros [r|l] [r'|l']; [|now intros []..]);
+      cbn; easy.
+    + apply (Forall2_impl _ _ _ _ Hdelt).
+      intros [l u] [l' u'] [Hl Hu]; cbn in *.
+      split; unfold get_var; [destruct l, l'|destruct u, u']; cbn; now subst.
+  - cbn.
+    apply sum_of_ext; intros x.
+    apply IHsums.
+    + apply (Forall2_impl _ _ _ _ Habs).
+      intros flu flu' [Hf Hlu].
+      split; [now rewrite Hf|].
+        split; [apply (Forall2_impl _ _ _ _ Hlu.1)|
+          apply (Forall2_impl _ _ _ _ Hlu.2)];
+      (intros [r|l] [r'|l']; [|now intros []..]);
+      (intros Hrs;
+      destruct_decide (decide (r < sums \/ r' < sums)) as Hrsm;
+      [now rewrite decide_True in Hrs by lia|
+      case_decide as HrS;[subst; now replace (pos_to_nat_pred _) with O by lia|
+        rewrite 2 lookup_cons_ne_0 by lia;
+        etransitivity; [etransitivity; [|apply Hrs]|];
+        f_equal; lia]]).
+    + apply (Forall2_impl _ _ _ _ Hdelt).
+      intros [l u] [l' u'] [Hl Hu].
+      cbn in *.
+      split; [destruct l as [r|], l' as [r'|]|
+        destruct u as [r|], u' as [r'|]]; try easy;
+      [revert Hl|revert Hu];
+      (intros Hrs;
+      destruct_decide (decide (r < sums \/ r' < sums)) as Hrsm;
+      [now rewrite decide_True in Hrs by lia|
+      case_decide as HrS;[subst; now replace (pos_to_nat_pred _) with O by lia|
+        rewrite 2 lookup_cons_ne_0 by lia;
+        etransitivity; [etransitivity; [|apply Hrs]|];
+        f_equal; lia]]).
+Qed.
+
+
+Lemma tl_total_semantics_aux_tl_times_aux' mabs ml mr mr'
+  lsums labs ldelt rsums rabs rdelt :
+  (* (∀ p : positive, p ∈ abstracts_bound_vars rabs -> p < length rsums + length mr')%nat -> *)
+  tl_total_semantics_aux mabs ml (mr' ++ mr) (lsums + rsums)
+    ((relabel_abs (relabel_bounds (λ p,
+      if decide (p < lsums)%nat then
+        pos_add_N p (rsums)
+      else pos_add_N p (length mr' + rsums))) <$> labs) ++
+      (relabel_abs (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
       else
-        if decide (p < length rsums + length mr') then
-          pos_add_N p (length lsums)
+        if decide (p < rsums + length mr') then
+          pos_add_N p (lsums)
         else
-          pos_add_N p (length lsums + length mr))) <$> rabs)) ==
-  tl_total_semantics_aux mabs mg ml mr lsums labs *
-  tl_total_semantics_aux mabs mg ml mr' rsums rabs.
+          pos_add_N p (lsums + length mr))) <$> rabs))
+    ((relabel_delt (relabel_bounds (λ p,
+      if decide (p < lsums)%nat then
+        pos_add_N p (rsums)
+      else pos_add_N p (length mr' + rsums))) <$> ldelt) ++
+      (relabel_delt (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
+      else
+        if decide (p < rsums + length mr') then
+          pos_add_N p (lsums)
+        else
+          pos_add_N p (lsums + length mr))) <$> rdelt)) ==
+  tl_total_semantics_aux mabs ml mr lsums labs ldelt *
+  tl_total_semantics_aux mabs ml mr' rsums rabs rdelt.
 Proof.
   (* intros Hrabs. *)
-  revert mr; induction lsums as [|ty lsums IHlsums]; intros mr.
-  - cbn [app length].
+  revert mr; induction lsums as [|lsums IHlsums]; intros mr.
+  - cbn [app length N.of_nat pos_add_N].
+    change (if decide (_ < 0) then _ else ?x) with x.
+    (* erewrite (list_fmap_ext _ _ rabs). 2:{
+      intros; apply relabel_abs_id';
+      intros; apply relabel_bounds_id';
+      intros; apply decide_same.
+    }
+    erewrite (list_fmap_ext _ _ rdelt). 2:{
+      intros; apply relabel_delt_id';
+      intros; apply relabel_bounds_id';
+      intros; apply decide_same.
+    }
+    rewrite 2 list_fmap_id.
     unfold N.of_nat at 4.
     cbn [pos_add_N].
+
     erewrite (list_fmap_ext _ _ labs). 2:{
       intros _ abs _.
       apply relabel_abs_ext.
-      apply relabel_rels_ext.
+      apply relabel_bounds_ext.
       intros r.
       rewrite decide_False by lia.
       reflexivity.
-    }
+    } *)
     cbn.
     revert mr';
-    induction rsums as [|ty rsums IHrsums]; intros mr'.
-    + cbn.
-      rewrite fmap_app.
+    induction rsums as [|rsums IHrsums]; intros mr'.
+    2:{
+      cbn.
+      rewrite sum_of_distr_r.
+      apply sum_of_ext; intros x.
+      rewrite <- (IHrsums (x :: mr')) by
+        now cbn in Hrabs |- *; intros ? ?%Hrabs; lia.
+      (* 2: cbn; intros ? ?%Hrabs; lia. *)
+      cbn.
+      f_equiv.
+      f_equal.
+      * apply list_fmap_ext; intros _ [[f low] up] _.
+        apply relabel_abs_ext, relabel_bounds_ext.
+        intros r; f_equal; lia.
+      * apply list_fmap_ext; intros _ [[f low] up] _.
+        apply relabel_abs_ext, relabel_bounds_ext.
+        intros r; repeat case_decide; repeat first [lia | f_equal].
+      * f_equal;
+        apply list_fmap_ext; intros _ [l u] _;
+        apply relabel_delt_ext;
+        intros; apply relabel_bounds_ext;
+        intros; f_equal; [lia|];
+        repeat case_decide; lia.
+    }
+    cbn.
+    rewrite rmul_comm_double.
+    f_equiv.
+    + rewrite fmap_app.
       rewrite Rlist_prod_app.
       f_equiv.
       * apply eq_reflexivity.
@@ -830,220 +969,175 @@ Proof.
         rewrite <- list_fmap_compose.
         apply list_fmap_ext; intros _ [[f low] up] _.
         cbn.
-        apply abstract_semantics_ext; [reflexivity|].
-        rewrite <- fmap_app, <- list_fmap_compose.
-        apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-        destruct v; [|reflexivity..].
-        cbn.
-        rewrite pos_add_N_to_nat.
-        unfold N.of_nat at 2; cbn.
-        rewrite N.add_0_r, Nat2N.id.
-        rewrite lookup_app_r by lia.
+        apply abstract_semantics_ext; [reflexivity|..];
+        rewrite <- list_fmap_compose;
+        apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2;
+        (destruct v; [|reflexivity..]);
+        cbn;
+        rewrite lookup_app_r by lia;
         f_equal; lia.
-      * rewrite 2 fold_tl_semantics_aux_base.
-        apply tl_total_semantics_aux_ext_base_mr.
-        induction rabs as [|flu rabs IHrabs]; constructor; [|apply IHrabs].
-        destruct flu as [[f low] up].
-        split; [reflexivity|].
+      * apply Rlist_prod_perm_mor, SetoidPermutation.eqlistA_PermutationA,
+          SetoidList.eqlistA_altdef.
+        rewrite Forall2_fmap, Forall2_fmap_l.
+        apply Forall_Forall2_diag.
+        rewrite Forall_forall.
+        intros [[f low] up] _.
         cbn.
-        rewrite <- fmap_app.
-        generalize (low ++ up) as lu.
-        intros lu.
-        induction lu as [|v lu IHlu]; constructor; [|apply IHlu].
-        destruct v as [r|l|g]; [|reflexivity..].
-        cbn.
-        rewrite decide_False by lia.
-        case_decide.
-        --apply lookup_app_l; lia.
-        --rewrite pos_add_N_to_nat.
-          unfold N.of_nat at 1.
-          change (0 + ?x)%N with x.
-          rewrite Nat2N.id.
-          now rewrite 2 lookup_ge_None_2 by (rewrite 1?length_app; lia).
-    + cbn.
-      rewrite sum_of_distr_r.
-      apply sum_of_ext; intros x.
-      rewrite <- (IHrsums (mk_Vval x :: mr')) by
-        now cbn in Hrabs |- *; intros ? ?%Hrabs; lia.
-      (* 2: cbn; intros ? ?%Hrabs; lia. *)
-      cbn.
-      f_equiv.
-      f_equal.
-      * apply list_fmap_ext; intros _ [[f low] up] _.
-        apply relabel_abs_ext, relabel_rels_ext.
-        intros r; f_equal; lia.
-      * apply list_fmap_ext; intros _ [[f low] up] _.
-        apply relabel_abs_ext, relabel_rels_ext.
-        intros r; repeat case_decide; repeat first [lia | f_equal].
+        apply eq_reflexivity, abstract_semantics_ext; [reflexivity|..];
+        rewrite <- list_fmap_compose; apply list_fmap_ext;
+          (intros _ [r|] _; [|reflexivity]);
+        cbn;
+        rewrite decide_False by easy;
+        (case_decide as Hsm; [now rewrite lookup_app_l by lia|]);
+        now rewrite 2 lookup_ge_None_2 by now rewrite ?length_app; lia.
+    + rewrite fmap_app, Rlist_prod_app.
+      f_equiv;
+      apply Rlist_prod_perm_mor, SetoidPermutation.eqlistA_PermutationA,
+          SetoidList.eqlistA_altdef;
+      rewrite Forall2_fmap, Forall2_fmap_l;
+      apply Forall_Forall2_diag;
+      rewrite Forall_forall;
+      intros [l u] _; cbn.
+      * apply eq_reflexivity, delta_semantics_ext;
+        symmetry; unfold get_var;
+        (case_match; cbn; [|reflexivity];
+        rewrite lookup_app_r; [f_equal|]; lia).
+      * apply eq_reflexivity, delta_semantics_ext;
+        symmetry; unfold get_var;
+        (case_match; cbn; [|reflexivity]);
+        rewrite decide_False by easy;
+        (case_decide as Hsm; [now rewrite lookup_app_l by lia|]);
+        now rewrite 2 lookup_ge_None_2 by now rewrite ?length_app; lia.
   - cbn.
     rewrite sum_of_distr_l.
     apply sum_of_ext; intros x.
     rewrite <- IHlsums.
     apply tl_total_semantics_aux_ext_mr.
-    apply Forall2_app; clear.
-    + induction labs as [|[[f low] up] labs IHlabs]; constructor;
-      [clear IHlabs|apply IHlabs].
-      split; [reflexivity|].
-      cbn.
-      rewrite <- 2 fmap_app.
-      generalize (low ++ up) as lu.
-      intros lu.
-      induction lu as [|v lu IHlu]; constructor; [|apply IHlu].
-      destruct v as [r|l|g]; [|reflexivity..].
-      cbn.
-      rewrite 2 pos_sub_N_to_nat.
-      rewrite !(dif_dist pos_to_nat_pred).
-      rewrite !pos_add_N_to_nat.
-      remember (pos_to_nat_pred r) as nr eqn:Hnr.
-      replace r with (Pos.of_succ_nat nr) by (subst; unfold pos_to_nat_pred; lia).
-      clear r Hnr.
-      rewrite !N2Nat.inj_add.
-      rewrite !Nat2N.id.
-      rewrite length_app.
-      destruct_decide (decide (nr < S (length lsums))) as HnrS;
-      [destruct_decide (decide (nr < (length lsums))) as Hnr|
-        rewrite (decide_False (P:= nr < _)) by lia;
-        rewrite decide_False by lia].
-      * rewrite decide_True by lia.
-        reflexivity.
-      * replace nr with (length lsums) by lia.
-        rewrite decide_False by lia.
-        rewrite Nat.sub_diag.
+    + apply Forall2_app; clear; apply Forall2_fmap, Forall_Forall2_diag;
+      rewrite Forall_forall;
+      intros [[f low] up] _; cbn;
+      (split; [reflexivity|]);
+      (eenough (Hen: _);
+        [split; apply Forall2_fmap, Forall_Forall2_diag;
+        rewrite Forall_forall; (intros [r|] _; [|reflexivity]);
+        cbn; exact (Hen r)|]); intros r; cbn.
+      * destruct_decide (decide (r < S lsums));
+          [destruct_decide (decide (r < lsums))|
+          rewrite (decide_False (P:=(r<_))) by lia];
+        [rewrite decide_True by lia; done|rewrite decide_False by lia..];
+        [|rewrite lookup_cons_ne_0, 2 lookup_app_r, lookup_cons_ne_0 by lia;
+        f_equal; lia].
+        replace (pos_to_nat_pred _) with O by lia.
         cbn.
         rewrite lookup_app_r by lia.
-        now replace (_ - _) with O by lia.
-      * rewrite lookup_app_r by lia.
-        rewrite 2 lookup_cons_ne_0 by lia.
+        replace (_-_) with O by lia.
+        reflexivity.
+      * destruct_decide (decide (r < rsums));
+          [rewrite decide_True by lia; reflexivity|
+          destruct_decide (decide (r < rsums + length mr'));
+          rewrite decide_False by lia];
+        [|rewrite lookup_cons_ne_0, 2 lookup_app_r, lookup_cons_ne_0 by lia;
+        f_equal; lia].
+        rewrite lookup_cons_ne_0, 2 lookup_app_l by lia.
+        f_equal; lia.
+    + apply Forall2_app; clear; apply Forall2_fmap, Forall_Forall2_diag;
+      rewrite Forall_forall;
+      intros [l u] _; cbn;
+      (eenough (Hen : _);
+      [split; [destruct l as [r|]; [|reflexivity]|
+        destruct u as [r|]; [|reflexivity]]; cbn; exact (Hen r)|]);
+      intros r.
+      * destruct_decide (decide (r < S lsums));
+          [destruct_decide (decide (r < lsums))|
+          rewrite (decide_False (P:=(r<_))) by lia];
+        [rewrite decide_True by lia; done|rewrite decide_False by lia..];
+        [|rewrite lookup_cons_ne_0, 2 lookup_app_r, lookup_cons_ne_0 by lia;
+        f_equal; lia].
+        replace (pos_to_nat_pred _) with O by lia.
+        cbn.
         rewrite lookup_app_r by lia.
+        replace (_-_) with O by lia.
+        reflexivity.
+      * destruct_decide (decide (r < rsums));
+          [rewrite decide_True by lia; reflexivity|
+          destruct_decide (decide (r < rsums + length mr'));
+          rewrite decide_False by lia];
+        [|rewrite lookup_cons_ne_0, 2 lookup_app_r, lookup_cons_ne_0 by lia;
+        f_equal; lia].
+        rewrite lookup_cons_ne_0, 2 lookup_app_l by lia.
         f_equal; lia.
-    + induction rabs as [|[[f low] up] rabs IHrabs]; constructor;
-        [clear IHrabs|apply IHrabs; set_solver +Hrabs].
-      split; [reflexivity|].
-      cbn.
-      rewrite <- 2 fmap_app.
-      generalize (low ++ up) as lu.
-      intros lu.
-      induction lu as [|v lu IHlu]; constructor; [|apply IHlu].
-      destruct v as [r|l|g]; [|reflexivity..].
-      cbn.
-      rewrite 2 pos_sub_N_to_nat.
-      rewrite !(dif_dist pos_to_nat_pred).
-      rewrite !pos_add_N_to_nat.
-      remember (pos_to_nat_pred r) as nr eqn:Hnr.
-      replace r with (Pos.of_succ_nat nr) by (subst; unfold pos_to_nat_pred; lia).
-      clear r Hnr.
-      rewrite !Nat2N.id.
-      rewrite length_app.
-      destruct_decide (decide (nr < length rsums)) as Hnr;
-      [rewrite decide_True by lia; reflexivity|].
-      destruct_decide (decide (nr < length rsums + length mr')) as Hnr_ge.
-      * rewrite decide_False by lia.
-        rewrite lookup_cons_ne_0 by lia.
-        rewrite 2 lookup_app_l by lia.
-        f_equal; lia.
-      * rewrite decide_False by lia.
-        rewrite !N2Nat.inj_add, !Nat2N.id.
-        now rewrite 2 lookup_ge_None_2 by now cbn; simpl_list; cbn; lia.
 Qed.
 
 
-Lemma tl_total_semantics_aux_tl_times_aux_alt mabs mg ml mr
-  lsums labs rsums rabs :
-  (* (∀ p : positive, p ∈ abstracts_rel_vars rabs -> p < length rsums + length mr')%nat -> *)
-  tl_total_semantics_aux mabs mg ml mr (lsums ++ rsums)
-    ((relabel_abs (relabel_rels (λ p, pos_add_N p (length rsums))) <$> labs) ++
-      (relabel_abs (relabel_rels (λ p,
-      if decide (p < length rsums)%nat then p
-      else pos_add_N p (length lsums))) <$> rabs)) ==
-  tl_total_semantics_aux mabs mg ml mr lsums labs *
-  tl_total_semantics_aux mabs mg ml mr rsums rabs.
+Lemma tl_total_semantics_aux_tl_times_aux_alt mabs ml mr
+  lsums labs ldelt rsums rabs rdelt :
+  (* (∀ p : positive, p ∈ abstracts_bound_vars rabs -> p < length rsums + length mr')%nat -> *)
+  tl_total_semantics_aux mabs ml mr (lsums + rsums)
+    ((relabel_abs (relabel_bounds (λ p, pos_add_N p rsums)) <$> labs) ++
+      (relabel_abs (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
+      else pos_add_N p lsums)) <$> rabs))
+    ((relabel_delt (relabel_bounds (λ p, pos_add_N p rsums)) <$> ldelt) ++
+      (relabel_delt (relabel_bounds (λ p,
+      if decide (p < rsums)%nat then p
+      else pos_add_N p lsums)) <$> rdelt)) ==
+  tl_total_semantics_aux mabs ml mr lsums labs ldelt *
+  tl_total_semantics_aux mabs ml mr rsums rabs rdelt.
 Proof.
   rewrite <- tl_total_semantics_aux_tl_times_aux'.
   apply tl_total_semantics_aux_ext_mr.
-  apply Forall2_app; clear.
-  - induction labs as [|[[f low] up] labs IHlabs]; constructor;
-    [clear IHlabs|apply IHlabs].
-    split; [reflexivity|].
-    cbn.
-    rewrite <- 2 fmap_app.
-    generalize (low ++ up) as lu.
-    intros lu.
-    induction lu as [|v lu IHlu]; constructor; [|apply IHlu].
-    destruct v as [r|l|g]; [|reflexivity..].
-    cbn.
-    rewrite 2 pos_sub_N_to_nat.
-    rewrite !(dif_dist pos_to_nat_pred).
-    rewrite !pos_add_N_to_nat.
-    remember (pos_to_nat_pred r) as nr eqn:Hnr.
-    replace r with (Pos.of_succ_nat nr) by (subst; unfold pos_to_nat_pred; lia).
-    clear r Hnr.
-    rewrite !N2Nat.inj_add.
-    rewrite !Nat2N.id.
-    rewrite length_app.
-    destruct_decide (decide (nr < S (length lsums))) as HnrS;
-    [destruct_decide (decide (nr < (length lsums))) as Hnr|
-      rewrite (decide_False (P:= nr < _)) by lia;
-      rewrite decide_False by lia].
-    + rewrite decide_True by lia.
-      reflexivity.
-    + replace nr with (length lsums) by lia.
-      rewrite decide_False by lia.
-      rewrite Nat.sub_diag.
-      cbn.
+  - apply Forall2_app; apply Forall2_fmap, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [[f low] up] _; cbn;
+    (split; [reflexivity|]);
+    (eenough (Hen : _);
+    [split; (apply Forall2_fmap, Forall_Forall2_diag;
+     rewrite Forall_forall; intros [r|] _; [|reflexivity];
+     cbn; exact (Hen r))|]); intros r.
+     + destruct_decide (decide (r < lsums));
+      [now rewrite decide_True by lia|rewrite decide_False by lia].
       rewrite lookup_app_r by lia.
-      now replace (_ - _) with O by lia.
-    + rewrite lookup_app_r by lia.
       f_equal; lia.
-  - induction rabs as [|[[f low] up] rabs IHrabs]; constructor;
-      [clear IHrabs|apply IHrabs; set_solver +Hrabs].
-    split; [reflexivity|].
-    cbn.
-    rewrite <- 2 fmap_app.
-    generalize (low ++ up) as lu.
-    intros lu.
-    induction lu as [|v lu IHlu]; constructor; [|apply IHlu].
-    destruct v as [r|l|g]; [|reflexivity..].
-    cbn.
-    rewrite 2 pos_sub_N_to_nat.
-    rewrite !(dif_dist pos_to_nat_pred).
-    rewrite !pos_add_N_to_nat.
-    remember (pos_to_nat_pred r) as nr eqn:Hnr.
-    replace r with (Pos.of_succ_nat nr) by (subst; unfold pos_to_nat_pred; lia).
-    clear r Hnr.
-    rewrite !Nat2N.id.
-    rewrite length_app.
-    destruct_decide (decide (nr < length rsums)) as Hnr;
-    [rewrite decide_True by lia; reflexivity|].
-    destruct_decide (decide (nr < length rsums + length mr)) as Hnr_ge.
-    + rewrite decide_False by lia.
-      rewrite lookup_app_l by lia.
+    + destruct_decide (decide (r < rsums)); [now rewrite decide_True by lia|].
+      destruct_decide (decide (r < rsums + length mr));
+      [now rewrite decide_False, lookup_app_l by lia|
+      rewrite decide_False, lookup_app_r by lia; f_equal; lia].
+  - apply Forall2_app; apply Forall2_fmap, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [l u] _; cbn;
+    (eenough (Hen : _);
+    [split; [destruct l as [r|];[|reflexivity]|
+      destruct u as [r|];[|reflexivity]]; cbn; exact (Hen r)|]);
+      intros r; cbn.
+     + destruct_decide (decide (r < lsums));
+      [now rewrite decide_True by lia|rewrite decide_False by lia].
+      rewrite lookup_app_r by lia.
       f_equal; lia.
-    + rewrite decide_False by lia.
-      rewrite !N2Nat.inj_add, !Nat2N.id.
-      now rewrite 2 lookup_ge_None_2 by now cbn; simpl_list; cbn; lia.
+    + destruct_decide (decide (r < rsums)); [now rewrite decide_True by lia|].
+      destruct_decide (decide (r < rsums + length mr));
+      [now rewrite decide_False, lookup_app_l by lia|
+      rewrite decide_False, lookup_app_r by lia; f_equal; lia].
 Qed.
 
 
-Lemma tl_total_semantics_aux_tl_times mabs mg ml mr tl tl' :
-  tl_total_semantics_aux mabs mg ml mr
-    (tl_times tl tl').(tl_sums) (tl_times tl tl').(tl_abstracts) ==
-  tl_total_semantics_aux mabs mg ml mr tl.(tl_sums) tl.(tl_abstracts) *
-  tl_total_semantics_aux mabs mg ml mr tl'.(tl_sums) tl'.(tl_abstracts).
+Lemma tl_total_semantics_aux_tl_times mabs ml mr tl tl' :
+  tl_total_semantics_aux mabs ml mr
+    (tl_times tl tl').(tl_sums) (tl_times tl tl').(tl_abstracts)
+    (tl_times tl tl').(tl_deltas) ==
+  tl_total_semantics_aux mabs ml mr tl.(tl_sums) tl.(tl_abstracts) tl.(tl_deltas) *
+  tl_total_semantics_aux mabs ml mr tl'.(tl_sums) tl'.(tl_abstracts) tl'.(tl_deltas).
 Proof.
   rewrite <- tl_total_semantics_aux_tl_times_aux_alt.
-  rewrite tl_times_spec_defn_correct.
-  destruct tl as [sums abs], tl' as [sums' abs']; reflexivity.
+  destruct tl, tl'; reflexivity.
 Qed.
 
 
-Lemma tensorlist_of_tensorexpr_correct mabs mg ml te :
-  tl_total_semantics mabs mg ml (tensorlist_of_tensorexpr te) ==
-  total_semantics mabs mg ml te.
+Lemma tensorlist_of_tensorexpr_correct mabs ml te :
+  tl_total_semantics mabs ml (tensorlist_of_tensorexpr te) ==
+  total_semantics mabs ml te.
 Proof.
-  unfold tl_total_semantics.
-  generalize (@nil Vval).
+  generalize (@nil A).
   induction te; intros mr.
-  - reflexivity.
+  - cbn; ring.
+  - cbn; ring.
   - cbn.
     ring.
   - cbn.
@@ -1058,13 +1152,13 @@ Qed.
 
 Section Teq.
 
-Definition teq_at mabs mg mr : relation tensorexpr :=
+Definition teq_at mabs mr : relation tensorexpr :=
   fun te1 te2 => forall ml,
-  total_semantics_aux mabs mg ml mr te1 ==
-  total_semantics_aux mabs mg ml mr te2.
+  total_semantics_aux mabs ml mr te1 ==
+  total_semantics_aux mabs ml mr te2.
 
 Definition teq : relation tensorexpr :=
-  fun te1 te2 => forall mabs mg mr, teq_at mabs mg mr te1 te2.
+  fun te1 te2 => forall mabs mr, teq_at mabs mr te1 te2.
 
 Local Notation "te1  '=t[' mabs ','  mg ']='  te2" :=
   (teq_at mabs mg [] te1 te2) (at level 70).
@@ -1074,9 +1168,9 @@ Local Notation "te1  '=t='  te2" :=
 
 Section Teq_at.
 
-Context (mabs : abscontext) (mg : varcontext) (mr : list Vval).
+Context (mabs : abscontext) (mr : list A).
 
-Local Notation teq_at := (teq_at mabs mg mr).
+Local Notation teq_at := (teq_at mabs mr).
 
 #[global]
 Instance teq_teq_at_subrelation :
@@ -1107,7 +1201,7 @@ Add Parametric Relation : tensorexpr teq_at
 
 
 #[global]
-Add Parametric Morphism ml : (total_semantics_aux mabs mg ml mr)
+Add Parametric Morphism ml : (total_semantics_aux mabs ml mr)
   with signature teq_at ==> req as total_semantics_at_mor.
 Proof.
   unfold teq_at; auto.
@@ -1125,9 +1219,9 @@ Qed.
 
 End Teq_at.
 
-Lemma tsum_at_ext mabs mg mr ty te te' :
-  (forall x : V ty, teq_at mabs mg (mk_Vval x :: mr) te te') ->
-  teq_at mabs mg mr (tsum ty te) (tsum ty te').
+Lemma tsum_at_ext mabs mr te te' :
+  (forall x : A, teq_at mabs (x :: mr) te te') ->
+  teq_at mabs mr (tsum te) (tsum te').
 Proof.
   unfold teq_at.
   cbn.
@@ -1136,13 +1230,13 @@ Qed.
 
 (* FIXME: Move *)
 #[global]
-Instance total_semantics_aux_Params : Params total_semantics_aux 4 := {}.
+Instance total_semantics_aux_Params : Params total_semantics_aux 3 := {}.
 
 #[global]
-Add Parametric Morphism ty : (tsum ty) with signature
+Add Parametric Morphism : tsum with signature
   teq ==> teq as tsum_mor.
 Proof.
-  intros smd smd' Hsmd abs globs rels locs.
+  intros smd smd' Hsmd abs rels frees.
   cbn.
   now setoid_rewrite Hsmd.
 Qed.
@@ -1173,13 +1267,13 @@ Add Parametric Relation : tensorexpr teq
 Add Parametric Morphism : tproduct with signature
   teq ==> teq ==> teq as tproduct_mor.
 Proof.
-  intros l l' Hl r r' Hr abs vars rels locs.
+  intros l l' Hl r r' Hr abs rels frees.
   cbn.
   now rewrite Hl, Hr.
 Qed.
 
 Local Ltac cring :=
-  intros abs globs rels locs; cbn; ring.
+  intros abs rels frees; cbn; ring.
 
 Lemma tproduct_tone_l te : teq (tproduct tone te) te.
 Proof.
@@ -1237,372 +1331,57 @@ Notation tl_total_semantics_aux' mabs mg ml mr tl :=
   (tl_total_semantics_aux mabs mg ml mr tl.(tl_sums) tl.(tl_abstracts)).
 
 
-
-(* Phantom typing for summing over maps *)
-Definition Vmap (tys : list (Idx * Ty)) : Type :=
-  Pmap Vval.
-
-(* #[global] Typeclasses Opaque Vmap.
-
-#[local] Hint Extern 10 =>
-  lazymatch goal with
-  | |- Summable _ => fail
-  | |- _ => progress unfold Vmap
-  end : typeclass_instances. *)
-
-(* #[global] Instance Vmap_lookup tys : Lookup Idx Vval (Vmap tys) :=
-  Pmap_lookup.
-
-#[global] Instance Vmap_empty tys : Empty (Vmap tys) := Pmap_empty.
-
-#[global] Instance Vmap_partial_alter tys : PartialAlter Idx Vval (Vmap tys) :=
-  Pmap_partial_alter. *)
-
-
-Definition WF_Vmap {tys} (m : Vmap tys) : Prop :=
-  map_is_typed projT1 (list_to_map tys :> Pmap Ty) m /\
-  map_Forall (fun _ v => projT2 v ∈ sum_elements) m.
-
-Fixpoint Vmap_elements tys : list (Vmap tys) :=
-  match tys with
-  | [] => [∅]
-  | idx_ty :: tys =>
-    m ← Vmap_elements tys;
-    (λ v, <[idx_ty.1 := mk_Vval v]> m) <$> @sum_elements (V idx_ty.2) _
-  end.
-
-Instance Vmap_summable tys : Summable (Vmap tys) :=
-  sum_over (Vmap_elements tys).
-
-(* FIXME: Remove, is in Aux *)
-Lemma exists_sigT {A} {P : A -> Type} {Q : sigT P -> Prop}:
-  (exists x : sigT P, Q x) <-> exists x p, Q (@existT A P x p).
+(* FIXME: Find existing; consolidate *)
+Lemma cast_id {n} (v : vec A n) H :
+  Vector.cast v H = v.
 Proof.
-  split.
-  - intros ((x & p) & q).
-    eauto.
-  - intros (x & p & q).
-    now exists (@existT A P x p).
+  revert H; induction v; intros ?; cbn; f_equal; auto.
 Qed.
-
-Lemma elem_of_Vmap_elements_1 tys m :
-  m ∈ Vmap_elements tys ->
-  WF_Vmap m.
+(* FIXME: Move *)
+Lemma sum_of_vec_cast {n m} (f : vec A n -> R) (H : m = n) :
+  ∑ v : _, f v == ∑ v : vec A m, f (Vector.cast v H).
 Proof.
-  unfold WF_Vmap, Vmap.
-  revert m; induction tys as [|(idx, ty) tys IHtys]; intros m;
-  [cbn; rewrite elem_of_list_singleton, map_is_typed_empty_l;
-    unfold Vmap; naive_solver apply map_Forall_empty|].
-  cbn.
-  unfold Vmap.
-  intros (m' & (x & -> & Hx)%elem_of_list_fmap
-    & Hm'%IHtys)%elem_of_list_bind.
-  split; [now apply map_is_typed_insert_2|].
-  now apply map_Forall_insert_2.
+  subst.
+  now setoid_rewrite cast_id.
 Qed.
-
-Lemma elem_of_Vmap_elements tys m :
-  NoDup tys.*1 ->
-  m ∈ Vmap_elements tys <->
-  WF_Vmap m.
+Lemma vec_to_list_rev {n} (v : vec A n) :
+  vec_to_list (Vector.rev v) = reverse v.
 Proof.
-  intros Hnd.
-  unfold WF_Vmap, Vmap.
-  revert Hnd m; induction tys as [|(idx, ty) tys IHtys]; intros Hnd m;
-  [cbn; rewrite elem_of_list_singleton, map_is_typed_empty_l;
-    unfold Vmap; naive_solver apply map_Forall_empty|].
-  cbn.
-  unfold Vmap.
-  cbn in Hnd.
-  apply NoDup_cons in Hnd as [Hidx Htys].
-  rewrite elem_of_list_bind.
-  setoid_rewrite elem_of_list_fmap.
-  tspecialize IHtys by easy.
-  setoid_rewrite IHtys.
-  rewrite map_is_typed_insert_l' by now apply not_elem_of_list_to_map_1.
-  fold Vval.
-  split.
-  - intros (m' & (x & -> & Hx) & Hty & Hin).
-    split; [|now apply map_Forall_insert_2].
-    exists (existT ty x), m'.
-    do 2 split; [easy|].
-    split; [|easy].
-    eapply map_is_typed_None_l; [eauto|].
-    now apply not_elem_of_list_to_map_1.
-  - intros [((? & x) & m' & <- & -> & Hm' & Hty) Htym'].
-    cbn.
-    rewrite map_Forall_insert in Htym' by easy.
-    firstorder eauto.
+  rewrite 2 vec_to_list_to_list, Vector.to_list_rev.
+  now rewrite rev_reverse.
 Qed.
-
-(* FIXME: Move to Aux_stdpp *)
-Lemma list_map_fmap :
-  @map = @fmap _ list_fmap.
-Proof. reflexivity. Qed.
-(* TODO: Name here seems backwards, but follows list_fmap_bind... *)
-Lemma list_bind_fmap {A B C} (f : A -> list B) (g : B -> C) l :
-  g <$> (l ≫= f) = l ≫= (λ a, g <$> f a).
+Lemma vec_to_list_cast {n m} (v : vec A n) (H : n = m) :
+  vec_to_list (Vector.cast v H) = v.
 Proof.
-  induction l; [reflexivity|].
-  cbn.
-  now rewrite fmap_app, IHl.
+  subst.
+  now rewrite cast_id.
 Qed.
-Lemma list_bind_flat_map :
-  list_bind = flat_map.
-Proof. reflexivity. Qed.
-Lemma list_bind_assoc {A B C} (f : A -> list B) (g : B -> list C) l :
-  (l ≫= f) ≫= g = l ≫= mbind g ∘ f.
+Lemma vec_rev_cons_alt {n} (a : A) (v : vec A n) :
+  Vector.rev (a ::: v) = Vector.cast (Vector.rev v +++ [#a]) (Nat.add_comm n 1).
 Proof.
-  induction l; [reflexivity|cbn].
-  now rewrite bind_app, IHl.
-Qed.
-Lemma bind_pointwise_Permutation_strong {A B} (f g : A -> list B) l l' :
-  (∀ a, a ∈ l -> f a ≡ₚ g a) ->
-  l ≡ₚ l' ->
-  l ≫= f ≡ₚ l' ≫= g.
-Proof.
-  intros Hfg <-.
-  rewrite <- Forall_forall in Hfg.
-  induction Hfg; cbn; [reflexivity|].
-  f_equiv; auto.
-Qed.
-Lemma list_bind_nil_r {A B} (lA : list A) :
-  lA ≫= (λ _, @nil B) = [].
-Proof.
-  now induction lA.
-Qed.
-Lemma list_bind_nil_r' {A B} (lA : list A) f :
-  (∀ a, a ∈ lA -> f a = @nil B) ->
-  lA ≫= f = [].
-Proof.
-  rewrite <- Forall_forall.
-  intros Hall.
-  induction Hall; [reflexivity|].
-  cbn.
-  now rewrite IHHall, app_nil_r.
-Qed.
-Lemma list_bind_cons_r {A B} l (f : A -> B) (g : A -> list B) :
-  l ≫= (λ x, f x :: g x) ≡ₚ (f <$> l) ++ l ≫= g.
-Proof.
-  induction l; cbn; [|rewrite IHl]; solve_Permutation.
-Qed.
-Lemma list_bind_singleton_r {A B} l (f : A -> B) :
-  l ≫= (λ x, [f x]) = (f <$> l).
-Proof.
-  reflexivity.
-Qed.
-Lemma list_bind_app_r {A B} l (f g : A -> list B) :
-  l ≫= (λ x, f x ++ g x) ≡ₚ (l ≫= f) ++ l ≫= g.
-Proof.
-  induction l; cbn; [|rewrite IHl]; solve_Permutation.
-Qed.
-Lemma list_bind_comm {A B C} (f : A -> B -> list C) l l' :
-  (l ≫= (λ a, l' ≫= λ b, f a b)) ≡ₚ
-  (l' ≫= (λ b, l ≫= λ a, f a b)).
-Proof.
-  induction l; [cbn; now rewrite list_bind_nil_r|cbn].
-  now rewrite list_bind_app_r, IHl.
-Qed.
-
-Lemma Vmap_elements_perm tys tys' :
-  NoDup tys.*1 -> tys ≡ₚ tys' ->
-  Vmap_elements tys ≡ₚ Vmap_elements tys'.
-Proof.
-  intros Hdup Hperm.
-  induction Hperm; [reflexivity| | |].
-  - cbn in Hdup |- *.
-    rewrite NoDup_cons in Hdup.
-    now rewrite IHHperm by apply Hdup.
-  - cbn in Hdup |- *.
-    rewrite 2 NoDup_cons, not_elem_of_cons in Hdup.
-    rewrite 2 list_bind_assoc.
-    apply bind_pointwise_Permutation_strong; [|easy].
-    intros m _.
-    cbn.
-    gen_sum_elem bs.
-    gen_sum_elem cs.
-    induction bs; [cbn; now rewrite list_bind_nil_r|].
-    cbn.
-    rewrite <- IHbs.
-    clear IHbs.
-    induction cs; [reflexivity|].
-    cbn.
-    rewrite IHcs.
-    unfold Vmap.
-    rewrite insert_commute by easy.
-    f_equiv.
-    rewrite Permutation_app_comm.
-    solve_Permutation.
-  - pose proof Hdup as Hdup'.
-    rewrite Hperm1 in Hdup.
-    etransitivity; [apply IHHperm1|]; eauto.
-Qed.
-
-(* FIXME: Move to Summable/Algebra, and make Morphism *)
-Lemma Rlist_sum_perm rs rs' : rs ≡ₚ rs' -> Rlist_sum rs == Rlist_sum rs'.
-Proof.
-  intros Hperm.
-  apply Rlist_sum_perm_mor.
-  now apply SetoidPermutation.Permutation_PermutationA.
-Qed.
-
-Lemma sum_of_Vmap_perm tys tys' f : NoDup tys.*1 -> tys ≡ₚ tys' ->
-  ∑ m : Vmap tys, f m == ∑ m : Vmap tys', f m.
-Proof.
-  intros Hdup Hperm.
-  unfold_sum_of.
-  unfold sum_elements; cbn.
-  rewrite list_map_fmap.
-  apply Rlist_sum_perm.
-  now rewrite (Vmap_elements_perm tys tys') by auto.
-Qed.
-
-Add Parametric Morphism A B : (@mbind list list_bind A B) with signature
-  pointwise_relation A eq ==> eq ==> eq as list_bind_mor.
-Proof.
-  intros; apply list_bind_ext; naive_solver.
-Qed.
-
-(* FIXME: Move (and can just use flat_map)*)
-Lemma Rlist_sum_bind {A} (f : A -> list R) l :
-  Rlist_sum (l ≫= f) == Rlist_sum ((λ x, Rlist_sum (f x)) <$> l).
-Proof.
-  induction l; [reflexivity|].
-  cbn.
-  now rewrite Rlist_sum_app, IHl.
-Qed.
-
-Lemma sum_of_Vmap_cons_gen idxty tys f :
-  ∑ m : Vmap (idxty :: tys), f m ==
-  ∑ m' : Vmap tys, ∑ x : V idxty.2, f (<[idxty.1 := mk_Vval x]> m').
-Proof.
-  destruct idxty as [idx ty].
-  (* rewrite sum_of_comm. *)
-  cbn.
-  unfold_sum_of.
-  rewrite list_map_fmap.
-  cbn.
-  rewrite list_bind_fmap.
-  setoid_rewrite <- list_fmap_compose.
-  unfold compose.
-  rewrite <- Rlist_sum_bind.
-  reflexivity.
-Qed.
-
-
-Lemma sum_of_Vmap_cons idx ty tys f :
-  ∑ m : Vmap ((idx, ty) :: tys), f m ==
-  ∑ m' : Vmap tys, ∑ x : V ty, f (<[idx := mk_Vval x]> m').
-Proof.
-  apply sum_of_Vmap_cons_gen.
-Qed.
-
-
-
-
-(* Phantom typing for summing over 'typed' lists *)
-Definition Vlist (tys : list Ty) : Type :=
-  list Vval.
-
-
-Definition WF_Vlist {tys} (m : Vlist tys) : Prop :=
-  Forall2 (λ t d, projT1 d = t /\ projT2 d ∈ sum_elements) tys m.
-
-Fixpoint Vlist_elements tys : list (Vlist tys) :=
-  match tys with
-  | [] => [[]]
-  | ty :: tys =>
-    m ← Vlist_elements tys;
-    (λ x, mk_Vval x :: m) <$> @sum_elements (V ty) _
-  end.
-
-Instance Vlist_summable tys : Summable (Vlist tys) :=
-  sum_over (Vlist_elements tys).
-
-Lemma elem_of_Vlist_elements
-  tys m :
-  m ∈ Vlist_elements tys <->
-  WF_Vlist m.
-Proof.
-  unfold WF_Vlist.
-  revert m; induction tys as [|ty tys IHtys]; intros m.
-  - cbn.
-    rewrite elem_of_list_singleton.
-    split; [now intros ->|].
-    apply Forall2_nil_inv_l.
-  - cbn.
-    rewrite elem_of_list_bind.
-    setoid_rewrite elem_of_list_fmap.
-    setoid_rewrite IHtys.
-    split; [naive_solver|].
-    intros ((?,?)&?&?&?&?)%Forall2_cons_inv_l.
-    clear IHtys.
-    naive_solver.
-Qed.
-(*
-Lemma Vlist_elements _perm tys tys' :
-  tys ≡ₚ tys' ->
-  SetoidPermutation.PermutationA Permutation
-    (Vlist_elements tys) (Vlist_elements tys'). *)
-
-Lemma sum_of_Vlist_cons ty tys f :
-  ∑ m : Vlist (ty :: tys), f m ==
-  ∑ x : V ty, ∑ m' : Vlist tys, f (mk_Vval x :: m').
-Proof.
-  cbn.
-  unfold_sum_of.
-  rewrite list_map_fmap.
-  cbn.
-  rewrite <- Rlist_sum_bind.
-  apply Rlist_sum_perm.
-  rewrite list_bind_fmap.
-  setoid_rewrite <- list_fmap_compose.
-  unfold compose.
-  cbn.
-  setoid_rewrite <- (list_bind_singleton_r sum_elements).
-  setoid_rewrite <- list_bind_singleton_r.
-  now rewrite list_bind_comm.
-Qed.
-
-
-Lemma sum_of_Vlist_nil f :
-  ∑ m : Vlist [], f m == f [].
-Proof.
-  unfold_sum_of; cbn.
-  ring.
-Qed.
-
-Lemma sum_of_Vlist_app tys tys' f :
-  ∑ m : Vlist (tys ++ tys'), f m ==
-  ∑ m : Vlist tys, ∑ m' : Vlist tys', f (m ++ m').
-Proof.
-  induction tys; [now rewrite sum_of_Vlist_nil|].
-  cbn.
-  rewrite 2 sum_of_Vlist_cons.
-  setoid_rewrite IHtys.
-  reflexivity.
-Qed.
-
-Lemma sum_of_Vlist_singleton ty f :
-  ∑ m : Vlist [ty], f m == ∑ x : V ty, f [mk_Vval x].
-Proof.
-  rewrite sum_of_Vlist_cons.
-  apply sum_of_ext; intros x.
-  apply sum_of_Vlist_nil.
-Qed.
-
-Lemma sum_of_Vlist_reverse tys f :
-  ∑ m : Vlist (reverse tys), f m ==
-  ∑ m : Vlist tys, f (reverse m).
-Proof.
-  induction tys; [now rewrite 2 sum_of_Vlist_nil|].
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_rev, vec_to_list_cast, vec_to_list_app,
+    vec_to_list_rev.
+  cbn -[reverse].
   rewrite reverse_cons.
-  rewrite sum_of_Vlist_cons, sum_of_Vlist_app.
-  setoid_rewrite sum_of_Vlist_singleton.
-  setoid_rewrite reverse_cons.
-  rewrite sum_of_comm.
-  now setoid_rewrite IHtys.
+  reflexivity.
 Qed.
+Lemma sum_of_vec_rev {n} (f : vec A n -> R) :
+  ∑ v : _, f v == ∑ v : _, f (Vector.rev v).
+Proof.
+  induction n.
+  - now rewrite 2 sum_of_vec_0, Vector.rev_nil.
+  - erewrite (sum_of_vec_cast f (Nat.add_comm n 1)).
+    rewrite sum_of_vec_add.
+    rewrite sum_of_comm.
+    rewrite sum_of_vec_1, sum_of_vec_succ.
+    f_equiv; intros a.
+    rewrite IHn.
+    f_equiv; intros v.
+    now rewrite vec_rev_cons_alt.
+Qed.
+
+
 
 (* TODO:
   (1) Add lemma about relabeling sum_of
@@ -1610,198 +1389,286 @@ Qed.
   (3) Put these together to prove the result connecting to tl_total_semantics_alt *)
 
 
-Lemma tl_total_semantics_aux_alt_Vlist mabs mg ml mr sums abs :
-  tl_total_semantics_aux mabs mg ml mr sums abs ==
-  ∑ m : Vlist sums, tl_total_semantics_aux mabs mg ml (rev_append m mr) [] abs.
+Lemma tl_total_semantics_aux_alt_vec mabs ml mr sums abs delt :
+  tl_total_semantics_aux mabs ml mr sums abs delt ==
+  ∑ m : vec A sums,
+    tl_total_semantics_aux mabs ml (rev_append m mr) O abs delt.
 Proof.
   revert mr; induction sums; intros mr.
-  - rewrite sum_of_Vlist_nil; reflexivity.
+  - rewrite sum_of_vec_0; reflexivity.
   - cbn.
     setoid_rewrite IHsums.
-    rewrite sum_of_Vlist_cons.
+    rewrite sum_of_vec_succ.
     reflexivity.
 Qed.
 
-Lemma tl_total_semantics_alt_Vlist mabs mg ml tl :
-  tl_total_semantics mabs mg ml tl ==
-  ∑ m : Vlist (reverse tl.(tl_sums)),
-    tl_total_semantics_aux mabs mg ml m [] tl.(tl_abstracts).
+Lemma tl_total_semantics_alt_vec mabs ml tl :
+  tl_total_semantics mabs ml tl ==
+  ∑ m : vec A tl.(tl_sums),
+    tl_total_semantics_aux mabs ml m O tl.(tl_abstracts) tl.(tl_deltas).
 Proof.
-  unfold tl_total_semantics.
-  rewrite tl_total_semantics_aux_alt_Vlist.
-  rewrite sum_of_Vlist_reverse.
-  reflexivity.
-Qed.
-
-(* FIXME: Move to Summable.v *)
-Lemma sum_of_relabel `{Summable A, Summable B} (f : A -> B) (g : B -> R) :
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ b : B, g b == ∑ a : A, g (f a).
-Proof.
-  unfold_sum_of.
-  intros Hperm.
-  apply Rlist_sum_perm.
-  rewrite <- Hperm, list_map_fmap, <- list_fmap_compose.
-  reflexivity.
+  rewrite tl_total_semantics_aux_alt_vec.
+  rewrite sum_of_vec_rev.
+  f_equiv; intros mr.
+  now rewrite vec_to_list_rev, rev_append_reverse, reverse_involutive, app_nil_r.
 Qed.
 
 
-Lemma list_to_map_Vlist_elements_gen f tys :
-  (λ mr, list_to_map (imap (fun i v => (f i, v)) mr)) <$>
-    Vlist_elements tys =
-  Vmap_elements (imap (fun i ty => (f i, ty)) tys).
-Proof.
-  revert f;
-  induction tys; intros f; [reflexivity|].
-  cbn.
-  unfold compose.
-  rewrite <- IHtys.
-  unfold Vlist, Vmap.
-  rewrite list_bind_fmap, list_fmap_bind.
-  setoid_rewrite <- list_fmap_compose.
-  reflexivity.
-Qed.
 
 
-Lemma list_to_map_Vlist_elements tys :
-  (λ mr, list_to_map (imap (fun i v => (Pos.of_succ_nat i, v)) mr)) <$>
-    Vlist_elements tys =
-  Vmap_elements (imap (fun i ty => (Pos.of_succ_nat i, ty)) tys).
-Proof.
-  apply list_to_map_Vlist_elements_gen.
-Qed.
-
-
-Lemma list_to_map_Vlist_sum_elements tys :
-  (λ mr, list_to_map (imap (fun i v => (Pos.of_succ_nat i, v)) mr)) <$>
-    (sum_elements :> list (Vlist tys)) =
-  (sum_elements :> list (Vmap (imap (fun i ty => (Pos.of_succ_nat i, ty)) tys))).
-Proof.
-  apply list_to_map_Vlist_elements_gen.
-Qed.
-
-
-Definition get_var_alt (mg ml mr : varcontext) (v : var) : option Vval :=
+Definition get_var_alt (ml mr : varcontext) (v : var) : option A :=
   match v with
-  | rel r => mr !! r
-  | loc l => ml !! l
-  | glob g => mg !! g
+  | bound r => mr !! r
+  | free l => ml !! l
   end.
 
-Definition abstract_semantics_alt (mabs : abscontext) mg ml mr
+Definition abstract_semantics_alt (mabs : abscontext) ml mr
   (absidx : Idx) (lower : list var) (upper : list var) : R :=
-  default rO (args ← join_list ((get_var_alt mg ml mr) <$> (lower ++ upper));
+  default rO (largs ← join_list ((get_var_alt ml mr) <$> lower);
+      uargs ← join_list ((get_var_alt ml mr) <$> upper);
       fval ← mabs !! absidx;
-      Vapplys fval args).
+      Some (Vapplys fval largs uargs)).
+
+Notation abstract_semantics_alt' mabs ml mr abs :=
+  (abstract_semantics_alt mabs ml mr abs.1.1 abs.1.2 abs.2).
+
+Definition delta_semantics_alt ml mr (l u : var) : R :=
+  default rO (la ← (get_var_alt ml mr l);
+      ua ← (get_var_alt ml mr u);
+      Some (delta_tensor (n:=1) [#la] [#ua])).
+
+Notation delta_semantics_alt' ml mr delt :=
+  (delta_semantics_alt ml mr delt.1 delt.2).
 
 
-Definition tl_total_semantics_alt_aux mabs mg ml
-  (tys : list (Idx * Ty)) abs : R :=
+Definition Vmap (tys : list Idx) : Type :=
+  Pmap A.
+
+Definition WF_Vmap {tys} (m : Vmap tys) : Prop :=
+  dom m =@{Pset} list_to_set tys /\
+  map_Forall (fun _ v => v ∈ sum_elements) m.
+
+Fixpoint Vmap_elements tys : list (Vmap tys) :=
+  match tys with
+  | [] => [∅]
+  | idx :: tys =>
+    m ← Vmap_elements tys;
+    (λ v, <[idx := v]> m) <$> sum_elements
+  end.
+
+Instance Vmap_summable tys : Summable (Vmap tys) :=
+  sum_over (Vmap_elements tys).
+
+
+Lemma elem_of_Vmap_elements_1 tys m :
+  m ∈ Vmap_elements tys ->
+  WF_Vmap m.
+Proof.
+  unfold WF_Vmap, Vmap.
+  revert m; induction tys as [|idx tys IHtys]; intros m;
+  [cbn; rewrite elem_of_list_singleton; intros ->;
+    unfold Vmap; split; [apply dom_empty_L|apply map_Forall_empty]|].
+  cbn -[list_to_set].
+  rewrite list_to_set_cons.
+  unfold Vmap.
+  intros (m' & (x & -> & Hx)%elem_of_list_fmap
+    & Hm'%IHtys)%elem_of_list_bind.
+  split; [now rewrite dom_insert_L, Hm'.1|].
+  now apply map_Forall_insert_2.
+Qed.
+
+Lemma elem_of_Vmap_elements tys m :
+  NoDup tys ->
+  m ∈ Vmap_elements tys <->
+  WF_Vmap m.
+Proof.
+  intros Hnd.
+  split; [apply elem_of_Vmap_elements_1|].
+  revert Hnd m; induction tys as [|idx tys IHtys]; intros Hnd m;
+  [unfold WF_Vmap; cbn; intros [Hdom _];
+    unfold Vmap in *;
+    rewrite elem_of_list_singleton; eapply (dom_empty_iff_L _).1; exact Hdom|].
+
+  cbn.
+  unfold Vmap.
+  apply NoDup_cons in Hnd as [Hidx Htys].
+  rewrite elem_of_list_bind.
+  setoid_rewrite elem_of_list_fmap.
+  tspecialize IHtys by easy.
+  intros [Hdomm Helems].
+  exists (delete idx m).
+  split.
+  - assert (Hidxm : idx ∈ dom m) by now rewrite Hdomm; set_solver +.
+    unfold Vmap in *.
+    apply elem_of_dom in Hidxm as (ty & Hty).
+    exists ty.
+    rewrite insert_delete by easy.
+    split; [easy|].
+    now apply (Helems idx ty).
+  - apply IHtys.
+    split;
+    unfold Vmap in *; [|now apply map_Forall_delete].
+    rewrite dom_delete_L, Hdomm.
+    set_solver + Hidx.
+Qed.
+
+
+Lemma Vmap_elements_perm tys tys' :
+  tys ≡ₚ tys' ->
+  Vmap_elements tys ≡ₚ Vmap_elements tys'.
+Proof.
+  intros Hperm.
+  induction Hperm; [reflexivity| | |].
+  - cbn in *.
+    now rewrite IHHperm.
+  - cbn. 
+    rewrite 2 list_bind_assoc.
+    unfold compose.
+    setoid_rewrite list_fmap_bind; unfold compose.
+    apply bind_pointwise_Permutation_strong; [|easy].
+    intros m _.
+    setoid_rewrite list_fmap_to_bind.
+    destruct_decide (decide (x = y)).
+    + subst.
+      reflexivity.
+    + rewrite list_bind_comm.
+      rewrite 2 list_bind_to_cprod.
+      apply eq_reflexivity, list_bind_mor; [|reflexivity].
+      intros (?,?).
+      cbn.
+      unfold Vmap in *.
+      now rewrite insert_commute.
+  - etransitivity; [apply IHHperm1|]; eauto.
+Qed.
+
+
+Lemma sum_of_Vmap_perm tys tys' f : tys ≡ₚ tys' ->
+  ∑ m : Vmap tys, f m == ∑ m : Vmap tys', f m.
+Proof.
+  intros Hperm.
+  unfold_sum_of.
+  unfold sum_elements; cbn.
+  rewrite list_map_fmap.
+  apply Rlist_sum_perm.
+  now rewrite (Vmap_elements_perm tys tys').
+Qed.
+
+
+Definition tl_total_semantics_alt_aux mabs ml
+  (tys : list Idx) abs delt : R :=
   ∑ mr : Vmap tys,
   Rlist_prod ((λ '(f, low, up),
-    abstract_semantics_alt mabs mg ml mr f low up) <$> abs).
+    abstract_semantics_alt mabs ml mr f low up) <$> abs) *
+  Rlist_prod ((λ '(l, u), delta_semantics_alt ml mr l u) <$> delt).
 
-
-Lemma tl_total_semantics_alt_aux_correct mabs mg ml sums abs :
-  tl_total_semantics_aux mabs mg ml [] sums abs ==
-  tl_total_semantics_alt_aux mabs mg ml
-    (* (list_to_map (imap (λ i v, (pos_add_N (Pos.of_succ_nat i) (lengthN sums), v)) (reverse mr))) *)
-    (imap (λ i v, (Pos.of_succ_nat i, v)) (reverse sums))
-    abs.
+Lemma tl_total_semantics_alt_aux_unfold mabs ml tys abs delt :
+  tl_total_semantics_alt_aux mabs ml tys abs delt =
+  ∑ mr : Vmap tys,
+  Rlist_prod ((λ flu,
+    abstract_semantics_alt' mabs ml mr flu) <$> abs) *
+  Rlist_prod ((λ lu, delta_semantics_alt' ml mr lu) <$> delt).
 Proof.
-  rewrite tl_total_semantics_aux_alt_Vlist.
+  apply sum_of_ext_eq.
+  intros m.
+  f_equiv; f_equal; (apply list_fmap_mor; [|reflexivity]);
+  [intros [[]]|intros []]; reflexivity.
+Qed.
+
+Lemma flat_map_to_list_bind `(f : A -> list B) (l : list A) :
+  flat_map f l = l ≫= f.
+Proof.
+  now rewrite list_bind_flat_map.
+Qed.
+
+Lemma list_to_map_vec_elements_gen f sums :
+  (λ mr : vec A sums,
+    list_to_map (imap (fun i v => (f (Pos.of_succ_nat i), v)) mr)) <$>
+    @vec_elements A sum_elements sums ≡ₚ
+  Vmap_elements (f <$> pseq 1 sums).
+Proof.
+  revert f;
+  induction sums; intros f; [reflexivity|].
+  rewrite Nat2N.inj_succ.
+  rewrite pseq_succ.
+  cbn.
+  rewrite pseq_succ_start.
+  rewrite <- list_fmap_compose.
+  rewrite flat_map_to_list_bind.
+  rewrite <- IHsums.
+  rewrite list_fmap_bind.
+  unfold compose.
+  rewrite list_bind_fmap.
+  symmetry.
+
+  erewrite (bind_pointwise_Permutation_strong _
+    (λ a, sum_elements ≫= (λ x, [<[f xH := x]> (list_to_map
+            (imap (λ i v, (f (Pos.succ (Pos.of_succ_nat i)), v))
+            (vec_to_list a)))]))) by
+    first [exact (Permutation_refl _)|
+    intros; rewrite list_fmap_to_bind; reflexivity].
+  rewrite list_bind_comm.
+  apply eq_reflexivity.
+  f_equiv; intros a.
+  rewrite list_map_fmap.
+  rewrite (list_fmap_to_bind (vcons a)).
+  rewrite list_bind_fmap.
+  reflexivity.
+Qed.
+
+Lemma vec_to_map_vec_sum_elements sums :
+  (vec_to_map) <$>
+    (sum_elements :> list (vec A sums)) ≡ₚ
+  (sum_elements :> list (Vmap (pseq 1 sums))).
+Proof.
+  pose proof (list_to_map_vec_elements_gen id sums) as Heq.
+  rewrite list_fmap_id in Heq.
+  apply Heq.
+Qed.
+
+(* FIXME: Move *)
+Import SetoidList SetoidPermutation list.
+
+Lemma tl_total_semantics_alt_aux_correct mabs ml sums abs delt :
+  tl_total_semantics_aux mabs ml [] sums abs delt ==
+  tl_total_semantics_alt_aux mabs ml
+    (* (list_to_map (imap (λ i v, (pos_add_N (Pos.of_succ_nat i) (lengthN sums), v)) (reverse mr))) *)
+    (pseq 1 sums)
+    abs delt.
+Proof.
+  rewrite tl_total_semantics_aux_alt_vec.
   change (rev_append ?x []) with (reverse x).
   unfold tl_total_semantics_alt_aux.
 
-  rewrite (sum_of_relabel _ _ (eq_reflexivity _ _
-    (list_to_map_Vlist_sum_elements (reverse sums)))).
-  (* change (list Vval) with (Vlist (reverse sums)). *)
-  rewrite sum_of_Vlist_reverse.
-  apply sum_of_ext; intros m.
+  rewrite (sum_of_relabel _ _ (vec_to_map_vec_sum_elements sums)).
+  rewrite sum_of_vec_rev.
+  apply sum_of_ext; intros v.
+  rewrite vec_to_list_rev, reverse_involutive.
   cbn.
-  apply Rlist_prod_perm_mor, SetoidPermutation.Permutation_PermutationA; [easy|].
-  apply eq_reflexivity.
-  apply list_fmap_ext; intros _ [[f low] up] _.
-  unfold abstract_semantics, abstract_semantics_alt.
-  f_equiv.
-  f_equal.
-  f_equal.
-  apply list_fmap_ext; intros _ v _.
-  destruct v; [|reflexivity..].
-  cbn.
-  generalize (reverse m); clear m; intros m.
-  symmetry.
-  unfold Vmap, Vlist.
-  destruct (m !! (p :> nat)) as [mp|] eqn:Hmp.
-  - apply elem_of_list_to_map.
-    + rewrite fmap_imap.
-      unfold compose; cbn.
-      rewrite imap_seq_0.
-      apply NoDup_fmap_2; [apply _|].
-      apply NoDup_seq.
-    + rewrite elem_of_lookup_imap.
-      exists p, mp.
-      split; [|easy].
-      f_equal; lia.
-  - apply not_elem_of_list_to_map.
-    rewrite fmap_imap.
-    unfold compose; cbn.
-    apply lookup_ge_None_1 in Hmp.
-    rewrite imap_seq_0.
-    rewrite elem_of_list_fmap.
-    intros (np & ? & ?%elem_of_seq).
-    lia.
-Qed.
-
-(* FIXME: Move to Summable, or algebra *)
-Lemma Rlist_sum_ext (rs rs' : list R) :
-  Forall2 req rs rs' -> Rlist_sum rs == Rlist_sum rs'.
-Proof.
-  intros ?%SetoidList.eqlistA_altdef%SetoidPermutation.eqlistA_PermutationA.
-  now apply Rlist_sum_perm_mor.
-Qed.
-Lemma Rlist_prod_ext (rs rs' : list R) :
-  Forall2 req rs rs' -> Rlist_prod rs == Rlist_prod rs'.
-Proof.
-  intros ?%SetoidList.eqlistA_altdef%SetoidPermutation.eqlistA_PermutationA.
-  now apply Rlist_prod_perm_mor.
+  f_equiv;
+  apply Rlist_prod_perm_mor, eqlistA_PermutationA, eqlistA_altdef,
+    Forall2_fmap, Forall_Forall2_diag;
+  rewrite Forall_forall;
+  [intros [[f low] up] _|intros [l u] _].
+  - unfold abstract_semantics, abstract_semantics_alt.
+    f_equiv.
+    apply option_bind_ext; [intros largs;
+      apply option_bind_ext; [reflexivity|]|];
+    f_equal; apply list_fmap_ext; (intros _ [r|] _; [|reflexivity]); cbn;
+    symmetry;
+    apply lookup_vec_to_map_to_list'.
+  - unfold delta_semantics, delta_semantics_alt.
+    f_equiv.
+    apply option_bind_ext; [intros largs;
+      apply option_bind_ext; [reflexivity|]|];
+    f_equal.
+    + destruct u as [r|]; [|reflexivity].
+      cbn; symmetry; apply lookup_vec_to_map_to_list'.
+    + destruct l as [r|]; [|reflexivity].
+      cbn; symmetry; apply lookup_vec_to_map_to_list'.
 Qed.
 
 
-Lemma sum_of_ext' `{Summable A} (f g : A -> R) :
-  (forall a, a ∈ sum_elements -> f a == g a) ->
-  sum_of f == sum_of g.
-Proof.
-  intros Hfg.
-  unfold_sum_of.
-  apply Rlist_sum_ext.
-  rewrite Forall2_fmap_l, Forall2_fmap_r, (unfold @compose).
-  apply Forall_Forall2_diag.
-  now apply Forall_forall.
-Qed.
 
-Lemma sum_of_relabel'_l2r `{Summable A, Summable B}
-  (f : A -> B) (g : A -> R) (h : B -> R) :
-  (forall a, a ∈ sum_elements -> g a == h (f a)) ->
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ a : A, g a == ∑ b : B, h b.
-Proof.
-  intros Hfh Hf.
-  rewrite (sum_of_relabel f h) by assumption.
-  now apply sum_of_ext'.
-Qed.
-
-
-Lemma sum_of_relabel'_r2l `{Summable A, Summable B}
-  (f : B -> A) (g : A -> R) (h : B -> R) :
-  (forall b, b ∈ sum_elements -> g (f b) == h b) ->
-  f <$> sum_elements ≡ₚ sum_elements ->
-  ∑ a : A, g a == ∑ b : B, h b.
-Proof.
-  intros Hfh Hf.
-  rewrite (sum_of_relabel f g) by assumption.
-  now apply sum_of_ext'.
-Qed.
 
 
 Lemma list_inj_exists_partial_inverse `{EqDecision A, EqDecision B,
@@ -1828,174 +1695,89 @@ Proof.
 Qed.
 
 
-Lemma abstract_semantics_alt_ext mabs mg ml mr mabs' mg' ml' mr'
+Lemma abstract_semantics_alt_ext mabs ml mr mabs' ml' mr'
   idx lower upper idx' lower' upper' :
   mabs !! idx = mabs' !! idx' ->
-  (get_var_alt mg ml mr) <$> (lower ++ upper) =
-    (get_var_alt mg' ml' mr') <$> (lower' ++ upper') ->
-  abstract_semantics_alt mabs mg ml mr idx lower upper =
-  abstract_semantics_alt mabs' mg' ml' mr' idx' lower' upper'.
+  (get_var_alt ml mr) <$> lower = (get_var_alt ml' mr') <$> lower' ->
+  (get_var_alt ml mr) <$> upper = (get_var_alt ml' mr') <$> upper' ->
+  abstract_semantics_alt mabs ml mr idx lower upper =
+  abstract_semantics_alt mabs' ml' mr' idx' lower' upper'.
 Proof.
-  intros Hidx Hargs.
+  intros Hidx Hl Hu.
   unfold abstract_semantics_alt.
-  now rewrite Hidx, Hargs.
+  now rewrite Hidx, Hl, Hu.
+Qed.
+
+Lemma delta_semantics_alt_ext ml mr ml' mr'
+  l u l' u' :
+  (get_var_alt ml mr) l = (get_var_alt ml' mr') l' ->
+  (get_var_alt ml mr) u = (get_var_alt ml' mr') u' ->
+  delta_semantics_alt ml mr l u =
+  delta_semantics_alt ml' mr' l' u'.
+Proof.
+  intros Hl Hu.
+  unfold delta_semantics_alt.
+  now rewrite Hl, Hu.
+Qed.
+
+Lemma kmap_Vmap_elements (f : positive -> positive) {Hf : Inj eq eq f}
+  (sums : list Idx) :
+  kmap (M2:=Pmap) f <$> Vmap_elements sums =
+  Vmap_elements (f <$> sums).
+Proof.
+  induction sums; [reflexivity|].
+  cbn.
+  rewrite list_bind_fmap.
+  rewrite <- IHsums.
+  rewrite list_fmap_bind.
+  apply list_bind_mor; [|reflexivity].
+  intros m.
+  cbn.
+  rewrite <- list_fmap_compose.
+  unfold compose.
+  apply list_fmap_ext.
+  intros _ b _.
+  unfold Vmap in *.
+  now rewrite (kmap_insert _).
 Qed.
 
 
-
-
-Lemma tl_total_semantics_alt_aux_relabel mabs mg ml mr (f : Idx -> Idx)
-  {Hf : Inj eq eq f} abs :
-  tl_total_semantics_alt_aux mabs mg ml mr abs ==
-  tl_total_semantics_alt_aux mabs mg ml (prod_map f id <$> mr)
-    (relabel_abs (relabel_rels f) <$> abs).
+Lemma tl_total_semantics_alt_aux_relabel mabs ml mr (f : Idx -> Idx)
+  {Hf : Inj eq eq f} abs delt :
+  tl_total_semantics_alt_aux mabs ml mr abs delt ==
+  tl_total_semantics_alt_aux mabs ml (f <$> mr)
+    (relabel_abs (relabel_bounds f) <$> abs)
+    (relabel_delt (relabel_bounds f) <$> delt).
 Proof.
   unfold tl_total_semantics_alt_aux.
-  unshelve (eapply sum_of_relabel'_l2r); [exact (kmap f)| |].
-  - intros a Ha%elem_of_Vmap_elements_1.
-    apply Rlist_prod_ext.
+  unshelve (eapply sum_of_relabel'_l2r); [exact (kmap f)| |
+  unfold sum_elements; cbn; now rewrite ?kmap_Vmap_elements].
+  intros m Hm%elem_of_Vmap_elements_1.
+  f_equiv.
+  - apply Rlist_prod_ext.
     rewrite Forall2_fmap_l, 2 Forall2_fmap_r, (unfold @compose).
     apply Forall_Forall2_diag.
     apply Forall_forall.
     intros ((fidx, low), up) _.
     cbn.
-    apply eq_reflexivity, abstract_semantics_alt_ext; [reflexivity|].
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext; intros _ v _.
-    destruct v as [r| |]; [|reflexivity..].
+    apply eq_reflexivity, abstract_semantics_alt_ext; [reflexivity|..];
+    rewrite <- list_fmap_compose;
+    apply list_fmap_ext; (intros _ [r|] _; [|reflexivity]);
+    cbn;
+    now rewrite (lookup_kmap _).
+  - apply Rlist_prod_ext.
+    rewrite Forall2_fmap_l, 2 Forall2_fmap_r, (unfold @compose).
+    apply Forall_Forall2_diag.
+    apply Forall_forall.
+    intros (l, u) _.
     cbn.
-    symmetry.
-    pose proof (map_is_typed_domL _ _ _ Ha.1) as Hdom.
-    fold Vval in Hdom.
-    now rewrite lookup_kmap.
-  - unfold sum_elements, Vmap_summable.
-    clear - Hf.
-    apply eq_reflexivity.
-    induction mr as [|[idx ty] mr IHmr]; [reflexivity|].
-    cbn.
-    rewrite list_bind_fmap.
-    rewrite <- IHmr.
-    rewrite list_fmap_bind.
-    apply list_bind_ext; [|reflexivity].
-    cbn.
-    intros m.
-    rewrite <- list_fmap_compose, (unfold @compose).
-    apply list_fmap_ext; intros _ x _.
-    cbn.
-    unfold Vmap.
-    now apply kmap_insert.
+    apply eq_reflexivity, delta_semantics_alt_ext;
+    [destruct l as [r|]|destruct u as [r|]]; try reflexivity;
+    cbn;
+    now rewrite (lookup_kmap _).
 Qed.
-(*
-Lemma ppermute_posperm_permutes_Vlist_elements_aux ps rhs (shift : nat) :
-  ps ≡ₚ rhs -> forall tys : list Ty,
-  rhs = Pos.of_succ_nat <$> seq shift (length tys)
-  → ppermute (λ p : Idx, perm_posperm ((λ p, pos_sub_N p shift) <$> ps) p) <$>
-    Vlist_elements tys
-    ≡ₚ Vlist_elements
-         (ppermute (λ p : Idx, perm_posperm
-          ((λ p, pos_sub_N p shift) <$> ps) p) tys).
-Proof.
-  intros Hps.
-  revert shift.
-  induction Hps; intros shift.
-  - intros []; [|easy].
-    cbn.
-    reflexivity.
-  - intros [|ty tys]; [easy|].
-    cbn [length seq fmap list_fmap Pos.of_succ_nat].
-    intros [= -> Hl'].
-    cbn.
-    replace (pos_sub_N _ _) with 1%positive by lia.
-    rewrite ppermute_perm_posperm_cons_1;
-      [|now rewrite Hps, Hl', 2 length_fmap, ?length_seq|].
-    2: {
-      rewrite Hps, Hl'.
-      rewrite <- list_fmap_compose.
-      rewrite elem_of_list_fmap.
-      intros (n & Hn & ?%elem_of_seq); cbn in *; lia.
-    }
-    rewrite list_bind_fmap.
-    erewrite list_bind_ext_strong. 2: {
-      intros mr Hmr%elem_of_Vlist_elements.
-      rewrite <- list_fmap_compose.
-      apply list_fmap_ext.
-      intros _ x _.
-      cbn.
-      rewrite ppermute_perm_posperm_cons_1.
-      - reflexivity.
-      - apply Forall2_length in Hmr.
-        now rewrite length_fmap, Hps, Hl', length_fmap, length_seq.
-      - rewrite Hps, Hl'.
-        rewrite <- list_fmap_compose.
-        rewrite elem_of_list_fmap.
-        intros (n & Hn & ?%elem_of_seq); cbn in *; lia.
-    }
-    cbn.
-    replace (perm_posperm (Pos.pred <$> ((λ p0 : Idx, pos_sub_N p0 shift) <$> l)))
-      with (perm_posperm ((λ p, pos_sub_N p (S shift)) <$> l)). 2:{
-      f_equal.
-      rewrite <- list_fmap_compose.
-      apply list_fmap_ext; intros _ ? _; cbn.
-      lia.
-    }
-    setoid_rewrite <- IHHps; [|easy].
-    rewrite list_fmap_bind.
-    reflexivity.
-  - intros [|tyx [|tyy tys]]; [easy..|].
-    cbn [length seq fmap list_fmap].
-    intros [= -> -> Hl].
-    cbn.
-    subst l.
-    rewrite <- list_fmap_compose.
-    (* set (lst := pos_sub_N _ _ :: _). *)
-    replace (pos_sub_N _ _ :: _) with
-      (2%positive :: 1%positive :: pseq 3 (lengthN tys))%positive. 2:{
-      f_equal; [lia|].
-      f_equal; [lia|].
-      rewrite pseq_to_seq.
-      replace (pos_to_nat_pred 3) with (2 + 0)%nat by reflexivity.
-      rewrite <- fmap_add_seq, <- list_fmap_compose.
-      rewrite lengthN_correct.
-      replace (S (S shift)) with (S (S shift) + 0)%nat by lia.
-      rewrite <- fmap_add_seq, <- list_fmap_compose.
-      apply list_fmap_ext; intros _ ? _.
-      cbn.
-      lia.
-    }
-    rewrite ppermute_perm_posperm_2_1_pseq.
-    cbn.
-    rewrite 2 list_bind_assoc.
-    rewrite list_bind_fmap.
-    apply bind_pointwise_Permutation_strong; [|reflexivity].
-    intros mr Hmr%elem_of_Vlist_elements.
-    cbn.
-    gen_sum_elem lx.
-    gen_sum_elem ly.
-    revert ly; induction lx; intros ly.
-    + cbn.
-      rewrite list_bind_nil_r.
-      reflexivity.
-    + cbn.
-      rewrite list_bind_cons_r, fmap_app.
-      rewrite IHlx.
-      f_equiv.
-      rewrite <- 2 list_fmap_compose.
-      apply eq_reflexivity.
-      apply list_fmap_ext; intros _ y _.
-      cbn.
-      apply Forall2_length in Hmr as Hlen.
-      apply (f_equal N.of_nat) in Hlen.
-      rewrite <- 2 lengthN_correct_rev in Hlen.
-      rewrite Hlen.
-      now rewrite ppermute_perm_posperm_2_1_pseq.
-  - intros tys Hl''.
-    rewrite IHHps1.
 
-
-    rewrite list_bind_fmap, list_fmap_bind.
-    apply eq_reflexivity, list_fmap_ext.
-    intros _ x _. *)
-
+(* 
 Lemma Vlist_elements_app tys tys' :
   Vlist_elements (tys ++ tys') ≡ₚ
   Vlist_elements tys ≫= λ l,
@@ -2041,16 +1823,11 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma list_fmap_to_bind {A B} (f : A -> B) (l : list A) :
-  f <$> l = x ← l; [f x].
-Proof.
-  now rewrite <- list_bind_singleton_r.
-Qed.
 
 Lemma Vlist_elements_cons_alt ty tys :
   Vlist_elements (ty :: tys) ≡ₚ
   x ← (sum_elements :> list (V ty));
-  (mk_Vval x ::.) <$> Vlist_elements tys.
+  (mk_A x ::.) <$> Vlist_elements tys.
 Proof.
   change (ty :: tys) with ([ty] ++ tys).
   rewrite Vlist_elements_app.
@@ -2070,7 +1847,7 @@ Lemma Vlist_elements_two_inserts tys ty tys' ty' tys'' :
   l ← Vlist_elements tys;
   l' ← Vlist_elements tys';
   l'' ← Vlist_elements tys'';
-  [l ++ mk_Vval x :: l' ++ mk_Vval x' :: l''].
+  [l ++ mk_A x :: l' ++ mk_A x' :: l''].
 Proof.
   rewrite Vlist_elements_app_alt.
   rewrite Vlist_elements_cons_alt, list_bind_assoc.
@@ -2096,24 +1873,6 @@ Proof.
   now rewrite list_bind_singleton_r.
 Qed.
 
-Lemma list_bind_cprod {A B C} (f : A * B -> list C) l k :
-  cprod l k ≫= f = l ≫= λ x, k ≫= λ y, f (x, y).
-Proof.
-  unfold list_cprod, cprod.
-  rewrite list_bind_assoc.
-  apply list_bind_ext; [|reflexivity].
-  intros a.
-  cbn.
-  rewrite list_fmap_bind.
-  reflexivity.
-Qed.
-
-Lemma list_bind_to_cprod {A B C} (f : A -> B -> list C) l k :
-  (l ≫= λ x, k ≫= λ y, f x y) =
-  cprod l k ≫= uncurry f.
-Proof.
-  rewrite list_bind_cprod; reflexivity.
-Qed.
 
 
 
@@ -2157,7 +1916,7 @@ Proof.
   apply bind_pointwise_Permutation_strong; [|reflexivity].
   intros v3 Hv3%elem_of_Vlist_elements%Forall2_length.
   rewrite fmap_cons, fmap_nil.
-  fold Vval in *.
+  fold A in *.
   rewrite ppermute_posperm_swap_swaps by (rewrite ?lengthN_correct_rev; lia).
   solve_Permutation.
 Qed.
@@ -2180,7 +1939,7 @@ Proof.
     apply list_fmap_ext; intros _ x
       Hx%elem_of_list_lookup_2%elem_of_Vlist_elements%Forall2_length.
     symmetry; apply ppermute_ext.
-    fold Vval in *.
+    fold A in *.
     rewrite lengthN_correct_rev, <- Hx, <- lengthN_correct_rev.
     apply Hfg.
   - intros tys ->.
@@ -2199,20 +1958,61 @@ Proof.
     apply eq_reflexivity.
     apply list_fmap_ext;
     intros _ vs Hvs%elem_of_list_lookup_2%elem_of_Vlist_elements%Forall2_length.
-    fold Vval in *.
+    fold A in *.
     rewrite <- ppermute_compose by
       (apply posperm_bounded; rewrite ?lengthN_correct_rev in *; congruence).
     reflexivity.
+Qed. *)
+
+
+Lemma make_pwf_inj n f :
+  posperm n f ->
+  Inj (=) (=) (make_pwf n f).
+Proof.
+  intros Hf.
+  specialize (posperm_inj _ _ Hf) as Hfinj.
+  specialize (posperm_bounded _ _ Hf) as Hfbdd.
+  intros p q.
+  specialize (Hfinj p q).
+  generalize (Hfbdd p) (Hfbdd q).
+  cbn.
+  do 2 case_decide; lia.
 Qed.
 
 
-
-Lemma tl_aeq_correct mabs mg ml tl tl' :
+(* 
+Lemma tl_aeq_correct mabs ml tl tl' :
   tl =tl= tl' ->
-  tl_total_semantics mabs mg ml tl ==
-  tl_total_semantics mabs mg ml tl'.
+  tl_total_semantics mabs ml tl ==
+  tl_total_semantics mabs ml tl'.
 Proof.
-  intros (f & Hf & Htypes & Habs).
+  intros (f & Hf & Htypes & Habs & Hdelt).
+  rewrite 2 tl_total_semantics_alt_aux_correct.
+  
+  rewrite <- Htypes.
+  unfold tl_total_semantics_alt_aux.
+  set (p:=Pos.of_succ_nat tl.(tl_sums)) in *.
+  assert (Hfinj : Inj (=) (=) (make_pwf p f)) by now apply make_pwf_inj.
+  apply (sum_of_relabel'_r2l (kmap (M2:=Pmap) (M1:=Pmap) (make_pwf p f))).
+  2: {
+    unfold sum_elements; cbn.
+    rewrite (kmap_Vmap_elements _).
+    apply Vmap_elements_perm.
+    replace (N.of_nat tl.(tl_sums)) with (Pos.pred_N p) by lia.
+    rewrite <- Hf at 2.
+    apply eq_reflexivity, list_fmap_ext; 
+      intros _ k Hk%elem_of_list_lookup_2%elem_of_pseq_1.
+    apply decide_False.
+    lia.
+  }
+  intros m Hm%elem_of_Vmap_elements_1.
+  f_equiv.
+  - rewrite Habs.
+
+
+
+  
+
   rewrite 2 tl_total_semantics_alt_Vlist.
   (* rewrite 2 sum_of_Vlist_reverse. *)
   apply (sum_of_relabel'_l2r (ppermute f))
@@ -2236,7 +2036,7 @@ Proof.
     assert (Hlenmr : lengthP mr = lengthP (tl.(tl_sums))). 1: {
       apply Forall2_length in Hmr.
       rewrite length_reverse in Hmr.
-      fold Vval in Hmr.
+      fold A in Hmr.
       rewrite lengthN_correct_rev, <- Hmr, <- lengthN_correct_rev.
       reflexivity.
     }
@@ -2290,17 +2090,17 @@ Qed.
 
 
 Lemma fill_tensorlist_rewrite_semantics mabs mg ml
-  outer inner relmap locmap :
-  abstracts_local_vars inner.(tl_abstracts) ⊆ dom locmap ->
+  outer inner relmap freemap :
+  abstracts_free_vars inner.(tl_abstracts) ⊆ dom freemap ->
   tl_total_semantics mabs mg ml
-    (fill_tensorlist_rewrite outer inner relmap locmap) ==
+    (fill_tensorlist_rewrite outer inner relmap freemap) ==
   ∑ mro : Vlist (reverse outer.(tl_sums)),
     tl_total_semantics_aux' mabs mg
-      (omap (get_var mg ml mro) locmap)
+      (omap (get_var mg ml mro) freemap)
       mro inner
     * tl_total_semantics_aux mabs mg ml mro [] outer.(tl_abstracts).
 Proof.
-  intros Hlocmap.
+  intros Hfreemap.
   rewrite tl_total_semantics_alt_Vlist.
   destruct outer as [osums oabs], inner as [isums iabs].
   cbn -[reverse].
@@ -2335,7 +2135,7 @@ Proof.
     apply elem_of_Vlist_elements, Forall2_length in Hmri.
     rewrite length_reverse in Hmri.
     pose proof (lengthN_correct isums).
-    fold Vval in *.
+    fold A in *.
     rewrite lookup_app_r by lia.
     f_equal; lia.
   - apply tl_total_semantics_aux_ext_base.
@@ -2353,18 +2153,18 @@ Proof.
     destruct v as [r| |]; [reflexivity| |reflexivity].
     cbn.
     rewrite (* lookup_union, *) lookup_omap.
-    specialize (Hlocmap p).
-    tspecialize Hlocmap. 1:{
-      rewrite elem_of_abstracts_local_vars; cbn; eauto.
+    specialize (Hfreemap p).
+    tspecialize Hfreemap. 1:{
+      rewrite elem_of_abstracts_free_vars; cbn; eauto.
     }
-    apply elem_of_dom in Hlocmap as [v Hlv].
+    apply elem_of_dom in Hfreemap as [v Hlv].
     rewrite Hlv; cbn.
     destruct v as [r| |]; [|reflexivity..].
     cbn.
     apply elem_of_Vlist_elements, Forall2_length in Hmri.
     rewrite length_reverse in Hmri.
     pose proof (lengthN_correct isums).
-    fold Vval in *.
+    fold A in *.
     rewrite lookup_app_r by lia.
     f_equal; lia.
 Qed.
@@ -2375,14 +2175,14 @@ Qed.
 
 (* TODO: Remove this alt version with union.
   NB: would require correctness condition; I believe somehting about the
-    image of locmap? Probably all rels being large *)
+    image of freemap? Probably all rels being large *)
 Lemma fill_tensorlist_rewrite_semantics' mabs mg ml
-  outer inner relmap locmap :
+  outer inner relmap freemap :
   tl_total_semantics mabs mg ml
-    (fill_tensorlist_rewrite outer inner relmap locmap) ==
+    (fill_tensorlist_rewrite outer inner relmap freemap) ==
   ∑ mro : Vlist (reverse outer.(tl_sums)),
     tl_total_semantics_aux' mabs mg
-      (omap (get_var mg ml mro) locmap ∪ ml) (* NB: Shouldn't need union, if WT *)
+      (omap (get_var mg ml mro) freemap ∪ ml) (* NB: Shouldn't need union, if WT *)
       mro inner
     * tl_total_semantics_aux mabs mg ml mro [] outer.(tl_abstracts).
 Proof.
@@ -2420,7 +2220,7 @@ Proof.
     apply elem_of_Vlist_elements, Forall2_length in Hmri.
     rewrite length_reverse in Hmri.
     pose proof (lengthN_correct isums).
-    fold Vval in *.
+    fold A in *.
     rewrite lookup_app_r by lia.
     f_equal; lia.
   - apply tl_total_semantics_aux_ext_base.
@@ -2438,7 +2238,7 @@ Proof.
     destruct v as [r| |]; [reflexivity| |reflexivity].
     cbn.
     rewrite lookup_union, lookup_omap.
-    destruct (locmap !! p) as [v|]; [|now cbn; destruct (ml !! p)].
+    destruct (freemap !! p) as [v|]; [|now cbn; destruct (ml !! p)].
     cbn.
     rewrite union_eq_l.
     + destruct v as [r| |]; [|reflexivity..].
@@ -2446,7 +2246,7 @@ Proof.
       apply elem_of_Vlist_elements, Forall2_length in Hmri.
       rewrite length_reverse in Hmri.
       pose proof (lengthN_correct isums).
-      fold Vval in *.
+      fold A in *.
       rewrite lookup_app_r by lia.
       f_equal; lia.
     +
@@ -2456,7 +2256,7 @@ Proof.
     apply elem_of_Vlist_elements, Forall2_length in Hmri.
     rewrite length_reverse in Hmri.
     pose proof (lengthN_correct isums).
-    fold Vval in *.
+    fold A in *.
     rewrite lookup_app_r by lia.
     f_equal; lia.
 
@@ -2479,7 +2279,7 @@ Lemma tl_total_semantics_alt_aux_relabel_gen_full mabs mg ml mr (f : Idx -> Idx)
   (forall i j, i ∉ mr.*1 -> j ∈ mr.*1 -> f i ≠ f j) ->
   tl_total_semantics_alt_aux mabs mg ml mr abs ==
   tl_total_semantics_alt_aux mabs mg ml (prod_map f id <$> mr)
-    (relabel_abs (relabel_rels f) <$> abs).
+    (relabel_abs (relabel_bounds f) <$> abs).
 Proof.
   intros Hfinj Hfsafe.
   unfold tl_total_semantics_alt_aux.
@@ -2500,7 +2300,7 @@ Proof.
     cbn.
     symmetry.
     pose proof (map_is_typed_domL _ _ _ Ha.1) as Hdom.
-    fold Vval in Hdom.
+    fold A in Hdom.
     apply lookup_kmap_full_gen.
     + intros j _ Hj%elem_of_dom_2 k _ Hk%elem_of_dom_2.
       rewrite Hdom, dom_list_to_map_L, elem_of_list_to_set in Hj, Hk.
@@ -2523,14 +2323,14 @@ Proof.
 Fixpoint tensorequation_semantics_aux
   mabs mg mr
   (lhs rhs : tensorexpr) (univ : list (positive * Ty))
-    (ml : Pmap Vval) : Prop :=
+    (ml : Pmap A) : Prop :=
   match univ with
   | [] => total_semantics_aux mabs mg ml mr lhs ==
     total_semantics_aux mabs mg ml mr rhs
   | (l, ty) :: univ =>
     forall x : V ty,
     tensorequation_semantics_aux mabs mg mr lhs rhs univ
-      (<[l := mk_Vval x]> ml)
+      (<[l := mk_A x]> ml)
   end.
 
 Definition tensorequation_semantics mabs mg teeq : Prop :=
@@ -2569,7 +2369,7 @@ Qed.
 Lemma Vmap_elements_cons_alt idxty univ :
   Vmap_elements (idxty :: univ) ≡ₚ
   (sum_elements :> list (V idxty.2)) ≫=
-  λ x, (insert idxty.1 (mk_Vval x)) <$> Vmap_elements univ.
+  λ x, (insert idxty.1 (mk_A x)) <$> Vmap_elements univ.
 Proof.
   cbn.
   setoid_rewrite list_fmap_to_bind.
@@ -2650,7 +2450,7 @@ Qed.
 Lemma tensorequation_subst_correct mabs mg mr (lhs rhs : tensorlist) univ :
   NoDup univ.*1 ->
   tensorequation_semantics_aux mabs mg mr lhs rhs univ ∅ ->
-  forall (ml : Pmap Vval),
+  forall (ml : Pmap A),
   map_is_typed projT1 (list_to_map univ :> Pmap Ty) ml ->
   tl_total_semantics_aux' mabs mg ml mr lhs ==
   tl_total_semantics_aux' mabs mg ml mr rhs.
@@ -2665,13 +2465,13 @@ Proof.
   apply Hall.
 Qed.
 
-(* Lemma tensorequation_weaken_locals mabs mg mr mr' lhs rhs univ :
+(* Lemma tensorequation_weaken_frees mabs mg mr mr' lhs rhs univ :
   tensorequation_semantics_aux mabs mg mr lhs rhs univ ∅  *)
 
 
 (* Lemma tensorlist_equ *)
 
-Lemma tl_well_bound_rel_irrelevant mabs mg ml mr mr' tl :
+Lemma tl_well_bound_bound_irrelevant mabs mg ml mr mr' tl :
   tl_well_bound tl ->
   tl_total_semantics_aux' mabs mg ml mr tl ==
   tl_total_semantics_aux' mabs mg ml mr' tl.
@@ -2689,7 +2489,7 @@ Proof.
   rewrite decide_True; [easy|].
   left.
   specialize (Htl r).
-  tspecialize Htl by now rewrite elem_of_abstracts_rel_vars; eauto.
+  tspecialize Htl by now rewrite elem_of_abstracts_bound_vars; eauto.
   rewrite elem_of_list_to_set, elem_of_pseq in Htl.
   pose proof (lengthN_correct tl.(tl_sums)).
   lia.
@@ -2697,20 +2497,20 @@ Qed.
 
 
 Lemma fill_tensorlist_rewrite_tensorequation_semantics
-  mabs mg ml (lhs rhs : tensorlist) univ outer locmap relmap :
+  mabs mg ml (lhs rhs : tensorlist) univ outer freemap relmap :
   NoDup univ.*1 ->
-  abstracts_local_vars lhs.(tl_abstracts) ⊆ dom locmap ->
-  abstracts_local_vars rhs.(tl_abstracts) ⊆ dom locmap ->
+  abstracts_free_vars lhs.(tl_abstracts) ⊆ dom freemap ->
+  abstracts_free_vars rhs.(tl_abstracts) ⊆ dom freemap ->
   tl_well_bound lhs -> tl_well_bound rhs ->
   map_is_typed id (list_to_map univ :> Pmap Ty)
     (omap (var_elim (λ r, reverse (tl_sums outer) !! (r:>nat))
       (fmap projT1 ∘ (ml !!.))
-      (fmap projT1 ∘ (mg !!.))) locmap) ->
+      (fmap projT1 ∘ (mg !!.))) freemap) ->
   tensorequation_semantics_aux mabs mg [] lhs rhs univ ∅ ->
   tl_total_semantics mabs mg ml
-    (fill_tensorlist_rewrite outer lhs relmap locmap) ==
+    (fill_tensorlist_rewrite outer lhs relmap freemap) ==
   tl_total_semantics mabs mg ml
-    (fill_tensorlist_rewrite outer rhs relmap locmap).
+    (fill_tensorlist_rewrite outer rhs relmap freemap).
 Proof.
   intros Hdup Hlhs Hrhs HlhsWB HrhsWB Htyped Heq.
   rewrite 2 fill_tensorlist_rewrite_semantics by easy.
@@ -2718,33 +2518,33 @@ Proof.
   intros mro Hmro%elem_of_Vlist_elements.
   f_equiv.
   pose proof (tensorequation_subst_correct _ _ _ _ _ _ Hdup Heq) as Heq'.
-  rewrite (tl_well_bound_rel_irrelevant _ _ _ _ [] lhs) by easy.
-  rewrite (tl_well_bound_rel_irrelevant _ _ _ _ [] rhs) by easy.
+  rewrite (tl_well_bound_bound_irrelevant _ _ _ _ [] lhs) by easy.
+  rewrite (tl_well_bound_bound_irrelevant _ _ _ _ [] rhs) by easy.
   apply Heq'.
   intros l.
   rewrite <- (Htyped l).
   cbn.
   rewrite 2 lookup_omap.
-  destruct (locmap !! l) as [v|]; [|easy].
+  destruct (freemap !! l) as [v|]; [|easy].
   cbn.
   destruct v; cbn; [|destruct (_ !! p); reflexivity..].
   hnf in Hmro.
   rewrite Forall2_lookup in Hmro.
   specialize (Hmro p).
-  fold Vval in *.
+  fold A in *.
   inversion Hmro; destruct_and?; cbn; congruence.
 Qed.
 
 
 Lemma match_rewrite_tensorlist_alt lhs rhs targ :
   match_rewrite_tensorlist lhs rhs targ =
-  '(outer, relmap, locmap) ← match_tensorlist_aux lhs targ;
-  Some (fill_tensorlist_rewrite outer rhs relmap locmap).
+  '(outer, relmap, freemap) ← match_tensorlist_aux lhs targ;
+  Some (fill_tensorlist_rewrite outer rhs relmap freemap).
 Proof.
   unfold match_rewrite_tensorlist.
   cbn.
   apply option_bind_ext; [|reflexivity].
-  intros (((usums & uabs), relmap), locmap); cbn;
+  intros (((usums & uabs), relmap), freemap); cbn;
   now destruct rhs.
 Qed.
 
@@ -2758,20 +2558,20 @@ Qed.
 Lemma match_correctness_tensorlist mabs mg ml (lhs rhs : tensorlist) targ univ :
   tensorequation_semantics_aux mabs mg [] lhs rhs univ ∅ ->
   NoDup univ.*1 ->
-  abstracts_local_vars lhs.(tl_abstracts) = list_to_set univ.*1 ->
-  abstracts_local_vars rhs.(tl_abstracts) ⊆ abstracts_local_vars lhs.(tl_abstracts) ->
+  abstracts_free_vars lhs.(tl_abstracts) = list_to_set univ.*1 ->
+  abstracts_free_vars rhs.(tl_abstracts) ⊆ abstracts_free_vars lhs.(tl_abstracts) ->
   all_bound lhs ->
   tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (list_to_map univ) []) lhs ->
   tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (list_to_map univ) []) rhs ->
-  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other rel contexts than [] *)
+  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other bound contexts than [] *)
   forall out, match_rewrite_tensorlist lhs rhs targ = Some out ->
   tl_total_semantics_aux' mabs mg ml [] targ ==
   tl_total_semantics_aux' mabs mg ml [] out.
 Proof.
-  intros Hrewrite Hdup Hlhs_loc Hrhs_loc Hlhs_bound HlhsWT HrhsWT HtargWT.
+  intros Hrewrite Hdup Hlhs_free Hrhs_free Hlhs_bound HlhsWT HrhsWT HtargWT.
   intros out.
   rewrite match_rewrite_tensorlist_alt.
-  intros (((outer, relmap), locmap) & Hmatch & [= Hout])%bind_Some.
+  intros (((outer, relmap), freemap) & Hmatch & [= Hout])%bind_Some.
   subst out.
   pose proof (match_tensorlist_aux_correct _ _ _ _ _ _ _ _ _
     Hmatch Hlhs_bound HlhsWT HtargWT) as (Hldom & Htyl & Hteq).
@@ -2788,18 +2588,18 @@ Proof.
     apply option_eq.
     intros ty.
     rewrite lookup_omap, <- elem_of_list_to_map by easy.
-    destruct (locmap !! k) as [v|] eqn:Hkv. 2:{
+    destruct (freemap !! k) as [v|] eqn:Hkv. 2:{
       cbn.
       split; [easy|].
       intros Hin%(elem_of_list_fmap_1 fst).
       cbn in Hin.
       apply not_elem_of_dom in Hkv.
-      rewrite <- Hldom, Hlhs_loc, elem_of_list_to_set in Hkv.
+      rewrite <- Hldom, Hlhs_free, elem_of_list_to_set in Hkv.
       easy.
     }
     apply elem_of_dom_2 in Hkv as Hkdom.
     cbn.
-    rewrite <- Hldom, Hlhs_loc, elem_of_list_to_set in Hkdom.
+    rewrite <- Hldom, Hlhs_free, elem_of_list_to_set in Hkdom.
     apply elem_of_list_lookup in Hkdom as (i & Hi).
     rewrite list_lookup_fmap in Hi.
     apply fmap_Some in Hi as ((_ & ty') & Huniv_i & [= <-]).
@@ -2819,10 +2619,10 @@ Proof.
     destruct v as [vr|vl|vg]; cbn in *.
     + split; congruence.
     + rewrite lookup_fmap in Htyl.
-      fold Vval in *.
+      fold A in *.
       split; congruence.
     + rewrite lookup_fmap in Htyl.
-      fold Vval in *.
+      fold A in *.
       split; congruence.
 Qed.
 
@@ -2840,12 +2640,12 @@ Lemma match_correctness_tensorexpr_aux mabs mg ml (telhs terhs : tensorexpr) tar
   let rhs := tensorlist_of_tensorexpr terhs in
   tleq_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) ∅ [])
     (mk_tleq lhs rhs (list_to_map univ)) ->
-  (* abstracts_local_vars lhs.(tl_abstracts) = list_to_set univ.*1 ->
-  abstracts_local_vars rhs.(tl_abstracts) ⊆ abstracts_local_vars lhs.(tl_abstracts) -> *)
+  (* abstracts_free_vars lhs.(tl_abstracts) = list_to_set univ.*1 ->
+  abstracts_free_vars rhs.(tl_abstracts) ⊆ abstracts_free_vars lhs.(tl_abstracts) -> *)
   all_bound lhs ->
   (* tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (list_to_map univ) []) lhs ->
   tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (list_to_map univ) []) rhs -> *)
-  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other rel contexts than [] *)
+  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other bound contexts than [] *)
   forall out, match_rewrite_tensorlist lhs rhs targ = Some out ->
   tl_total_semantics_aux' mabs mg ml [] targ ==
   tl_total_semantics_aux' mabs mg ml [] out.
@@ -2853,7 +2653,7 @@ Proof.
   intros Heq Hdup lhs rhs HeqWT Hlhs_bound.
   hnf in HeqWT.
   cbn in HeqWT.
-  rewrite 2 te_local_varset_tl in HeqWT.
+  rewrite 2 te_free_varset_tl in HeqWT.
   apply match_correctness_tensorlist with univ; auto.
   - revert Heq.
     clear HeqWT.
@@ -2898,7 +2698,7 @@ Definition teeq_is_correct_aux (mabs : abstypecontext)
   let rhs := tensorlist_of_tensorexpr terhs in
   tleq_is_well_typed_aux mabs mg
     lhs rhs (list_to_map univ) &&&
-  Nat.eqb (size (abstracts_rel_vars lhs.(tl_abstracts)))
+  Nat.eqb (size (abstracts_bound_vars lhs.(tl_abstracts)))
     (length lhs.(tl_sums)).
 
 Lemma teeq_is_correct_aux_correct_aux (mabs : abscontext) (mg : varcontext)
@@ -2932,10 +2732,10 @@ Proof.
   rewrite <- lengthN_correct, <- (length_pseq 1), <- (size_list_to_set (C:=Pset))
     by apply NoDup_pseq.
   transitivity (size (list_to_set (pseq 1 (lengthN lhs.(tl_sums))) :> Pset) <=
-    size (abstracts_rel_vars lhs.(tl_abstracts))); [lia|].
+    size (abstracts_bound_vars lhs.(tl_abstracts))); [lia|].
   unfold all_bound.
   (* transitivity (list_to_set (pseq 1 (lengthN (tl_sums lhs))) ⊆
-    abstracts_rel_vars (tl_abstracts lhs)); [|set_solver +HlhsWT]. *)
+    abstracts_bound_vars (tl_abstracts lhs)); [|set_solver +HlhsWT]. *)
   split.
   + now apply set_subseteq_size_eq.
   + intros ->.
@@ -3264,7 +3064,7 @@ Fixpoint Vapplys_replicate_vec {A n k} : V_n_args (replicate n k) A ->
 
 Lemma Vapplys_replicate_vec_correct {n k} (f : V_n_args (replicate n k) R) args :
   Vapplys (mk_Vfunc _ f) args =
-  kargs ← join_list (Vval_get k <$> args);
+  kargs ← join_list (A_get k <$> args);
   vargs ← list2vec n kargs;
   Some (Vapplys_replicate_vec f vargs).
 Proof.
@@ -3315,8 +3115,8 @@ Lemma abstract_semantics_mabs_of_tensor_map_gen mabst mg ml mr f low up :
   abstract_semantics (mabs_of_tensor_map mabst) mg ml mr f low up =
   default rO (
     knm_T ← (mabst !! f :> option BTensor);
-    ins' ← join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
-    outs' ← join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
+    ins' ← join_list (mbind (A_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
+    outs' ← join_list (mbind (A_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
     '(ins, outs) ← Vector.splitat _ <$> list2vec (knm_T.1.2.1 + knm_T.1.2.2) (ins' ++ outs');
     Some ((projT2 (knm_T :> BTensor)) ins outs)
   ).
@@ -3349,10 +3149,10 @@ Lemma abstract_semantics_mabs_of_tensor_map mabst mg ml mr f low up :
   default rO (
     knm_T ← (mabst !! f :> option BTensor);
     ins' ←
-      join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
+      join_list (mbind (A_get knm_T.1.1) <$> (get_var mg ml mr <$> low));
     ins ← list2vec (knm_T.1.2.1) ins';
     outs' ←
-      join_list (mbind (Vval_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
+      join_list (mbind (A_get knm_T.1.1) <$> (get_var mg ml mr <$> up));
     outs ← list2vec (knm_T.1.2.2) outs';
     Some ((projT2 (knm_T :> BTensor)) ins outs)
   ).
@@ -3379,9 +3179,6 @@ Proof.
 Qed.
 
 
-(* FIXME: Move *)
-Notation abstract_semantics' mabs mg ml mr abs :=
-  (abstract_semantics mabs mg ml mr abs.1.1 abs.1.2 abs.2).
 
 
 Lemma abstract_semantics'_abstracts_perm_eq_permutative_tensor
@@ -3407,18 +3204,18 @@ Proof.
   specialize (Hpermtens _ Ht).
   cbn in Hpermtens.
 
-  (* pose proof (join_list_is_Some (mbind (Vval_get k) <$> (get_var mg ml mr <$> low)))
+  (* pose proof (join_list_is_Some (mbind (A_get k) <$> (get_var mg ml mr <$> low)))
     as Hjoinlow.
   rewrite Hlow in Hjoinlow at 2.
   rewrite <- join_list_is_Some in Hjoinlow.
   rewrite 2 is_Some_alt in Hjoinlow. *)
   pose proof (join_list_Permutation
-    (mbind (Vval_get k) <$> (get_var mg ml mr <$> low))
-    (mbind (Vval_get k) <$> (get_var mg ml mr <$> low'))
+    (mbind (A_get k) <$> (get_var mg ml mr <$> low))
+    (mbind (A_get k) <$> (get_var mg ml mr <$> low'))
     ltac:(now rewrite Hlow)) as Hlperm%option_Forall2_alt.
   pose proof (join_list_Permutation
-    (mbind (Vval_get k) <$> (get_var mg ml mr <$> up))
-    (mbind (Vval_get k) <$> (get_var mg ml mr <$> up'))
+    (mbind (A_get k) <$> (get_var mg ml mr <$> up))
+    (mbind (A_get k) <$> (get_var mg ml mr <$> up'))
     ltac:(now rewrite Hup)) as Huperm%option_Forall2_alt.
   destruct (join_list (_ <$> (_ <$> low))) as [largs|] eqn:Hlargs;
   destruct (join_list (_ <$> (_ <$> low'))) as [largs'|] eqn:Hlargs';
@@ -3502,8 +3299,6 @@ Proof.
 Qed.
 
 
-Notation abstract_semantics_alt' mabs mg ml mr abs :=
-  (abstract_semantics_alt mabs mg ml mr abs.1.1 abs.1.2 abs.2).
 
 Definition ntl_total_semantics mabs mg ml ntl :=
   tl_total_semantics mabs mg ml (ntl2tl ntl).
@@ -3541,7 +3336,7 @@ Proof.
     cbn.
     intros Hfsts.
     hnf in Hwf.
-    cbn -[abstracts_rel_vars] in Hwf.
+    cbn -[abstracts_bound_vars] in Hwf.
     apply pos_to_nat_pred_inj.
     apply (NoDup_lookup _ _ _ ia.1 (Hwf.1));
     rewrite list_lookup_fmap;
@@ -3579,7 +3374,7 @@ Proof.
     apply relabel_abs_id_strong; intros [r| |] Hr; [|done..].
     cbn.
     specialize (Hwf.2 r) as Hr'.
-    tspecialize Hr' by now apply elem_of_abstracts_rel_vars;
+    tspecialize Hr' by now apply elem_of_abstracts_bound_vars;
       destruct flu as [[f l] u]; eauto.
     rewrite elem_of_list_to_set in Hr'.
     cbn in Hr'.
@@ -3705,7 +3500,7 @@ Proof.
 Lemma match_correctness_tensorexpr mabs mg ml telhs terhs univ :
   tensorequation_semantics_aux mabs mg [] telhs terhs univ ∅ ->
   teeq_is_correct_aux mabs mg telhs terhs univ ->
-  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other rel contexts than [] *)
+  tl_well_typed (mk_tc (projT1 <$> mabs) (projT1 <$> mg) (projT1 <$> ml) []) targ -> (* TODO: extend to other bound contexts than [] *)
   forall out, match_rewrite_tensorlist lhs rhs targ = Some out ->
   tl_total_semantics_aux' mabs mg ml [] targ ==
   tl_total_semantics_aux' mabs mg ml [] out. *)
@@ -3714,7 +3509,7 @@ Lemma match_correctness_tensorexpr mabs mg ml telhs terhs univ :
   Get the parser outputting things in terms of tensorequation_semantics
   and check they're correct, then get rewrite_in_lhs and rewrite_in_rhs
   working. A key thing to consider is passing between maps and lists of
-  local variables; it shouldn't matter _too_ too much, except of course
+  free variables; it shouldn't matter _too_ too much, except of course
   that for parsing you'll have to have the order exactly right for them
   to unify. I think we may get away with just having the final lemma do
   the nodup checking (i.e. it talks about tensorequation_semantics_aux)
@@ -3796,7 +3591,7 @@ Proof.
         now destruct tx].
       apply Hins.
     + intros Hins x ml' Hty [Hml'_l Hdisj]%map_disjoint_insert_l.
-      specialize (Hins (<[l:=mk_Vval x]> ml')).
+      specialize (Hins (<[l:=mk_A x]> ml')).
       tspecialize Hins by now apply map_is_typed_insert_2.
       assert (Hml_l : ml !! l = None). 1:{
         apply not_elem_of_dom.
@@ -3818,15 +3613,15 @@ Lemma tensorequation_semantics_alt mabs mg teeq :
   tensorequation_semantics
 
 
-  map_fold (fun l ty (IH : Pmap Vval -> Prop) =>
+  map_fold (fun l ty (IH : Pmap A -> Prop) =>
     fun ml =>
     forall x : V ty,
-    IH (<[l := mk_Vval x]> ml)
+    IH (<[l := mk_A x]> ml)
   ) (fun ml => tl_total_semantics_aux' mabs mg ml mr ∅
 
 (* We need conditions to be able to say something like the following:
   Given a tensorlist [tl = sums, abs] and a pattern [tl' = sums', abs'],
-  we can consider a (pair of) mapping(s) [m = ml, mb] of the local and bound
+  we can consider a (pair of) mapping(s) [m = ml, mb] of the free and bound
   variables, respectively, of [tl'], along with a "context"
   [tlctx = sumctx, absctx]. We then say this is "valid" if ["CONDITIONS"],
   meaning the maps give a "valid" decomposition
@@ -3846,9 +3641,9 @@ Lemma tensorequation_semantics_alt mabs mg teeq :
     hence none of its bound variables can be asked to be summed over
     (otherwise, the tensor containing that variable could not be 'extracted'
     from the inner sum)
-  (iii) [ml] can only assign a local variable of [tl'] to something that
-    at least _looks_ like a local variable of the match (i.e., a global,
-      a local, or a variable bound by [sumctx]), which is _not_ what a
+  (iii) [ml] can only assign a free variable of [tl'] to something that
+    at least _looks_ like a free variable of the match (i.e., a global,
+      a free, or a variable bound by [sumctx]), which is _not_ what a
       variable bound by the match looks like
   *)
 
@@ -3858,9 +3653,9 @@ Lemma tensorequation_semantics_alt mabs mg teeq :
   and we have [tensorequation_semantics]*)
 
 
-(* TODO: Something in [teq_at] about [ml] including all the local variables?
+(* TODO: Something in [teq_at] about [ml] including all the free variables?
   Otherwise, we maybe lose some expressiveness (specifically, we can easily
-  show [teq_at] implies the local variable sets are the same, which maybe isn't
+  show [teq_at] implies the free variable sets are the same, which maybe isn't
   semantically true, i.e. you could imagine saying 'this operation is actually
   independent of the input')*)
 
@@ -3871,7 +3666,7 @@ Lemma tensorequation_semantics_alt mabs mg teeq :
 Fixpoint extend_map_of_abstract_pair
   (mb : Pmap Idx) (* The map of [rel]/bound variables, which must map
     to other bound variables *)
-  (ml : Pmap var) (* The map of local variables, which can map to any [var] *)
+  (ml : Pmap var) (* The map of free variables, which can map to any [var] *)
   (l r : list var) : option (Pmap Idx * Pmap var) :=
   match l, r with
   | [], [] => Some (mb, ml)
@@ -3883,7 +3678,7 @@ Fixpoint extend_map_of_abstract_pair
       else None
     | glob gl, _ => (* global variables can't map anywhere (nontrivially) *)
       None
-    | loc ll, vr => (* local variables can map anywhere (ab initio, at least) *)
+    | free ll, vr => (* free variables can map anywhere (ab initio, at least) *)
       match ml !! ll with
       | None => extend_map_of_abstract_pair mb (<[ll := vr]> ml) l r
       | Some vr' =>
@@ -3891,7 +3686,7 @@ Fixpoint extend_map_of_abstract_pair
           extend_map_of_abstract_pair mb ml l r
         else None
       end
-    | rel rl, rel rr => (* bound variables must map to bound variables *)
+    | bound rl, bound rr => (* bound variables must map to bound variables *)
       match mb !! rl with
       | None => extend_map_of_abstract_pair (<[rl := rr]> mb) ml l r
       | Some rr' =>
@@ -3899,7 +3694,7 @@ Fixpoint extend_map_of_abstract_pair
           extend_map_of_abstract_pair mb ml l r
         else None
       end
-    | rel rl, _ => (* bound variables can only map to other bound variables *)
+    | bound rl, _ => (* bound variables can only map to other bound variables *)
       None
     end
   | _, _ => None
@@ -3924,7 +3719,7 @@ Fixpoint extend_match_of_abstract_tensors
   `{HP : forall mb ml rrest, Decision (P mb ml rrest)}
   (mb : Pmap Idx) (* The map of [rel]/bound variables, which must map
     to other bound variables *)
-  (ml : Pmap var) (* The map of local variables, which can map to any [var] *)
+  (ml : Pmap var) (* The map of free variables, which can map to any [var] *)
   (labs rabs : list (Idx * list var * list var)) :
     option (Pmap Idx * Pmap var * list (Idx * list var * list var)) :=
   match labs with
@@ -4240,7 +4035,7 @@ Proof.
   intros abs vars.
   cbn.
   apply sum_of_ext; intros x.
-  transitivity (total_semantics abs (<[var:=mk_Vval x]> vars) te); [|symmetry].
+  transitivity (total_semantics abs (<[var:=mk_A x]> vars) te); [|symmetry].
   - apply te_relabel_bound_aux_semantics.
     + intros ? ->%elem_of_singleton.
       rewrite decide_True by easy.
@@ -4553,7 +4348,7 @@ Proof.
 Qed.
 
 
-Lemma tsum_overwrite_irrel var var' ty ty' te :
+Lemma tsum_overwrite_irbound var var' ty ty' te :
   var' ∉ te_free_varset te ->
   tsum var ty (tsum var ty' te) =t=
   tsum var' ty (tsum var ty' te).
@@ -5311,6 +5106,6 @@ Proof.
   intros Heq%tensorlist_eqb_correct.
   rewrite 2 tensorlist_of_tensorexpr_correct in Heq.
   apply Heq.
-Qed.*)
+Qed.*) *)
 
 End TensorExprDBSemantics.

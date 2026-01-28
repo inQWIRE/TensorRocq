@@ -175,11 +175,6 @@ Proof.
   lia.
 Qed.
 
-Lemma pos_sub_N_add p n n' :
-  pos_sub_N p (n + n') = pos_sub_N (pos_sub_N p n) n'.
-Proof.
-  unfold N.add; destruct n, n'; cbn; lia.
-Qed.
 
 Lemma withrelshift_add s s' f v :
   withrelshift s (withrelshift s' f) v = withrelshift (s + s') f v.
@@ -4835,12 +4830,6 @@ Proof.
     now destruct (list2vec m (drop n l)).
 Qed.
 
-(* FIXME: Find existing; consolidate *)
-Lemma cast_id {A n} (v : vec A n) H :
-  Vector.cast v H = v.
-Proof.
-  revert H; induction v; intros ?; cbn; f_equal; auto.
-Qed.
 
 Lemma list2vec_length {A} (l : list A) :
   list2vec (length l) l = Some (Vector.of_list l).

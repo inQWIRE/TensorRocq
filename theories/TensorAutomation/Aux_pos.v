@@ -24,7 +24,6 @@ Proof.
   unfold pos_add_N; destruct n; lia.
 Qed.
 
-
 Definition pos_sub_N (p : positive) (n : N) : positive :=
   match n with
   | N0 => p
@@ -68,6 +67,44 @@ Next Obligation.
   destruct m; lia.
 Qed.
 Add Zify BinOp Op_pos_sub_N.
+
+
+
+Lemma pos_add_N_to_nat p n :
+  (pos_add_N p n =@{nat} p + N.to_nat n)%nat.
+Proof.
+  destruct n; cbn; unfold pos_to_nat_pred; lia.
+Qed.
+
+Lemma pos_sub_N_to_nat p n :
+  (pos_sub_N p n =@{nat} p - N.to_nat n)%nat.
+Proof.
+  destruct n; cbn; unfold pos_to_nat_pred; lia.
+Qed.
+
+Lemma pos_pred_to_nat p :
+  Pos.pred p =@{nat} pred p.
+Proof.
+  unfold pos_to_nat_pred; lia.
+Qed.
+
+Lemma pos_add_N_alt p n :
+  pos_add_N p n = Pos.pred (N.succ_pos (Npos p + n)).
+Proof.
+  destruct n; cbn; lia.
+Qed.
+
+Lemma pos_sub_N_alt p n :
+  pos_sub_N p n = Pos.pred (N.succ_pos (Npos p - n)).
+Proof.
+  destruct n; cbn; lia.
+Qed.
+
+Lemma pos_sub_N_add p n n' :
+  pos_sub_N p (n + n') = pos_sub_N (pos_sub_N p n) n'.
+Proof.
+  unfold N.add; destruct n, n'; cbn; lia.
+Qed.
 
 
 (* FIXME: Move *)
@@ -1669,6 +1706,7 @@ Lemma pos_to_nat_pred_of_nat (i : nat) :
 Proof.
   lia.
 Qed.
+
 
 Lemma perm_exists_perm_posperm l l' :
   l ≡ₚ l' ->

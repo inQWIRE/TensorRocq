@@ -8,7 +8,7 @@ From stdpp Require Import prelude.
 From stdpp Require Import strings fin_maps pmap gmap hlist.
 From stdpp Require Import pretty.
 
-Lemma exists_dsig {A} {P Q : A -> Prop} `{forall x, Decision (P x)} : 
+Lemma exists_dsig {A} {P Q : A -> Prop} `{forall x, Decision (P x)} :
   (exists x : dsig P, Q (`x)) <-> exists x, P x /\ Q x.
 Proof.
   split.
@@ -20,9 +20,9 @@ Proof.
     now exists (dexist x p).
 Qed.
 
-Lemma exists_and_dsig {A} {P Q R : A -> Prop} 
-  `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)} : 
-  (exists x : dsig (λ a, P a /\ Q a), R (`x)) <-> 
+Lemma exists_and_dsig {A} {P Q R : A -> Prop}
+  `{∀ x, Decision (P x)} `{∀ x, Decision (Q x)} :
+  (exists x : dsig (λ a, P a /\ Q a), R (`x)) <->
     exists (x : dsig P), Q (`x) /\ R (`x).
 Proof.
   rewrite exists_dsig.
@@ -33,16 +33,16 @@ Qed.
 
 
 Fixpoint join_list {A} (l : list (option A)) : option (list A) :=
-  match l with 
+  match l with
   | [] => Some []
   | None :: _ => None
-  | Some x :: ml => 
+  | Some x :: ml =>
       l ← join_list ml;
       Some (x :: l)
   end.
 
 
-Lemma join_list_Some {A} (l : list (option A)) l' : 
+Lemma join_list_Some {A} (l : list (option A)) l' :
   join_list l = Some l' <-> l = Some <$> l'.
 Proof.
   revert l'; induction l as [|a l IHl]; intros l'.
@@ -57,7 +57,7 @@ Proof.
     naive_solver.
 Qed.
 
-Lemma join_list_is_Some {A} (l : list (option A)) : 
+Lemma join_list_is_Some {A} (l : list (option A)) :
   is_Some (join_list l) <-> None ∉ l.
 Proof.
   unfold is_Some.
@@ -82,7 +82,7 @@ Qed.
 
 
 (* FIXME: Move to Aux_stdpp *)
-Lemma bind_is_Some {A B} (f : A -> option B) (mx : option A) : 
+Lemma bind_is_Some {A B} (f : A -> option B) (mx : option A) :
   is_Some (mx ≫= f) <-> is_Some mx /\ forall x, mx = Some x -> is_Some (f x).
 Proof.
   destruct mx.
@@ -94,22 +94,22 @@ Proof.
 Qed.
 
 Ltac f_equal_let :=
-  let H := fresh in 
-  match goal with 
-  | |- (let '_ := ?x in _) = (let '_ := ?y in _) => 
+  let H := fresh in
+  match goal with
+  | |- (let '_ := ?x in _) = (let '_ := ?y in _) =>
     enough (H : x = y) by now first [rewrite H | rewrite <- H]
-  | |- (let _ := ?x in _) = (let _ := ?y in _) => 
+  | |- (let _ := ?x in _) = (let _ := ?y in _) =>
     enough (H : x = y) by now first [rewrite H | rewrite <- H]
   end.
 
 
-Lemma lookup_insert_case `{FinMap K M} {A} (m : M A) (i j : K) (x : A) : 
+Lemma lookup_insert_case `{FinMap K M} {A} (m : M A) (i j : K) (x : A) :
   <[i:=x]> m !! j = if decide (i = j) then Some x else m !! j.
 Proof.
   case_decide; now simplify_map_eq.
 Qed.
 
-Lemma NoDup_fmap_iff {A B} (f : A -> B) (l : list A) : 
+Lemma NoDup_fmap_iff {A B} (f : A -> B) (l : list A) :
   NoDup (f <$> l) <->
   NoDup l /\
   forall a a', a ∈ l -> a' ∈ l -> f a = f a' -> a = a'.
@@ -126,25 +126,25 @@ Proof.
   now rewrite Hia', Hfas.
 Qed.
 
-Lemma fsts_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) : 
+Lemma fsts_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) :
   (prod_map f g <$> l).*1 = f <$> (l.*1).
 Proof.
   rewrite <- 2 list_fmap_compose.
   reflexivity.
 Qed.
 
-Lemma snds_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) : 
+Lemma snds_prod_map {A B C D} (f : A -> C) (g : B -> D) (l : list (A * B)) :
   (prod_map f g <$> l).*2 = g <$> (l.*2).
 Proof.
   rewrite <- 2 list_fmap_compose.
   reflexivity.
 Qed.
 
-  
+
 
 Lemma disjoint_difference_l
-  `{Set_ A C} `{!RelDecision (@elem_of A C _)} (X Y Z : C) : 
-  X ∖ Y ## Z <-> X ∩ Z ⊆ Y. 
+  `{Set_ A C} `{!RelDecision (@elem_of A C _)} (X Y Z : C) :
+  X ∖ Y ## Z <-> X ∩ Z ⊆ Y.
 Proof.
   split; [set_solver|].
   intros HXZ x.
@@ -152,7 +152,7 @@ Proof.
 Qed.
 
 Lemma disjoint_difference_symm
-  `{Set_ A C} (X Y Z : C) : 
+  `{Set_ A C} (X Y Z : C) :
   X ∖ Y ## Z <-> X ## Z ∖ Y.
 Proof.
   set_solver.
@@ -218,7 +218,7 @@ Proof.
 Qed.
 
 Lemma last_filter_Some `{P : A -> Prop} `{∀ a, Decision (P a)} l a :
-  last (filter P l) = Some a <-> exists i, l !! i = Some a /\ P a /\ forall j a', i < j -> 
+  last (filter P l) = Some a <-> exists i, l !! i = Some a /\ P a /\ forall j a', i < j ->
     l !! j = Some a' -> ~ P a'.
 Proof.
   split.
@@ -297,7 +297,7 @@ Qed.
 Definition finv {A B C} `{Elements A C}
   `{EqDecision B} `{Inhabited A}
   (dom : C) (f : A -> B) : B -> A :=
-  fun b => 
+  fun b =>
     default inhabitant (
       head (filter (fun a => f a = b) (elements dom))
     ).
@@ -326,7 +326,7 @@ Proof.
 Qed.
 
 Lemma finv_left_inverse {A B C} `{FinSet A C} `{Inhabited A} `{EqDecision B}
-  (dom : C) (f : A -> B) a : a ∈ dom -> 
+  (dom : C) (f : A -> B) a : a ∈ dom ->
     (forall a a', a ∈ dom -> a' ∈ dom -> f a = f a' -> a = a') ->
     finv dom f (f a) = a.
 Proof.
@@ -342,9 +342,9 @@ Qed.
 
 
 
-Lemma app_inj_len_l {A} (l m l' m' : list A) : 
-  length l = length l' -> 
-  l ++ m = l' ++ m' -> 
+Lemma app_inj_len_l {A} (l m l' m' : list A) :
+  length l = length l' ->
+  l ++ m = l' ++ m' ->
   l = l' /\ m = m'.
 Proof.
   intros Hlen Heq.
@@ -355,9 +355,9 @@ Proof.
   now apply app_inv_head in Heq.
 Qed.
 
-Lemma app_inj_len_r {A} (l m l' m' : list A) : 
-  length m = length m' -> 
-  l ++ m = l' ++ m' -> 
+Lemma app_inj_len_r {A} (l m l' m' : list A) :
+  length m = length m' ->
+  l ++ m = l' ++ m' ->
   l = l' /\ m = m'.
 Proof.
   intros Hlen Heq.
@@ -369,14 +369,14 @@ Qed.
 
 
 
-Lemma list_to_set_concat {A C} `{Set_ A C} (l : list (list A)) : 
+Lemma list_to_set_concat {A C} `{Set_ A C} (l : list (list A)) :
   list_to_set (concat l) ≡@{C} ⋃ (list_to_set <$> l).
 Proof.
   induction l; [reflexivity|].
   now cbn; rewrite list_to_set_app, IHl.
 Qed.
 
-Lemma list_to_set_concat_L {A C} `{Set_ A C} `{!LeibnizEquiv C} (l : list (list A)) : 
+Lemma list_to_set_concat_L {A C} `{Set_ A C} `{!LeibnizEquiv C} (l : list (list A)) :
   list_to_set (concat l) =@{C} ⋃ (list_to_set <$> l).
 Proof.
   unfold_leibniz.
@@ -385,10 +385,10 @@ Qed.
 
 
 
-Lemma NoDup_list_bind {A B} (f : A -> list B) l : 
-  NoDup l -> 
+Lemma NoDup_list_bind {A B} (f : A -> list B) l :
+  NoDup l ->
     (forall a, a ∈ l -> NoDup (f a)) ->
-    (forall a a' b, a ∈ l -> a' ∈ l -> a <> a' -> 
+    (forall a a' b, a ∈ l -> a' ∈ l -> a <> a' ->
       b ∈ f a -> b ∉ f a') ->
   NoDup (l ≫= f).
 Proof.
@@ -407,8 +407,8 @@ Qed.
 
 
 
-Lemma map_img_list_to_map `{FinMap K M} `{Set_ A SA} 
-  (l : list (K * A)) : 
+Lemma map_img_list_to_map `{FinMap K M} `{Set_ A SA}
+  (l : list (K * A)) :
   NoDup l.*1 ->
   map_img (list_to_map l :> M A) ≡@{SA} list_to_set l.*2.
 Proof.
@@ -418,7 +418,7 @@ Proof.
 Qed.
 
 Lemma map_img_list_to_map_L `{FinMap K M} `{Set_ A SA} `{!LeibnizEquiv SA}
-  (l : list (K * A)) : 
+  (l : list (K * A)) :
   NoDup l.*1 ->
   map_img (list_to_map l :> M A) =@{SA} list_to_set l.*2.
 Proof.
@@ -430,17 +430,17 @@ Qed.
 
 
 Fixpoint list_decomps_aux {A} (pre l : list A) : list (list A * A * list A) :=
-  match l with 
+  match l with
   | [] => []
-  | a :: l => 
+  | a :: l =>
     (pre, a, l) :: list_decomps_aux (pre ++ [a]) l
   end.
 
 Definition list_decomps {A} (l : list A) : list (list A * A * list A) :=
   list_decomps_aux [] l.
-  
 
-Lemma elem_of_list_decomps_aux {A} (pre l : list A) : 
+
+Lemma elem_of_list_decomps_aux {A} (pre l : list A) :
   forall hd a tl, (hd, a, tl) ∈ list_decomps_aux pre l <->
     hd ++ [a] ++ tl = pre ++ l /\
     length (pre) <= length (hd).
@@ -473,7 +473,7 @@ Proof.
         simpl_list; cbn; lia.
 Qed.
 
-Lemma elem_of_list_decomps {A} (l : list A) : 
+Lemma elem_of_list_decomps {A} (l : list A) :
   forall hd a tl, (hd, a, tl) ∈ list_decomps l <->
     hd ++ [a] ++ tl = l.
 Proof.
@@ -484,7 +484,7 @@ Proof.
 Qed.
 
 (* FIXME: Move *)
-Lemma exists_pair {A B} (P : A * B -> Prop) : 
+Lemma exists_pair {A B} (P : A * B -> Prop) :
   (exists ab, P ab) <-> exists a, exists b, P (a, b).
 Proof.
   split.
@@ -495,8 +495,8 @@ Qed.
 Definition list_removals {A} (l : list A) : list (A * list A) :=
   (λ '(hd, a, tl), (a, hd ++ tl)) <$> list_decomps l.
 
-Lemma elem_of_list_removals {A} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_removals l <-> exists hd tl, hd_tl = hd ++ tl /\ 
+Lemma elem_of_list_removals {A} (l : list A) a hd_tl :
+  (a, hd_tl) ∈ list_removals l <-> exists hd tl, hd_tl = hd ++ tl /\
     hd ++ [a] ++ tl = l.
 Proof.
   unfold list_removals.
@@ -508,7 +508,7 @@ Proof.
 Qed.
 
 
-Lemma elem_of_list_removals_perm {A} (l : list A) a hd_tl : 
+Lemma elem_of_list_removals_perm {A} (l : list A) a hd_tl :
   (a, hd_tl) ∈ list_removals l -> l ≡ₚ a :: hd_tl.
 Proof.
   rewrite elem_of_list_removals.
@@ -525,8 +525,8 @@ Definition list_select `(P : A -> Prop)
 
 
 Lemma elem_of_list_select {A} `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
-  (a, hd_tl) ∈ list_select P l <-> P a /\ exists hd tl, hd_tl = hd ++ tl /\ 
+  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl :
+  (a, hd_tl) ∈ list_select P l <-> P a /\ exists hd tl, hd_tl = hd ++ tl /\
     hd ++ [a] ++ tl = l.
 Proof.
   unfold list_select.
@@ -536,34 +536,34 @@ Qed.
 
 
 Lemma elem_of_list_select_perm {A} `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
+  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl :
   (a, hd_tl) ∈ list_select P l -> l ≡ₚ a :: hd_tl.
-Proof. 
+Proof.
   intros [_ (? & ? & -> & <-)]%elem_of_list_select.
   solve_Permutation.
 Qed.
 
 
 Lemma elem_of_list_select_perm_Prop {A} `(P : A -> Prop)
-  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl : 
+  `{forall (a : A), Decision (P a)} (l : list A) a hd_tl :
   (a, hd_tl) ∈ list_select P l -> P a /\ l ≡ₚ a :: hd_tl.
-Proof. 
+Proof.
   intros [? (? & ? & -> & <-)]%elem_of_list_select.
   split; [easy|solve_Permutation].
-Qed. 
+Qed.
 
 
 Definition gmap_map `{Countable A} (m : gmap A A) : A -> A :=
   fun a => default a (m !! a).
 
-Lemma gmap_map_correct `{Countable A} (m : gmap A A) a b : 
+Lemma gmap_map_correct `{Countable A} (m : gmap A A) a b :
   m !! a = Some b -> gmap_map m a = b.
 Proof.
   unfold gmap_map.
   now intros ->.
 Qed.
 
-Lemma gmap_map_idemp `{Countable A} (m : gmap A A) a : 
+Lemma gmap_map_idemp `{Countable A} (m : gmap A A) a :
   a ∉ dom m -> gmap_map m a = a.
 Proof.
   intros Ha.
@@ -575,7 +575,7 @@ Qed.
 
 
 
-Lemma elem_of_from_option_list_singleton {A} (a : A) (ma : option A) : 
+Lemma elem_of_from_option_list_singleton {A} (a : A) (ma : option A) :
   a ∈ from_option (λ x, [x]) [] ma <->
   ma = Some a.
 Proof.
@@ -583,9 +583,9 @@ Proof.
 Qed.
 
 
-Lemma filter_with_iff_neg_Permutation {A} {P Q : A -> Prop} 
-  `{∀ a, Decision (P a)} `{∀ a, Decision (Q a)} l : 
-  (∀ a, P a <-> ~ Q a) -> 
+Lemma filter_with_iff_neg_Permutation {A} {P Q : A -> Prop}
+  `{∀ a, Decision (P a)} `{∀ a, Decision (Q a)} l :
+  (∀ a, P a <-> ~ Q a) ->
   filter P l ++ filter Q l ≡ₚ l.
 Proof.
   intros HPQ.
@@ -600,16 +600,16 @@ Proof.
     solve_Permutation.
 Qed.
 
-Lemma filter_with_neg_Permutation {A} {P : A -> Prop} 
-  `{∀ a, Decision (P a)} l : 
+Lemma filter_with_neg_Permutation {A} {P : A -> Prop}
+  `{∀ a, Decision (P a)} l :
   filter P l ++ filter (λ a, ~ P a) l ≡ₚ l.
 Proof.
   rewrite Permutation_app_comm.
   now apply filter_with_iff_neg_Permutation.
 Qed.
 
-Lemma filter_neg_with_Permutation {A} {P : A -> Prop} 
-  `{∀ a, Decision (P a)} l : 
+Lemma filter_neg_with_Permutation {A} {P : A -> Prop}
+  `{∀ a, Decision (P a)} l :
   filter (λ a, ~ P a) l ++ filter P l ≡ₚ l.
 Proof.
   now apply filter_with_iff_neg_Permutation.
@@ -617,8 +617,8 @@ Qed.
 
 
 
-Lemma fmap_Permuation_iff_exists {A B} (f : A -> B) (l : list A) l' : 
-  f <$> l ≡ₚ l' <-> 
+Lemma fmap_Permuation_iff_exists {A B} (f : A -> B) (l : list A) l' :
+  f <$> l ≡ₚ l' <->
   exists l'', l ≡ₚ l'' /\ f <$> l'' = l'.
 Proof.
   split.
@@ -645,7 +645,7 @@ Qed.
 
 
 Lemma size_map_img_le_size_dom `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} (m : M A) : 
+  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} (m : M A) :
   size (map_img m :> SA) <= size (dom m).
 Proof.
   induction m using map_first_key_ind.
@@ -663,12 +663,12 @@ Qed.
 
 Lemma map_dom_img_lt_card_iff `{FinMapDom K M SK}
   `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (map_img m :> SA) < size (dom m) <-> 
+    (m : M A) :
+  size (map_img m :> SA) < size (dom m) <->
   exists i j a, m !! i = Some a /\ m !! j = Some a /\ i <> j.
 Proof.
   split.
-  - induction m using map_first_key_ind; 
+  - induction m using map_first_key_ind;
     [now rewrite dom_empty, map_img_empty, 2 size_empty|].
     rewrite dom_insert, map_img_insert_notin by easy.
     assert (Hid : i ∉ dom m) by (now apply not_elem_of_dom).
@@ -676,7 +676,7 @@ Proof.
     + apply elem_of_map_img_1 in Hx as (j & Hj).
       intros _.
       exists i, j, x.
-      enough (i <> j) by now 
+      enough (i <> j) by now
       rewrite lookup_insert, lookup_insert_ne.
       intros ->.
       now apply elem_of_dom_2 in Hj.
@@ -693,9 +693,9 @@ Proof.
     rewrite <- (insert_delete (delete i m) j a) by now rewrite lookup_delete_ne.
     rewrite map_img_insert_notin, dom_insert by apply lookup_delete.
     rewrite (union_assoc _), (union_idemp _).
-    rewrite size_union_alt, 
+    rewrite size_union_alt,
       (size_union {[i]}), (size_union {[j]}), 3 size_singleton by set_solver.
-    eapply Nat.le_lt_trans; [apply -> Nat.succ_le_mono; 
+    eapply Nat.le_lt_trans; [apply -> Nat.succ_le_mono;
       apply subseteq_size, subseteq_difference_l; reflexivity|].
     pose proof (size_map_img_le_size_dom (delete j (delete i m)) (SA:=SA)).
     lia.
@@ -703,8 +703,8 @@ Qed.
 
 Lemma map_dom_img_eq_card_iff_inj `{FinMapDom K M SK}
   `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (dom m) = size (map_img m :> SA) <-> 
+    (m : M A) :
+  size (dom m) = size (map_img m :> SA) <->
   forall i j a, m !! i = Some a -> m !! j = Some a -> i = j.
 Proof.
   split.
@@ -725,8 +725,8 @@ Qed.
 
 Lemma map_dom_img_eq_card_iff_NoDup `{FinMapDom K M SK}
   `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
-    (m : M A) : 
-  size (dom m) = size (map_img m :> SA) <-> 
+    (m : M A) :
+  size (dom m) = size (map_img m :> SA) <->
   NoDup (map_to_list m).*2.
 Proof.
   rewrite map_dom_img_eq_card_iff_inj.
@@ -755,9 +755,9 @@ Proof.
 Qed.
 
 
-Lemma elem_of_list_fmap_prod_map {A B C D} 
-  (f : A -> C) (g : B -> D) (l : list (A * B)) cd : 
-  cd ∈ prod_map f g <$> l <-> 
+Lemma elem_of_list_fmap_prod_map {A B C D}
+  (f : A -> C) (g : B -> D) (l : list (A * B)) cd :
+  cd ∈ prod_map f g <$> l <->
   exists a b, (a, b) ∈ l /\ f a = cd.1 /\ g b = cd.2.
 Proof.
   destruct cd as [c d].
@@ -767,20 +767,20 @@ Proof.
   naive_solver.
 Qed.
 
-Lemma fsts_prod_swap {A B} (l : list (A * B)) : 
+Lemma fsts_prod_swap {A B} (l : list (A * B)) :
   (prod_swap <$> l).*1 = l.*2.
 Proof.
   induction l as [|[]]; cbn; f_equal; easy.
 Qed.
 
-Lemma snds_prod_swap {A B} (l : list (A * B)) : 
+Lemma snds_prod_swap {A B} (l : list (A * B)) :
   (prod_swap <$> l).*2 = l.*1.
 Proof.
   induction l as [|[]]; cbn; f_equal; easy.
 Qed.
 
-Lemma lookup_list_to_map_gen `{FinMap K M} {A} 
-  (l : list (K * A)) k : 
+Lemma lookup_list_to_map_gen `{FinMap K M} {A}
+  (l : list (K * A)) k :
     (list_to_map l :> M A) !! k = snd <$> head (filter (λ kv, kv.1 = k) l).
 Proof.
   induction l as [|[k' a'] l IHl].
@@ -792,16 +792,16 @@ Proof.
     apply IHl.
 Qed.
 
-Lemma list_to_map_eq_fold_right `{FinMap K M} {A} 
+Lemma list_to_map_eq_fold_right `{FinMap K M} {A}
   (l : list (K * A)) : (list_to_map l :> M A) = foldr (λ p, <[p.1:=p.2]>) ∅ l.
 Proof.
   induction l; cbn; f_equal; congruence.
 Qed.
 
 
-Lemma gmap_map_inj_on `{Countable A} (m : gmap A A) (X : gset A) : 
-  (forall i j a, m !! i = Some a -> m !! j = Some a -> i = j) -> 
-  X ⊆ dom m -> 
+Lemma gmap_map_inj_on `{Countable A} (m : gmap A A) (X : gset A) :
+  (forall i j a, m !! i = Some a -> m !! j = Some a -> i = j) ->
+  X ⊆ dom m ->
   forall a b, a ∈ X -> b ∈ X -> gmap_map m a = gmap_map m b -> a = b.
 Proof.
   intros Hinj HX a b [ma Hma]%HX%elem_of_dom [mb Hmb]%HX%elem_of_dom.
@@ -811,7 +811,7 @@ Proof.
 Qed.
 
 
-Lemma list_to_set_equiv `{SemiSet A C} (l l' : list A) : 
+Lemma list_to_set_equiv `{SemiSet A C} (l l' : list A) :
   list_to_set l ≡@{C} list_to_set l' <-> l ≡ l'.
 Proof.
   rewrite set_equiv.
@@ -819,7 +819,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma list_to_set_subseteq `{SemiSet A C} (l l' : list A) : 
+Lemma list_to_set_subseteq `{SemiSet A C} (l l' : list A) :
   list_to_set l ⊆@{C} list_to_set l' <-> l ⊆ l'.
 Proof.
   unfold subseteq, set_subseteq_instance, list_subseteq.
@@ -828,21 +828,21 @@ Proof.
 Qed.
 
 
-Notation "'unfold' x" := (ltac:(let x' := eval unfold x in x in 
+Notation "'unfold' x" := (ltac:(let x' := eval unfold x in x in
   exact (eq_refl : x = x'))) (at level 10, only parsing).
 
-Notation "'unfold' x 'in' y" := (ltac:(let y' := eval unfold x in y in 
+Notation "'unfold' x 'in' y" := (ltac:(let y' := eval unfold x in y in
   exact (eq_refl : y = y'))) (at level 10, only parsing).
 
 
-Notation "'unfolded' x" := (ltac:(let x' := eval unfold x in x in 
+Notation "'unfolded' x" := (ltac:(let x' := eval unfold x in x in
   exact x')) (at level 10, only parsing).
 
-Notation "'unfolded' x 'in' y" := (ltac:(let y' := eval unfold x in y in 
+Notation "'unfolded' x 'in' y" := (ltac:(let y' := eval unfold x in y in
   exact y')) (at level 10, only parsing).
 
-Lemma decide_not `{HNP : Decision (~ P)} `{HP : Decision P} {A} (x y : A) : 
-  (if @decide (~ P) HNP then x else y) = 
+Lemma decide_not `{HNP : Decision (~ P)} `{HP : Decision P} {A} (x y : A) :
+  (if @decide (~ P) HNP then x else y) =
   (if @decide P HP then y else x).
 Proof.
   now do 2 case_decide.
@@ -850,11 +850,11 @@ Qed.
 
 
 
-Notation gset_to_Pset s := 
+Notation gset_to_Pset s :=
   (list_to_set (C:=Pset) $ strings.string_to_pos <$> elements s).
 
 
-Lemma elem_of_gset_string_to_Pset (s : gset string) p : 
+Lemma elem_of_gset_string_to_Pset (s : gset string) p :
   p ∈@{Pset} gset_to_Pset s <->
   exists y, y ∈ s /\ p = encode y.
 Proof.
@@ -870,7 +870,7 @@ Proof.
   naive_solver.
 Qed.
 
-Lemma gset_to_Pset_inj (s s' : gset string) : 
+Lemma gset_to_Pset_inj (s s' : gset string) :
   gset_to_Pset s = gset_to_Pset s' -> s = s'.
 Proof.
   intros Heq.
@@ -891,13 +891,13 @@ Proof.
   apply IHl; intros; apply Hfg; now right.
 Qed.
 
-Lemma caps_eq_r_weaken `{FinSet A SA} (X Y Z Z' : SA) : 
+Lemma caps_eq_r_weaken `{FinSet A SA} (X Y Z Z' : SA) :
   Z ⊆ Z' -> X ∩ Z' ≡ Y ∩ Z' -> X ∩ Z ≡ Y ∩ Z.
 Proof.
   set_solver.
 Qed.
 
-Lemma caps_eq_r_weaken_L `{FinSet A SA} `{!LeibnizEquiv SA} (X Y Z Z' : SA) : 
+Lemma caps_eq_r_weaken_L `{FinSet A SA} `{!LeibnizEquiv SA} (X Y Z Z' : SA) :
   Z ⊆ Z' -> X ∩ Z' = Y ∩ Z' -> X ∩ Z = Y ∩ Z.
 Proof.
   unfold_leibniz.
@@ -905,29 +905,29 @@ Proof.
 Qed.
 
 
-Lemma guard_is_Some `{Decision P} {A} (x : A) : 
+Lemma guard_is_Some `{Decision P} {A} (x : A) :
   is_Some (guard P ≫= λ _, Some x) <-> P.
 Proof.
   case_guard; cbn; [done|]; by split; [intros ?%is_Some_None|].
 Qed.
 
-Lemma list_fmap_filter_inv 
-  `(f : A -> B) (g : B -> A) `{!Cancel eq g f} 
-  {P : A -> Prop} `{∀ a, Decision (P a)} l : 
+Lemma list_fmap_filter_inv
+  `(f : A -> B) (g : B -> A) `{!Cancel eq g f}
+  {P : A -> Prop} `{∀ a, Decision (P a)} l :
   f <$> filter P l =@{list B} filter (P ∘ g) (f <$> l).
 Proof.
   induction l; [done|].
   cbn.
-  rewrite (decide_ext (P (g _)) (P a)) by 
+  rewrite (decide_ext (P (g _)) (P a)) by
     now rewrite (cancel g f).
   unfold filter in *.
   rewrite <- IHl.
   by case_decide.
 Qed.
 
-Lemma list_filter_fmap 
+Lemma list_filter_fmap
   `(f : A -> B)
-  {P : B -> Prop} `{∀ a, Decision (P a)} l : 
+  {P : B -> Prop} `{∀ a, Decision (P a)} l :
   filter P (f <$> l) =@{list B} f <$> filter (P ∘ f) l.
 Proof.
   induction l; [done|].
@@ -938,7 +938,7 @@ Proof.
 Qed.
 
 Lemma list_filter_iff_strong {A} (P1 P2 : A -> Prop)
-  `{∀ a, Decision (P1 a)} `{∀ a, Decision (P2 a)} (l : list A) : 
+  `{∀ a, Decision (P1 a)} `{∀ a, Decision (P2 a)} (l : list A) :
   (∀ a, a ∈ l -> P1 a <-> P2 a) ->
   filter P1 l = filter P2 l.
 Proof.
@@ -987,44 +987,44 @@ Fixpoint pfin_to_pos {p} (i : pfin p) : positive :=
   end.
 
 
-Lemma pfin_to_pos_lt {p} (i : pfin p) : 
+Lemma pfin_to_pos_lt {p} (i : pfin p) :
   pfin_to_pos i < p.
 Proof.
   induction i; cbn; lia.
 Qed.
 
 Definition pfin_1_inv (P : pfin 1 -> Type) (i : pfin 1) : P i :=
-  match i with | PFO_H | PFO_O _ | PFO_I _ 
-  | PFI_H | PFI_SH | PFI_SO _ | PFI_SI _ => 
+  match i with | PFO_H | PFO_O _ | PFO_I _
+  | PFI_H | PFI_SH | PFI_SO _ | PFI_SI _ =>
     fun devil => False_rect (@ID) devil end.
 
-Definition pfin_xO_inv {p} (P : pfin p~0 -> Type) (H1 : P PFO_H) 
-  (HxO : forall i, P (PFO_O i)) (HxI : forall i, P (PFO_I i)) : 
+Definition pfin_xO_inv {p} (P : pfin p~0 -> Type) (H1 : P PFO_H)
+  (HxO : forall i, P (PFO_O i)) (HxI : forall i, P (PFO_I i)) :
   forall i, P i :=
-  fun i => 
-  match i as i' in pfin p return 
+  fun i =>
+  match i as i' in pfin p return
     forall (P : pfin p -> Type),
-    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with 
+    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with
     | p~0 => fun P i => _ -> _ -> _ -> P i
     | _ => fun P _ => True
     end P i' with
   | PFO_H => fun P H1 _ _ => H1
   | PFO_O i => fun P _ HxO _ => HxO i
   | PFO_I i => fun P _ _ HxI => HxI i
-  | PFI_H 
+  | PFI_H
   | PFI_SH
-  | PFI_SO _ 
+  | PFI_SO _
   | PFI_SI _ => fun _ => Logic.I
   end P H1 HxO HxI.
 
 Definition pfin_xI_inv {p} (P : pfin p~1 -> Type) (H1 : P PFI_H)
   (H2 : P PFI_SH)
-  (HxO : forall i, P (PFI_SO i)) (HxI : forall i, P (PFI_SI i)) : 
+  (HxO : forall i, P (PFI_SO i)) (HxI : forall i, P (PFI_SI i)) :
   forall i, P i :=
-  fun i => 
-  match i as i' in pfin p return 
+  fun i =>
+  match i as i' in pfin p return
     forall (P : pfin p -> Type),
-    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with 
+    match p as p' return (pfin p' -> Type) -> (pfin p' -> Type) with
     | p~1 => fun P i => _ -> _ -> _ -> _ -> P i
     | _ => fun P _ => True
     end P i' with
@@ -1032,43 +1032,43 @@ Definition pfin_xI_inv {p} (P : pfin p~1 -> Type) (H1 : P PFI_H)
   | PFI_SH => fun P _ H2 _ _ => H2
   | PFI_SO i => fun P _ _ HxO _ => HxO i
   | PFI_SI i => fun P _ _ _ HxI => HxI i
-  | PFO_H 
-  | PFO_O _ 
+  | PFO_H
+  | PFO_O _
   | PFO_I _ => fun _ => Logic.I
   end P H1 H2 HxO HxI.
 
 Definition PFI_S {p} (i : pfin p~0) : pfin p~1 :=
   pfin_xO_inv _ PFI_SH PFI_SO PFI_SI i.
 
-Definition pfin_xI_inv' {p} (P : pfin p~1 -> Type) 
+Definition pfin_xI_inv' {p} (P : pfin p~1 -> Type)
   (H1 : P PFI_H) (HS : forall i, P (PFI_S i)) i : P i :=
-  pfin_xI_inv P H1 (HS PFO_H) (fun i => HS (PFO_O i)) 
+  pfin_xI_inv P H1 (HS PFO_H) (fun i => HS (PFO_O i))
     (fun i => HS (PFO_I i)) i.
 
-Definition pfin_rect' (P : forall p, pfin p -> Type) 
+Definition pfin_rect' (P : forall p, pfin p -> Type)
   (HO_1 : forall p, P p~0 PFO_H) (HI_1 : forall p, P p~1 PFI_H)
   (HxO : forall p i, P p i -> P p~0 (PFO_O i))
   (HxI : forall p i, P p i -> P p~0 (PFO_I i))
   (HS : forall p i, P p~0 i -> P p~1 (PFI_S i)) : forall p i, P p i :=
   fix go p :=
-  match p with 
+  match p with
   | 1 => pfin_1_inv _
-  | p~0 => pfin_xO_inv (P p~0) (HO_1 _) 
+  | p~0 => pfin_xO_inv (P p~0) (HO_1 _)
     (fun i => HxO _ _ (go _ i)) (fun i => HxI _ _ (go _ i))
-  | p~1 => pfin_xI_inv' (P p~1) (HI_1 _) 
-    (fun i => HS _ _ (pfin_xO_inv (P p~0) (HO_1 _) 
-    (fun i => HxO _ _ (go _ i)) (fun i => HxI _ _ (go _ i)) i)) 
+  | p~1 => pfin_xI_inv' (P p~1) (HI_1 _)
+    (fun i => HS _ _ (pfin_xO_inv (P p~0) (HO_1 _)
+    (fun i => HxO _ _ (go _ i)) (fun i => HxI _ _ (go _ i)) i))
   end.
 
 Definition pfin_1 {p} : pfin (Pos.succ p) :=
-  match p with 
+  match p with
   | 1 => PFO_H
   | p~0 => PFI_H
   | p~1 => PFO_H
   end.
 
 Fixpoint pfin_S {p} : pfin p -> pfin (Pos.succ p) :=
-  match p with 
+  match p with
   | 1 => pfin_1_inv _
   | p~0 => PFI_S
   | p~1 => pfin_xI_inv _ (PFO_O pfin_1) (PFO_I pfin_1)
@@ -1098,36 +1098,36 @@ Proof.
 Qed.
 
 Fixpoint pos_to_pfin (i p : positive) : i < p -> pfin p :=
-  match p with 
+  match p with
   | xH => fun H => False_rect (pfin 1) (Pos.nlt_1_r i H)
-  | p~0 => match i with 
+  | p~0 => match i with
     | xH => fun _ => PFO_H
     | i~0 => fun H => PFO_O (pos_to_pfin i p H)
-    | i~1 => fun H => PFO_I (pos_to_pfin i p 
+    | i~1 => fun H => PFO_I (pos_to_pfin i p
       (lt_xI_xO_inv H))
     end
-  | p~1 => 
+  | p~1 =>
     Pos.peano_rect (fun i => i < p~1 -> pfin p~1)
       (fun _ => PFI_H)
-      (fun i _ => 
-      match i with 
+      (fun i _ =>
+      match i with
       | xH => fun _ => PFI_SH
       | i~0 => fun H => PFI_SO (pos_to_pfin i p H)
       | i~1 => fun H => PFI_SI (pos_to_pfin i p (lt_SxI_xI_inv H))
       end) i
   end.
 
-Lemma pfin_to_pos_to_pfin {p} (i : pfin p) H : 
+Lemma pfin_to_pos_to_pfin {p} (i : pfin p) H :
   pos_to_pfin (pfin_to_pos i) p H = i.
 Proof.
-  induction i; cbn; rewrite 1?Pos.peano_rect_succ, 1?IHi; 
+  induction i; cbn; rewrite 1?Pos.peano_rect_succ, 1?IHi;
     try reflexivity.
 Qed.
 
-Lemma pos_to_pfin_to_pos i p H : 
+Lemma pos_to_pfin_to_pos i p H :
   pfin_to_pos (pos_to_pfin i p H) = i.
 Proof.
-  revert i H; induction p; intros i H; [destruct i..|lia]; 
+  revert i H; induction p; intros i H; [destruct i..|lia];
   cbn; rewrite ?IHp; try reflexivity.
   destruct i using Pos.peano_case; [reflexivity|].
   rewrite Pos.peano_rect_succ.
@@ -1139,18 +1139,18 @@ Qed.
 
 
 Fixpoint pos_to_pfin_opt (i p : positive) : option (pfin p) :=
-  match p with 
+  match p with
   | xH => None
-  | p~0 => match i with 
+  | p~0 => match i with
     | xH => Some (PFO_H)
     | i~0 => PFO_O <$> (pos_to_pfin_opt i p)
     | i~1 => PFO_I <$> (pos_to_pfin_opt i p)
     end
-  | p~1 => 
+  | p~1 =>
     Pos.peano_rect (fun i => option (pfin p~1))
       (Some PFI_H)
-      (fun i _ => 
-      match i with 
+      (fun i _ =>
+      match i with
       | xH => Some PFI_SH
       | i~0 => PFI_SO <$> (pos_to_pfin_opt i p)
       | i~1 => PFI_SI <$> (pos_to_pfin_opt i p)
@@ -1158,7 +1158,7 @@ Fixpoint pos_to_pfin_opt (i p : positive) : option (pfin p) :=
   end.
 
 
-Lemma pos_to_pfin_opt_is_Some i p : 
+Lemma pos_to_pfin_opt_is_Some i p :
   is_Some (pos_to_pfin_opt i p) <-> i < p.
 Proof.
   revert i; induction p; intros i; cbn.
@@ -1173,7 +1173,7 @@ Proof.
   - split; [intros []%is_Some_None|lia].
 Qed.
 
-Lemma pos_to_pfin_opt_correct i p H : 
+Lemma pos_to_pfin_opt_correct i p H :
   pos_to_pfin_opt i p = Some (pos_to_pfin i p H).
 Proof.
   revert i H; induction p; intros i H; cbn.
@@ -1189,12 +1189,12 @@ End pfin.
 Module pvec.
 
 #[universes(template)]
-Inductive pvec (A : Type) : positive -> Type := 
+Inductive pvec (A : Type) : positive -> Type :=
   | pvnil : pvec A 1
   | pvxO {p} (aH : A) (pO : pvec A p) (pI : pvec A p) : pvec A p~0
   | pvxI {p} (aH aSH : A) (pO : pvec A p) (pI : pvec A p) : pvec A p~1.
 
-(* 
+(*
 Inductive pfin : positive -> Set :=
   | PFO_H {p} : pfin (p~0)
   | PFO_O {p} : pfin p -> pfin (p~0)
@@ -1366,7 +1366,7 @@ Proof.
   apply Hty.
 Qed.
 
-(* Lemma map_is_subtyped_iff_restriction_is_typed mT mD :
+Lemma map_is_subtyped_iff_restriction_is_typed mT mD :
   map_is_subtyped ty mT mD <->
   map_is_typed ty mT (filter (λ kv, is_Some (mT !! kv.1)) mD).
 Proof.
@@ -1374,15 +1374,52 @@ Proof.
   setoid_rewrite map_lookup_filter.
   cbn.
   split.
-  -  *)
+  - intros Hst k.
+    destruct (mT !! k) as [t|] eqn:Ht.
+    + cbn.
+      apply Hst in Ht as Htyd.
+      destruct (mD !! k) as [d|] eqn:Hd; [|easy].
+      cbn in Htyd.
+      revert Htyd.
+      intros [= <-].
+      cbn.
+      case_guard as HSome; [|now rewrite is_Some_alt in HSome].
+      reflexivity.
+    + cbn.
+      destruct (mD !! k); [|reflexivity].
+      cbn.
+      case_guard as HSome; cbn; now rewrite is_Some_alt in HSome.
+  - intros Hty.
+    intros k t Hmt.
+    specialize (Hty k).
+    rewrite Hmt in Hty.
+    rewrite <- Hty.
+    destruct (mD !! k); [|reflexivity].
+    cbn.
+    clear Hty.
+    case_guard as HSome; cbn; now rewrite is_Some_alt in HSome.
+Qed.
 
 
-(* Lemma map_is_subtyped_iff_submap_is_typed mT mD :
+Lemma map_is_subtyped_iff_submap_is_typed mT mD :
   map_is_subtyped ty mT mD <->
   exists mD', mD' ⊆ mD /\ map_is_typed ty mT mD'.
 Proof.
   split.
-  -  *)
+  - intros Hst.
+    eexists; split; [|apply map_is_subtyped_iff_restriction_is_typed; eauto].
+    apply map_filter_subseteq.
+  - intros (mD' & HmD' & Hty).
+    intros k t Hmk.
+    specialize (Hty k).
+    rewrite Hmk in Hty.
+    destruct (mD' !! k) as [d'|] eqn:Hd'; [|easy].
+    cbn in Hty.
+    pose proof (lookup_weaken _ _ _ _ Hd' HmD') as Hd''.
+    rewrite Hd''.
+    cbn.
+    easy.
+Qed.
 
 Lemma map_is_typed_None k mT mD :
   map_is_typed ty mT mD ->
@@ -1436,65 +1473,65 @@ Proof.
 Qed.
 
 (* TODO: Extend to gmap *)
-Fixpoint Pmap_ne_dom_subseteqb 
+Fixpoint Pmap_ne_dom_subseteqb
   {A B} (ma : Pmap_ne A) (mb : Pmap_ne B) : bool :=
-  match ma with 
-  | PNode001 mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+  match ma with
+  | PNode001 mar => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match mbr with
     | PNodes mbr => Pmap_ne_dom_subseteqb mar mbr
     | _ => false
     end)
-  | PNode010 a => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+  | PNode010 a => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match b with
     | Some _ => true
     | _ => false
     end)
-  | PNode011 a mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+  | PNode011 a mar => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match b, mbr with
     | Some _, PNodes mbr => Pmap_ne_dom_subseteqb mar mbr
     | _, _ => false
-    end) 
-  | PNode100 mal => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    end)
+  | PNode100 mal => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match mbl with
     | PNodes mbl => Pmap_ne_dom_subseteqb mal mbl
     | _ => false
     end)
-  | PNode101 mal mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+  | PNode101 mal mar => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match mbl, mbr with
-    | PNodes mbl, PNodes mbr => 
-      if Pmap_ne_dom_subseteqb mal mbl then 
+    | PNodes mbl, PNodes mbr =>
+      if Pmap_ne_dom_subseteqb mal mbl then
         Pmap_ne_dom_subseteqb mar mbr
       else false
     | _, _ => false
-    end) 
-  | PNode110 mal a => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    end)
+  | PNode110 mal a => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match mbl, b with
     | PNodes mbl, Some _ => Pmap_ne_dom_subseteqb mal mbl
     | _, _ => false
-    end) 
-  | PNode111 mal a mar => pmap.Pmap_ne_case mb (fun mbl b mbr => 
+    end)
+  | PNode111 mal a mar => pmap.Pmap_ne_case mb (fun mbl b mbr =>
     match mbl, b, mbr with
-    | PNodes mbl, Some _, PNodes mbr => 
-      if Pmap_ne_dom_subseteqb mal mbl then 
+    | PNodes mbl, Some _, PNodes mbr =>
+      if Pmap_ne_dom_subseteqb mal mbl then
         Pmap_ne_dom_subseteqb mar mbr
       else false
     | _, _, _ => false
-    end) 
+    end)
   end.
 
-Definition Pmap_dom_subseteqb 
+Definition Pmap_dom_subseteqb
   {A B} (ma : Pmap A) (mb : Pmap B) : bool :=
-  match ma with 
+  match ma with
   | PEmpty => true
-  | PNodes ma => match mb with 
+  | PNodes ma => match mb with
     | PNodes mb => Pmap_ne_dom_subseteqb ma mb
     | _ => false
     end
   end.
 
 
-Lemma forall_positive {P : positive -> Prop} : 
-  (forall p, P p) <-> 
+Lemma forall_positive {P : positive -> Prop} :
+  (forall p, P p) <->
   P xH /\ (forall p, P (xO p)) /\ (forall p, P (xI p)).
 Proof.
   split; [auto|].
@@ -1535,28 +1572,28 @@ Qed.
 Lemma Pmap_ne_not_empty {A} (m : Pmap_ne A) : ~ (forall p, ~ (is_Some (m !! p))).
 Proof.
   intros HF.
-  now destruct (pmap.Pmap_ne_lookup_not_None m) as 
+  now destruct (pmap.Pmap_ne_lookup_not_None m) as
     (p & []%not_eq_None_Some%HF).
 Qed.
 
-Local Lemma Pmap_ne_not_empty_alt {A B} (m : Pmap_ne A) : 
+Local Lemma Pmap_ne_not_empty_alt {A B} (m : Pmap_ne A) :
   ~ (forall p, is_Some (m !! p) -> @is_Some B None).
 Proof.
   setoid_rewrite is_Some_None_iff.
   apply Pmap_ne_not_empty.
 Qed.
 
-Lemma Pmap_ne_dom_subseteqb_correct {A B} (ma : Pmap_ne A) (mb : Pmap_ne B) : 
-  Pmap_ne_dom_subseteqb ma mb <-> 
+Lemma Pmap_ne_dom_subseteqb_correct {A B} (ma : Pmap_ne A) (mb : Pmap_ne B) :
+  Pmap_ne_dom_subseteqb ma mb <->
     forall i, is_Some (ma !! i) -> is_Some (mb !! i).
 Proof.
   revert mb; induction ma; intros mb; cbn.
   - rewrite forall_positive; cbn.
     setoid_rewrite is_Some_None_iff.
     setoid_rewrite False_impl.
-    destruct mb; cbn; 
+    destruct mb; cbn;
     first [split; [exact (False_rect _)|intros; destruct_and!;
-      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      eapply Pmap_ne_not_empty_alt; eassumption] |
       rewrite IHma; easy].
   - rewrite forall_positive; cbn.
     setoid_rewrite is_Some_None_iff.
@@ -1569,24 +1606,24 @@ Proof.
     setoid_rewrite False_impl.
     rewrite is_Some_Some_iff.
     rewrite is_Some_alt.
-    destruct mb; cbn; 
+    destruct mb; cbn;
     (* destruct mb; cbn;  *)
     first [easy | split; [exact (False_rect _)|intros; destruct_and!;
-      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      eapply Pmap_ne_not_empty_alt; eassumption] |
       rewrite IHma; easy].
   - rewrite forall_positive; cbn.
     setoid_rewrite is_Some_None_iff.
     setoid_rewrite False_impl.
-    destruct mb; cbn; 
+    destruct mb; cbn;
     first [split; [exact (False_rect _)|intros; destruct_and!;
-      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      eapply Pmap_ne_not_empty_alt; eassumption] |
       rewrite IHma; easy].
   - rewrite forall_positive; cbn.
     rewrite is_Some_None_iff.
     rewrite False_impl.
     destruct mb; cbn;
     first [split; [exact (False_rect _)|intros; destruct_and!;
-      eapply Pmap_ne_not_empty_alt; eassumption] | 
+      eapply Pmap_ne_not_empty_alt; eassumption] |
       rewrite lazy_andb_True, IHma1, IHma2; tauto].
   - rewrite forall_positive; cbn.
     setoid_rewrite is_Some_None_iff.
@@ -1595,7 +1632,7 @@ Proof.
     destruct mb; cbn;
     first [easy | split; [exact (False_rect _)|intros; destruct_and!;
       easy || eapply Pmap_ne_not_empty_alt; eassumption] |
-      rewrite IHma; easy]. 
+      rewrite IHma; easy].
   - rewrite forall_positive; cbn.
     rewrite is_Some_Some_iff, True_impl, is_Some_alt.
     destruct mb; cbn;
@@ -1605,8 +1642,8 @@ Proof.
 Qed.
 
 
-Lemma Pmap_dom_subseteqb_correct_impl {A B} (ma : Pmap A) (mb : Pmap B) : 
-  Pmap_dom_subseteqb ma mb <-> 
+Lemma Pmap_dom_subseteqb_correct_impl {A B} (ma : Pmap A) (mb : Pmap B) :
+  Pmap_dom_subseteqb ma mb <->
     forall i, is_Some (ma !! i) -> is_Some (mb !! i).
 Proof.
   unfold Pmap_lookup, lookup.
@@ -1616,8 +1653,8 @@ Proof.
   - apply Pmap_ne_dom_subseteqb_correct.
 Qed.
 
-Lemma Pmap_dom_subseteqb_correct {A B} (ma : Pmap A) (mb : Pmap B) : 
-  Pmap_dom_subseteqb ma mb <-> 
+Lemma Pmap_dom_subseteqb_correct {A B} (ma : Pmap A) (mb : Pmap B) :
+  Pmap_dom_subseteqb ma mb <->
     dom ma ⊆ dom mb.
 Proof.
   rewrite Pmap_dom_subseteqb_correct_impl.
@@ -1625,18 +1662,18 @@ Proof.
   now rewrite 2 elem_of_dom.
 Qed.
 
-Lemma Pmap_dom_subseteqb_correct' {A B} (ma : Pmap A) (mb : Pmap B) : 
+Lemma Pmap_dom_subseteqb_correct' {A B} (ma : Pmap A) (mb : Pmap B) :
   if (Pmap_dom_subseteqb ma mb) then
     dom ma ⊆ dom mb
-  else 
+  else
     ~ dom ma ⊆ dom mb.
 Proof.
   generalize (Pmap_dom_subseteqb_correct ma mb); now case_match; naive_solver.
 Qed.
 
 
-#[global] Instance Pmap_dom_subseteq_dec {A B} (ma : Pmap A) (mb : Pmap B) : 
-  Decision (dom ma ⊆ dom mb) := 
+#[global] Instance Pmap_dom_subseteq_dec {A B} (ma : Pmap A) (mb : Pmap B) :
+  Decision (dom ma ⊆ dom mb) :=
   match Pmap_dom_subseteqb ma mb as b return ((if b then _ else _ :> Prop) -> _) with
   | true => left
   | false => right
@@ -1652,10 +1689,10 @@ Proof.
   now intros ? [].
 Qed.
 
-Notation Pset_subseteqb ma mb := 
+Notation Pset_subseteqb ma mb :=
   (Pmap_dom_subseteqb ma.(mapset.mapset_car) mb.(mapset.mapset_car)).
 
-Lemma Pset_subseteqb_correct (ma : Pset) (mb : Pset) : 
+Lemma Pset_subseteqb_correct (ma : Pset) (mb : Pset) :
   Pset_subseteqb ma mb <->
     ma ⊆ mb.
 Proof.
@@ -1664,22 +1701,22 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma Pset_subseteqb_correct' (ma : Pset) (mb : Pset) : 
+Lemma Pset_subseteqb_correct' (ma : Pset) (mb : Pset) :
   if Pset_subseteqb ma mb then
     ma ⊆ mb
-  else 
+  else
     ~ ma ⊆ mb.
 Proof.
   (* destruct ma as [ma], mb as [mb].  *)
-  cbn. 
-  pose proof (Pmap_dom_subseteqb_correct' 
+  cbn.
+  pose proof (Pmap_dom_subseteqb_correct'
     ma.(mapset.mapset_car) mb.(mapset.mapset_car)) as Hen.
   rewrite 2 dom_Pset in Hen.
   apply Hen.
 Qed.
 
-#[global] Instance Pset_subseteq_dec (ma : Pset) (mb : Pset) : 
-  Decision (ma ⊆ mb) := 
+#[global] Instance Pset_subseteq_dec (ma : Pset) (mb : Pset) :
+  Decision (ma ⊆ mb) :=
   match Pset_subseteqb ma mb
     as b return ((if b then _ else _ :> Prop) -> _) with
   | true => left
@@ -1687,15 +1724,15 @@ Qed.
   end (Pset_subseteqb_correct' ma mb).
 
 
-(*   
+(*
 
 Fixpoint Pmap_ne_relation_dec {A B} (P : positive -> A -> B -> Prop)
-  (PA : positive -> A -> Prop) (PB : positive -> B -> Prop) 
+  (PA : positive -> A -> Prop) (PB : positive -> B -> Prop)
   `{HP : forall i a b, Decision (P i a b)}
   `{HPA : forall i a, Decision (PA i a)}
-  `{HPB : forall i b, Decision (PB i b)} 
+  `{HPB : forall i b, Decision (PB i b)}
   (ma : Pmap_ne A) : forall mb : Pmap_ne B, Decision (map_relation P PA PB ma mb) :=
-  match ma with 
+  match ma with
   | PNode001 *)
 
 
@@ -1971,4 +2008,171 @@ Lemma list_bind_comm {A B C} (f : A -> B -> list C) l l' :
 Proof.
   induction l; [cbn; now rewrite list_bind_nil_r|cbn].
   now rewrite list_bind_app_r, IHl.
+Qed.
+
+
+Add Parametric Morphism {A B} : fmap with signature
+  pointwise_relation A (@eq B) ==> (@eq (list A)) ==> (@eq (list B)) as list_fmap_mor.
+Proof.
+  intros; unfold pointwise_relation;
+  apply list_fmap_ext; auto.
+Qed.
+
+
+Definition set_Forall2 `{ElemOf A C} (R : relation A) (s : C) : Prop :=
+  forall a a', a ∈ s -> a' ∈ s -> R a a'.
+
+Add Parametric Morphism `{ElemOf A C} : (@set_Forall2 A C _) with signature
+  pointwise_relation A (pointwise_relation A iff) ==> (≡) ==> iff as set_Forall2_ext.
+Proof.
+  intros R R' HR s s' Hs.
+  apply forall_iff; intros a.
+  apply forall_iff; intros a'.
+  rewrite Hs.
+  apply forall_iff; intros Ha.
+  apply forall_iff; intros Ha'.
+  apply HR.
+Qed.
+
+Add Parametric Morphism `{ElemOf A C} : (@set_Forall2 A C _) with signature
+  pointwise_relation A (pointwise_relation A impl) --> (⊆) ==> flip impl as set_Forall2_mono.
+Proof.
+  intros R R' HR s s' Hs.
+  unfold impl, set_Forall2.
+  intros Has a a' Ha Ha'.
+  apply HR.
+  now apply Has; apply Hs.
+Qed.
+
+Lemma set_Forall2_list_to_set `{SemiSet A C} (R : relation A) (l : list A) :
+  set_Forall2 R (list_to_set l :> C) <-> ForallPairs R l.
+Proof.
+  unfold set_Forall2, ForallPairs.
+  setoid_rewrite elem_of_list_to_set.
+  now setoid_rewrite elem_of_list_In.
+Qed.
+(* FIXME: Move *)
+Lemma ForallPairs_forall {A} {R : relation A} (l : list A) :
+  ForallPairs R l <-> forall a b, a ∈ l -> b ∈ l -> R a b.
+Proof.
+  unfold ForallPairs.
+  now setoid_rewrite elem_of_list_In.
+Qed.
+Section invfun.
+Context `{Inhabited (B -> A), EqDecision B} .
+Definition invfun (f : A -> B) (dom : list A) : B -> A :=
+  λ b, default (inhabitant b) (ia ← list_find (eq b) (f <$> dom); dom !! ia.1).
+Lemma invfun_rinv (f : A -> B) (dom : list A) b :
+  b ∈ f <$> dom ->
+  f (invfun f dom b) = b.
+Proof.
+  intros Hb.
+  unfold invfun.
+  destruct (list_find_elem_of (eq b) (f <$> dom) b Hb eq_refl)
+    as [ia Hia].
+  rewrite Hia.
+  cbn.
+  destruct ia as [i b'].
+  apply list_find_Some in Hia.
+  rewrite list_lookup_fmap in Hia.
+  cbn.
+  destruct Hia as (Hlook & <- & ?).
+  destruct (dom !! i) in *; cbn in *; congruence.
+Qed.
+Lemma invfun_linv (f : A -> B) (dom : list A) a :
+  (ForallPairs (λ a a', f a = f a' -> a = a') dom) ->
+  a ∈ dom ->
+  invfun f dom (f a) = a.
+Proof.
+  intros Hinj Ha.
+  unfold invfun.
+  apply (elem_of_list_fmap_1 f) in Ha as Hfa.
+  destruct (list_find_elem_of (eq (f a)) (f <$> dom) _ Hfa eq_refl)
+    as [ia Hia].
+  rewrite Hia.
+  cbn.
+  destruct ia as [i b'].
+  apply list_find_Some in Hia.
+  rewrite list_lookup_fmap in Hia.
+  cbn.
+  destruct Hia as (Hlook & <- & ?).
+  destruct (dom !! i) as [a'|] eqn:Ha' in *; [cbn in *|easy].
+  apply ((ForallPairs_forall _).1 Hinj).
+  - by apply elem_of_list_lookup_2 in Ha'.
+  - easy.
+  - congruence.
+Qed.
+Lemma invfun_inj (f : A -> B) (dom : list A) :
+  ForallPairs (λ a a', f a = f a' -> a = a') dom ->
+  ForallPairs (λ a a', invfun f dom a = invfun f dom a' -> a = a') (f <$> dom).
+Proof.
+  intros Hinj.
+  rewrite ForallPairs_forall.
+  intros ? ? (a & -> & Ha)%elem_of_list_fmap (b & -> & Hb)%elem_of_list_fmap.
+  rewrite 2 invfun_linv by easy; now intros ->.
+Qed.
+End invfun.
+Lemma set_map_list_to_set `{FinSet A SA, SemiSet B SB}
+  (f : A -> B) (l : list A) :
+  set_map f (list_to_set l :> SA) ≡@{SB} list_to_set (f <$> l).
+Proof.
+  intros x.
+  rewrite elem_of_map.
+  setoid_rewrite elem_of_list_to_set.
+  symmetry; apply elem_of_list_fmap.
+Qed.
+Lemma set_map_list_to_set_L `{FinSet A SA, SemiSet B SB, !LeibnizEquiv SB}
+  (f : A -> B) (l : list A) :
+  set_map f (list_to_set l :> SA) =@{SB} list_to_set (f <$> l).
+Proof.
+  unfold_leibniz; apply set_map_list_to_set.
+Qed.
+Lemma kmap_id `{FinMap K M} {A} (m : M A) :
+  kmap id m = m.
+Proof.
+  apply map_eq.
+  intros.
+  apply (lookup_kmap id m i).
+Qed.
+Lemma map_Forall_inj_iff `{FinMap K M} {A K'}
+  (f : K -> K') (m : M A) :
+  map_Forall (λ i _, map_Forall (λ j _, f i = f j -> i = j) m) m <->
+  ForallPairs (λ i j, f i = f j -> i = j) (map_to_list m).*1.
+Proof.
+  unfold map_Forall; rewrite ForallPairs_forall.
+  split.
+  - intros Hinj _ _ ([a x] & [= ->] & Ha%elem_of_map_to_list)%elem_of_list_fmap
+    ([b y] & [= ->] & Hb%elem_of_map_to_list)%elem_of_list_fmap.
+    eauto.
+  - intros Hinj a x Ha%elem_of_map_to_list%(elem_of_list_fmap_1 fst)
+      b y Hb%elem_of_map_to_list%(elem_of_list_fmap_1 fst).
+    now apply Hinj.
+Qed.
+
+
+Lemma dif_dist {P Q} {A B} (f : A -> B) (b : {P} + {Q}) (x y : A) :
+  f (if b then x else y) = if b then f x else f y.
+Proof.
+  now destruct b.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma rev_reverse {A} (l : list A) :
+  rev l = reverse l.
+Proof.
+  induction l; [reflexivity|].
+  now rewrite reverse_cons, <- IHl.
+Qed.
+
+Lemma rev_append_reverse {A} (l l' : list A) :
+  rev_append l l' = reverse l ++ l'.
+Proof.
+  now rewrite rev_append_rev, rev_reverse.
+Qed.
+
+Lemma union_eq_l {A} (ma ma' : option A) :
+  is_Some ma -> ma ∪ ma' = ma.
+Proof.
+  now destruct ma, ma'; intros [].
 Qed.

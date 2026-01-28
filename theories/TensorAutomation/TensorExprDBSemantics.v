@@ -379,35 +379,6 @@ Definition swaprel (v : var) : var :=
   end.
 
 
-Lemma pos_add_N_to_nat p n :
-  (pos_add_N p n =@{nat} p + N.to_nat n)%nat.
-Proof.
-  destruct n; cbn; unfold pos_to_nat_pred; lia.
-Qed.
-
-Lemma pos_sub_N_to_nat p n :
-  (pos_sub_N p n =@{nat} p - N.to_nat n)%nat.
-Proof.
-  destruct n; cbn; unfold pos_to_nat_pred; lia.
-Qed.
-
-Lemma pos_pred_to_nat p :
-  Pos.pred p =@{nat} pred p.
-Proof.
-  unfold pos_to_nat_pred; lia.
-Qed.
-
-Lemma pos_add_N_alt p n :
-  pos_add_N p n = Pos.pred (N.succ_pos (Npos p + n)).
-Proof.
-  destruct n; cbn; lia.
-Qed.
-
-Lemma pos_sub_N_alt p n :
-  pos_sub_N p n = Pos.pred (N.succ_pos (Npos p - n)).
-Proof.
-  destruct n; cbn; lia.
-Qed.
 
 Lemma total_semantics_aux_cons_gen mabs mg ml mr mr' te p x :
   p ∉ te_local_varset te ->
@@ -2133,25 +2104,6 @@ Definition abstracts_semantics_alt mabs mg ml mr abs :=
   Rlist_prod ((λ '(f, low, up), abstract_semantics_alt mabs mg ml mr f low up)
     <$> abs).
 
-(* FIXME: Move *)
-Lemma rev_reverse {A} (l : list A) :
-  rev l = reverse l.
-Proof.
-  induction l; [reflexivity|].
-  now rewrite reverse_cons, <- IHl.
-Qed.
-
-Lemma rev_append_reverse {A} (l l' : list A) :
-  rev_append l l' = reverse l ++ l'.
-Proof.
-  now rewrite rev_append_rev, rev_reverse.
-Qed.
-
-Lemma union_eq_l {A} (ma ma' : option A) :
-  is_Some ma -> ma ∪ ma' = ma.
-Proof.
-  now destruct ma, ma'; intros [].
-Qed.
 
 
 Lemma fill_tensorlist_rewrite_semantics mabs mg ml
