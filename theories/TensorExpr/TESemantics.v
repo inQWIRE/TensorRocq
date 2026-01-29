@@ -1979,8 +1979,15 @@ Proof.
   do 2 case_decide; lia.
 Qed.
 
+(* FIXME: Move *)
+Lemma Rlist_prod_Forall2_ext (rs rs' : list R) : 
+  Forall2 req rs rs' -> Rlist_prod rs == Rlist_prod rs'.
+Proof.
+  intros Halls.
+  f_equiv.
+  now apply eqlistA_PermutationA, eqlistA_altdef.
+Qed.
 
-(* 
 Lemma tl_aeq_correct mabs ml tl tl' :
   tl =tl= tl' ->
   tl_total_semantics mabs ml tl ==
@@ -2007,167 +2014,33 @@ Proof.
   }
   intros m Hm%elem_of_Vmap_elements_1.
   f_equiv.
-  - rewrite Habs.
-
-
-
-  
-
-  rewrite 2 tl_total_semantics_alt_Vlist.
-  (* rewrite 2 sum_of_Vlist_reverse. *)
-  apply (sum_of_relabel'_l2r (ppermute f))
-    (* (reflect_posperm (lengthP tl.(tl_sums)) f)))*);
-    unfold sum_elements, Vlist_summable.
-  - intros mr Hmr%elem_of_Vlist_elements.
-    cbn.
-    erewrite Rlist_prod_perm_mor by now
-      apply SetoidPermutation.Permutation_PermutationA; [easy|];
-      rewrite Habs.
-    apply Rlist_prod_ext.
-    rewrite 2 Forall2_fmap_l, Forall2_fmap_r.
+  - erewrite Rlist_prod_perm by now rewrite Habs.
+    apply Rlist_prod_Forall2_ext.
+    rewrite Forall2_fmap_l, Forall2_fmap.
     apply Forall_Forall2_diag.
     rewrite Forall_forall.
-    intros ((idx, low), up) Hin.
+    intros [[idx low] up] _.
     cbn.
-    apply eq_reflexivity, abstract_semantics_ext; [reflexivity|].
-    rewrite <- fmap_app, <- list_fmap_compose.
-    apply list_fmap_ext; intros _ [r| |] _; [|reflexivity..].
+    apply eq_reflexivity, abstract_semantics_alt_ext; [reflexivity|..];
+      rewrite <- list_fmap_compose; apply list_fmap_ext; 
+        (intros _ [r|] _; [|reflexivity]; cbn -[make_pwf];
+        apply (lookup_kmap _)).
+  - erewrite Rlist_prod_perm by now rewrite Hdelt.
+    apply Rlist_prod_Forall2_ext.
+    rewrite Forall2_fmap_l, Forall2_fmap.
+    apply Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [l u] _.
     cbn.
-    assert (Hlenmr : lengthP mr = lengthP (tl.(tl_sums))). 1: {
-      apply Forall2_length in Hmr.
-      rewrite length_reverse in Hmr.
-      fold A in Hmr.
-      rewrite lengthN_correct_rev, <- Hmr, <- lengthN_correct_rev.
-      reflexivity.
-    }
-    rewrite <- Hlenmr.
-    pose proof (lengthN_correct mr).
-    pose proof (lengthN_correct tl.(tl_sums)).
-    case_decide as Hrsmall.
-    + rewrite lookup_ge_None_2 by lia.
-      rewrite lookup_ge_None_2 by (rewrite length_ppermute; lia).
-      reflexivity.
-    + rewrite lookup_ppermute_alt_bdd by
-        first [now rewrite Hlenmr; apply posperm_bounded | lia].
-      rewrite pos_to_nat_pred_to_pos.
-      reflexivity.
-  - rewrite <- Htypes.
-    now rewrite ppermute_posperm_permutes_Vlist_elements
-      by now rewrite lengthN_reverse.
+    apply eq_reflexivity, delta_semantics_alt_ext;
+    [destruct l as [r|]; [|reflexivity]|destruct u as [r|]; [|reflexivity]];
+    cbn -[make_pwf]; apply (lookup_kmap _).
 Qed.
 
 
 (* Notation tl_total_semantics_alt mabs mg ml mr tl :=
   tl_total_semantics_alt_aux mabs mg ml mr (tl.()) *)
 
-Definition abstracts_semantics mabs mg ml mr abs :=
-  Rlist_prod ((λ '(f, low, up), abstract_semantics mabs mg ml mr f low up)
-    <$> abs).
-
-Definition abstracts_semantics_alt mabs mg ml mr abs :=
-  Rlist_prod ((λ '(f, low, up), abstract_semantics_alt mabs mg ml mr f low up)
-    <$> abs).
-
-(* FIXME: Move *)
-Lemma rev_reverse {A} (l : list A) :
-  rev l = reverse l.
-Proof.
-  induction l; [reflexivity|].
-  now rewrite reverse_cons, <- IHl.
-Qed.
-
-Lemma rev_append_reverse {A} (l l' : list A) :
-  rev_append l l' = reverse l ++ l'.
-Proof.
-  now rewrite rev_append_rev, rev_reverse.
-Qed.
-
-Lemma union_eq_l {A} (ma ma' : option A) :
-  is_Some ma -> ma ∪ ma' = ma.
-Proof.
-  now destruct ma, ma'; intros [].
-Qed.
-
-
-Lemma fill_tensorlist_rewrite_semantics mabs mg ml
-  outer inner relmap freemap :
-  abstracts_free_vars inner.(tl_abstracts) ⊆ dom freemap ->
-  tl_total_semantics mabs mg ml
-    (fill_tensorlist_rewrite outer inner relmap freemap) ==
-  ∑ mro : Vlist (reverse outer.(tl_sums)),
-    tl_total_semantics_aux' mabs mg
-      (omap (get_var mg ml mro) freemap)
-      mro inner
-    * tl_total_semantics_aux mabs mg ml mro [] outer.(tl_abstracts).
-Proof.
-  intros Hfreemap.
-  rewrite tl_total_semantics_alt_Vlist.
-  destruct outer as [osums oabs], inner as [isums iabs].
-  cbn -[reverse].
-  setoid_rewrite fmap_app.
-  setoid_rewrite Rlist_prod_app.
-  rewrite reverse_app, sum_of_Vlist_app, sum_of_comm.
-  apply sum_of_ext'.
-  intros mro Hmro.
-  rewrite tl_total_semantics_aux_alt_Vlist.
-  symmetry.
-  setoid_rewrite (rev_append_reverse _ mro).
-  rewrite <- (sum_of_Vlist_reverse _ (λ m, tl_total_semantics_aux _ _ _ (m ++ mro) _ _)).
-  rewrite sum_of_distr_l.
-  apply sum_of_ext'.
-  intros mri Hmri.
-  rewrite rmul_comm.
-  f_equiv.
-  - apply tl_total_semantics_aux_ext_base.
-    rewrite Forall2_fmap_r.
-    apply Forall_Forall2_diag.
-    apply Forall_forall.
-    intros ((f, low), up) Hflu.
-    cbn.
-    split; [easy|].
-    rewrite <- fmap_app.
-    rewrite Forall2_fmap_r.
-    apply Forall_Forall2_diag.
-    apply Forall_forall; intros v Hv.
-    cbn.
-    destruct v as [r| |]; [|reflexivity..].
-    cbn.
-    apply elem_of_Vlist_elements, Forall2_length in Hmri.
-    rewrite length_reverse in Hmri.
-    pose proof (lengthN_correct isums).
-    fold A in *.
-    rewrite lookup_app_r by lia.
-    f_equal; lia.
-  - apply tl_total_semantics_aux_ext_base.
-    rewrite Forall2_fmap_r.
-    apply Forall_Forall2_diag.
-    apply Forall_forall.
-    intros ((f, low), up) Hflu.
-    cbn.
-    split; [easy|].
-    rewrite <- fmap_app.
-    rewrite Forall2_fmap_r.
-    apply Forall_Forall2_diag.
-    apply Forall_forall; intros v Hv.
-    cbn.
-    destruct v as [r| |]; [reflexivity| |reflexivity].
-    cbn.
-    rewrite (* lookup_union, *) lookup_omap.
-    specialize (Hfreemap p).
-    tspecialize Hfreemap. 1:{
-      rewrite elem_of_abstracts_free_vars; cbn; eauto.
-    }
-    apply elem_of_dom in Hfreemap as [v Hlv].
-    rewrite Hlv; cbn.
-    destruct v as [r| |]; [|reflexivity..].
-    cbn.
-    apply elem_of_Vlist_elements, Forall2_length in Hmri.
-    rewrite length_reverse in Hmri.
-    pose proof (lengthN_correct isums).
-    fold A in *.
-    rewrite lookup_app_r by lia.
-    f_equal; lia.
-Qed.
 
 
 (* TODO: Extensionality of semantics from equation semantics*)
@@ -2318,7 +2191,7 @@ Proof.
 
 
 
-
+(* 
 
 Fixpoint tensorequation_semantics_aux
   mabs mg mr
@@ -3176,11 +3049,11 @@ Proof.
   rewrite (list2vec_length' (eq_sym Hlenl)).
   rewrite (list2vec_length' (eq_sym Hlenu)).
   reflexivity.
-Qed.
+Qed. *)
 
 
 
-
+(* 
 Lemma abstract_semantics'_abstracts_perm_eq_permutative_tensor
   (mabst : Pmap BTensor) mg ml mr
   abs abs' :
@@ -3296,10 +3169,10 @@ Proof.
   cbn -[abstracts_indices] in *.
   intros HWT Hperm.
   now apply tl_perm_eq_correct_permutative_aux.
-Qed.
+Qed. *)
 
 
-
+(* 
 Definition ntl_total_semantics mabs mg ml ntl :=
   tl_total_semantics mabs mg ml (ntl2tl ntl).
 
@@ -3471,7 +3344,7 @@ Proof.
     rewrite Hdom.
     done.
   - now apply ntl_perm_eq_correct_permutative.
-Qed.
+Qed. *)
 
 
 
@@ -5106,6 +4979,6 @@ Proof.
   intros Heq%tensorlist_eqb_correct.
   rewrite 2 tensorlist_of_tensorexpr_correct in Heq.
   apply Heq.
-Qed.*) *)
+Qed.*)
 
 End TensorExprDBSemantics.

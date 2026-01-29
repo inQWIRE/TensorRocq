@@ -4830,6 +4830,11 @@ Proof.
     now destruct (list2vec m (drop n l)).
 Qed.
 
+Lemma cast_id {A n} (v : vec A n) H :
+  Vector.cast v H = v.
+Proof.
+  revert H; induction v; intros ?; cbn; f_equal; auto.
+Qed.
 
 Lemma list2vec_length {A} (l : list A) :
   list2vec (length l) l = Some (Vector.of_list l).
