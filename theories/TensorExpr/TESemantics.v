@@ -52,171 +52,6 @@ Proof.
   intros; apply list_bind_ext; naive_solver.
 Qed.
 
-Lemma list_fmap_to_bind {A B} (f : A -> B) (l : list A) :
-  f <$> l = x ← l; [f x].
-Proof.
-  now rewrite <- list_bind_singleton_r.
-Qed.
-
-
-Lemma list_bind_cprod {A B C} (f : A * B -> list C) l k :
-  cprod l k ≫= f = l ≫= λ x, k ≫= λ y, f (x, y).
-Proof.
-  unfold list_cprod, cprod.
-  rewrite list_bind_assoc.
-  apply list_bind_ext; [|reflexivity].
-  intros a.
-  cbn.
-  rewrite list_fmap_bind.
-  reflexivity.
-Qed.
-
-Lemma list_bind_to_cprod {A B C} (f : A -> B -> list C) l k :
-  (l ≫= λ x, k ≫= λ y, f x y) =
-  cprod l k ≫= uncurry f.
-Proof.
-  rewrite list_bind_cprod; reflexivity.
-Qed.
-
-Lemma lookup_list_to_map_imap_to_pos `{FinMap positive M} {A B}
-  (f : A -> B) (l : list A) (i : positive) :
-  (list_to_map (imap (fun j v => (Pos.of_succ_nat j, f v)) l) :> M B) !! i =
-  f <$> (l !! (i:>nat)).
-Proof.
-  apply option_eq.
-  intros x.
-  rewrite <- elem_of_list_to_map. 2:{
-    rewrite fmap_imap.
-    unfold compose.
-    cbn.
-    rewrite imap_seq_0.
-    apply NoDup_fmap_2; [hnf; lia|].
-    apply NoDup_seq.
-  }
-  rewrite elem_of_lookup_imap.
-  split.
-  - intros (i' & z & [= -> ->] & Heq).
-    now rewrite pos_to_nat_pred_of_nat, Heq.
-  - destruct (l !! (i:>nat)) as [li|] eqn:Heq; [|easy].
-    cbn.
-    intros [= <-].
-    exists (i:>nat).
-    rewrite pos_to_nat_pred_to_pos.
-    eauto.
-Qed.
-
-Definition vec_to_map {A n} (v : vec A n) : Pmap A :=
-  list_to_map (imap (λ i a, (Pos.of_succ_nat i, a)) v).
-
-Lemma lookup_vec_to_map {A n} (v : vec A n) (i : positive) :
-  vec_to_map v !! i =
-  H ← guard (i < n)%nat;
-  Some (v !!! nat_to_fin H).
-Proof.
-  unfold vec_to_map.
-  rewrite lookup_list_to_map_imap_to_pos.
-  apply option_eq; intros a.
-  rewrite option_fmap_id.
-  rewrite <- vlookup_lookup'.
-  split.
-  - intros (H & Hv).
-    case_guard; [|lia].
-    cbn.
-    rewrite <- Hv.
-    do 3 f_equal; apply proof_irrel.
-  - case_guard as H; [|easy].
-    cbn.
-    intros [= <-].
-    now exists H.
-Qed.
-
-Lemma lookup_vec_to_map' {A n} (v : vec A n) (i : fin n) :
-  vec_to_map v !! (Pos.of_succ_nat i) =
-  Some (v !!! i).
-Proof.
-  rewrite lookup_vec_to_map.
-  pose proof (fin_to_nat_lt i) as Hi.
-  case_guard; [|lia].
-  cbn.
-  f_equal.
-  f_equal.
-  apply fin_to_nat_inj.
-  rewrite fin_to_nat_to_fin; lia.
-Qed.
-
-Lemma lookup_vec_to_map_Some {A n} (v : vec A n) (i : positive) a :
-  vec_to_map v !! i = Some a <->
-  exists (H : (i < n)%nat),
-  v !!! nat_to_fin H = a.
-Proof.
-  rewrite lookup_vec_to_map.
-  case_guard; [|cbn; split; [done|now intros []; lia]].
-  cbn.
-  split; [intros [=<-]; eauto|].
-  intros (H' & <-).
-  do 3 f_equal; apply proof_irrel.
-Qed.
-
-
-Lemma lookup_vec_to_map_to_list {A n} (v : vec A n) i :
-  vec_to_map v !! (Pos.of_succ_nat i) =
-  vec_to_list v !! i.
-Proof.
-  apply option_eq; intros a.
-  rewrite lookup_vec_to_map_Some.
-  rewrite <- vlookup_lookup'.
-  split.
-  - intros (H & <-).
-    pose proof H as H'.
-    rewrite pos_to_nat_pred_of_nat in H'.
-    exists H'.
-    f_equal.
-    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
-  - intros (H & <-).
-    pose proof H as H'.
-    rewrite <- (pos_to_nat_pred_of_nat i) in H'.
-    exists H'.
-    f_equal.
-    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
-Qed.
-
-Lemma lookup_vec_to_map_to_list' {A n} (v : vec A n) (i : positive) :
-  vec_to_map v !! i =
-  vec_to_list v !! (i:>nat).
-Proof.
-  rewrite <- (pos_to_nat_pred_to_pos i) at 1.
-  apply lookup_vec_to_map_to_list.
-Qed.
-
-
-Lemma dom_vec_to_map {A n} (v : vec A n) :
-  dom (vec_to_map v) =@{Pset} list_to_set (pseq 1 n).
-Proof.
-  unfold vec_to_map.
-  rewrite dom_list_to_map_L.
-  rewrite fmap_imap.
-  unfold compose; cbn.
-  rewrite imap_seq_0, length_vec_to_list, pseq_to_seq.
-  repeat first [lia|f_equal].
-Qed.
-
-Lemma vec_to_map_inj_iff {A n} (v w : vec A n) :
-  vec_to_map v = vec_to_map w <-> v = w.
-Proof.
-  split; [|now intros ->].
-  intros Hvw.
-  apply vec_eq.
-  intros i.
-  apply (f_equal (.!! (Pos.of_succ_nat i))) in Hvw.
-  rewrite 2 lookup_vec_to_map' in Hvw.
-  congruence.
-Qed.
-
-#[export] Instance vec_to_map_inj {A n} : Inj (@eq (vec A n)) (=) vec_to_map.
-Proof.
-  intros ? ?.
-  apply vec_to_map_inj_iff.
-Qed.
 
 
 
@@ -231,6 +66,7 @@ Import Tensor.
 
 Import Setoid. *)
 
+Import SetoidList SetoidPermutation list.
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
@@ -1625,9 +1461,6 @@ Proof.
   apply Heq.
 Qed.
 
-(* FIXME: Move *)
-Import SetoidList SetoidPermutation list.
-
 Lemma tl_total_semantics_alt_aux_correct mabs ml sums abs delt :
   tl_total_semantics_aux mabs ml [] sums abs delt ==
   tl_total_semantics_alt_aux mabs ml
@@ -1965,19 +1798,6 @@ Proof.
 Qed. *)
 
 
-Lemma make_pwf_inj n f :
-  posperm n f ->
-  Inj (=) (=) (make_pwf n f).
-Proof.
-  intros Hf.
-  specialize (posperm_inj _ _ Hf) as Hfinj.
-  specialize (posperm_bounded _ _ Hf) as Hfbdd.
-  intros p q.
-  specialize (Hfinj p q).
-  generalize (Hfbdd p) (Hfbdd q).
-  cbn.
-  do 2 case_decide; lia.
-Qed.
 
 (* FIXME: Move *)
 Lemma Rlist_prod_Forall2_ext (rs rs' : list R) : 
@@ -3172,71 +2992,81 @@ Proof.
 Qed. *)
 
 
-(* 
-Definition ntl_total_semantics mabs mg ml ntl :=
-  tl_total_semantics mabs mg ml (ntl2tl ntl).
+Definition abstracts_semantics mabs ml mr abs :=
+  Rlist_prod ((λ '(f, low, up), abstract_semantics mabs ml mr f low up)
+    <$> abs).
 
-Lemma tl_total_semantics_alt_aux_eq mabs mg ml mr abs :
-  tl_total_semantics_alt_aux mabs mg ml mr abs =
+Definition abstracts_semantics_alt mabs ml mr abs :=
+  Rlist_prod ((λ '(f, low, up), abstract_semantics_alt mabs ml mr f low up)
+    <$> abs).
+
+Definition deltas_semantics ml mr delt :=
+  Rlist_prod ((λ '(l, u), delta_semantics ml mr l u)
+    <$> delt).
+
+Definition deltas_semantics_alt ml mr delt :=
+  Rlist_prod ((λ '(l, u), delta_semantics_alt ml mr l u)
+    <$> delt).
+
+Definition ntl_total_semantics mabs ml ntl :=
+  tl_total_semantics mabs ml (ntl2tl ntl).
+
+Lemma tl_total_semantics_alt_aux_eq mabs ml mr abs delt :
+  tl_total_semantics_alt_aux mabs ml mr abs delt =
   ∑ mr : Vmap mr,
-    abstracts_semantics_alt mabs mg ml mr abs.
+    abstracts_semantics_alt mabs ml mr abs *
+    deltas_semantics_alt ml mr delt.
 Proof.
   reflexivity.
 Qed.
 
-Lemma ntl_total_semantics_alt mabs mg ml ntl :
+Lemma ntl_total_semantics_alt mabs ml ntl :
   WF_ntl ntl ->
-  ntl_total_semantics mabs mg ml ntl ==
+  ntl_total_semantics mabs ml ntl ==
   ∑ mr : Vmap ntl.(ntl_sums),
-  abstracts_semantics_alt mabs mg ml mr ntl.(ntl_abstracts).
+  abstracts_semantics_alt mabs ml mr ntl.(ntl_abstracts) *
+  deltas_semantics_alt ml mr ntl.(ntl_deltas).
 Proof.
   intros Hwf.
   unfold ntl_total_semantics.
   unfold tl_total_semantics.
   rewrite tl_total_semantics_alt_aux_correct.
-  destruct ntl as [isums abs]; cbn -[reverse abstracts_semantics_alt].
+  destruct ntl as [isums abs delt]; cbn -[reverse abstracts_semantics_alt].
   specialize (partial_injection_extension (pseq 1 (lengthP isums))
-    (fun p => default p (isums.*1 !! (p:>nat)))) as Hinj.
+    (fun p => default p (isums !! (p:>nat)))) as Hinj.
   pose proof (lengthN_correct isums).
   tspecialize Hinj. 1:{
     intros a b Ha%elem_of_list_In%elem_of_pseq_1
       Hb%elem_of_list_In%elem_of_pseq_1.
-    rewrite 2 list_lookup_fmap.
+    (* rewrite 2 list_lookup_fmap. *)
     destruct (isums !! (a:>nat)) as [ia|] eqn:Hia;
       [|apply lookup_ge_None_1 in Hia; lia].
     destruct (isums !! (b:>nat)) as [ib|] eqn:Hib;
       [|apply lookup_ge_None_1 in Hib; lia].
     cbn.
-    intros Hfsts.
-    hnf in Hwf.
-    cbn -[abstracts_bound_vars] in Hwf.
+    intros ->.
     apply pos_to_nat_pred_inj.
-    apply (NoDup_lookup _ _ _ ia.1 (Hwf.1));
-    rewrite list_lookup_fmap;
-    [rewrite Hia|rewrite Hib, Hfsts]; done.
+    revert Hia Hib.
+    apply NoDup_lookup, Hwf.
   }
   destruct Hinj as (g & Hginj & Hgeq).
   rewrite Forall_forall in Hgeq.
   setoid_rewrite elem_of_pseq_1 in Hgeq.
 
-  rewrite (tl_total_semantics_alt_aux_relabel _ _ _ _ g).
-  replace (prod_map _ _ <$> _) with isums. 2:{
-    rewrite fmap_reverse, reverse_involutive.
-    rewrite fmap_imap.
-    rewrite imap_fmap.
-    unfold compose; cbn.
+  rewrite (tl_total_semantics_alt_aux_relabel _ _ _ g).
+  replace (_ <$> _) with isums. 2:{
+    
     apply (fun H => list_eq_same_length _ _ _ H eq_refl);
-      [now rewrite length_imap|].
+      [now rewrite length_fmap, length_pseq; lia|].
     intros i x y Hi.
-    intros Hisi.
-    rewrite list_lookup_imap, Hisi.
+    rewrite list_lookup_fmap, lookup_pseq_1_lt by lia.
     cbn.
     rewrite Hgeq by lia.
-    rewrite list_lookup_fmap, pos_to_nat_pred_of_nat.
+    rewrite pos_to_nat_pred_of_nat.
+    intros Hisi.
     rewrite Hisi.
     cbn.
-    intros [= <-].
-    now destruct x.
+    congruence.
   }
   replace (_ <$> _) with abs. 2:{
     symmetry.
@@ -3244,37 +3074,67 @@ Proof.
     apply list_fmap_id'; intros flu Hflu.
     cbn.
     rewrite relabel_abs_compose.
-    apply relabel_abs_id_strong; intros [r| |] Hr; [|done..].
+    apply relabel_abs_id_strong; intros [r|] Hr; [|done..].
     cbn.
-    specialize (Hwf.2 r) as Hr'.
+    specialize (Hwf.2.1 r) as Hr'.
     tspecialize Hr' by now apply elem_of_abstracts_bound_vars;
       destruct flu as [[f l] u]; eauto.
     rewrite elem_of_list_to_set in Hr'.
     cbn in Hr'.
-    apply elem_of_list_fmap in Hr' as ((_, ty) & [= <-] & Hr').
+    (* apply elem_of_list_fmap in Hr' as ((_, ty) & [= <-] & Hr'). *)
     apply elem_of_list_lookup in Hr' as Hi.
     destruct Hi as [i Hi].
     replace (list_to_map _ !! r) with (Some (Pos.of_succ_nat i)). 2:{
       symmetry.
       apply elem_of_list_to_map.
       - rewrite fmap_imap; unfold compose; cbn.
-        rewrite imap_to_fmap; apply Hwf.
+        rewrite imap_to_fmap, list_fmap_id; apply Hwf.
       - apply elem_of_lookup_imap.
-        exists i, (r, ty).
+        exists i, r.
         easy.
     }
     cbn.
     rewrite Hgeq by (apply lookup_lt_Some in Hi; lia).
-    rewrite list_lookup_fmap, pos_to_nat_pred_of_nat, Hi.
+    rewrite pos_to_nat_pred_of_nat, Hi.
+    reflexivity.
+  }
+  replace (_ <$> _) with delt. 2:{
+    symmetry.
+    rewrite <- list_fmap_compose.
+    apply list_fmap_id'; intros lu Hlu.
+    cbn.
+    rewrite relabel_delt_compose.
+    apply relabel_delt_id_strong; intros [r|] Hr; [|done..].
+    cbn.
+    specialize (Hwf.2.2 r) as Hr'.
+    tspecialize Hr' by now apply elem_of_deltas_bound_vars;
+      destruct lu as [l u]; naive_solver.
+    rewrite elem_of_list_to_set in Hr'.
+    cbn in Hr'.
+    (* apply elem_of_list_fmap in Hr' as ((_, ty) & [= <-] & Hr'). *)
+    apply elem_of_list_lookup in Hr' as Hi.
+    destruct Hi as [i Hi].
+    replace (list_to_map _ !! r) with (Some (Pos.of_succ_nat i)). 2:{
+      symmetry.
+      apply elem_of_list_to_map.
+      - rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_to_fmap, list_fmap_id; apply Hwf.
+      - apply elem_of_lookup_imap.
+        exists i, r.
+        easy.
+    }
+    cbn.
+    rewrite Hgeq by (apply lookup_lt_Some in Hi; lia).
+    rewrite pos_to_nat_pred_of_nat, Hi.
     reflexivity.
   }
   reflexivity.
 Qed.
 
-Lemma tl2ntl_correct mabs mg ml tl :
+Lemma tl2ntl_correct mabs ml tl :
   WF_tl tl ->
-  ntl_total_semantics mabs mg ml (tl2ntl tl) ==
-  tl_total_semantics mabs mg ml tl.
+  ntl_total_semantics mabs ml (tl2ntl tl) ==
+  tl_total_semantics mabs ml tl.
 Proof.
   intros Hwf.
   rewrite ntl_total_semantics_alt by now apply tl2ntl_WF.
@@ -3283,14 +3143,14 @@ Proof.
   now destruct tl.
 Qed.
 
-Lemma ntl2tl_correct mabs mg ml ntl :
-  tl_total_semantics mabs mg ml (ntl2tl ntl) ==
-  ntl_total_semantics mabs mg ml ntl.
+Lemma ntl2tl_correct mabs ml ntl :
+  tl_total_semantics mabs ml (ntl2tl ntl) ==
+  ntl_total_semantics mabs ml ntl.
 Proof.
   reflexivity.
 Qed.
 
-
+(* 
 Lemma ntl_perm_eq_correct_permutative mabst mg ml ntl ntl' :
   ntl ≡ntl≡ₚ ntl' ->
   Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
@@ -3306,13 +3166,13 @@ Proof.
   apply tl_perm_eq_correct_permutative; [easy|..|now rewrite abstracts_indices_ntl2tl].
   now specialize (ntl2tl_abst_WT'_all2 (snd ∘ projT1 <$> mabst) ntl)
     as Hiff%Forall2_iff_pred; apply Hiff.
-Qed.
+Qed. *)
 
-Lemma ntl_aeq_correct mabs mg ml ntl ntl' :
+Lemma ntl_aeq_correct mabs ml ntl ntl' :
   WF_ntl ntl -> WF_ntl ntl' ->
   ntl =ntl= ntl' ->
-  ntl_total_semantics mabs mg ml ntl ==
-  ntl_total_semantics mabs mg ml ntl'.
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
 Proof.
   intros Hntl Hntl' Heq.
   unfold ntl_total_semantics.
@@ -3320,6 +3180,7 @@ Proof.
   now apply ntl2tl_aeq.
 Qed.
 
+(*
 Lemma ntl_perm_eq'_correct_permutative mabst mg ml ntl ntl' :
   WF_ntl ntl -> WF_ntl ntl' ->
   ntl ≡ntl'≡ₚ ntl' ->

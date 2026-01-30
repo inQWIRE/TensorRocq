@@ -2063,3 +2063,145 @@ Proof.
   - rewrite 2 (lookup_kmap_None _ _ _).2 by now cbn; lia.
     reflexivity.
 Qed.
+
+
+Lemma lookup_list_to_map_imap_to_pos `{FinMap positive M} {A B}
+  (f : A -> B) (l : list A) (i : positive) :
+  (list_to_map (imap (fun j v => (Pos.of_succ_nat j, f v)) l) :> M B) !! i =
+  f <$> (l !! (i:>nat)).
+Proof.
+  apply option_eq.
+  intros x.
+  rewrite <- elem_of_list_to_map. 2:{
+    rewrite fmap_imap.
+    unfold compose.
+    cbn.
+    rewrite imap_seq_0.
+    apply NoDup_fmap_2; [hnf; lia|].
+    apply NoDup_seq.
+  }
+  rewrite elem_of_lookup_imap.
+  split.
+  - intros (i' & z & [= -> ->] & Heq).
+    now rewrite pos_to_nat_pred_of_nat, Heq.
+  - destruct (l !! (i:>nat)) as [li|] eqn:Heq; [|easy].
+    cbn.
+    intros [= <-].
+    exists (i:>nat).
+    rewrite pos_to_nat_pred_to_pos.
+    eauto.
+Qed.
+
+
+Definition vec_to_map {A n} (v : vec A n) : Pmap A :=
+  list_to_map (imap (λ i a, (Pos.of_succ_nat i, a)) v).
+
+Lemma lookup_vec_to_map {A n} (v : vec A n) (i : positive) :
+  vec_to_map v !! i =
+  H ← guard (i < n)%nat;
+  Some (v !!! nat_to_fin H).
+Proof.
+  unfold vec_to_map.
+  rewrite lookup_list_to_map_imap_to_pos.
+  apply option_eq; intros a.
+  rewrite option_fmap_id.
+  rewrite <- vlookup_lookup'.
+  split.
+  - intros (H & Hv).
+    case_guard; [|lia].
+    cbn.
+    rewrite <- Hv.
+    do 3 f_equal; apply proof_irrel.
+  - case_guard as H; [|easy].
+    cbn.
+    intros [= <-].
+    now exists H.
+Qed.
+
+Lemma lookup_vec_to_map' {A n} (v : vec A n) (i : fin n) :
+  vec_to_map v !! (Pos.of_succ_nat i) =
+  Some (v !!! i).
+Proof.
+  rewrite lookup_vec_to_map.
+  pose proof (fin_to_nat_lt i) as Hi.
+  case_guard; [|lia].
+  cbn.
+  f_equal.
+  f_equal.
+  apply fin_to_nat_inj.
+  rewrite fin_to_nat_to_fin; lia.
+Qed.
+
+Lemma lookup_vec_to_map_Some {A n} (v : vec A n) (i : positive) a :
+  vec_to_map v !! i = Some a <->
+  exists (H : (i < n)%nat),
+  v !!! nat_to_fin H = a.
+Proof.
+  rewrite lookup_vec_to_map.
+  case_guard; [|cbn; split; [done|now intros []; lia]].
+  cbn.
+  split; [intros [=<-]; eauto|].
+  intros (H' & <-).
+  do 3 f_equal; apply proof_irrel.
+Qed.
+
+
+Lemma lookup_vec_to_map_to_list {A n} (v : vec A n) i :
+  vec_to_map v !! (Pos.of_succ_nat i) =
+  vec_to_list v !! i.
+Proof.
+  apply option_eq; intros a.
+  rewrite lookup_vec_to_map_Some.
+  rewrite <- vlookup_lookup'.
+  split.
+  - intros (H & <-).
+    pose proof H as H'.
+    rewrite pos_to_nat_pred_of_nat in H'.
+    exists H'.
+    f_equal.
+    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
+  - intros (H & <-).
+    pose proof H as H'.
+    rewrite <- (pos_to_nat_pred_of_nat i) in H'.
+    exists H'.
+    f_equal.
+    apply fin_to_nat_inj; rewrite 2 fin_to_nat_to_fin; lia.
+Qed.
+
+Lemma lookup_vec_to_map_to_list' {A n} (v : vec A n) (i : positive) :
+  vec_to_map v !! i =
+  vec_to_list v !! (i:>nat).
+Proof.
+  rewrite <- (pos_to_nat_pred_to_pos i) at 1.
+  apply lookup_vec_to_map_to_list.
+Qed.
+
+
+Lemma dom_vec_to_map {A n} (v : vec A n) :
+  dom (vec_to_map v) =@{Pset} list_to_set (pseq 1 n).
+Proof.
+  unfold vec_to_map.
+  rewrite dom_list_to_map_L.
+  rewrite fmap_imap.
+  unfold compose; cbn.
+  rewrite imap_seq_0, length_vec_to_list, pseq_to_seq.
+  repeat first [lia|f_equal].
+Qed.
+
+Lemma vec_to_map_inj_iff {A n} (v w : vec A n) :
+  vec_to_map v = vec_to_map w <-> v = w.
+Proof.
+  split; [|now intros ->].
+  intros Hvw.
+  apply vec_eq.
+  intros i.
+  apply (f_equal (.!! (Pos.of_succ_nat i))) in Hvw.
+  rewrite 2 lookup_vec_to_map' in Hvw.
+  congruence.
+Qed.
+
+#[export] Instance vec_to_map_inj {A n} : Inj (@eq (vec A n)) (=) vec_to_map.
+Proof.
+  intros ? ?.
+  apply vec_to_map_inj_iff.
+Qed.

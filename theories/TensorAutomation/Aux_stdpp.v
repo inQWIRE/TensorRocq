@@ -2176,3 +2176,30 @@ Lemma union_eq_l {A} (ma ma' : option A) :
 Proof.
   now destruct ma, ma'; intros [].
 Qed.
+
+
+Lemma list_fmap_to_bind {A B} (f : A -> B) (l : list A) :
+  f <$> l = x ← l; [f x].
+Proof.
+  now rewrite <- list_bind_singleton_r.
+Qed.
+
+
+Lemma list_bind_cprod {A B C} (f : A * B -> list C) l k :
+  cprod l k ≫= f = l ≫= λ x, k ≫= λ y, f (x, y).
+Proof.
+  unfold list_cprod, cprod.
+  rewrite list_bind_assoc.
+  apply list_bind_ext; [|reflexivity].
+  intros a.
+  cbn.
+  rewrite list_fmap_bind.
+  reflexivity.
+Qed.
+
+Lemma list_bind_to_cprod {A B C} (f : A -> B -> list C) l k :
+  (l ≫= λ x, k ≫= λ y, f x y) =
+  cprod l k ≫= uncurry f.
+Proof.
+  rewrite list_bind_cprod; reflexivity.
+Qed.

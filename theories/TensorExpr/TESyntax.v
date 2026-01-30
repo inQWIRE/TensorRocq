@@ -524,12 +524,24 @@ Proof.
   erewrite relabel_delt_ext; [apply relabel_delt_id|apply Hid].
 Qed.
 
+Lemma relabel_delt_compose {A B C} (f : A -> B) (g : B -> C) lu :
+  relabel_delt g (relabel_delt f lu) = relabel_delt (g ∘ f) lu.
+Proof.
+  now destruct lu.
+Qed.
+
 Lemma relabel_bounds_ext f g :
   (forall r, f r = g r) -> forall v, relabel_bounds f v = relabel_bounds g v.
 Proof.
   intros Hfg.
   destruct v; [|reflexivity..].
   cbn; now rewrite Hfg.
+Qed.
+
+Add Parametric Morphism : relabel_bounds with signature
+  pointwise_relation _ eq ==> eq ==> eq as relabel_bounds_mor.
+Proof.
+  apply relabel_bounds_ext.
 Qed.
 
 Lemma relabel_bounds_id v : relabel_bounds id v = v.
@@ -560,6 +572,25 @@ Proof.
   intros Hf.
   transitivity (relabel_abs id abs); [|apply relabel_abs_id].
   now apply relabel_abs_ext_strong.
+Qed.
+
+Lemma relabel_delt_ext_strong {A B} (f g : A -> B) lu :
+  (forall x, x = lu.1 \/ x = lu.2 -> f x = g x) ->
+    relabel_delt f lu = relabel_delt g lu.
+Proof.
+  intros Hfg.
+  destruct lu as [l u].
+  cbn.
+  f_equal; auto.
+Qed.
+
+Lemma relabel_delt_id_strong {A} (f : A -> A) lu :
+  (forall x, x = lu.1 \/ x = lu.2 -> f x = x) ->
+  relabel_delt f lu = lu.
+Proof.
+  intros Hf.
+  transitivity (relabel_delt id lu); [|apply relabel_delt_id].
+  now apply relabel_delt_ext_strong.
 Qed.
 
 Lemma relabel_bounds_compose g f v :
@@ -1451,36 +1482,63 @@ Proof.
   destruct Heq;
   congruence.
 Qed.
+Add Parametric Morphism {A B} : relabel_abs with signature
+  pointwise_relation A (@eq B) ==> eq ==>
+  eq as relabel_abs_mor.
+Proof.
+  intros; now apply relabel_abs_ext.
+Qed.
 
 
-
-(* Lemma tl_times_comm_aeq tl tl' :
+Lemma tl_times_comm_aeq tl tl' :
   tl_times tl tl' =tl= tl_times tl' tl.
 Proof.
   (* rewrite 2 tl_times_spec_defn_correct. *)
   destruct tl as [lsums labs ldelt], tl' as [rsums rabs rdelt].
   cbn.
-  eexists (pbig_swap lsums rsums); cbn -[reverse].
+  eexists (pbig_swap rsums lsums); cbn -[reverse].
   split; [eapply pbig_swap_posperm'; lia|].
-
-  rewrite 2 reverse_app.
-  split; [|split; [apply ppermute_pbig_swap_app|]];
-  [eapply pbig_swap_posperm'; rewrite lengthN_app, 2 lengthN_reverse; lia|].
-  rewrite Permutation_app_comm.
-  rewrite fmap_app, <- 2 list_fmap_compose.
-  pose proof (lengthN_correct rsums).
-  pose proof (lengthN_correct lsums).
-  rewrite 2 lengthN_reverse, lengthN_app.
-  apply Permutation_app; apply eq_reflexivity, list_fmap_ext;
-    intros _ ((f, low), up) _; cbn;
-    rewrite <- 2 list_fmap_compose;
-    apply abs_fmap_l_ext; rewrite <- 2 fmap_app;
-    generalize (low ++ up); intros l;
-    apply list_fmap_ext;
-    (intros _ [r| |] _; [cbn|reflexivity..]);
-    unfold pbig_swap;
-    repeat case_decide; f_equal; lia || reflexivity.
-Qed. *)
+  split; [lia|].
+  split.
+  - rewrite Permutation_app_comm.
+    rewrite fmap_app, <- 2 list_fmap_compose.
+    apply Permutation_app.
+    + apply eq_reflexivity, list_fmap_ext; intros _ flu _.
+      cbn.
+      rewrite relabel_abs_compose.
+      apply relabel_abs_ext; intros [r|]; [|reflexivity].
+      cbn.
+      f_equal.
+      unfold pbig_swap.
+      repeat case_decide; lia.
+    + apply eq_reflexivity, list_fmap_ext; intros _ flu _.
+      cbn.
+      rewrite relabel_abs_compose.
+      apply relabel_abs_ext; intros [r|]; [|reflexivity].
+      cbn.
+      f_equal.
+      unfold pbig_swap.
+      repeat case_decide; lia.
+  - rewrite Permutation_app_comm.
+    rewrite fmap_app, <- 2 list_fmap_compose.
+    apply Permutation_app.
+    + apply eq_reflexivity, list_fmap_ext; intros _ lu _.
+      cbn.
+      rewrite relabel_delt_compose.
+      apply relabel_delt_ext; intros [r|]; [|reflexivity].
+      cbn.
+      f_equal.
+      unfold pbig_swap.
+      repeat case_decide; lia.
+    + apply eq_reflexivity, list_fmap_ext; intros _ lu _.
+      cbn.
+      rewrite relabel_delt_compose.
+      apply relabel_delt_ext; intros [r|]; [|reflexivity].
+      cbn.
+      f_equal.
+      unfold pbig_swap.
+      repeat case_decide; lia.
+Qed.
 
 (* FIXME: Move *)
 (* Lemma Pmap_posperm_of *)
@@ -2521,14 +2579,6 @@ Qed.
 
 
 
-(* FIXME: Move *)
-#[export]
-Instance pos_to_nat_pred_inj : Inj (=) (=) pos_to_nat_pred.
-Proof.
-  intros p p'.
-  lia.
-Qed.
-
 
 
 
@@ -2741,61 +2791,86 @@ Proof.
   unfold_leibniz.
   apply dom_kmap'.
 Qed.
-
+*)
 
 
 Record namedtensorlist := mk_ntl {
-  ntl_sums : list (Idx * Ty);
+  ntl_sums : list Idx;
   ntl_abstracts : list (Idx * list var * list var);
+  ntl_deltas : list (var * var);
 }.
 
 
 
 Definition ntl2tl (ntl : namedtensorlist) :=
-  let '(mk_ntl sums abs) := ntl in
+  let '(mk_ntl sums abs delt) := ntl in
   let varmap : Pmap Idx := list_to_map
-    (imap (λ idx r_ty, (r_ty.1, Pos.of_succ_nat idx)) sums) in
-  mk_tl (reverse sums).*2
-  (relabel_abs (relabel_bounds (λ v, default v (varmap !! v))) <$> abs).
+    (imap (λ idx r, (r, Pos.of_succ_nat idx)) sums) in
+  mk_tl (length sums)
+  (relabel_abs (relabel_bounds (λ v, default v (varmap !! v))) <$> abs)
+  (relabel_delt (relabel_bounds (λ v, default v (varmap !! v))) <$> delt).
 
 Definition tl2ntl (tl : tensorlist) :=
-  let '(mk_tl sums abs) := tl in
-  mk_ntl (imap (λ i v, (Pos.of_succ_nat i, v)) (reverse sums))
-    abs.
+  let '(mk_tl sums abs delt) := tl in
+  mk_ntl (pseq 1 sums)
+    abs
+    delt.
 
 Definition WF_ntl (ntl : namedtensorlist) : Prop :=
-  NoDup ntl.(ntl_sums).*1 /\
-  abstracts_bound_vars ntl.(ntl_abstracts) ⊆ list_to_set ntl.(ntl_sums).*1.
+  NoDup ntl.(ntl_sums) /\
+  abstracts_bound_vars ntl.(ntl_abstracts) ⊆ list_to_set ntl.(ntl_sums) /\
+  deltas_bound_vars ntl.(ntl_deltas) ⊆ list_to_set ntl.(ntl_sums).
 
 Definition WF_tl (tl : tensorlist) : Prop :=
-  set_Forall (fun k => (k < Pos.of_succ_nat (length tl.(tl_sums))))
-  (abstracts_bound_vars tl.(tl_abstracts)).
+  set_Forall (fun k => (k < Pos.of_succ_nat tl.(tl_sums)))
+  (abstracts_bound_vars tl.(tl_abstracts) ∪
+  deltas_bound_vars tl.(tl_deltas)).
 
 Lemma tl2ntl2tl tl :
   ntl2tl (tl2ntl tl) = tl.
 Proof.
-  destruct tl as [sums abs].
+  destruct tl as [sums abs delt].
   cbn.
-
-  rewrite fmap_reverse, fmap_imap.
-  unfold compose, snd.
-  rewrite imap_to_fmap, list_fmap_id, reverse_involutive.
-  f_equiv.
-  apply list_fmap_id'; intros flu _.
-  apply relabel_abs_id'.
-  intros v.
-  apply relabel_bounds_id'.
-  intros r.
-  destruct (list_to_map _ !! _) as [look|] eqn:Hlook; [|reflexivity].
-  apply elem_of_list_to_map_2 in Hlook.
-  apply elem_of_lookup_imap in Hlook as (i & (idx, ty) & [= <- ->] & Hlook).
-  (* apply reverse_lookup_Some in Hlook as [Hlook Hlt].
-  rewrite length_imap, length_reverse in Hlt.
-  cbn. *)
-  rewrite list_lookup_imap in Hlook.
-  (* rewrite reverse_lookup in Hlook by lia. *)
-  destruct (_ !! _); [cbn in *|easy].
-  congruence.
+  rewrite length_pseq.
+  f_equal; [lia|..].
+  - apply list_fmap_id'; intros flu _;
+    apply relabel_abs_id'; intros [r|]; [|reflexivity].
+    cbn.
+    f_equal.
+    rewrite pseq_to_seq.
+    rewrite imap_fmap.
+    unfold compose.
+    rewrite imap_to_zip_with_seq.
+    rewrite length_seq.
+    change (xH :> nat) with O.
+    rewrite <- zip_with_flip.
+    unfold flip.
+    rewrite <- (length_seq 0 (N.to_nat sums)) at 1.
+    rewrite <- imap_to_zip_with_seq.
+    rewrite lookup_list_to_map_imap_to_pos.
+    destruct_decide (decide (r < sums)%nat) as Hrsm.
+    + rewrite lookup_seq_lt by lia.
+      cbn. lia.
+    + now rewrite lookup_seq_ge by lia.
+  - apply list_fmap_id'; intros lu _;
+    apply relabel_delt_id'; intros [r|]; [|reflexivity].
+    cbn.
+    f_equal.
+    rewrite pseq_to_seq.
+    rewrite imap_fmap.
+    unfold compose.
+    rewrite imap_to_zip_with_seq.
+    rewrite length_seq.
+    change (xH :> nat) with O.
+    rewrite <- zip_with_flip.
+    unfold flip.
+    rewrite <- (length_seq 0 (N.to_nat sums)) at 1.
+    rewrite <- imap_to_zip_with_seq.
+    rewrite lookup_list_to_map_imap_to_pos.
+    destruct_decide (decide (r < sums)%nat) as Hrsm.
+    + rewrite lookup_seq_lt by lia.
+      cbn. lia.
+    + now rewrite lookup_seq_ge by lia.
 Qed.
 
 
@@ -2804,11 +2879,14 @@ Definition ntl_aeq : relation namedtensorlist :=
   λ ntl ntl',
   exists fr : Idx -> Idx,
     set_Forall2 (λ i j, fr i = fr j -> i = j)
-      (list_to_set ntl.(ntl_sums).*1 ∪ abstracts_bound_vars ntl.(ntl_abstracts)) /\
-    prod_map fr id <$> ntl.(ntl_sums) ≡ₚ ntl'.(ntl_sums) /\
+      (list_to_set ntl.(ntl_sums) ∪ abstracts_bound_vars ntl.(ntl_abstracts)
+        ∪ deltas_bound_vars ntl.(ntl_deltas)) /\
+    fr <$> ntl.(ntl_sums) ≡ₚ ntl'.(ntl_sums) /\
     (* prod_map fr id <$> ntl.(ntl_sums) ≡ₚ ntl'.(ntl_sums) /\ *)
     relabel_abs (relabel_bounds fr) <$> ntl.(ntl_abstracts) ≡ₚ
-    ntl'.(ntl_abstracts).
+      ntl'.(ntl_abstracts) /\
+    relabel_delt (relabel_bounds fr) <$> ntl.(ntl_deltas) ≡ₚ
+      ntl'.(ntl_deltas).
 
 Infix "=ntl=" := ntl_aeq (at level 70).
 
@@ -2830,6 +2908,24 @@ Proof.
   apply set_eq.
   intros r.
   rewrite 2 elem_of_abstracts_bound_vars.
+  now setoid_rewrite Habs.
+Qed.
+Add Parametric Morphism : deltas_bound_vars with signature
+  (≡) ==> eq as deltas_bound_vars_mor.
+Proof.
+  intros abs abs' Habs.
+  apply set_eq.
+  intros r.
+  rewrite 2 elem_of_deltas_bound_vars.
+  now setoid_rewrite Habs.
+Qed.
+Add Parametric Morphism : deltas_bound_vars with signature
+  (≡ₚ) ==> eq as deltas_bound_vars_perm_mor.
+Proof.
+  intros abs abs' Habs.
+  apply set_eq.
+  intros r.
+  rewrite 2 elem_of_deltas_bound_vars.
   now setoid_rewrite Habs.
 Qed.
 Lemma abstracts_bound_vars_relabel_bounds (f : positive -> positive)
@@ -2855,6 +2951,23 @@ Proof.
     rewrite <- fmap_app.
     apply (elem_of_list_fmap_1 (relabel_bounds f) _ _ Hr').
 Qed.
+Lemma deltas_bound_vars_relabel_bounds (f : positive -> positive)
+  (delt : list _) :
+  deltas_bound_vars (relabel_delt (relabel_bounds f) <$> delt) =
+  set_map f (deltas_bound_vars delt).
+Proof.
+  apply set_eq.
+  intros r.
+  rewrite elem_of_map, elem_of_deltas_bound_vars.
+  setoid_rewrite elem_of_deltas_bound_vars.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite exists_pair.
+  cbn.
+  split; [|set_solver].
+  intros (l & u & (a & b & [= -> ->] & Hab) & Hor).
+  destruct a, b; cbn in *; naive_solver.
+Qed.
+
 (* Lemma kmap_kmap `{FinMap K1 M1, FinMap K2 M2, FinMap K3 M3} {A}
   (f : K1 -> K2) (g : K2 -> K3) (m : M1 A) :
   kmap g (kmap f m :> M2 A) =@{M3 A} kmap (g ∘ f) m.
@@ -2869,26 +2982,32 @@ Proof.
   split; [easy|].
   rewrite list_fmap_id' by now intros [].
   split; [done|].
+  split;
   apply eq_reflexivity, list_fmap_id'; intros;
-  apply relabel_abs_id'; intros;
+  [apply relabel_abs_id'|apply relabel_delt_id']; intros;
   apply relabel_bounds_id.
 Qed.
 Lemma ntl_aeq_symm ntl ntl' : ntl =ntl= ntl' -> ntl' =ntl= ntl.
 Proof.
-  intros (fr & Hfr & Hsums & Habs).
-  exists (invfun fr (ntl.(ntl_sums).*1 ++
-    elements (abstracts_bound_vars ntl.(ntl_abstracts)))).
+  intros (fr & Hfr & Hsums & Habs & Hdelt).
+  exists (invfun fr (ntl.(ntl_sums) ++
+    elements (abstracts_bound_vars ntl.(ntl_abstracts)
+    ∪ deltas_bound_vars ntl.(ntl_deltas)))).
   assert (Hfrinj : ForallPairs (λ a a' : Idx, fr a = fr a' → a = a')
-  ((ntl_sums ntl).*1 ++ elements (abstracts_bound_vars (ntl_abstracts ntl)))). 1:{
+  (ntl.(ntl_sums) ++
+    elements (abstracts_bound_vars ntl.(ntl_abstracts)
+    ∪ deltas_bound_vars ntl.(ntl_deltas)))). 1:{
      rewrite ForallPairs_forall; hnf in Hfr; set_solver +Hfr.
   }
-  apply (fmap_Permutation fst) in Hsums as Hdoms.
-  rewrite fsts_prod_map in Hdoms.
-  split; [|split].
+  (* apply (fmap_Permutation fst) in Hsums as Hdoms. *)
+  (* rewrite fsts_prod_map in Hdoms. *)
+  split; [|split; [|split]].
   - intros a b Ha Hb.
-    rewrite <- Hdoms in Ha, Hb.
+    rewrite <- Hsums in Ha, Hb.
     rewrite <- Habs in Ha, Hb.
-    rewrite abstracts_bound_vars_relabel_bounds in Ha, Hb.
+    rewrite <- Hdelt in Ha, Hb.
+    rewrite abstracts_bound_vars_relabel_bounds,
+      deltas_bound_vars_relabel_bounds in Ha, Hb.
     rewrite <- (set_map_list_to_set (SA:=Pset)) in Ha, Hb.
     rewrite <- set_map_union in Ha.
     apply invfun_inj; [easy|..].
@@ -2899,13 +3018,12 @@ Proof.
   - rewrite <- Hsums.
     rewrite <- list_fmap_compose.
     apply eq_reflexivity, list_fmap_id'.
-    intros (i, ty).
+    intros i.
     intros Hity.
     cbn.
     f_equal.
     apply invfun_linv; [easy|].
-    apply elem_of_app; left.
-    now apply (elem_of_list_fmap_1 fst) in Hity.
+    now apply elem_of_app; left.
   - rewrite <- Habs.
     apply eq_reflexivity.
     rewrite <- list_fmap_compose.
@@ -2913,37 +3031,60 @@ Proof.
     cbn.
     rewrite relabel_abs_compose.
     apply relabel_abs_id_strong.
-    intros [r| |] Hr; [|done..].
+    intros [r|] Hr; [|done..].
     cbn.
     f_equal.
     apply invfun_linv; [easy|].
     apply elem_of_app; right.
-    rewrite elem_of_elements, elem_of_abstracts_bound_vars.
+    apply elem_of_elements, elem_of_union, or_introl, elem_of_abstracts_bound_vars.
     destruct flu as [[f l] u]; eauto.
+  - rewrite <- Hdelt.
+    apply eq_reflexivity.
+    rewrite <- list_fmap_compose.
+    apply list_fmap_id'; intros lu Hlu.
+    cbn.
+    rewrite relabel_delt_compose.
+    apply relabel_delt_id_strong.
+    intros v Hv.
+    destruct v as [r|]; [|reflexivity].
+    cbn.
+    f_equal.
+    apply invfun_linv; [easy|].
+    apply elem_of_app; right.
+    apply elem_of_elements, elem_of_union, or_intror, elem_of_deltas_bound_vars.
+    destruct lu as [l u]; cbn in *.
+    naive_solver.
 Qed.
 Lemma ntl_aeq_trans ntl ntl' ntl'' :
   ntl =ntl= ntl' -> ntl' =ntl= ntl'' ->
   ntl =ntl= ntl''.
 Proof.
-  intros (fr & Hfr & Hsums & Habs)
-    (fr' & Hfr' & Hsums' & Habs').
+  intros (fr & Hfr & Hsums & Habs & Hdelt)
+    (fr' & Hfr' & Hsums' & Habs' & Hdelt').
   exists (fr' ∘ fr).
-  split; [|split].
+  split; [|split; [|split]].
   - intros a a' Ha Ha'.
     cbn.
-    intros Hfas%Hfr'; [|rewrite <- Habs, <- Hsums, abstracts_bound_vars_relabel_bounds,
-      fsts_prod_map..]; [|set_solver +Ha|set_solver +Ha'].
+    intros Hfas%Hfr'; [|rewrite <- Habs, <- Hdelt, <- Hsums,
+      abstracts_bound_vars_relabel_bounds, deltas_bound_vars_relabel_bounds..];
+      [|set_solver +Ha|set_solver +Ha'].
     revert Hfas.
     now apply Hfr.
   - rewrite <- Hsums', <- Hsums.
     now rewrite <- list_fmap_compose.
   - rewrite <- Habs', <- Habs.
     rewrite <- list_fmap_compose.
-
     unfold compose.
     setoid_rewrite relabel_abs_compose.
     apply eq_reflexivity, list_fmap_ext; intros _ flu _.
     apply relabel_abs_ext; intros v.
+    now unfold compose; rewrite relabel_bounds_compose.
+  - rewrite <- Hdelt', <- Hdelt.
+    rewrite <- list_fmap_compose.
+    unfold compose.
+    setoid_rewrite relabel_delt_compose.
+    apply eq_reflexivity, list_fmap_ext; intros _ lu _.
+    apply relabel_delt_ext; intros v.
     now unfold compose; rewrite relabel_bounds_compose.
 Qed.
 Add Parametric Relation : namedtensorlist ntl_aeq
@@ -2958,85 +3099,86 @@ Proof.
   set_solver.
 Qed.
 
+
+
+(* FIXME: Move *)
+#[export]
+Instance pos_to_nat_pred_inj : Inj (=) (=) pos_to_nat_pred.
+Proof.
+  intros p p'.
+  lia.
+Qed.
+
 Lemma ntl2tl2ntl ntl :
   WF_ntl ntl ->
   tl2ntl (ntl2tl ntl) =ntl= ntl.
 Proof.
-  destruct ntl as [isums abs].
+  destruct ntl as [isums abs delt].
   intros [Hdup Hbnd].
-  cbn -[abstracts_bound_vars] in *.
-  rewrite fmap_reverse, reverse_involutive.
+  cbn -[abstracts_bound_vars deltas_bound_vars] in *.
+  (* rewrite fmap_reverse, reverse_involutive. *)
   exists (Pmap_map (list_to_map
-    (imap (λ idx idx', (Pos.of_succ_nat idx, idx')) isums.*1)));
-  cbn -[abstracts_bound_vars].
-  rewrite abstracts_bound_vars_relabel_bounds.
+    (imap (λ idx idx', (Pos.of_succ_nat idx, idx')) isums)));
+  cbn -[abstracts_bound_vars deltas_bound_vars].
+  rewrite abstracts_bound_vars_relabel_bounds,
+    deltas_bound_vars_relabel_bounds.
   split_and!.
-  - erewrite union_mono; [|rewrite fmap_imap; unfold compose; cbn;
-    rewrite imap_seq_0; reflexivity|eapply set_map_mono; [apply reflexivity|apply Hbnd]].
+  - erewrite union_mono; [|apply union_mono; [reflexivity|]|];
+    [|(eapply set_map_mono; [apply reflexivity|apply Hbnd])..].
+    rewrite <- (union_assoc _), (union_idemp _).
     rewrite union_eq_l. 2:{
       rewrite set_map_list_to_set.
       apply list_to_set_subseteq.
-      rewrite <- list_fmap_compose.
-      unfold compose; cbn.
-      intros _ ((idx, ty) & -> & Hidx)%elem_of_list_fmap.
+
+      intros _ (idx & -> & Hidx)%elem_of_list_fmap.
       cbn.
       apply elem_of_list_lookup in Hidx as Hi.
       destruct Hi as [i Hi].
       replace (list_to_map _ !! _) with
         (Some (Pos.of_succ_nat i)).
       - cbn.
-        apply elem_of_list_fmap_1.
-        apply elem_of_seq.
-        now apply lookup_lt_Some in Hi; rewrite length_fmap; lia.
+        rewrite elem_of_pseq_1.
+        now apply lookup_lt_Some in Hi; lia.
       - symmetry.
         apply elem_of_list_to_map.
         + rewrite fmap_imap.
           unfold compose; cbn.
-          rewrite imap_to_fmap; easy.
+          rewrite imap_to_fmap, list_fmap_id; easy.
         + rewrite elem_of_lookup_imap.
-          exists i, (idx, ty); easy.
+          exists i, idx; easy.
     }
     rewrite set_Forall2_list_to_set.
-    rewrite ForallPairs_map.
+    (* rewrite ForallPairs_map. *)
     hnf.
-    intros i j Hi%elem_of_list_In%elem_of_seq Hj%elem_of_list_In%elem_of_seq.
+    intros i j Hi%elem_of_list_In%elem_of_pseq_1 Hj%elem_of_list_In%elem_of_pseq_1.
     unfold Pmap_map.
-    rewrite imap_fmap.
-    unfold compose; cbn.
-    rewrite length_fmap in Hi, Hj.
-    cbn in Hi, Hj.
-    destruct Hi as [_ Hi], Hj as [_ Hj].
-    rewrite 2 lookup_list_to_map_imap_to_pos, 2 pos_to_nat_pred_of_nat.
-    apply lookup_lt_is_Some in Hi as Hli.
-    apply lookup_lt_is_Some in Hj as Hlj.
+    (* destruct Hi as [_ Hi], Hj as [_ Hj]. *)
+    rewrite 2 lookup_list_to_map_imap_to_pos, 2 option_fmap_id.
+    assert (Hi' : (i < length isums)%nat) by lia.
+    assert (Hj' : (j < length isums)%nat) by lia.
+
+    apply lookup_lt_is_Some in Hi' as Hli.
+    apply lookup_lt_is_Some in Hj' as Hlj.
     destruct Hli as [li Hli], Hlj as [lj Hlj].
     rewrite Hli, Hlj.
     cbn.
-    intros Heq.
+    intros <-.
     apply (inj pos_to_nat_pred).
-    rewrite 2 pos_to_nat_pred_of_nat.
-    apply (f_equal (fmap fst)) in Hli, Hlj.
-    rewrite <- list_lookup_fmap in Hli, Hlj.
-    cbn in Hli, Hlj.
-    rewrite <- Heq in Hlj.
     revert Hli Hlj.
     now apply NoDup_lookup.
   -
-    rewrite fmap_imap.
-    rewrite imap_fmap.
-    unfold compose; cbn.
     apply eq_reflexivity.
     apply (list_eq_same_length _ _ _ eq_refl);
-    [now rewrite length_imap|].
+    [now rewrite length_fmap, length_pseq; lia|].
     intros i x y Hi.
-    rewrite list_lookup_imap.
-    destruct (isums !! i) as [(idx, ty)|] eqn:Hidxi; [|easy].
+    rewrite list_lookup_fmap.
+    destruct (isums !! i) as [idx|] eqn:Hidxi; [|easy].
+    rewrite lookup_pseq_1_lt by lia.
     cbn.
     intros [= <-] [= <-].
-    f_equal.
     unfold Pmap_map.
     rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
-    now rewrite list_lookup_fmap, Hidxi.
+    now rewrite Hidxi.
   - apply eq_reflexivity.
     rewrite <- list_fmap_compose.
     apply list_fmap_id'; intros ((f, low), up) Hflu.
@@ -3044,28 +3186,57 @@ Proof.
     rewrite relabel_abs_compose.
     apply relabel_abs_id_strong.
     intros v Hv.
-    destruct v as [r| |]; [|reflexivity..].
+    destruct v as [r|]; [|reflexivity].
     cbn.
+    revert Hbnd; intros [Hbnd _].
     specialize (Hbnd r).
     tspecialize Hbnd by now apply elem_of_abstracts_bound_vars; eauto.
     rewrite elem_of_list_to_set in Hbnd.
-    apply elem_of_list_fmap in Hbnd
-      as ((_ & ty) & [= <-] & [i Hi]%elem_of_list_lookup).
+    apply elem_of_list_lookup in Hbnd as [i Hi].
     replace (list_to_map _ !! r) with (Some (Pos.of_succ_nat i)). 2:{
       symmetry.
       apply elem_of_list_to_map.
       - rewrite fmap_imap.
         unfold compose.
         cbn.
-        rewrite imap_to_fmap.
-        easy.
+        now rewrite imap_to_fmap, list_fmap_id.
       - rewrite elem_of_lookup_imap.
-        exists i, (r, ty).
+        exists i, r.
         easy.
     }
     cbn.
     unfold Pmap_map.
-    rewrite lookup_list_to_map_imap_to_pos, list_lookup_fmap,
+    rewrite lookup_list_to_map_imap_to_pos,
+      pos_to_nat_pred_of_nat, Hi.
+    reflexivity.
+  - apply eq_reflexivity.
+    rewrite <- list_fmap_compose.
+    apply list_fmap_id'; intros [l u] Hlu.
+    cbn [compose].
+    rewrite relabel_delt_compose.
+    apply relabel_delt_id_strong.
+    intros v Hv.
+    destruct v as [r|]; [|reflexivity].
+    cbn in *.
+    revert Hbnd; intros [_ Hbnd].
+    specialize (Hbnd r).
+    tspecialize Hbnd by now apply elem_of_deltas_bound_vars; naive_solver.
+    rewrite elem_of_list_to_set in Hbnd.
+    apply elem_of_list_lookup in Hbnd as [i Hi].
+    replace (list_to_map _ !! r) with (Some (Pos.of_succ_nat i)). 2:{
+      symmetry.
+      apply elem_of_list_to_map.
+      - rewrite fmap_imap.
+        unfold compose.
+        cbn.
+        now rewrite imap_to_fmap, list_fmap_id.
+      - rewrite elem_of_lookup_imap.
+        exists i, r.
+        easy.
+    }
+    cbn.
+    unfold Pmap_map.
+    rewrite lookup_list_to_map_imap_to_pos,
       pos_to_nat_pred_of_nat, Hi.
     reflexivity.
 Qed.
@@ -3076,46 +3247,47 @@ Proof.
   destruct tl as [sums abs].
   cbn.
   unfold WF_tl, WF_ntl.
-  cbn -[abstracts_bound_vars].
-  rewrite and_is_True_l. 2:{
-    rewrite fmap_imap.
-    unfold compose; cbn.
-    rewrite imap_seq_0.
-    apply NoDup_fmap_2; [apply _|apply NoDup_seq].
-  }
+  cbn -[abstracts_bound_vars deltas_bound_vars].
+  rewrite and_is_True_l by now apply NoDup_pseq.
+  rewrite <- union_subseteq.
   apply forall_iff; intros r.
   apply forall_iff; intros Hr.
-  rewrite fmap_imap.
-  unfold compose; cbn.
-  rewrite imap_seq_0.
-  rewrite elem_of_list_to_set.
-  rewrite length_reverse, <- lengthN_correct.
-  change O with (pos_to_nat_pred 1).
-  rewrite <- pseq_to_seq.
-  rewrite elem_of_pseq_1.
+  rewrite elem_of_list_to_set, elem_of_pseq_1.
   lia.
 Qed.
 
 Lemma ntl2tl_WF ntl : WF_ntl ntl -> WF_tl (ntl2tl ntl).
 Proof.
-  destruct ntl as [isums abs].
+  destruct ntl as [isums abs delt].
   intros [Hdup Hsub].
   unfold WF_tl.
-  cbn -[abstracts_bound_vars] in *.
-  rewrite abstracts_bound_vars_relabel_bounds.
-  intros x (idx & -> & Hi)%elem_of_map.
-  apply Hsub in Hi as Hi'.
-  rewrite elem_of_list_to_set, elem_of_list_fmap in Hi'.
-  destruct Hi' as ((_, ty) & [= <-] & [i Hisi]%elem_of_list_lookup).
-  replace (list_to_map _ !! _) with (Some (Pos.of_succ_nat i)).
-  - apply lookup_lt_Some in Hisi.
-    rewrite length_fmap, length_reverse.
-    cbn.
-    lia.
-  - symmetry.
+  cbn -[abstracts_bound_vars deltas_bound_vars] in *.
+  apply set_Forall_union.
+  - rewrite abstracts_bound_vars_relabel_bounds.
+    intros x (idx & -> & Hi)%elem_of_map.
+    apply Hsub in Hi as Hi'.
+    rewrite elem_of_list_to_set in Hi'.
+    pose proof Hi' as [i Hisi]%elem_of_list_lookup.
+    replace (list_to_map _ !! _) with (Some (Pos.of_succ_nat i));
+      [cbn; apply lookup_lt_Some in Hisi; lia|].
+    symmetry.
     apply elem_of_list_to_map.
     + rewrite fmap_imap; unfold compose; cbn.
-      now rewrite imap_to_fmap.
+      now rewrite imap_to_fmap, list_fmap_id.
+    + rewrite elem_of_lookup_imap.
+      eexists _, _; split; [|apply Hisi].
+      reflexivity.
+  - rewrite deltas_bound_vars_relabel_bounds.
+    intros x (idx & -> & Hi)%elem_of_map.
+    apply Hsub in Hi as Hi'.
+    rewrite elem_of_list_to_set in Hi'.
+    pose proof Hi' as [i Hisi]%elem_of_list_lookup.
+    replace (list_to_map _ !! _) with (Some (Pos.of_succ_nat i));
+      [cbn; apply lookup_lt_Some in Hisi; lia|].
+    symmetry.
+    apply elem_of_list_to_map.
+    + rewrite fmap_imap; unfold compose; cbn.
+      now rewrite imap_to_fmap, list_fmap_id.
     + rewrite elem_of_lookup_imap.
       eexists _, _; split; [|apply Hisi].
       reflexivity.
@@ -3306,40 +3478,52 @@ Lemma ntl_aeq_alt ntl ntl' :
   WF_ntl ntl ->
   ntl =ntl= ntl' <->
   exists fr, Inj (=) (=) fr /\
-    prod_map fr id <$> ntl.(ntl_sums) ≡ₚ
-    ntl'.(ntl_sums) /\
+    fr <$> ntl.(ntl_sums) ≡ₚ ntl'.(ntl_sums) /\
     relabel_abs (relabel_bounds fr) <$> ntl.(ntl_abstracts) ≡ₚ
-    ntl'.(ntl_abstracts).
+      ntl'.(ntl_abstracts) /\
+    relabel_delt (relabel_bounds fr) <$> ntl.(ntl_deltas) ≡ₚ
+      ntl'.(ntl_deltas).
 Proof.
   intros HWF.
   split; cycle 1.
-  - intros (f & Hf & Hsums & Habs).
+  - intros (f & Hf & Hsums & Habs & Hdelt).
     exists f.
     split; [intros ? ? ? ?; apply Hf|].
-    split; assumption.
-  - intros (fr & Hfr & Hsums & Habs).
+    split_and!; assumption.
+  - intros (fr & Hfr & Hsums & Habs & Hdelt).
     apply partial_injection_extension' in Hfr as (g & Hginj & Hgf).
     (* rewrite Forall_forall in Hgf. *)
     exists g.
     split; [easy|].
-    split.
+    split; [|split].
     + rewrite <- Hsums.
-      apply eq_reflexivity, list_fmap_ext; intros _ (idx, ty) Hidx%elem_of_list_lookup_2.
+      apply eq_reflexivity, list_fmap_ext; intros _ idx Hidx%elem_of_list_lookup_2.
       cbn.
       f_equal.
-      apply (elem_of_list_fmap_1 fst) in Hidx.
       apply Hgf; set_solver + Hidx.
     + rewrite <- Habs.
       apply eq_reflexivity.
       apply list_fmap_ext; intros _ flu Hflu%elem_of_list_lookup_2.
       apply relabel_abs_ext_strong.
-      intros [r| |] Hr; [|reflexivity..].
+      intros [r|] Hr; [|reflexivity..].
+      cbn.
+      f_equal.
+      apply Hgf.
+      rewrite elem_of_union; left.
+      rewrite elem_of_union; right.
+      rewrite elem_of_abstracts_bound_vars.
+      now destruct flu as [[f l] u]; cbn; eauto.
+    + rewrite <- Hdelt.
+      apply eq_reflexivity.
+      apply list_fmap_ext; intros _ lu Hlu%elem_of_list_lookup_2.
+      apply relabel_delt_ext_strong.
+      intros [r|] Hr; [|reflexivity..].
       cbn.
       f_equal.
       apply Hgf.
       rewrite elem_of_union; right.
-      rewrite elem_of_abstracts_bound_vars.
-      now destruct flu as [[f l] u]; cbn; eauto.
+      rewrite elem_of_deltas_bound_vars.
+      now destruct lu as [l u]; cbn; naive_solver.
 Qed.
 
 
@@ -3349,34 +3533,32 @@ Lemma ntl2tl_aeq ntl ntl' :
   ntl =ntl= ntl' ->
   ntl2tl ntl =tl= ntl2tl ntl'.
 Proof.
-  destruct ntl as [isums abs], ntl' as [isums' abs'].
+  destruct ntl as [isums abs delt], ntl' as [isums' abs' delt'].
   cbn.
-  intros Hntl Hntl' (fr & Hfrinj & Hsums & Habs)%(ntl_aeq_alt _ _ Hntl).
+  intros Hntl Hntl' (fr & Hfrinj & Hsums & Habs & Hdelt)%(ntl_aeq_alt _ _ Hntl).
   cbn in *.
   set (g := λ i : Idx,
     (si ← isums !! (i:>nat);
-    (Pos.of_succ_nat ∘ fst) <$> list_find (λ si', fr si.1 = si'.1) isums') :> option Idx).
+    (Pos.of_succ_nat ∘ fst) <$> list_find (λ si', fr si = si') isums') :> option Idx).
   assert (Hgsome : forall i j,
-    g i = Some j <-> exists idx ty, isums !! (i:>nat) = Some (idx, ty) /\
-      isums' !! (j:>nat) = Some (fr idx, ty)). 1:{
+    g i = Some j <-> exists idx, isums !! (i:>nat) = Some (idx) /\
+      isums' !! (j:>nat) = Some (fr idx)). 1:{
     pose proof (lengthN_correct isums).
     intros i j.
     subst g.
     cbn.
-    rewrite bind_Some, exists_pair.
+    rewrite bind_Some.
     apply exists_iff; intros idx.
-    apply exists_iff; intros ty.
     apply and_iff_from_l; [reflexivity|]; intros Hidx _.
     split.
     - apply elem_of_list_lookup_2 in Hidx as Hidx_in.
-      apply (elem_of_list_fmap_1 (prod_map fr id)) in Hidx_in.
+      apply (elem_of_list_fmap_1 fr) in Hidx_in.
       rewrite Hsums in Hidx_in.
       apply elem_of_list_lookup in Hidx_in as Hidx'.
       destruct Hidx' as [j' Hj'].
-      cbn in Hj'.
       (* apply elem_of_list_lookup_2 in Hidx' as Hidx_in'. *)
 
-      specialize (list_find_elem_of (λ si', fr idx = si'.1) _ _ Hidx_in
+      specialize (list_find_elem_of (λ si', fr idx = si') _ _ Hidx_in
         eq_refl) as Hsome.
       destruct Hsome as [(j'', lj) Hlj].
       cbn.
@@ -3386,65 +3568,49 @@ Proof.
       rewrite pos_to_nat_pred_of_nat.
       apply list_find_Some in Hlj as [Hlook Hlj1].
       rewrite Hlook.
-      destruct lj as [? ty']; cbn in *;
-      destruct Hlj1 as [<- Hlooklt];
-      enough (ty = ty') by congruence.
-      pose proof Hntl'.1 as Hdup'.
-      apply NoDup_fmap_iff in Hdup' as [_ Hinj].
-      cbn in Hinj.
-      specialize (Hinj (fr idx, ty) (fr idx, ty') Hidx_in).
-      tspecialize Hinj by now apply elem_of_list_lookup_2 in Hlook.
-      tspecialize Hinj by done.
-      congruence.
+      now destruct Hlj1 as [<- _].
     - intros Hsums'.
-      specialize (list_find_elem_of (λ si', fr idx = si'.1) _ _ (elem_of_list_lookup_2 _ _ _ Hsums')
+      specialize (list_find_elem_of (λ si', fr idx = si') _ _ (elem_of_list_lookup_2 _ _ _ Hsums')
         eq_refl) as Hsome.
       destruct Hsome as [lj Hlj].
       cbn.
       rewrite Hlj.
       cbn.
-      destruct lj as [j' (fridx & ty')].
+      destruct lj as [j' fridx].
       apply list_find_Some in Hlj as (Hj' & [= <-] & Hlooks).
       cbn.
       f_equal.
-      apply (f_equal (fmap fst)) in Hsums' as Hfsums'.
-      rewrite <- list_lookup_fmap in Hfsums'.
-      cbn in Hfsums'.
-      apply (f_equal (fmap fst)) in Hj' as Hfj'.
-      rewrite <- list_lookup_fmap in Hfj'.
-      cbn in Hfj'.
-      specialize (NoDup_lookup _ j j' _ Hntl'.1 Hfsums' Hfj').
-      clear; lia.
+      apply pos_to_nat_pred_inj.
+      rewrite pos_to_nat_pred_of_nat.
+      revert Hj' Hsums'.
+      apply NoDup_lookup, Hntl'.
   }
   assert (HgisSome : forall i, i < lengthP isums -> exists j, g i = Some j /\
     j < lengthP isums'). 1:{
     pose proof (lengthN_correct isums).
     intros i Hi.
 
-    subst g.
     cbn.
-    destruct (isums !! (i:>nat)) as [(idx, ty)|] eqn:Hidx;
+    destruct (isums !! (i:>nat)) as [idx|] eqn:Hidx;
       [|apply lookup_ge_None_1 in Hidx; lia].
     cbn.
-    apply (fmap_Permutation fst) in Hsums as Hsums''.
-    rewrite fsts_prod_map in Hsums''.
+    (* apply (fmap_Permutation fst) in Hsums as Hsums''.
+    rewrite fsts_prod_map in Hsums''. *)
     (* apply Permutation equiv
     apply (f_equal dom) in Hsums as Hsums'. *)
     (* rewrite dom_kmap_L', <- leibniz_equiv_iff in Hsums'. *)
-    assert (Hsums' : fr <$> isums.*1 ≡ isums'.*1) by now intros ?; rewrite Hsums''.
+    assert (Hsums' : fr <$> isums ≡ isums') by now intros ?; rewrite Hsums.
     specialize (Hsums' (fr idx)).1 as Hdom.
     tspecialize Hdom. 1:{
       apply elem_of_list_fmap_1.
-      now apply elem_of_list_lookup_2, (elem_of_list_fmap_1 fst) in Hidx.
+      now apply elem_of_list_lookup_2 in Hidx.
     }
-    apply elem_of_list_fmap in Hdom as (x & Hx_fr & Hxsums').
-    specialize (list_find_elem_of (λ si', fr idx = si'.1) _ _ Hxsums'
-      Hx_fr) as Hsome.
-    destruct Hsome as [(j, lj) Hlj].
+    apply elem_of_list_lookup in Hdom as [j Hj].
     exists (Pos.of_succ_nat j).
-    split; [now rewrite Hlj|].
-    apply list_find_Some in Hlj as [?%lookup_lt_Some _].
-    rewrite lengthN_correct_rev; lia.
+    split; [|apply lookup_lt_Some in Hj; rewrite lengthN_correct_rev; lia].
+    apply Hgsome.
+    exists idx.
+    now rewrite pos_to_nat_pred_of_nat.
   }
   pose proof (lengthN_correct isums).
   pose proof (lengthN_correct isums').
@@ -3452,18 +3618,18 @@ Proof.
     i < lengthP isums). 1:{
     intros j Hj.
 
-    destruct (isums' !! (j:>nat)) as [(fridx, ty)|] eqn:Hidx;
+    destruct (isums' !! (j:>nat)) as [fridx|] eqn:Hidx;
       [|apply lookup_ge_None_1 in Hidx; lia].
 
     apply elem_of_list_lookup_2 in Hidx as Hidx_in.
     rewrite <- Hsums in Hidx_in.
-    apply elem_of_list_fmap in Hidx_in as ((idx, _) & [= -> <-] & Hidx_in).
+    apply elem_of_list_fmap in Hidx_in as (idx & [= ->] & Hidx_in).
     apply elem_of_list_lookup in Hidx_in as Hi.
     destruct Hi as [i Hi].
     exists (Pos.of_succ_nat i).
     split; [|apply lookup_lt_Some in Hi; lia].
     apply Hgsome.
-    exists idx, ty.
+    exists idx.
     now rewrite pos_to_nat_pred_of_nat.
   }
   symmetry.
@@ -3472,7 +3638,7 @@ Proof.
     now rewrite <- Hsums, length_fmap.
   }
   apply lengthN_eq in Hlens as HlenNs.
-  rewrite lengthN_fmap, lengthN_reverse, 2 fmap_reverse, 2 reverse_involutive.
+  (* rewrite lengthN_fmap, lengthN_reverse, 2 fmap_reverse, 2 reverse_involutive. *)
   assert (Hgperm : posperm (lengthP isums) (λ i : Idx, default i (g i))). 1:{
     apply surj_is_posperm.
     intros j Hj.
@@ -3482,7 +3648,7 @@ Proof.
     exists i.
     rewrite Hgi; eauto.
   }
-  assert (Hpperm : ppermute (λ i : Idx, default i (g i)) isums' = prod_map fr id <$> isums). 1:{
+  assert (Hpperm : ppermute (λ i : Idx, default i (g i)) isums' = fr <$> isums). 1:{
     apply (list_eq_same_length _ _ _ eq_refl);
     [now rewrite length_ppermute, length_fmap|].
     intros i x y Hi.
@@ -3494,58 +3660,102 @@ Proof.
     destruct Hgi as (j & Hgi & Hj).
     rewrite Hgi.
     cbn.
-    apply Hgsome in Hgi as (idx & ty & Hisums & Hisums').
+    apply Hgsome in Hgi as (idx & Hisums & Hisums').
     rewrite pos_to_nat_pred_of_nat in Hisums.
     rewrite list_lookup_fmap.
     rewrite Hisums, Hisums'.
     cbn.
     congruence.
   }
-  split; [now rewrite <- HlenNs|].
-  rewrite ppermute_fmap, Hpperm, snds_prod_map, list_fmap_id.
-  apply (conj eq_refl).
+  split; [rewrite <- Hlens; replace (Pos.of_succ_nat (length isums)) 
+    with (lengthP isums) by lia; easy|].
+  split; [easy|].
+  (* rewrite ppermute_fmap, Hpperm, snds_prod_map, list_fmap_id.
+  apply (conj eq_refl). *)
   rewrite <- Habs.
   rewrite <- 2 list_fmap_compose.
-  apply eq_reflexivity.
-  apply list_fmap_ext; intros _ flu Hlu%elem_of_list_lookup_2.
-  cbn.
-  rewrite 2 relabel_abs_compose.
-  apply relabel_abs_ext_strong.
-  intros [r| |] Hr; [|done..].
-  cbn [compose relabel_bounds var_map].
-  specialize (Hntl.2 r) as Hrabs.
-  tspecialize Hrabs by now apply elem_of_abstracts_bound_vars;
-    destruct flu as [[f l] u]; cbn in *; eauto.
-  rewrite elem_of_list_to_set in Hrabs.
-  cbn in Hrabs.
-  apply elem_of_list_fmap in Hrabs as ((_, ty) & [= <-] & Hrty).
-  apply elem_of_list_lookup in Hrty as Hi.
-  destruct Hi as (i & Hi).
-  replace ((list_to_map (imap _ isums)) !! r) with (Some (Pos.of_succ_nat i)). 2:{
+  split. 
+  - apply eq_reflexivity.
+    apply list_fmap_ext; intros _ flu Hlu%elem_of_list_lookup_2.
+    cbn.
+    rewrite 2 relabel_abs_compose.
+    apply relabel_abs_ext_strong.
+    intros [r|] Hr; [|done..].
+    cbn [compose relabel_bounds var_map].
+    specialize (Hntl.2.1 r) as Hrabs.
+    tspecialize Hrabs by now apply elem_of_abstracts_bound_vars;
+      destruct flu as [[f l] u]; cbn in *; eauto.
+    rewrite elem_of_list_to_set in Hrabs.
+    cbn in Hrabs.
+    (* apply elem_of_list_fmap in Hrabs as ((_, ty) & [= <-] & Hrty). *)
+    apply elem_of_list_lookup in Hrabs as Hi.
+    destruct Hi as (i & Hi).
+    replace ((list_to_map (imap _ isums)) !! r) with (Some (Pos.of_succ_nat i)). 2:{
+      symmetry.
+      apply elem_of_list_to_map.
+      - rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap, list_fmap_id; apply Hntl.
+      - rewrite elem_of_lookup_imap.
+        exists i, r.
+        easy.
+    }
+    cbn.
+    apply lookup_lt_Some in Hi as Hilt.
+    rewrite decide_False by lia.
+    specialize (HgisSome (Pos.of_succ_nat i) ltac:(lia)) as (j & Hgi & Hj).
+    rewrite Hgi.
+    cbn.
+    replace (list_to_map _ !! _) with (Some j); [done|].
     symmetry.
-    apply elem_of_list_to_map.
-    - rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap; apply Hntl.
-    - rewrite elem_of_lookup_imap.
-      exists i, (r, ty).
-      easy.
-  }
-  cbn.
-  apply lookup_lt_Some in Hi as Hilt.
-  rewrite decide_False by lia.
-  specialize (HgisSome (Pos.of_succ_nat i) ltac:(lia)) as (j & Hgi & Hj).
-  rewrite Hgi.
-  cbn.
-  replace (list_to_map _ !! _) with (Some j); [done|].
-  symmetry.
-  apply elem_of_list_to_map;
-  [rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap; apply Hntl'|].
-  rewrite elem_of_lookup_imap.
-  apply Hgsome in Hgi.
-  exists (pos_to_nat_pred j), (fr r, ty).
-  rewrite pos_to_nat_pred_to_pos.
-  split; [easy|].
-  rewrite pos_to_nat_pred_of_nat in Hgi.
-  destruct Hgi as (? & ? & ? & ?); congruence.
+    apply elem_of_list_to_map;
+    [rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap, list_fmap_id; apply Hntl'|].
+    rewrite elem_of_lookup_imap.
+    apply Hgsome in Hgi.
+    exists (pos_to_nat_pred j), (fr r).
+    rewrite pos_to_nat_pred_to_pos.
+    split; [easy|].
+    rewrite pos_to_nat_pred_of_nat in Hgi.
+    destruct Hgi as (? & ? & ?); congruence.
+  - rewrite <- Hdelt, <- 2 list_fmap_compose.
+    apply eq_reflexivity.
+    apply list_fmap_ext; intros _ lu Hlu%elem_of_list_lookup_2.
+    cbn.
+    rewrite 2 relabel_delt_compose.
+    apply relabel_delt_ext_strong.
+    intros [r|] Hr; [|done..].
+    cbn [compose relabel_bounds var_map].
+    specialize (Hntl.2.2 r) as Hrabs.
+    tspecialize Hrabs by now apply elem_of_deltas_bound_vars;
+      destruct lu as [l u]; cbn in *; naive_solver.
+    rewrite elem_of_list_to_set in Hrabs.
+    cbn in Hrabs.
+    (* apply elem_of_list_fmap in Hrabs as ((_, ty) & [= <-] & Hrty). *)
+    apply elem_of_list_lookup in Hrabs as Hi.
+    destruct Hi as (i & Hi).
+    replace ((list_to_map (imap _ isums)) !! r) with (Some (Pos.of_succ_nat i)). 2:{
+      symmetry.
+      apply elem_of_list_to_map.
+      - rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap, list_fmap_id; apply Hntl.
+      - rewrite elem_of_lookup_imap.
+        exists i, r.
+        easy.
+    }
+    cbn.
+    apply lookup_lt_Some in Hi as Hilt.
+    rewrite decide_False by lia.
+    specialize (HgisSome (Pos.of_succ_nat i) ltac:(lia)) as (j & Hgi & Hj).
+    rewrite Hgi.
+    cbn.
+    replace (list_to_map _ !! _) with (Some j); [done|].
+    symmetry.
+    apply elem_of_list_to_map;
+    [rewrite fmap_imap; unfold compose; cbn; rewrite imap_to_fmap, list_fmap_id; apply Hntl'|].
+    rewrite elem_of_lookup_imap.
+    apply Hgsome in Hgi.
+    exists (pos_to_nat_pred j), (fr r).
+    rewrite pos_to_nat_pred_to_pos.
+    split; [easy|].
+    rewrite pos_to_nat_pred_of_nat in Hgi.
+    destruct Hgi as (? & ? & ?); congruence.
 Qed.
 
 
@@ -3570,45 +3780,46 @@ Proof.
   apply Hfg; constructor.
 Qed.
 
+
+Lemma make_pwf_inj n f :
+  posperm n f ->
+  Inj (=) (=) (make_pwf n f).
+Proof.
+  intros Hf.
+  specialize (posperm_inj _ _ Hf) as Hfinj.
+  specialize (posperm_bounded _ _ Hf) as Hfbdd.
+  intros p q.
+  specialize (Hfinj p q).
+  generalize (Hfbdd p) (Hfbdd q).
+  cbn.
+  do 2 case_decide; lia.
+Qed.
+
 Lemma tl2ntl_aeq tl tl' :
   tl =tl= tl' ->
   tl2ntl tl =ntl= tl2ntl tl'.
 Proof.
-  intros (f & Hf & Hfpperm & Habs)%symmetry.
-  destruct tl as [sums abs], tl' as [sums' abs'].
-  cbn.
+  intros (f & Hf & Hlen & Habs & Hdelt)%symmetry.
+  destruct tl as [sums abs delt], tl' as [sums' abs' delt'].
+  cbn in *.
   eexists.
-  assert (Hinj : Inj (=) (=) (make_pwf (lengthP sums') f)) by now apply make_pwf_inj.
+  assert (Hinj : Inj (=) (=) (make_pwf (Pos.of_succ_nat sums') f)) by 
+    now apply make_pwf_inj.
   split; [intros ????; apply Hinj|
-    split; [|symmetry; apply Habs]]; cbn -[make_pwf reverse] in *.
-  rewrite fmap_imap.
-  unfold compose; cbn -[make_pwf].
-  rewrite <- Hfpperm.
-  rewrite imap_to_imap_pair, posperm_imap_eq by now rewrite lengthN_reverse.
-  rewrite ppermute_permutation. 2:{
-    rewrite lengthN_correct_rev, length_zip, length_fmap,
-      length_seq, length_reverse, Nat.min_id, <- lengthN_correct_rev.
-    easy.
-  }
-  rewrite fmap_zip_with.
-  cbn -[make_pwf].
-  rewrite zip_with_fmap_l.
-  apply eq_reflexivity.
-  rewrite imap_to_zip_with_seq.
-  apply zip_with_ext_strong; [|done..].
-  intros a b Ha%elem_of_seq Hb%elem_of_reverse.
-  rewrite pos_to_nat_pred_to_pos.
-  pose proof (lengthN_reverse sums').
-  pose proof (length_reverse sums').
-  pose proof (lengthN_correct sums').
+    split; [|split; [symmetry; apply Habs | symmetry; apply Hdelt]]].
   cbn.
-  rewrite decide_False by now rewrite <- (lengthN_reverse sums');
-    apply Pos.lt_nle, posperm_inv_bounded; try lia.
-  rewrite posperm_inv_rinv by solve [now rewrite lengthN_reverse | lia].
-  reflexivity.
+  pose proof Hf as Hperm.
+  hnf in Hperm.
+  replace (Pos.pred_N (Pos.of_succ_nat sums')) with (sums' :> N)
+    in Hperm by lia.
+  rewrite <- Hperm.
+  apply eq_reflexivity.
+  rewrite Hlen.
+  apply list_fmap_ext; intros _ p Hp%elem_of_list_lookup_2%elem_of_pseq_1.
+  apply decide_False; lia. 
 Qed.
 
-
+(* 
 Section abstracts_perm_eq.
 
 Context {A B : Type}.
@@ -4142,7 +4353,7 @@ Proof.
   intros a _.
   cbn.
   symmetry; apply relabel_abs_WT'_iff.
-Qed.
+Qed. 
 
 Lemma abstracts_indices_ntl2tl ntl :
   abstracts_indices (ntl2tl ntl).(tl_abstracts) =
@@ -4176,6 +4387,7 @@ Proof.
   apply abstracts_indices_relabel_abs.
 Qed.
 
+*)
 
 
 
@@ -4186,4 +4398,3 @@ Qed.
 
 
 
- *)
