@@ -47,6 +47,191 @@ Qed.
 
 
 
+Section list_index.
+Context `{EqDecision A}.
+Implicit Type l : list A.
+
+Definition list_index (x : A) l :=
+  fst <$> list_find (eq x) l.
+
+Lemma list_index_is_Some x l :
+  is_Some (list_index x l) <-> x ∈ l.
+Proof.
+  unfold list_index.
+  rewrite fmap_is_Some.
+  split; [|intros Hx; apply (list_find_elem_of _ _ x Hx eq_refl)].
+  now intros [[] (?%elem_of_list_lookup_2 & <- & _)%list_find_Some].
+Qed.
+
+Lemma list_index_Some x l i :
+  list_index x l = Some i <->
+  l !! i = Some x /\ forall j y, l !! j = Some y -> j < i -> x <> y.
+Proof.
+  unfold list_index.
+  rewrite fmap_Some, exists_pair.
+  setoid_rewrite list_find_Some.
+  naive_solver.
+Qed.
+
+Lemma list_index_Some_NoDup x l i :
+  NoDup l ->
+  list_index x l = Some i <-> l !! i = Some x.
+Proof.
+  intros Hdup.
+  rewrite list_index_Some.
+  rewrite <- (and_True (l !! i = Some x)) at 2.
+  apply and_iff_from_l; [reflexivity|intros Hli _].
+  apply iff_True_1.
+  intros j y Hlj Hji ->.
+  enough (i = j) by lia.
+  revert Hli Hlj.
+  now apply NoDup_lookup.
+Qed.
+
+Lemma list_index_inj x y l i :
+  list_index x l = Some i -> list_index y l = Some i -> x = y.
+Proof.
+  rewrite 2 list_index_Some.
+  intros [] [].
+  congruence.
+Qed.
+
+Lemma list_index_lt x l i :
+  list_index x l = Some i -> i < length l.
+Proof.
+  now intros [?%lookup_lt_Some _]%list_index_Some.
+Qed.
+
+Lemma list_index_ppermute_NoDup x l f : posperm (lengthP l) f ->
+  NoDup l ->
+  list_index x (ppermute f l) =
+  (pos_to_nat_pred ∘ posperm_inv (lengthP l) f ∘ Pos.of_succ_nat) <$> list_index x l.
+Proof.
+  intros Hf Hl.
+  apply option_eq; intros i.
+  rewrite list_index_Some_NoDup by now rewrite ppermute_permutation.
+  pose proof (lengthN_correct l).
+  split.
+  - intros Hlook.
+    apply lookup_lt_Some in Hlook as Hi.
+    rewrite length_ppermute in Hi.
+    rewrite lookup_ppermute_alt_bdd in Hlook by now easy + apply posperm_bounded.
+    replace (list_index x l) with (Some (f (Pos.of_succ_nat i) :> nat)) by
+      now symmetry; apply list_index_Some_NoDup.
+    cbn.
+    rewrite pos_to_nat_pred_to_pos.
+    rewrite posperm_inv_linv by now easy + lia.
+    f_equal; lia.
+  - destruct (list_index x l) as [fi|] eqn:Hfi; [|easy].
+    apply list_index_Some in Hfi as [Hfi _].
+    apply lookup_lt_Some in Hfi as Hfilt.
+    cbn.
+    intros [= <-].
+    rewrite lookup_ppermute_alt_bdd by first [
+      now apply posperm_bounded|
+      specialize (posperm_inv_bounded (lengthP l) f (Pos.of_succ_nat fi));
+      lia
+    ].
+    rewrite pos_to_nat_pred_to_pos.
+    rewrite posperm_inv_rinv by now easy || lia.
+    now rewrite pos_to_nat_pred_of_nat.
+Qed.
+
+Lemma list_lookup_omap_all_is_Some `(f : A -> option B) (l : list A) (i : nat)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l !! i = l !! i ≫= f.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  revert i;
+  induction Hf; [now intros []|intros i].
+  cbn.
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  destruct i; [cbn; now rewrite Hfx|].
+  cbn.
+  apply IHHf.
+Qed.
+
+Lemma length_omap_all_is_Some `(f : A -> option B) (l : list A)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  length (omap f l) = length l.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  induction Hf; [done|cbn].
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  cbn.
+  f_equal; apply IHHf.
+Qed.
+
+Lemma omap_all_is_Some_default `(f : A -> option B) (l : list A) (g : A -> B)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l = (λ i, default (g i) (f i)) <$> l.
+Proof.
+  apply (list_eq_same_length _ _ _ eq_refl).
+  - now rewrite length_fmap; apply length_omap_all_is_Some.
+  - intros i x y.
+    rewrite length_fmap.
+    intros Hi.
+    rewrite list_lookup_omap_all_is_Some by easy.
+    rewrite list_lookup_fmap.
+    destruct (l !! i) as [li|]; [|easy].
+    cbn.
+    destruct (f li); [|easy].
+    cbn; congruence.
+Qed.
+
+Lemma ppermute_alt_list_index_aux_Some f l : posbdd (lengthP l) f -> NoDup l ->
+  forall x, x ∈ l ->
+    is_Some (i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat)).
+Proof.
+  intros Hf Hl x Hx.
+  pose proof (lengthN_correct l).
+  apply elem_of_list_lookup in Hx as Hi.
+  destruct Hi as [i Hi].
+  apply list_index_Some_NoDup in Hi as Hi'; [|easy].
+  rewrite Hi'.
+  cbn.
+  apply lookup_lt_Some in Hi as Hilt.
+  apply lookup_lt_is_Some.
+  specialize (Hf (Pos.of_succ_nat i)).
+  lia.
+Qed.
+
+Lemma ppermute_alt_list_index f l : posbdd (lengthP l) f -> NoDup l ->
+  ppermute f l = omap (λ x, i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat)) l.
+Proof.
+  intros Hf Hl.
+  pose proof (lengthN_correct l).
+  specialize (ppermute_alt_list_index_aux_Some f l Hf Hl) as Hsome.
+  apply length_omap_all_is_Some in Hsome as Hlen.
+  apply (λ H, list_eq_same_length _ _ _ H eq_refl);
+  [now rewrite length_ppermute, Hlen|].
+  intros i x y.
+  rewrite length_ppermute.
+  intros Hi.
+  rewrite lookup_ppermute_alt_bdd by easy.
+  rewrite list_lookup_omap_all_is_Some by easy.
+  apply lookup_lt_is_Some in Hi as Hli.
+  destruct Hli as [li Hli].
+  rewrite Hli.
+  cbn.
+  apply list_index_Some_NoDup in Hli as Hli'; [|easy].
+  rewrite Hli'.
+  cbn.
+  congruence.
+Qed.
+
+Lemma ppermute_alt_list_index_total
+  f l : posbdd (lengthP l) f -> NoDup l ->
+  ppermute f l = (λ x, default x
+    (i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat))) <$> l.
+Proof.
+  intros Hf Hl.
+  rewrite ppermute_alt_list_index by easy.
+  now apply omap_all_is_Some_default, ppermute_alt_list_index_aux_Some.
+Qed.
+
+End list_index.
+
 
 
 Section TensorExprDBSemantics.
@@ -3498,6 +3683,311 @@ Proof.
   - apply ntl_aeq_correct; easy + apply HWF.
   - apply ntl_delta_eq_correct; easy.
 Qed.
+
+(* Fixpoint join_vec {A n} (v : vec (option A) n) : option (vec A n) :=
+  match v in vec _ n return option (vec A n) with
+  | [#] => Some [#]
+  | ma ::: mv =>
+    ma ≫= λ a, join_vec mv ≫= λ v, Some (a ::: v)
+  end.
+
+Lemma vec_to_list_join `{A : Type} {n} (v : vec (option A) n) :
+  vec_to_list <$> join_vec v = join_list v.
+Proof. *)
+
+Definition make_ml {n m} (inputs : vec Idx n) (outputs : vec Idx m)
+  (ins : vec A n) (outs : vec A m) : varcontext :=
+  list_to_map (zip inputs ins) ∪
+  list_to_map (zip outputs outs).
+
+(* Semantics of a tensorexpr as a (dimensioned) tensor, based on
+  vectors of input and output vertices *)
+Definition tensorexpr_to_tensor (mabs : abscontext)
+  {n m} (inputs : vec Idx n) (outputs : vec Idx m)
+    (te : tensorexpr) : @Tensor R n m A :=
+  fun ins outs =>
+    total_semantics mabs (make_ml inputs outputs ins outs) te.
+
+
+Definition tensorlist_to_tensor (mabs : abscontext)
+  {n m} (inputs : vec Idx n) (outputs : vec Idx m)
+    (tl : tensorlist) : @Tensor R n m A :=
+  fun ins outs =>
+    tl_total_semantics mabs (make_ml inputs outputs ins outs) tl.
+
+Definition namedtensorlist_to_tensor (mabs : abscontext)
+  {n m} (inputs : vec Idx n) (outputs : vec Idx m)
+    (ntl : namedtensorlist) : @Tensor R n m A :=
+  fun ins outs =>
+    ntl_total_semantics mabs (make_ml inputs outputs ins outs) ntl.
+
+Definition tl_subst_free (l : Idx) (tl : tensorlist) :=
+  tl_add_sums 1 (relabel_tl
+    (var_elim (bound ∘ Pos.succ)
+    (λ l', if decide (l' = l) then bound 1 else free l')) tl).
+
+Lemma tl_total_semantics_tl_subst_free mabs ml l tl :
+  tl_total_semantics mabs ml (tl_subst_free l tl) ==
+  ∑ a : A, tl_total_semantics mabs (<[l:=a]> ml) tl.
+Proof.
+  destruct tl as [sums abs delt].
+  rewrite tl_total_semantics_alt_vec.
+  cbn [tl_subst_free tl_add_sums relabel_tl tl_sums tl_abstracts tl_deltas].
+  rewrite sum_of_vec_succ.
+  apply sum_of_ext'.
+  intros a Ha.
+  rewrite (tl_total_semantics_alt_vec _ _ (mk_tl sums abs delt)).
+  cbn [tl_sums tl_abstracts tl_deltas].
+  apply sum_of_ext'; intros m Hm.
+  apply tl_total_semantics_aux_ext_base.
+  - apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [[f low] up] _.
+    cbn.
+    split; [reflexivity|].
+    split;
+    apply Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall;
+    intros v _;
+    cbn;
+    (destruct v as [r|l']; cbn;
+    [rewrite lookup_cons_ne_0 by lia; f_equal; lia|];
+    rewrite lookup_insert_case;
+    do 2 case_decide; done).
+  - apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [lv uv] _;
+    cbn.
+    split; [rename lv into v|rename uv into v];
+    (destruct v as [r|l']; cbn;
+    [rewrite lookup_cons_ne_0 by lia; f_equal; lia|];
+    rewrite lookup_insert_case;
+    do 2 case_decide; done).
+Qed.
+
+(* Definition compose_tensorlist (mids : list Idx) (l r : tensorlist) : tensorlist :=
+  tl_add_sums (length mids) (relabel_tl
+    (var_elim (bound ∘ (λ p, pos_add_N p (lengthN mids))) (λ fr,
+      from_option (bound ∘ Pos.of_succ_nat ∘ (λ n, (length mids - S n)%nat))
+      (free fr) (list_index fr mids))) (tl_times l r)).
+ *)
+
+Lemma list_find_app `(P : X -> Prop) `{forall x, Decision (P x)} (l l' : list X) :
+  list_find P (l ++ l') =
+  list_find P l ∪ (prod_map (Nat.add (length l)) id <$> list_find P l').
+Proof.
+  induction l.
+  - cbn.
+    rewrite option_union_left_id.
+    symmetry.
+    etransitivity; [|apply option_fmap_id].
+    apply option_fmap_ext; now intros [].
+  - cbn.
+    case_decide; [now rewrite union_Some_l|].
+    rewrite IHl.
+    destruct (list_find P l) as [[]|].
+    + cbn.
+      now rewrite 2 union_Some_l.
+    + cbn.
+      rewrite 2 option_union_left_id.
+      rewrite <- option_fmap_compose.
+      reflexivity.
+Qed.
+
+
+Definition compose_tensorlist (mids : list Idx) (l r : tensorlist) : tensorlist :=
+  tl_add_sums (length mids) (relabel_tl
+    (var_elim (bound ∘ (λ p, pos_add_N p (lengthN mids))) (λ fr,
+      from_option (bound ∘ Pos.of_succ_nat ∘ (λ n, (length mids - S n)%nat))
+      (free fr) (list_index fr mids))) (tl_times l r)).
+
+Lemma compose_tensorlist_foldr mids l r :
+  compose_tensorlist mids l r =
+  foldr (fun mid tl => tl_subst_free mid tl) (tl_times l r) (reverse mids).
+Proof.
+  unfold compose_tensorlist.
+  set (lr := tl_times l r).
+  generalize lr.
+  clear l r lr.
+  induction mids; intros lr.
+  - cbn.
+    apply tl_ext; cbn; [reflexivity|..];
+    apply list_fmap_id'; intros ? _;
+    [apply relabel_abs_id'|apply relabel_delt_id'];
+    intros []; done.
+  - rewrite reverse_cons, foldr_app.
+    cbn.
+    rewrite <- IHmids.
+    apply tl_ext; [cbn; lia|..];
+    cbn;
+    rewrite <- list_fmap_compose;
+    apply list_fmap_ext; intros _ ? _; cbn;
+    [rewrite relabel_abs_compose; apply relabel_abs_ext|
+     rewrite relabel_delt_compose; apply relabel_delt_ext];
+    (intros [r'|l']; [f_equal/=; lia|]);
+    (cbn;
+    case_decide as Hl'; cbn;
+    [rewrite lengthN_correct_rev; f_equal; lia|];
+    unfold list_index;
+    destruct (list_find _ _) as [[n ?]|]; done).
+Qed.
+
+
+Lemma tl_total_semantics_compose_tensorlist_aux mabs ml mids (l r : tensorlist) :
+  tl_total_semantics mabs ml (compose_tensorlist mids l r) ==
+  ∑ rmi : vec A (length (reverse (reverse mids))),
+    tl_total_semantics mabs (list_to_map (zip mids rmi) ∪ ml) (tl_times l r).
+Proof.
+  rewrite compose_tensorlist_foldr.
+  erewrite sum_of_ext by now intros;
+    replace (zip mids) with (zip_with (B:=A) pair (reverse (reverse mids))) by (now rewrite (reverse_involutive mids));
+    refine (reflexivity _).
+  cbv beta.
+  generalize (reverse mids) as rmids.
+  clear mids.
+  intros mids.
+  revert ml;
+  induction mids as [|mid mids IHmid]; intros ml.
+  - rewrite sum_of_vec_0.
+    cbn.
+    now rewrite map_empty_union.
+  - cbn [foldr].
+    unshelve (rewrite (sum_of_vec_cast (m:=length (reverse mids) + 1))).
+    1: {
+      abstract (rewrite reverse_cons, length_app at 1; cbn;
+      exact eq_refl).
+    }
+    setoid_rewrite vec_to_list_cast.
+    rewrite sum_of_vec_add, sum_of_comm.
+    rewrite tl_total_semantics_tl_subst_free.
+    rewrite sum_of_vec_1.
+    apply sum_of_ext'; intros a Ha.
+    rewrite IHmid.
+    apply sum_of_ext; intros mr.
+    f_equiv.
+    rewrite reverse_cons, vec_to_list_app.
+    rewrite zip_with_app by now rewrite length_vec_to_list.
+    rewrite list_to_map_app.
+    cbn.
+    rewrite <- map_union_assoc.
+    now rewrite <- insert_union_l, map_empty_union.
+Qed.
+
+(* FIXME: Move *)
+Definition tl_free_varset (tl : tensorlist) : Pset :=
+  abstracts_free_vars tl.(tl_abstracts) ∪
+  deltas_free_vars tl.(tl_deltas).
+
+Lemma tl_total_semantics_free_varset_ext mabs ml ml' tl :
+  (forall l, l ∈ tl_free_varset tl -> ml !! l = ml' !! l) ->
+  tl_total_semantics mabs ml tl == tl_total_semantics mabs ml' tl.
+Proof.
+  intros Hml.
+  rewrite 2 tl_total_semantics_alt_vec.
+  apply sum_of_ext; intros mr.
+  apply tl_total_semantics_aux_ext_base;
+  apply Forall_Forall2_diag; rewrite Forall_forall.
+  - intros [[f low] up] Hflu.
+    cbn [fst snd].
+    split; [easy|].
+    split; apply Forall_Forall2_diag; rewrite Forall_forall;
+    (intros [|l] Hl; [done|]); cbn;
+    apply Hml;
+    apply elem_of_union; left;
+    rewrite elem_of_abstracts_free_vars; set_solver + Hflu Hl.
+  - intros [l u] Hlu.
+    cbn.
+    split; [rename l into v|rename u into v];
+    (destruct v as [|l']; [done|]); cbn;
+    apply Hml;
+    apply elem_of_union; right;
+    rewrite elem_of_deltas_free_vars; set_solver + Hlu.
+Qed.
+
+Lemma compose_tensorlist_correct mabs {n m o} (ins : vec Idx n)
+  (mids : vec Idx m) (outs : vec Idx o) (ltl rtl : tensorlist) :
+  ins ##@{list _} mids -> 
+  mids ##@{list _} outs ->
+  ins ##@{list _} outs ->
+  tl_free_varset ltl ⊆ list_to_set (ins ++ mids) ->
+  tl_free_varset rtl ⊆ list_to_set (mids ++ outs) ->
+  tensorlist_to_tensor mabs ins outs (compose_tensorlist mids ltl rtl) ≡
+  compose_tensor (tensorlist_to_tensor mabs ins mids ltl)
+    (tensorlist_to_tensor mabs mids outs rtl).
+Proof.
+  intros Hins_mids Hmids_outs Hins_outs Hltl Hrtl.
+  intros v w Hv Hw.
+  unfold compose_tensor, tensorlist_to_tensor.
+  rewrite tl_total_semantics_compose_tensorlist_aux.
+  unshelve (rewrite (sum_of_vec_cast (m:=m))).
+  1:{
+    abstract (now rewrite reverse_involutive, length_vec_to_list).
+  }
+  apply sum_of_ext'; intros mr Hmr.
+  rewrite vec_to_list_cast.
+  rewrite tl_total_semantics_aux_tl_times.
+  f_equiv.
+  - apply tl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hltl in Hl as Hl'.
+    rewrite elem_of_list_to_set, elem_of_app in Hl'.
+    destruct Hl' as [Hl'|Hl'].
+    + rewrite lookup_union_r. 2:{
+        apply not_elem_of_dom.
+        rewrite dom_list_to_map.
+        rewrite fst_zip
+          by now rewrite 2 length_vec_to_list.
+        rewrite elem_of_list_to_set.
+        now apply Hins_mids in Hl'.
+      }
+      unfold make_ml.
+      rewrite 2 lookup_union.
+      eenough (Hen : _) by now
+      rewrite 2 union_eq_l by exact Hen.
+      apply elem_of_dom.
+      rewrite dom_list_to_map.
+      rewrite elem_of_list_to_set.
+      now rewrite fst_zip by now rewrite 2 length_vec_to_list.
+    + rewrite lookup_union, union_eq_l
+        by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
+          fst_zip by now rewrite 2 length_vec_to_list.
+      unfold make_ml.
+      rewrite lookup_union_r; [done|].
+      apply not_elem_of_dom.
+      rewrite dom_list_to_map, elem_of_list_to_set, 
+        fst_zip by now rewrite 2 length_vec_to_list.
+      now intros ?%Hins_mids.
+  - apply tl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hrtl in Hl as Hl'.
+    rewrite elem_of_list_to_set, elem_of_app in Hl'.
+    destruct Hl' as [Hl'|Hl'].
+    + unfold make_ml.
+      now rewrite 3 lookup_union, 2 union_eq_l
+        by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
+          fst_zip by now rewrite 2 length_vec_to_list.
+    + 
+      
+      rewrite lookup_union_r. 2:{
+        apply not_elem_of_dom.
+        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+          by now rewrite 2 length_vec_to_list.
+        now intros ?%Hmids_outs.
+      }
+      unfold make_ml.
+      
+      rewrite 2 lookup_union_r by 
+        now apply not_elem_of_dom;
+        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+          by (now rewrite 2 length_vec_to_list);
+        now intros ?%Hmids_outs || intros ?%Hins_outs.
+      done.
+Qed.
+
+
+
+
+
 
 
 
