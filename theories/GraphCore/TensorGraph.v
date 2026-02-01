@@ -2,6 +2,7 @@ Require Export Tensor.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
 Require Export Aux_stdpp.
+Require Import TESyntax (relabel_abs).
 
 (* Basic definitions and structural operations on TensorGraphs *)
 
@@ -178,6 +179,30 @@ Definition out_arity (es : list edge) (k : nat) :=
 
 (* Definition sorted_outputs (tg : TensorGraph) : list nat :=
   merge_sort le $ elements (outputs tg). *)
+
+Definition vertices (tg : TensorGraph) : Pset :=
+  list_to_set (map_to_list (tg.(nodes)) ≫= λ k_flu, k_flu.2.1.2 ++ k_flu.2.2) ∪
+  list_to_set (tg.(inputs) ++ tg.(outputs)).
+
+Lemma elem_of_vertices (tg : TensorGraph) (r : positive) :
+  r ∈ vertices tg <-> 
+    (exists k flu, tg.(nodes) !! k = Some flu /\
+      (r ∈ flu.1.2 \/ r ∈ flu.2)) \/
+    r ∈ tg.(inputs) \/ r ∈ tg.(outputs).
+Proof.
+  unfold vertices.
+  rewrite elem_of_union, 2 elem_of_list_to_set.
+  rewrite elem_of_list_bind.
+  setoid_rewrite elem_of_app.
+  rewrite exists_pair.
+  cbn.
+  setoid_rewrite elem_of_map_to_list.
+  naive_solver.
+Qed.
+
+
+Definition relabel_graph (f : positive -> positive) (tg : TensorGraph) : TensorGraph :=
+  mk_tg (relabel_abs f <$> tg.(nodes)) (f <$> tg.(inputs)) (f <$> tg.(outputs)).
 
 
 

@@ -1,6 +1,6 @@
 Require Export TensorGraph Aux_pos.
 
-Require Export TensorExprDBSyntax.
+Require Export TESyntax.
 
 (* FIXME: Move: *)
 Require Combinators.
@@ -23,34 +23,32 @@ Section TensorGraphExpr.
 
 Context {T : Type}.
 
-Let TensorGraph := (TensorGraph T).
+Let TensorGraph := (TensorHyperGraph T).
 
 Implicit Types tg : TensorGraph.
 
-Definition input_edges (linternal lexternal : list labedge)
-  (k : nat) : list var :=
-  ((rel ∘ Pos.of_succ_nat ∘ fst) <$>
-    node_input_edges k linternal) ++
-  ((loc ∘ bcons false ∘ Pos.of_succ_nat ∘ fst ∘ snd) <$>
-    node_input_edges k lexternal).
 
-Definition output_edges (linternal lexternal : list labedge)
-  (k : nat) : list var :=
-  ((rel ∘ Pos.of_succ_nat ∘ fst) <$>
-    node_output_edges k linternal) ++
-  ((loc ∘ bcons true ∘ Pos.of_succ_nat ∘ snd ∘ snd) <$>
-    node_output_edges k lexternal).
+Definition tg_abstracts (tm : Pmap (T * list positive * list positive)) :
+  list (Idx * list var * list var) :=
+  (λ k_flu : _*(_*list _*list _), 
+    (k_flu.1, bound <$> k_flu.2.1.2, bound <$> k_flu.2.2)) <$> 
+    (map_to_list tm :> list (positive * (T * list positive * list positive))).
+
+Definition tg_list_to_deltas (is_output : bool) 
+  (idxs : list positive) : list (var * var) :=
+  imap (λ idx input, (free $ bcons is_output (Pos.of_succ_nat idx), bound input))
+    idxs.
 
 
+Definition graph_namedtensorlist_semantics (tg : TensorGraph) : namedtensorlist := {|
+  ntl_sums := elements (vertices tg);
+  ntl_abstracts := tg_abstracts tg.(nodes);
+  ntl_deltas := tg_list_to_deltas false tg.(inputs) 
+    ++ tg_list_to_deltas true tg.(outputs); 
+|}.
 
-Definition mk_node (linternal lexternal : list labedge)
-  (k : nat) :=
-  (Pos.of_succ_nat k, input_edges linternal lexternal k,
-    output_edges linternal lexternal k).
 
-
-
-
+(* 
 Definition graph_tensorlist_semantics (tg : TensorGraph) : tensorlist :=
   mk_tl (const 0%nat <$> internal_edges tg)
     (mk_node (i_internal_edges tg) (i_external_edges tg) <$>
@@ -1036,7 +1034,7 @@ Proof.
   naive_solver.
 Qed.
 
-
+ *)
 
 
 

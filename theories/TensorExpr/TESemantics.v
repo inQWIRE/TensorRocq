@@ -29,13 +29,6 @@ Proof.
 Qed.
 
 
-Add Parametric Morphism {A B} : relabel_abs with signature
-  pointwise_relation A (@eq B) ==> eq ==>
-  eq as relabel_abs_mor.
-Proof.
-  intros f g Hfg abs.
-  now apply relabel_abs_ext.
-Qed.
 
 Add Parametric Morphism : relabel_bounds with signature
   pointwise_relation _ eq ==> eq ==>
@@ -1357,7 +1350,7 @@ Proof.
   induction Hperm; [reflexivity| | |].
   - cbn in *.
     now rewrite IHHperm.
-  - cbn. 
+  - cbn.
     rewrite 2 list_bind_assoc.
     unfold compose.
     setoid_rewrite list_fmap_bind; unfold compose.
@@ -1610,7 +1603,7 @@ Proof.
     now rewrite (lookup_kmap _).
 Qed.
 
-(* 
+(*
 Lemma Vlist_elements_app tys tys' :
   Vlist_elements (tys ++ tys') ≡ₚ
   Vlist_elements tys ≫= λ l,
@@ -1800,7 +1793,7 @@ Qed. *)
 
 
 (* FIXME: Move *)
-Lemma Rlist_prod_Forall2_ext (rs rs' : list R) : 
+Lemma Rlist_prod_Forall2_ext (rs rs' : list R) :
   Forall2 req rs rs' -> Rlist_prod rs == Rlist_prod rs'.
 Proof.
   intros Halls.
@@ -1815,7 +1808,7 @@ Lemma tl_aeq_correct mabs ml tl tl' :
 Proof.
   intros (f & Hf & Htypes & Habs & Hdelt).
   rewrite 2 tl_total_semantics_alt_aux_correct.
-  
+
   rewrite <- Htypes.
   unfold tl_total_semantics_alt_aux.
   set (p:=Pos.of_succ_nat tl.(tl_sums)) in *.
@@ -1827,7 +1820,7 @@ Proof.
     apply Vmap_elements_perm.
     replace (N.of_nat tl.(tl_sums)) with (Pos.pred_N p) by lia.
     rewrite <- Hf at 2.
-    apply eq_reflexivity, list_fmap_ext; 
+    apply eq_reflexivity, list_fmap_ext;
       intros _ k Hk%elem_of_list_lookup_2%elem_of_pseq_1.
     apply decide_False.
     lia.
@@ -1842,7 +1835,7 @@ Proof.
     intros [[idx low] up] _.
     cbn.
     apply eq_reflexivity, abstract_semantics_alt_ext; [reflexivity|..];
-      rewrite <- list_fmap_compose; apply list_fmap_ext; 
+      rewrite <- list_fmap_compose; apply list_fmap_ext;
         (intros _ [r|] _; [|reflexivity]; cbn -[make_pwf];
         apply (lookup_kmap _)).
   - erewrite Rlist_prod_perm by now rewrite Hdelt.
@@ -2011,7 +2004,7 @@ Proof.
 
 
 
-(* 
+(*
 
 Fixpoint tensorequation_semantics_aux
   mabs mg mr
@@ -2873,7 +2866,7 @@ Qed. *)
 
 
 
-(* 
+(*
 Lemma abstract_semantics'_abstracts_perm_eq_permutative_tensor
   (mabst : Pmap BTensor) mg ml mr
   abs abs' :
@@ -3055,7 +3048,7 @@ Proof.
 
   rewrite (tl_total_semantics_alt_aux_relabel _ _ _ g).
   replace (_ <$> _) with isums. 2:{
-    
+
     apply (fun H => list_eq_same_length _ _ _ H eq_refl);
       [now rewrite length_fmap, length_pseq; lia|].
     intros i x y Hi.
@@ -3150,7 +3143,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* 
+(*
 Lemma ntl_perm_eq_correct_permutative mabst mg ml ntl ntl' :
   ntl ≡ntl≡ₚ ntl' ->
   Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
@@ -3169,16 +3162,345 @@ Proof.
 Qed. *)
 
 Lemma ntl_aeq_correct mabs ml ntl ntl' :
-  WF_ntl ntl -> WF_ntl ntl' ->
+  WF_ntl ntl ->
   ntl =ntl= ntl' ->
   ntl_total_semantics mabs ml ntl ==
   ntl_total_semantics mabs ml ntl'.
 Proof.
-  intros Hntl Hntl' Heq.
+  intros Hntl Heq.
+  apply ntl_aeq_WF in Heq as Hntl'; [|easy].
   unfold ntl_total_semantics.
   apply tl_aeq_correct.
   now apply ntl2tl_aeq.
 Qed.
+
+Lemma ntl_delta_idemp_correct mabs ml ntl ntl' v :
+  WT_ntl (dom ml) ntl -> WT_ntl (dom ml) ntl' ->
+  ntl_delta_idemp v ntl ntl' ->
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
+Proof.
+  intros HWT HWT' Hidemp.
+  hnf in Hidemp.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn -[ntl2tl] in *.
+  rewrite 2 ntl_total_semantics_alt by first [apply HWT|apply HWT'].
+  cbn [ntl_sums ntl_abstracts ntl_deltas].
+  destruct Hidemp as (<- & -> & ->).
+  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  cbn [deltas_semantics_alt fmap list_fmap Rlist_prod].
+  enough (delta_semantics_alt ml mr v v == 1) as Heq
+    by now unfold deltas_semantics_alt; ring [Heq].
+  destruct v as [r|l].
+  - cbn.
+    assert (Hr : r ∈ dom mr). 1:{
+      rewrite Hmr.1.
+      apply HWT'.2.2.2.2.
+      set_solver +.
+    }
+    unfold Vmap in *.
+    apply elem_of_dom in Hr as [a Ha].
+    rewrite Ha.
+    cbn.
+    apply eq_reflexivity, delta_tensor_eq.
+  - cbn.
+    assert (Hl : l ∈ dom ml). 1:{
+      apply HWT'.2.1.
+      set_solver +.
+    }
+    unfold Vmap in *.
+    apply elem_of_dom in Hl as [a Ha].
+    rewrite Ha.
+    cbn.
+    apply eq_reflexivity, delta_tensor_eq.
+Qed.
+
+(* Lemma Vmap_elements_cons_alt ty tys :
+  Vmap_elements ty tys  *)
+
+Lemma sum_of_Vmap_cons ty tys f :
+  ∑ mr : Vmap (ty :: tys), f mr ==
+  ∑ mr' : Vmap tys, ∑ vty : A, f (<[ty := vty]> mr').
+Proof.
+  unfold_sum_of.
+  cbn.
+  rewrite list_bind_fmap.
+
+  rewrite Rlist_sum_bind.
+  apply Rlist_sum_ext, Forall2_fmap, Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros mr Hmr%elem_of_Vmap_elements_1.
+  rewrite <- list_fmap_compose.
+  reflexivity.
+Qed.
+
+Lemma deltas_semantics_alt_cons ml mr lu delt :
+  deltas_semantics_alt ml mr (lu :: delt) =
+  delta_semantics_alt ml mr lu.1 lu.2 *
+  deltas_semantics_alt ml mr delt.
+Proof.
+  now destruct lu.
+Qed.
+
+Context {HAWF : WFSummable A}.
+
+(* FIXME: Move *)
+#[export] Instance SummedElement_vcons (a : A) {n} (v : vec A n) :
+  SummedElement a -> SummedElement v -> SummedElement (a ::: v).
+Proof.
+  rewrite 3 SummedElement_iff.
+  rewrite 3 elem_of_list_In.
+  unfold sum_elements at 2 3; cbn [Summable_vec].
+  rewrite 2 vec_elements_in.
+  rewrite Vector.Forall_cons_iff.
+  easy.
+Qed.
+
+#[export] Instance SummedElement_vnil :
+  SummedElement ([#] :> vec A 0).
+Proof.
+  now apply SummedElement_vec.
+Qed.
+
+
+Lemma abstracts_semantics_alt_ext mabs ml mr mabs' ml' mr'
+  abs abs' :
+  Forall2 (fun '(idx, lower, upper) '(idx', lower', upper') =>
+    mabs !! idx = mabs' !! idx' /\
+  (get_var_alt ml mr) <$> lower = (get_var_alt ml' mr') <$> lower' /\
+  (get_var_alt ml mr) <$> upper = (get_var_alt ml' mr') <$> upper') abs abs' ->
+  abstracts_semantics_alt mabs ml mr abs =
+  abstracts_semantics_alt mabs' ml' mr' abs'.
+Proof.
+  intros Hall2.
+  unfold abstracts_semantics_alt.
+  f_equal.
+  apply list_eq_Forall2, Forall2_fmap.
+  apply (Forall2_impl _ _ _ _ Hall2).
+  intros [[f low] up] [[f' low'] up'].
+  intros (?&?&?); now apply abstract_semantics_alt_ext.
+Qed.
+
+Lemma deltas_semantics_alt_ext ml mr ml' mr' delt delt' :
+  Forall2 (fun '(l, u) '(l', u') =>
+  (get_var_alt ml mr) l = (get_var_alt ml' mr') l' /\
+  (get_var_alt ml mr) u = (get_var_alt ml' mr') u') delt delt' ->
+  deltas_semantics_alt ml mr delt =
+  deltas_semantics_alt ml' mr' delt'.
+Proof.
+  intros Hall2.
+  unfold deltas_semantics_alt.
+  f_equal.
+  apply list_eq_Forall2, Forall2_fmap.
+  apply (Forall2_impl _ _ _ _ Hall2).
+  intros [l u] [l' u'].
+  intros (?&?); now apply delta_semantics_alt_ext.
+Qed.
+
+Lemma ntl_delta_subst_correct mabs ml ntl ntl' lb r :
+  map_Forall (λ _ a, SummedElement a) ml ->
+  WT_ntl (dom ml) ntl -> WT_ntl (dom ml) ntl' ->
+  ntl_delta_subst lb r ntl ntl' ->
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
+Proof.
+  intros Hml Hwt Hwt' Hsubst.
+  hnf in Hsubst.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  destruct delt as [|lu delt]; [easy|].
+  cbn [head tail] in Hsubst.
+  pose proof Hsubst as (Hne & Hsums & Habs & [= ->] & Hdelt).
+  subst abs' delt'.
+  assert (Heq : ntl_aeq {|
+    ntl_sums := sums;
+    ntl_abstracts := abs;
+    ntl_deltas := (bound lb, r) :: delt
+  |} {|
+    ntl_sums := lb :: sums';
+    ntl_abstracts := abs;
+    ntl_deltas := (bound lb, r) :: delt
+  |}) by now eapply (ntl_aeq_of_perm _ (mk_ntl _ _ _));
+    [apply Hsums|cbn; reflexivity..].
+
+  etransitivity; [apply ntl_aeq_correct; [apply Hwt|apply Heq]|].
+
+  rewrite ntl_total_semantics_alt by now
+    apply (ntl_aeq_WF _ _ Heq), Hwt.
+  rewrite ntl_total_semantics_alt by apply Hwt'.
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  rewrite sum_of_Vmap_cons.
+  apply sum_of_ext'; intros mr' Hmr'%elem_of_Vmap_elements_1.
+  assert (Hr : exists ar, get_var_alt ml mr' r = Some ar /\
+    SummedElement ar). 1:{
+    destruct r as [r|l].
+    - cbn.
+      assert (r ∈ dom mr') as Hdom.
+      + pose proof Hmr'.1 as Hdom.
+        unfold Vmap in *.
+        rewrite Hdom.
+        assert (Hne' : r ≠ lb) by congruence.
+        enough (r ∈@{Pset} list_to_set (lb :: sums')) as Hen by
+          now rewrite elem_of_list_to_set in Hen |- *;
+            rewrite elem_of_cons in Hen; clear -Hne' Hen; firstorder congruence.
+        rewrite <- Hsums.
+        apply Hwt.2.2.2.2.
+        set_solver +.
+      + unfold Vmap in Hdom.
+        apply elem_of_dom in Hdom as [ar Har].
+        exists ar.
+        split; [easy|].
+        specialize (Hmr'.2 r ar Har) as Harsum.
+        now constructor.
+    - cbn.
+      assert (l ∈ dom ml) as Hdom.
+      + apply Hwt.2.1.
+        set_solver +.
+      + apply elem_of_dom in Hdom as [ar Har].
+        specialize (Hml l ar Har).
+        eauto.
+  }
+  assert (Hgetr : forall a, get_var_alt ml (<[lb:=a]> mr') r =
+    get_var_alt ml mr' r). 1:{
+    intros a.
+    destruct r as [r|]; [|easy].
+    cbn.
+    unfold Vmap.
+    apply lookup_insert_ne; congruence.
+  }
+  destruct Hr as (ar & Har & Harsum).
+  erewrite (sum_of_ext _ (fun a => delta_tensor [#a] [#ar] *
+    (abstracts_semantics_alt mabs ml (<[lb:=a]> mr') abs *
+    deltas_semantics_alt ml (<[lb:=a]> mr') delt))). 2:{
+    intros a.
+    rewrite deltas_semantics_alt_cons.
+    unfold delta_semantics_alt.
+    cbn [fst snd get_var_alt].
+    unfold Vmap.
+    rewrite lookup_insert.
+    cbn [mbind option_bind from_option id].
+    rewrite Hgetr, Har.
+    cbn.
+    ring.
+  }
+  rewrite sum_of_delta_l_1.
+  cbn.
+  f_equiv.
+  - apply eq_reflexivity.
+    unfold Vmap.
+    apply abstracts_semantics_alt_ext, Forall2_fmap_r, Forall_Forall2_diag.
+    rewrite Forall_forall; intros [[f low] up] Hflu.
+    cbn.
+    split; [easy|].
+    split;
+    rewrite <- list_fmap_compose; apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2;
+    (destruct v as [vr|vl]; [|reflexivity]);
+    cbn;
+    rewrite lookup_insert_case, fn_lookup_singleton_case;
+    now case_decide as Hvr_lb;
+    [rewrite decide_True by congruence|rewrite decide_False by congruence].
+  - apply eq_reflexivity, deltas_semantics_alt_ext, Forall2_fmap_r, Forall_Forall2_diag.
+    rewrite Forall_forall; intros [l u] Hlu.
+    cbn.
+    unfold Vmap.
+    split;
+    [rename l into v|rename u into v];
+    (destruct v as [vr|vl]; [|reflexivity]);
+    cbn;
+    rewrite lookup_insert_case, fn_lookup_singleton_case;
+    now case_decide as Hvr_lb;
+    [rewrite decide_True by congruence|rewrite decide_False by congruence].
+Qed.
+
+
+Lemma delta_semantics_alt_comm ml mr v v' :
+  delta_semantics_alt ml mr v v' =
+  delta_semantics_alt ml mr v' v.
+Proof.
+  unfold delta_semantics_alt.
+  destruct (get_var_alt ml mr v), (get_var_alt ml mr v'); [|done..].
+  cbn.
+  apply delta_tensor_comm.
+Qed.
+
+Lemma ntl_delta_perm_eq_correct mabs ml ntl ntl' :
+  WF_ntl ntl -> WF_ntl ntl' ->
+  ntl_delta_perm_eq ntl ntl' ->
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
+Proof.
+  intros HWF HWF' Heq.
+  rewrite 2 ntl_total_semantics_alt by easy.
+  hnf in Heq.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  destruct Heq as (<- & <- & Hdelt).
+  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  f_equiv.
+  unfold deltas_semantics_alt.
+  apply Rlist_prod_perm_mor.
+  clear HWF HWF'.
+  induction Hdelt as [|? ? ? ? Heq | |].
+  - done.
+  - cbn.
+    f_equiv; [|easy].
+    do 2 case_match.
+    rewrite prod_swap_eq_pair in Heq.
+    destruct Heq as [[-> ->]|[-> ->]]; [done|].
+    apply eq_reflexivity, delta_semantics_alt_comm.
+  - apply (Permutation_PermutationA _).
+    solve_Permutation.
+  - now etransitivity; eassumption.
+Qed.
+
+
+
+
+
+Lemma ntl_delta_eq_correct mabs ml ntl ntl' :
+  map_Forall (λ _ a, SummedElement a) ml ->
+  WT_ntl (dom ml) ntl ->
+  ntl_delta_eq (dom ml) ntl ntl' ->
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
+Proof.
+  intros Hml HWF Heq.
+  assert (HWF' : WT_ntl (dom ml) ntl') by now
+    eapply ntl_delta_eq_WT; eauto.
+  induction Heq.
+  - eapply ntl_delta_idemp_correct; eauto.
+  - eapply ntl_delta_subst_correct; eauto.
+  - eapply ntl_delta_perm_eq_correct; solve [eauto|apply HWF|apply HWF'].
+  - symmetry; eauto.
+  - assert (WT_ntl (dom ml) ntl') by now eapply ntl_delta_eq_WT; eauto.
+    etransitivity; [apply IHHeq1|apply IHHeq2]; easy.
+Qed.
+
+
+
+Lemma ntl_eq_correct mabs ml ntl ntl' :
+  map_Forall (λ _ a, SummedElement a) ml ->
+  WT_ntl (dom ml) ntl -> (* WT_ntl (dom ml) ntl' -> *)
+  ntl_eq (dom ml) ntl ntl' ->
+  ntl_total_semantics mabs ml ntl ==
+  ntl_total_semantics mabs ml ntl'.
+Proof.
+  intros Hml HWF Heq.
+  induction Heq as [|ntl ntl' ntl'' Hntl Hrtc IHntl]; [done|].
+  hnf in Hntl.
+  assert (Hntl' : WT_ntl (dom ml) ntl'). 1:{
+    destruct Hntl as [Hntl|Hntl];
+    [eapply ntl_aeq_WT|eapply ntl_delta_eq_WT];
+    eauto; now symmetry.
+  }
+  etransitivity; [|apply IHntl; easy].
+  destruct Hntl as [Hntl|Hntl].
+  - apply ntl_aeq_correct; easy + apply HWF.
+  - apply ntl_delta_eq_correct; easy.
+Qed.
+
+
+
 
 (*
 Lemma ntl_perm_eq'_correct_permutative mabst mg ml ntl ntl' :

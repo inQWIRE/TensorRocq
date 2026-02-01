@@ -405,7 +405,7 @@ Definition deltas_free_vars (delts : list (var * var)) : Pset :=
 
 (** Relabeling in [tensorlist]s *)
 
-Definition relabel_abs {A B} (f : A -> B) (abs : Idx * list A * list A) :=
+Definition relabel_abs {I} {A B} (f : A -> B) (abs : I * list A * list A) :=
   let '(idx, lower, upper) := abs in
   (idx, f <$> lower, f <$> upper).
 
@@ -476,29 +476,29 @@ Definition tl_times (l r : tensorlist) : tensorlist :=
   mk_tl (lsums + rsums) (labs' ++ rabs') (ldelts' ++ rdelts').
 
 
-Lemma relabel_abs_id {A} abs : relabel_abs (@id A) abs = abs.
+Lemma relabel_abs_id {I A} abs : relabel_abs (I:=I) (@id A) abs = abs.
 Proof.
   destruct abs as [[f low] up]; cbn.
   now rewrite 2 list_fmap_id.
 Qed.
 
-Lemma relabel_abs_ext {A B} f g abs :
-  (forall x, f x = g x) -> @relabel_abs A B f abs = relabel_abs g abs.
+Lemma relabel_abs_ext {I A B} f g abs :
+  (forall x, f x = g x) -> @relabel_abs I A B f abs = relabel_abs g abs.
 Proof.
   intros Heq.
   destruct abs as [[idx low] up]; cbn.
   f_equal; [f_equal|]; apply list_fmap_ext; intros; apply Heq.
 Qed.
 
-Lemma relabel_abs_id' {A} f abs :
-  (forall x : A, f x = x) -> relabel_abs f abs = abs.
+Lemma relabel_abs_id' {I A} f abs :
+  (forall x : A, f x = x) -> relabel_abs (I:=I) f abs = abs.
 Proof.
   intros Hid.
   erewrite relabel_abs_ext; [apply relabel_abs_id|apply Hid].
 Qed.
 
-Lemma relabel_abs_compose {A B C} (f : A -> B) (g : B -> C) l :
-  relabel_abs g (relabel_abs f l) = relabel_abs (g ∘ f) l.
+Lemma relabel_abs_compose {I A B C} (f : A -> B) (g : B -> C) l :
+  relabel_abs g (relabel_abs (I:=I) f l) = relabel_abs (g ∘ f) l.
 Proof.
   unfold relabel_abs.
   destruct l as ((idx, low), up).
@@ -555,9 +555,9 @@ Proof.
 Qed.
 
 
-Lemma relabel_abs_ext_strong {A B} (f g : A -> B) abs :
+Lemma relabel_abs_ext_strong {I A B} (f g : A -> B) abs :
   (forall x, x ∈ abs.1.2 ++ abs.2 ->
-    f x = g x) -> relabel_abs f abs = relabel_abs g abs.
+    f x = g x) -> @relabel_abs I A B f abs = relabel_abs g abs.
 Proof.
   intros Hfg.
   unfold relabel_abs.
@@ -566,8 +566,8 @@ Proof.
   apply Hfg, elem_of_app; [left|right]; easy.
 Qed.
 
-Lemma relabel_abs_id_strong {A} (f : A -> A) abs :
-  (forall x, x ∈ abs.1.2 ++ abs.2 -> f x = x) -> relabel_abs f abs = abs.
+Lemma relabel_abs_id_strong {I A} (f : A -> A) abs :
+  (forall x, x ∈ abs.1.2 ++ abs.2 -> f x = x) -> relabel_abs (I:=I) f abs = abs.
 Proof.
   intros Hf.
   transitivity (relabel_abs id abs); [|apply relabel_abs_id].
@@ -1482,7 +1482,7 @@ Proof.
   destruct Heq;
   congruence.
 Qed.
-Add Parametric Morphism {A B} : relabel_abs with signature
+Add Parametric Morphism {I A B} : (relabel_abs (I:=I)) with signature
   pointwise_relation A (@eq B) ==> eq ==>
   eq as relabel_abs_mor.
 Proof.
@@ -2976,16 +2976,28 @@ Proof.
   intros i.
   apply option_eq.
   induction m using map_first_key_ind. *)
-Lemma ntl_aeq_refl ntl : ntl =ntl= ntl.
+Lemma ntl_aeq_of_perm ntl ntl' :
+  ntl.(ntl_sums) ≡ₚ ntl'.(ntl_sums) ->
+  ntl.(ntl_abstracts) ≡ₚ ntl'.(ntl_abstracts) ->
+  ntl.(ntl_deltas) ≡ₚ ntl'.(ntl_deltas) ->
+  ntl =ntl= ntl'.
 Proof.
-  exists id.
+  destruct ntl as [isums abs delt], ntl' as [isums' abs' delt'];
+  cbn.
+  intros Hsums Habs Hdelt.
+  exists id; cbn.
   split; [easy|].
-  rewrite list_fmap_id' by now intros [].
+  rewrite list_fmap_id.
   split; [done|].
+  rewrite <- Habs, <- Hdelt.
   split;
   apply eq_reflexivity, list_fmap_id'; intros;
   [apply relabel_abs_id'|apply relabel_delt_id']; intros;
   apply relabel_bounds_id.
+Qed.
+Lemma ntl_aeq_refl ntl : ntl =ntl= ntl.
+Proof.
+  now apply ntl_aeq_of_perm.
 Qed.
 Lemma ntl_aeq_symm ntl ntl' : ntl =ntl= ntl' -> ntl' =ntl= ntl.
 Proof.
@@ -3667,14 +3679,14 @@ Proof.
     cbn.
     congruence.
   }
-  split; [rewrite <- Hlens; replace (Pos.of_succ_nat (length isums)) 
+  split; [rewrite <- Hlens; replace (Pos.of_succ_nat (length isums))
     with (lengthP isums) by lia; easy|].
   split; [easy|].
   (* rewrite ppermute_fmap, Hpperm, snds_prod_map, list_fmap_id.
   apply (conj eq_refl). *)
   rewrite <- Habs.
   rewrite <- 2 list_fmap_compose.
-  split. 
+  split.
   - apply eq_reflexivity.
     apply list_fmap_ext; intros _ flu Hlu%elem_of_list_lookup_2.
     cbn.
@@ -3803,7 +3815,7 @@ Proof.
   destruct tl as [sums abs delt], tl' as [sums' abs' delt'].
   cbn in *.
   eexists.
-  assert (Hinj : Inj (=) (=) (make_pwf (Pos.of_succ_nat sums') f)) by 
+  assert (Hinj : Inj (=) (=) (make_pwf (Pos.of_succ_nat sums') f)) by
     now apply make_pwf_inj.
   split; [intros ????; apply Hinj|
     split; [|split; [symmetry; apply Habs | symmetry; apply Hdelt]]].
@@ -3816,10 +3828,10 @@ Proof.
   apply eq_reflexivity.
   rewrite Hlen.
   apply list_fmap_ext; intros _ p Hp%elem_of_list_lookup_2%elem_of_pseq_1.
-  apply decide_False; lia. 
+  apply decide_False; lia.
 Qed.
 
-(* 
+(*
 Section abstracts_perm_eq.
 
 Context {A B : Type}.
@@ -4353,7 +4365,7 @@ Proof.
   intros a _.
   cbn.
   symmetry; apply relabel_abs_WT'_iff.
-Qed. 
+Qed.
 
 Lemma abstracts_indices_ntl2tl ntl :
   abstracts_indices (ntl2tl ntl).(tl_abstracts) =
@@ -4388,6 +4400,1532 @@ Proof.
 Qed.
 
 *)
+
+From stdpp Require Import functions.
+
+
+Definition prod_swap_eq {A} : relation (A * A) :=
+  fun ab ab' => ab = ab' \/ prod_swap ab = ab'.
+
+Lemma prod_swap_eq_pair {A} (a b a' b' : A) :
+  prod_swap_eq (a, b) (a', b') <->
+  a = a' /\ b = b' \/ a = b' /\ b = a'.
+Proof.
+  unfold prod_swap_eq.
+  cbn.
+  rewrite 2 pair_eq; tauto.
+Qed.
+
+Add Parametric Relation {A} : (A * A) prod_swap_eq
+  reflexivity proved by
+    ltac:(repeat first [intros []|intro|rewrite ?prod_swap_eq_pair in *; cbn in *; tauto])
+  symmetry proved by
+    ltac:(repeat first [intros [? ?]|intro|rewrite ?prod_swap_eq_pair in *; cbn in *; naive_solver])
+  transitivity proved by
+    ltac:(repeat first [intros [? ?]|intro|rewrite ?prod_swap_eq_pair in *; cbn in *; naive_solver])
+  as prod_swap_eq_setoid.
+
+
+From stdpp Require Import functions.
+
+Import SetoidList SetoidPermutation stdpp.list.
+
+Definition ntl_delta_perm_eq : relation namedtensorlist :=
+  fun ntl ntl' =>
+  ntl.(ntl_sums) = ntl'.(ntl_sums) /\
+  ntl.(ntl_abstracts) = ntl'.(ntl_abstracts) /\
+  PermutationA prod_swap_eq ntl.(ntl_deltas) ntl'.(ntl_deltas).
+
+#[export] Program Instance ntl_delta_perm_eq_setoid : Equivalence ntl_delta_perm_eq.
+Next Obligation.
+  easy.
+Qed.
+Next Obligation.
+  hnf.
+  intros * Heq; hnf; split_and!; symmetry; apply Heq.
+Qed.
+Next Obligation.
+  hnf.
+  unfold ntl_delta_perm_eq.
+  intros ??? (?&?&?) (?&?&?);
+  split_and!; etransitivity; eassumption.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance relation_elem_of {A B} : ElemOf (A * B) (A -> B -> Prop) :=
+  fun ab R => R ab.1 ab.2.
+#[export] Instance relation_empty {A B} : Empty (A -> B -> Prop) :=
+  fun a b => False.
+#[export] Instance relation_top {A B} : Top (A -> B -> Prop) :=
+  fun a b => True.
+#[export] Instance relation_singleton {A B} : Singleton (A * B) (A -> B -> Prop) :=
+  fun ab => fun a b => (a, b) = ab.
+#[export] Instance relation_union {A B} : Union (A -> B -> Prop) :=
+  fun R R' => fun a b => R a b \/ R' a b.
+#[export] Instance relation_intersection {A B} : Intersection (A -> B -> Prop) :=
+  fun R R' => fun a b => R a b /\ R' a b.
+#[export] Instance relation_difference {A B} : Difference (A -> B -> Prop) :=
+  fun R R' => fun a b => R a b /\ ~ R' a b.
+
+#[global] Arguments relation_elem_of {_ _} _ _ / : assert.
+#[global] Arguments relation_empty {_ _} _ _ / : assert.
+#[global] Arguments relation_top {_ _} _ _ / : assert.
+#[global] Arguments relation_singleton {_ _} _ _ _ / : assert.
+#[global] Arguments relation_union {_ _} _ _ _ _ / : assert.
+#[global] Arguments relation_intersection {_ _} _ _ _ _ / : assert.
+#[global] Arguments relation_difference {_ _} _ _ _ _ / : assert.
+
+
+
+
+#[export] Program Instance relation_semi_set {A B} : SemiSet (A * B) (A -> B -> Prop).
+Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
+
+#[export] Program Instance relation_set {A B} : Set_ (A * B) (A -> B -> Prop).
+Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
+
+#[export] Program Instance relation_top_set {A B} : TopSet (A * B) (A -> B -> Prop).
+Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
+
+
+#[export] Instance fn_empty {A} : Empty (A -> A) := id.
+#[export] Instance fn_singleton `{EqDecision A} : SingletonM A A (A -> A) :=
+  fun a b => fun c => if decide (a = c) then b else c.
+
+Lemma fn_lookup_singleton `{EqDecision A} (a b : A) :
+  {[a := b]} a = b.
+Proof.
+  now apply decide_True.
+Qed.
+
+Lemma fn_lookup_singleton_ne `{EqDecision A} (a b c : A) : a <> c ->
+  {[a := b]} c = c.
+Proof.
+  apply decide_False.
+Qed.
+
+Lemma fn_lookup_singleton_case `{EqDecision A} (a b c : A) :
+  {[a := b]} c = if decide (a = c) then b else c.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma fn_lookup_insert_to_compose `{EqDecision A} (a b : A) (f : A -> A) (c : A) :
+  f b = b ->
+  <[a := b]> f c =
+  f ({[a:=b]} c).
+Proof.
+  unfold insert, fn_insert; cbn.
+  rewrite fn_lookup_singleton_case.
+  case_decide; easy.
+Qed.
+
+
+Lemma fn_lookup_insert_case `{EqDecision A} (a b : A) (f : A -> A) (c : A) :
+  <[a := b]> f c =
+  if decide (a = c) then b else f c.
+Proof.
+  reflexivity.
+Qed.
+
+Definition ntl_delta_subst (lb : positive) (r : var) : relation namedtensorlist :=
+  fun ntl ntl' =>
+  r <> bound lb /\
+  ntl.(ntl_sums) ≡ₚ lb :: ntl'.(ntl_sums) /\
+  ntl'.(ntl_abstracts) = relabel_abs {[bound lb := r]} <$> ntl.(ntl_abstracts) /\
+  head ntl.(ntl_deltas) = Some (bound lb, r) /\
+  ntl'.(ntl_deltas) = relabel_delt {[bound lb := r]} <$> tail ntl.(ntl_deltas).
+
+Definition ntl_delta_idemp (v : var) : relation namedtensorlist :=
+  fun ntl ntl' =>
+  ntl.(ntl_sums) = ntl'.(ntl_sums) /\
+  ntl'.(ntl_abstracts) = ntl.(ntl_abstracts) /\
+  ntl'.(ntl_deltas) = (v, v) :: ntl.(ntl_deltas).
+
+Definition psets_to_varset (bounds frees : Pset) : gset var :=
+  set_map bound bounds ∪ set_map free frees.
+
+Lemma elem_of_psets_to_varset bounds frees v :
+  v ∈ psets_to_varset bounds frees <->
+  match v with
+  | bound r => r ∈ bounds
+  | free l => l ∈ frees
+  end.
+Proof.
+  unfold psets_to_varset.
+  destruct v; set_solver.
+Qed.
+
+(* FIXME: Move *)
+Lemma ntl_aeq_WF ntl ntl' :
+  ntl =ntl= ntl' -> WF_ntl ntl -> WF_ntl ntl'.
+Proof.
+  intros (fr & Hfr & Hfsums & Hfabs & Hfdelt).
+  intros (Hdup & Habs & Hdelt).
+  split; [|split].
+  - rewrite <- Hfsums.
+    apply NoDup_fmap_2_strong, Hdup.
+    intros ? ? Hx Hy; apply Hfr; set_solver + Hx Hy.
+  - rewrite <- Hfabs, <- Hfsums.
+    rewrite <- (set_map_list_to_set (SA:=Pset)),
+      abstracts_bound_vars_relabel_bounds.
+    now apply set_map_mono.
+  - rewrite <- Hfdelt, <- Hfsums.
+    rewrite <- (set_map_list_to_set (SA:=Pset)),
+      deltas_bound_vars_relabel_bounds.
+    now apply set_map_mono.
+Qed.
+
+Definition WT_ntl (tl : Pset) (ntl : namedtensorlist) :=
+  abstracts_free_vars ntl.(ntl_abstracts) ⊆ tl /\
+  deltas_free_vars ntl.(ntl_deltas) ⊆ tl /\
+  WF_ntl ntl.
+
+Inductive ntl_delta_eq (tl : Pset) : relation namedtensorlist :=
+  | ntl_delta_eq_idemp v ntl ntl' :
+    v ∈ psets_to_varset (list_to_set ntl.(ntl_sums)) tl ->
+    ntl_delta_idemp v ntl ntl' -> ntl_delta_eq tl ntl ntl'
+  | ntl_delta_eq_subst lb r ntl ntl' :
+    lb ∉ ntl'.(ntl_sums) ->
+    r ∈ psets_to_varset (list_to_set ntl'.(ntl_sums)) tl ->
+    ntl_delta_subst lb r ntl ntl' -> ntl_delta_eq tl ntl ntl'
+  | ntl_delta_eq_perm ntl ntl' :
+    ntl_delta_perm_eq ntl ntl' -> ntl_delta_eq tl ntl ntl'
+  | ntl_delta_eq_symm ntl ntl' :
+    ntl_delta_eq tl ntl ntl' -> ntl_delta_eq tl ntl' ntl
+  | ntl_delta_eq_trans ntl ntl' ntl'' :
+    ntl_delta_eq tl ntl ntl' -> ntl_delta_eq tl ntl' ntl'' ->
+    ntl_delta_eq tl ntl ntl''.
+
+Add Parametric Relation tl : namedtensorlist (ntl_delta_eq tl)
+  reflexivity proved by
+    ltac:(intros ?; apply ntl_delta_eq_perm; done)
+  symmetry proved by (ntl_delta_eq_symm _)
+  transitivity proved by (ntl_delta_eq_trans _)
+  as ntl_delta_eq_setoid.
+
+Lemma ntl_delta_idemp_WF tl v ntl ntl' :
+  v ∈ psets_to_varset (list_to_set ntl.(ntl_sums)) tl ->
+  ntl_delta_idemp v ntl ntl' ->
+  WF_ntl ntl <-> WF_ntl ntl'.
+Proof.
+  intros Hv Heq.
+  hnf in Heq.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  destruct Heq as (<- & -> & ->).
+  cbn.
+  unfold WF_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  do 2 f_equiv.
+  destruct v as [r|l]; [|reflexivity].
+  rewrite elem_of_psets_to_varset in Hv.
+  set_solver +Hv.
+Qed.
+
+Lemma ntl_delta_idemp_WT tl v ntl ntl' :
+  v ∈ psets_to_varset (list_to_set ntl.(ntl_sums)) tl ->
+  ntl_delta_idemp v ntl ntl' ->
+  WT_ntl tl ntl <-> WT_ntl tl ntl'.
+Proof.
+  intros Hv Heq.
+  unfold WT_ntl.
+  rewrite 2 (and_assoc _).
+  f_equiv; [|now eapply ntl_delta_idemp_WF; eauto].
+  hnf in Heq.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  destruct Heq as (<- & -> & ->).
+  f_equiv.
+  destruct v as [r|l]; [reflexivity|].
+  rewrite elem_of_psets_to_varset in Hv.
+  set_solver +Hv.
+Qed.
+
+
+Lemma v2bound_Some (v : var) (r : Idx) : v2bound v = Some r <-> v = bound r.
+Proof.
+  destruct v; cbn; firstorder congruence.
+Qed.
+
+Lemma v2free_Some (v : var) (r : Idx) : v2free v = Some r <-> v = free r.
+Proof.
+  destruct v; cbn; firstorder congruence.
+Qed.
+
+
+Lemma elem_of_abstracts_vars v abs :
+  v ∈ abstracts_vars abs <-> exists idx low up,
+    (idx, low, up) ∈ abs /\ v ∈ low ++ up.
+Proof.
+  set_unfold.
+  rewrite 2 exists_pair.
+  setoid_rewrite elem_of_app.
+  firstorder.
+Qed.
+
+Lemma elem_of_deltas_vars v delt :
+  v ∈ deltas_vars delt <-> exists l u,
+    (l, u) ∈ delt /\ (v = l \/ v = u).
+Proof.
+  set_unfold.
+  rewrite exists_pair.
+  set_solver.
+Qed.
+
+Lemma abstracts_bound_vars_relabel_abs (f : var -> var) (abs : _) :
+  abstracts_bound_vars (relabel_abs f <$> abs) =
+  set_omap (v2bound ∘ f) (abstracts_vars abs).
+Proof.
+  apply set_eq; intros r.
+  rewrite elem_of_abstracts_bound_vars.
+  rewrite elem_of_set_omap.
+  cbn.
+  setoid_rewrite v2bound_Some.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite elem_of_abstracts_vars.
+  do 2 setoid_rewrite exists_pair.
+  cbn.
+  setoid_rewrite pair_eq.
+  setoid_rewrite pair_eq.
+  firstorder.
+  - subst.
+    rewrite <- fmap_app, elem_of_list_fmap in *.
+    naive_solver.
+  - eexists _, _, _.
+    split; [|replace <- (bound r);
+      erewrite <- fmap_app; apply elem_of_list_fmap_1; eassumption].
+    naive_solver.
+Qed.
+
+Lemma deltas_bound_vars_relabel_delt (f : var -> var) (abs : _) :
+  deltas_bound_vars (relabel_delt f <$> abs) =
+  set_omap (v2bound ∘ f) (deltas_vars abs).
+Proof.
+  apply set_eq; intros r.
+  rewrite elem_of_deltas_bound_vars.
+  rewrite elem_of_set_omap.
+  cbn.
+  setoid_rewrite v2bound_Some.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite elem_of_deltas_vars.
+  setoid_rewrite exists_pair.
+  cbn.
+  setoid_rewrite pair_eq.
+  split; [|naive_solver].
+  firstorder; subst; [|naive_solver].
+  eexists; split; [|eassumption].
+  naive_solver.
+Qed.
+
+
+Lemma abstracts_free_vars_relabel_abs (f : var -> var) (abs : _) :
+  abstracts_free_vars (relabel_abs f <$> abs) =
+  set_omap (v2free ∘ f) (abstracts_vars abs).
+Proof.
+  apply set_eq; intros r.
+  rewrite elem_of_abstracts_free_vars.
+  rewrite elem_of_set_omap.
+  cbn.
+  setoid_rewrite v2free_Some.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite elem_of_abstracts_vars.
+  do 2 setoid_rewrite exists_pair.
+  cbn.
+  setoid_rewrite pair_eq.
+  setoid_rewrite pair_eq.
+  firstorder.
+  - subst.
+    rewrite <- fmap_app, elem_of_list_fmap in *.
+    naive_solver.
+  - eexists _, _, _.
+    split; [|replace <- (free r);
+      erewrite <- fmap_app; apply elem_of_list_fmap_1; eassumption].
+    naive_solver.
+Qed.
+
+Lemma deltas_free_vars_relabel_delt (f : var -> var) (abs : _) :
+  deltas_free_vars (relabel_delt f <$> abs) =
+  set_omap (v2free ∘ f) (deltas_vars abs).
+Proof.
+  apply set_eq; intros r.
+  rewrite elem_of_deltas_free_vars.
+  rewrite elem_of_set_omap.
+  cbn.
+  setoid_rewrite v2free_Some.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite elem_of_deltas_vars.
+  setoid_rewrite exists_pair.
+  cbn.
+  setoid_rewrite pair_eq.
+  split; [|naive_solver].
+  firstorder; subst; [|naive_solver].
+  eexists; split; [|eassumption].
+  naive_solver.
+Qed.
+
+Lemma abstracts_vars_decomp abs :
+  abstracts_vars abs =
+  set_map bound (abstracts_bound_vars abs) ∪
+  set_map free (abstracts_free_vars abs).
+Proof.
+  apply set_eq; intros v.
+  rewrite elem_of_abstracts_vars.
+  rewrite elem_of_union, 2 elem_of_map.
+  setoid_rewrite elem_of_abstracts_bound_vars.
+  setoid_rewrite elem_of_abstracts_free_vars.
+  destruct v; cbn; set_solver.
+Qed.
+
+Lemma deltas_vars_decomp abs :
+  deltas_vars abs =
+  set_map bound (deltas_bound_vars abs) ∪
+  set_map free (deltas_free_vars abs).
+Proof.
+  apply set_eq; intros v.
+  rewrite elem_of_deltas_vars.
+  rewrite elem_of_union, 2 elem_of_map.
+  setoid_rewrite elem_of_deltas_bound_vars.
+  setoid_rewrite elem_of_deltas_free_vars.
+  destruct v; cbn; set_solver.
+Qed.
+
+
+Lemma set_omap_set_map `{FinSet A SA, FinSet B SB, FinSet C SC}
+  (f : A -> B) (g : B -> option C) (X : SA) :
+  set_omap g (set_map f X :> SB) ≡@{SC} set_omap (g ∘ f) X.
+Proof.
+  set_solver.
+Qed.
+
+Lemma list_to_set_filter `{P : A -> Prop} `{forall a, Decision (P a)}
+  `{FinSet A SA} (l : list A) :
+  list_to_set (filter P l) ≡@{SA} filter P (list_to_set l).
+Proof.
+  set_unfold.
+  now intros; rewrite elem_of_list_filter.
+Qed.
+
+Lemma abstracts_bound_vars_relabel_abs_singleton lb r abs :
+  abstracts_bound_vars (relabel_abs {[bound lb := r]} <$> abs) =
+  abstracts_bound_vars abs ∖ {[lb]} ∪ if decide (lb ∈ abstracts_bound_vars abs)
+    then list_to_set (omap v2bound [r]) else ∅.
+Proof.
+  rewrite abstracts_bound_vars_relabel_abs, abstracts_vars_decomp.
+  unfold_leibniz.
+  rewrite set_omap_union, 2 set_omap_set_map.
+  assert (Hemp : set_omap (v2bound ∘ {[bound lb := r]} ∘ free)
+    (abstracts_free_vars abs) =@{Pset} ∅). 1:{
+    apply elem_of_equiv_empty_L.
+    intros b.
+    rewrite elem_of_set_omap.
+    cbn.
+    intros (? & ? & Heq).
+    rewrite fn_lookup_singleton_ne in Heq by congruence.
+    easy.
+  }
+  rewrite Hemp, (union_empty_r _).
+  case_decide as Helem.
+  - intros v.
+    rewrite elem_of_set_omap.
+    rewrite elem_of_union, elem_of_difference.
+    setoid_rewrite elem_of_abstracts_bound_vars.
+    cbn.
+    setoid_rewrite v2bound_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (r' & (idx & low & up & Hflu & Hbnd) & Hdec).
+      case_decide as Heq.
+      * subst.
+        right.
+        set_solver +.
+      * left.
+        set_solver.
+    + intros [[(idx & low & up & Hflu & Hbnd) Hv] | Hv].
+      * exists v.
+        rewrite decide_False by set_solver +Hv.
+        eauto 20.
+      * destruct r as [r|]; [|easy].
+        cbn -[list_to_set] in Hv.
+        rewrite list_to_set_singleton, elem_of_singleton in Hv.
+        subst v.
+        apply elem_of_abstracts_bound_vars in Helem
+          as (idx & low & up & Hflu & Hbnd).
+        exists lb.
+        rewrite decide_True by easy.
+        eauto 20.
+  - transitivity (abstracts_bound_vars abs); [|set_solver +Helem].
+    intros x.
+    rewrite elem_of_set_omap.
+    cbn.
+    setoid_rewrite v2bound_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (x' & Hx' & Hlook).
+      rewrite decide_False in Hlook by congruence.
+      congruence.
+    + intros Hx.
+      exists x.
+      split; [easy|].
+      now rewrite decide_False by congruence.
+Qed.
+
+Lemma deltas_bound_vars_relabel_delt_singleton lb r delt :
+  deltas_bound_vars (relabel_delt {[bound lb := r]} <$> delt) =
+  deltas_bound_vars delt ∖ {[lb]} ∪ if decide (lb ∈ deltas_bound_vars delt)
+    then list_to_set (omap v2bound [r]) else ∅.
+Proof.
+  rewrite deltas_bound_vars_relabel_delt, deltas_vars_decomp.
+  unfold_leibniz.
+  rewrite set_omap_union, 2 set_omap_set_map.
+  assert (Hemp : set_omap (v2bound ∘ {[bound lb := r]} ∘ free)
+    (deltas_free_vars delt) =@{Pset} ∅). 1:{
+    apply elem_of_equiv_empty_L.
+    intros b.
+    rewrite elem_of_set_omap.
+    cbn.
+    intros (? & ? & Heq).
+    rewrite fn_lookup_singleton_ne in Heq by congruence.
+    easy.
+  }
+  rewrite Hemp, (union_empty_r _).
+  case_decide as Helem.
+  - intros v.
+    rewrite elem_of_set_omap.
+    rewrite elem_of_union, elem_of_difference.
+    setoid_rewrite elem_of_deltas_bound_vars.
+    cbn.
+    setoid_rewrite v2bound_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (r' & (low & up & Hflu & Hbnd) & Hdec).
+      case_decide as Heq.
+      * subst.
+        right.
+        set_solver +.
+      * left.
+        set_solver.
+    + intros [[(low & up & Hflu & Hbnd) Hv] | Hv].
+      * exists v.
+        rewrite decide_False by set_solver +Hv.
+        eauto 20.
+      * destruct r as [r|]; [|easy].
+        cbn -[list_to_set] in Hv.
+        rewrite list_to_set_singleton, elem_of_singleton in Hv.
+        subst v.
+        apply elem_of_deltas_bound_vars in Helem
+          as (low & up & Hflu & Hbnd).
+        exists lb.
+        rewrite decide_True by easy.
+        eauto 20.
+  - transitivity (deltas_bound_vars delt); [|set_solver +Helem].
+    intros x.
+    rewrite elem_of_set_omap.
+    cbn.
+    setoid_rewrite v2bound_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (x' & Hx' & Hlook).
+      rewrite decide_False in Hlook by congruence.
+      congruence.
+    + intros Hx.
+      exists x.
+      split; [easy|].
+      now rewrite decide_False by congruence.
+Qed.
+
+
+Lemma abstracts_free_vars_relabel_abs_singleton lb r abs :
+  abstracts_free_vars (relabel_abs {[bound lb := r]} <$> abs) =
+  abstracts_free_vars abs ∪ if decide (lb ∈ abstracts_bound_vars abs)
+    then list_to_set (omap v2free [r]) else ∅.
+Proof.
+  rewrite abstracts_free_vars_relabel_abs, abstracts_vars_decomp.
+  unfold_leibniz.
+  rewrite set_omap_union, 2 set_omap_set_map.
+  rewrite (union_comm _).
+  f_equiv.
+  - intros b.
+    rewrite elem_of_set_omap.
+    cbn.
+    setoid_rewrite v2free_Some.
+    setoid_rewrite fn_lookup_singleton_ne; [|easy].
+    naive_solver.
+  - intros x.
+    rewrite elem_of_set_omap.
+    cbn -[omap].
+    setoid_rewrite v2free_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (lb' & Hlb & Hdec).
+      case_decide as Heq; [|easy].
+      subst r.
+      rewrite decide_True by congruence.
+      set_solver +.
+    + case_decide as Hlb; [|easy].
+      destruct r as [|r]; [easy|].
+      intros Hx.
+      assert (x = r) by set_solver +Hx.
+      subst x.
+      exists lb.
+      split; [easy|].
+      now apply decide_True.
+Qed.
+
+Lemma deltas_free_vars_relabel_delt_singleton lb r delt :
+  deltas_free_vars (relabel_delt {[bound lb := r]} <$> delt) =
+  deltas_free_vars delt ∪ if decide (lb ∈ deltas_bound_vars delt)
+    then list_to_set (omap v2free [r]) else ∅.
+Proof.
+  rewrite deltas_free_vars_relabel_delt, deltas_vars_decomp.
+  unfold_leibniz.
+  rewrite set_omap_union, 2 set_omap_set_map.
+  rewrite (union_comm _).
+  f_equiv.
+  - intros b.
+    rewrite elem_of_set_omap.
+    cbn.
+    setoid_rewrite v2free_Some.
+    setoid_rewrite fn_lookup_singleton_ne; [|easy].
+    naive_solver.
+  - intros x.
+    rewrite elem_of_set_omap.
+    cbn -[omap].
+    setoid_rewrite v2free_Some.
+    setoid_rewrite fn_lookup_singleton_case.
+    split.
+    + intros (lb' & Hlb & Hdec).
+      case_decide as Heq; [|easy].
+      subst r.
+      rewrite decide_True by congruence.
+      set_solver +.
+    + case_decide as Hlb; [|easy].
+      destruct r as [|r]; [easy|].
+      intros Hx.
+      assert (x = r) by set_solver +Hx.
+      subst x.
+      exists lb.
+      split; [easy|].
+      now apply decide_True.
+Qed.
+
+
+
+Lemma subseteq_union_r `{Set_ A SA} `{!RelDecision (∈@{SA})} (X Y Z : SA):
+  X ⊆ Y ∪ Z <-> X ∖ Y ⊆ Z.
+Proof.
+  (* intros ?. *)
+  split; [set_solver|].
+  set_unfold.
+  intros HXY x Hx.
+  destruct_decide (decide (x ∈ Y)); [now left|right; now apply HXY].
+Qed.
+
+Lemma ntl_delta_subst_WF tl lb r ntl ntl' :
+  lb ∉ ntl'.(ntl_sums) ->
+  r ∈ psets_to_varset (list_to_set ntl'.(ntl_sums)) tl ->
+  ntl_delta_subst lb r ntl ntl' ->
+  WF_ntl ntl <-> WF_ntl ntl'.
+Proof.
+  intros Hlb Hr Heq.
+  hnf in Heq.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  destruct delt as [|lu delt]; [easy|].
+  cbn in Heq.
+  destruct Heq as (Hneq & Hsums & -> & [= ->] & ->).
+  unfold WF_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  rewrite Hsums.
+  rewrite NoDup_cons.
+  apply and_iff_from_l; [set_solver + Hlb|].
+  intros _ Hdup.
+  rewrite abstracts_bound_vars_relabel_abs_singleton.
+  rewrite deltas_bound_vars_relabel_delt_singleton.
+  rewrite elem_of_psets_to_varset in Hr.
+  f_equiv.
+  - rewrite list_to_set_cons.
+    rewrite subseteq_union_r.
+    split; [|set_solver +].
+    intros Hsubs.
+    rewrite union_subseteq;
+    split; [easy|].
+    case_decide as Hlb'; [|set_solver+].
+    destruct r; [|set_solver +].
+    set_solver +Hr.
+  - rewrite list_to_set_cons.
+    rewrite subseteq_union_r.
+    case_decide as Hlb'.
+    + split; [|set_solver +].
+      destruct r; set_solver + Hr.
+    + split; [set_solver +|].
+      destruct r; set_solver + Hr.
+Qed.
+
+
+Lemma ntl_delta_subst_WT tl lb r ntl ntl' :
+  lb ∉ ntl'.(ntl_sums) ->
+  r ∈ psets_to_varset (list_to_set ntl'.(ntl_sums)) tl ->
+  ntl_delta_subst lb r ntl ntl' ->
+  WT_ntl tl ntl <-> WT_ntl tl ntl'.
+Proof.
+  intros Hlb Hr Heq.
+  hnf in Heq.
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  unfold WT_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  rewrite 2 (and_assoc _), 2 (and_comm _ (WF_ntl _)).
+  apply and_iff_from_l; [now eapply ntl_delta_subst_WF; eauto|].
+  intros HWF HWF'.
+  destruct delt as [|lu delt]; [easy|].
+  cbn in Heq.
+  destruct Heq as (Hneq & Hsums & -> & [= ->] & ->).
+  unfold WF_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  rewrite abstracts_free_vars_relabel_abs_singleton.
+  rewrite deltas_free_vars_relabel_delt_singleton.
+  rewrite elem_of_psets_to_varset in Hr.
+  enough (list_to_set (omap v2free [r]) ⊆ tl) as Hsub by
+    now f_equiv; case_decide; set_solver + Hsub.
+  destruct r as [|r]; [set_solver+|].
+  set_solver +Hr.
+Qed.
+
+Lemma deltas_bound_vars_cons lu delt :
+  deltas_bound_vars (lu :: delt) =
+  list_to_set (omap v2bound [lu.1; lu.2]) ∪ deltas_bound_vars delt.
+Proof.
+  destruct lu; cbn; set_solver.
+Qed.
+
+
+Lemma deltas_free_vars_cons lu delt :
+  deltas_free_vars (lu :: delt) =
+  list_to_set (omap v2free [lu.1; lu.2]) ∪ deltas_free_vars delt.
+Proof.
+  destruct lu; cbn; set_solver.
+Qed.
+
+Lemma deltas_bound_vars_permA_mor :
+  Proper (PermutationA prod_swap_eq ==> eq) deltas_bound_vars.
+Proof.
+  intros delt delt' Hdelt.
+  induction Hdelt as [|x y delt delt' Hx Hdelt| |];
+    [reflexivity| |set_solver|etransitivity; eassumption].
+  rewrite 2 deltas_bound_vars_cons.
+  f_equiv; [|easy].
+  destruct Hx as [<- | <-]; [done|].
+  unfold_leibniz.
+  apply list_to_set_perm.
+  destruct x as [[] []]; cbn; [solve_Permutation|done..].
+Qed.
+
+
+Lemma deltas_free_vars_permA_mor :
+  Proper (PermutationA prod_swap_eq ==> eq) deltas_free_vars.
+Proof.
+  intros delt delt' Hdelt.
+  induction Hdelt as [|x y delt delt' Hx Hdelt| |];
+    [reflexivity| |set_solver|etransitivity; eassumption].
+  rewrite 2 deltas_free_vars_cons.
+  f_equiv; [|easy].
+  destruct Hx as [<- | <-]; [done|].
+  unfold_leibniz.
+  apply list_to_set_perm.
+  destruct x as [[] []]; cbn; [done..|solve_Permutation].
+Qed.
+
+
+
+
+Lemma ntl_delta_perm_eq_WF ntl ntl' :
+  ntl_delta_perm_eq ntl ntl' ->
+  WF_ntl ntl <-> WF_ntl ntl'.
+Proof.
+  intros (Hsum & Habs & Hdelt).
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  unfold WF_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  subst sums' abs'.
+  f_equiv.
+  f_equiv.
+  f_equiv.
+  now apply eq_reflexivity,
+    deltas_bound_vars_permA_mor.
+Qed.
+
+
+Lemma ntl_delta_perm_eq_WT tl ntl ntl' :
+  ntl_delta_perm_eq ntl ntl' ->
+  WT_ntl tl ntl <-> WT_ntl tl ntl'.
+Proof.
+  intros (Hsum & Habs & Hdelt).
+  destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
+  unfold WT_ntl;
+  cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
+  subst sums' abs'.
+  f_equiv.
+  f_equiv; [|now apply ntl_delta_perm_eq_WF].
+  f_equiv.
+  now apply eq_reflexivity,
+    deltas_free_vars_permA_mor.
+Qed.
+
+Lemma ntl_delta_eq_WF tl ntl ntl' :
+  ntl_delta_eq tl ntl ntl' ->
+  WF_ntl ntl <-> WF_ntl ntl'.
+Proof.
+  induction 1.
+  - eauto using ntl_delta_idemp_WF.
+  - eauto using ntl_delta_subst_WF.
+  - eauto using ntl_delta_perm_eq_WF.
+  - easy.
+  - etransitivity; eassumption.
+Qed.
+
+Lemma ntl_delta_eq_WT tl ntl ntl' :
+  ntl_delta_eq tl ntl ntl' ->
+  WT_ntl tl ntl <-> WT_ntl tl ntl'.
+Proof.
+  induction 1.
+  - eauto using ntl_delta_idemp_WT.
+  - eauto using ntl_delta_subst_WT.
+  - eauto using ntl_delta_perm_eq_WT.
+  - easy.
+  - etransitivity; eassumption.
+Qed.
+
+
+
+Lemma gmap_map_insert `{Countable A} (m : gmap A A) (a b : A) :
+  pointwise_relation A eq (gmap_map (<[a := b]> m))
+    (<[a := b]> (gmap_map m)).
+Proof.
+  intros c.
+  rewrite fn_lookup_insert_case.
+  unfold gmap_map.
+  rewrite lookup_insert_case.
+  now case_decide.
+Qed.
+
+
+Lemma gmap_map_empty `{Countable A} :
+  pointwise_relation A eq (gmap_map (∅ :> gmap A A))
+    id.
+Proof.
+  intros c.
+  unfold gmap_map.
+  now rewrite lookup_empty.
+Qed.
+
+(* FIXME: Move *)
+Add Parametric Morphism {A B} : (relabel_delt) with signature
+  pointwise_relation A (@eq B) ==> eq ==>
+  eq as relabel_delt_mor.
+Proof.
+  intros; now apply relabel_delt_ext.
+Qed.
+
+(*
+Lemma simplify_ntl_deltas_relabel fsubst summed delt delt_other abs :
+  simplify_ntl_deltas_aux (fsubst) summed delt delt_other abs =
+  prod_map (prod_map (prod_map (.∪ fsubst) id) id) id $
+  simplify_ntl_deltas_aux ∅ summed
+    (relabel_delt (gmap_map fsubst) <$> delt)
+    (relabel_delt (gmap_map fsubst) <$> delt_other)
+    (relabel_abs (gmap_map fsubst) <$> abs).
+Proof.
+  revert fsubst summed delt_other abs.
+  induction delt as [delt IHdelt] using (Nat.measure_induction _ (@length (var*var))).
+  intros fsubst summed delt_other abs.
+  destruct delt as [|(l_, r_) delt].
+  - cbn.
+    rewrite (map_empty_union _).
+    repeat apply (f_equal2 pair);
+    [done|done|symmetry; rewrite <- list_fmap_compose;
+      apply list_fmap_ext;
+      intros _ lu _;
+      cbn;
+      rewrite gmap_map_empty
+      (* rewrite ?relabel_delt_compose;
+      try apply relabel_delt_ext *)
+      ..];
+    [now rewrite relabel_delt_id|now rewrite relabel_abs_id].
+  - cbn delta [simplify_ntl_deltas_aux] fix match.
+    set (l := gmap_map fsubst l_).
+    set (r := gmap_map fsubst r_).
+    cbv zeta.
+
+
+    case_decide as Hlr. 1:{
+      rewrite IHdelt by now cbn; lia.
+      f_equal.
+      cbn.
+      rewrite 2 gmap_map_empty.
+      now rewrite decide_True by easy.
+    }
+    cbn.
+    rewrite 2 gmap_map_empty.
+    rewrite decide_False by easy.
+    cbn.
+    fold l r.
+    case_match eqn:Hl.
+    + case_decide as Hlsummed.
+      * rewrite IHdelt by now cbn; lia.
+        symmetry.
+        rewrite IHdelt by now rewrite length_fmap; cbn; lia.
+
+
+    setoid_rewrite list_fmap_ext.
+    erewrite (list_fmap_mor _ _ (gmap_map ∅ :> var -> var)). by first [apply gmap_map_empty|reflexivity].
+    (* relabel_delt_mor *)
+    rewrite gmap_map_empty at 1. *)
+
+
+
+(* Lemma simplify_ntl_deltas_insert v v' fsubst summed delt delt_other abs :
+
+  simplify_ntl_deltas_aux (<[v := v']> fsubst) summed delt delt_other abs =
+  prod_map (prod_map (prod_map <[v := v']> id) id) id $
+  simplify_ntl_deltas_aux fsubst summed
+    (relabel_delt {[v := v']} <$> delt)
+    (relabel_delt {[v := v']} <$> delt_other)
+    (relabel_abs {[v := v']} <$> abs).
+Proof.
+  revert fsubst summed delt_other abs.
+  induction delt as [delt IHdelt] using (Nat.measure_induction _ (@length (var*var))).
+  intros fsubst summed delt_other abs.
+  destruct delt as [|(l, r) delt].
+  - cbn.
+
+
+  (length delt)  *)
+
+
+(* Lemma simplify_ntl_deltas_cons  *)
+
+Lemma list_filter_all {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  (forall a, a ∈ l -> P a) ->
+  filter P l = l.
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; [reflexivity|].
+  cbn.
+  rewrite decide_True by easy.
+  f_equal.
+  apply IHHl.
+Qed.
+
+Lemma NoDup_perm_filter_out `{EqDecision A} (l : list A) (a : A) :
+  NoDup l -> a ∈ l ->
+  l ≡ₚ a :: filter (.≠ a) l.
+Proof.
+  intros Hl Ha.
+  apply elem_of_list_split in Ha as Hspl.
+  destruct Hspl as (l1 & l2 & ->).
+  rewrite <- Permutation_middle in Hl |- *.
+  f_equiv.
+  apply NoDup_cons in Hl as [Hal Hdup].
+  cbn.
+  rewrite decide_False by easy.
+  symmetry.
+  apply eq_reflexivity.
+  apply list_filter_all.
+  congruence.
+Qed.
+
+
+
+(* Fixpoint simplify_ntl_deltas_aux (fsubst : gmap var var) (summed : list Idx)
+  (delt : list (var * var)) (delt_other : list (var * var)) (abs : list (Idx * list var * list var)) :
+    gmap var var * list Idx * list (var * var) *
+    list (Idx * list var * list var) :=
+  match delt with
+  | [] => (fsubst, summed, relabel_delt (gmap_map fsubst) <$> delt_other,
+    relabel_abs (gmap_map fsubst) <$> abs)
+  | (l_, r_) :: delt =>
+    let l := gmap_map fsubst l_ in let r := gmap_map fsubst r_ in
+    if decide (l = r) then simplify_ntl_deltas_aux fsubst summed delt delt_other abs else
+    let neither :=
+      simplify_ntl_deltas_aux fsubst summed delt (delt_other ++ [(l, r)]) abs in
+    let not_l :=
+      match r with
+      | free _ =>
+        neither
+      | bound rb =>
+        if decide (rb ∈ summed) then
+          simplify_ntl_deltas_aux (<[bound rb := l]> fsubst)
+            (filter (.≠ rb) summed) delt delt_other abs
+        else
+          neither
+      end in
+    match l with
+    | bound lb =>
+      if decide (lb ∈ summed) then
+        simplify_ntl_deltas_aux (<[bound lb := r]> fsubst)
+          (filter (.≠ lb) summed) delt delt_other abs
+      else
+        not_l
+    | free _ => not_l
+    end
+  end. *)
+
+Definition get_subst (summed : list Idx) (l r : var) : option (Idx * var) :=
+  match l with
+  | bound lr =>
+    if decide (lr ∈ summed) then
+      Some (lr, r)
+    else
+      match r with
+      | bound rr =>
+        if decide (rr ∈ summed) then
+          Some (rr, l)
+        else
+          None
+      | free _ => None
+      end
+  | free _ =>
+    match r with
+    | bound rr =>
+      if decide (rr ∈ summed) then
+        Some (rr, l)
+      else
+        None
+    | free _ => None
+    end
+  end.
+
+
+Fixpoint simplify_ntl_deltas_aux (summed : list Idx)
+  {n} : forall (delt : vec (var * var) n) (delt_other : list (var * var))
+    (abs : list (Idx * list var * list var)),
+    list Idx * list (var * var) *
+    list (Idx * list var * list var) :=
+  match n (* delt *) with
+  | O (* [# ] *) => fun delt delt_other abs => (summed, delt_other, abs)
+  | S n' (* (l, r) ::: delt *) =>
+    fun delt' delt_other abs =>
+    let '(l, r) := Vector.hd delt' in
+    let delt := Vector.tl delt' in
+    if decide (l = r) then
+      simplify_ntl_deltas_aux summed delt delt_other abs
+    else
+      match get_subst summed l r with
+      | Some (iold, vnew) =>
+        simplify_ntl_deltas_aux (filter (.≠iold) summed)
+          (vmap (relabel_delt {[bound iold := vnew]}) delt)
+          (relabel_delt {[bound iold := vnew]} <$> delt_other)
+          (relabel_abs {[bound iold := vnew]} <$> abs)
+      | None =>
+        simplify_ntl_deltas_aux summed delt ((l, r) :: delt_other) abs
+      end
+  end.
+
+Lemma simplify_ntl_deltas_aux_unfold summed {n} (delt : vec _ n) delt_other abs :
+  simplify_ntl_deltas_aux summed delt delt_other abs =
+  match delt with
+  | [# ] => (summed, delt_other, abs)
+  | (l, r) ::: delt =>
+    if decide (l = r) then
+      simplify_ntl_deltas_aux summed delt delt_other abs
+    else
+      match get_subst summed l r with
+      | Some (iold, vnew) =>
+        simplify_ntl_deltas_aux (filter (.≠iold) summed)
+          (vmap (relabel_delt {[bound iold := vnew]}) delt)
+          (relabel_delt {[bound iold := vnew]} <$> delt_other)
+          (relabel_abs {[bound iold := vnew]} <$> abs)
+      | None =>
+        simplify_ntl_deltas_aux summed delt ((l, r) :: delt_other) abs
+      end
+  end.
+Proof.
+  destruct delt as [|(l, r) delt]; reflexivity.
+Qed.
+
+
+Lemma simplify_ntl_deltas_cons summed {n} (delt : vec _ n) delt_other abs lr :
+  simplify_ntl_deltas_aux summed (lr ::: delt) delt_other abs =
+  if decide (lr.1 = lr.2) then
+    simplify_ntl_deltas_aux summed delt delt_other abs
+  else
+    match get_subst summed lr.1 lr.2 with
+    | Some (iold, vnew) =>
+      simplify_ntl_deltas_aux (filter (.≠iold) summed)
+        (vmap (relabel_delt {[bound iold := vnew]}) delt)
+        (relabel_delt {[bound iold := vnew]} <$> delt_other)
+        (relabel_abs {[bound iold := vnew]} <$> abs)
+    | None =>
+      simplify_ntl_deltas_aux summed delt (lr :: delt_other) abs
+    end.
+Proof.
+  rewrite simplify_ntl_deltas_aux_unfold.
+  now destruct lr.
+Qed.
+
+
+Lemma get_subst_correct_aux sums l r iold vnew :
+  get_subst sums l r = Some (iold, vnew) ->
+  prod_swap_eq (l, r) (bound iold, vnew) /\
+  iold ∈ sums.
+Proof.
+  rewrite prod_swap_eq_pair.
+  unfold get_subst.
+  repeat case_match; subst; cbn; naive_solver congruence.
+Qed.
+
+Lemma set_omap_v2bound_deltas_vars delt :
+  set_omap v2bound (deltas_vars delt) = deltas_bound_vars delt.
+Proof.
+  rewrite <- (deltas_bound_vars_relabel_delt id).
+  f_equal.
+  apply list_fmap_id'; intros ? _;
+  apply relabel_delt_id.
+Qed.
+
+Lemma set_omap_v2free_deltas_vars delt :
+  set_omap v2free (deltas_vars delt) = deltas_free_vars delt.
+Proof.
+  rewrite <- (deltas_free_vars_relabel_delt id).
+  f_equal.
+  apply list_fmap_id'; intros ? _;
+  apply relabel_delt_id.
+Qed.
+
+Lemma set_omap_v2bound_abstracts_vars abs :
+  set_omap v2bound (abstracts_vars abs) = abstracts_bound_vars abs.
+Proof.
+  rewrite <- (abstracts_bound_vars_relabel_abs id).
+  f_equal.
+  apply list_fmap_id'; intros ? _;
+  apply relabel_abs_id.
+Qed.
+
+Lemma set_omap_v2free_abstracts_vars abs :
+  set_omap v2free (abstracts_vars abs) = abstracts_free_vars abs.
+Proof.
+  rewrite <- (abstracts_free_vars_relabel_abs id).
+  f_equal.
+  apply list_fmap_id'; intros ? _;
+  apply relabel_abs_id.
+Qed.
+
+Lemma subseteq_psets_to_varset vars bounds frees :
+  vars ⊆ psets_to_varset bounds frees <->
+  set_omap v2bound vars ⊆ bounds /\
+  set_omap v2free vars ⊆ frees.
+Proof.
+  unfold subseteq, set_subseteq_instance.
+  setoid_rewrite elem_of_psets_to_varset.
+  setoid_rewrite elem_of_set_omap.
+  setoid_rewrite v2bound_Some.
+  setoid_rewrite v2free_Some.
+  split; [naive_solver|].
+  intros; case_match; naive_solver.
+Qed.
+
+
+Lemma WT_ntl_alt tl ntl :
+  WT_ntl tl ntl <->
+  NoDup ntl.(ntl_sums) /\
+  abstracts_vars ntl.(ntl_abstracts) ∪
+  deltas_vars ntl.(ntl_deltas)
+   ⊆ psets_to_varset (list_to_set ntl.(ntl_sums)) tl.
+Proof.
+  rewrite union_subseteq, 2 subseteq_psets_to_varset.
+  rewrite set_omap_v2bound_abstracts_vars, set_omap_v2free_abstracts_vars.
+  rewrite set_omap_v2bound_deltas_vars, set_omap_v2free_deltas_vars.
+  unfold WT_ntl, WF_ntl.
+  tauto.
+Qed.
+
+
+Lemma WT_ntl_alt' tl ntl :
+  WT_ntl tl ntl <->
+  NoDup ntl.(ntl_sums) /\
+  abstracts_vars ntl.(ntl_abstracts)
+    ⊆ psets_to_varset (list_to_set ntl.(ntl_sums)) tl /\
+  deltas_vars ntl.(ntl_deltas)
+   ⊆ psets_to_varset (list_to_set ntl.(ntl_sums)) tl.
+Proof.
+  now rewrite WT_ntl_alt, union_subseteq.
+Qed.
+
+Lemma get_subst_correct tl sums l r iold vnew abs delt :
+  NoDup sums ->
+  l <> r ->
+  list_to_set [l;r] ⊆ psets_to_varset (list_to_set sums) tl ->
+  get_subst sums l r = Some (iold, vnew) ->
+  ntl_delta_eq tl
+  {|
+    ntl_sums := sums;
+    ntl_abstracts := abs;
+    ntl_deltas := (l, r) :: delt
+  |}
+  {|
+    ntl_sums := filter (λ y : positive, y ≠ iold) sums;
+    ntl_abstracts :=
+      relabel_abs {[bound iold := vnew]} <$> abs;
+    ntl_deltas :=
+      relabel_delt {[bound iold := vnew]} <$> delt
+  |}.
+Proof.
+  intros Hdup Hne Hsubs [Heq Hin]%get_subst_correct_aux.
+  transitivity (mk_ntl sums abs ((bound iold, vnew) :: delt)).
+  - apply ntl_delta_eq_perm.
+    do 2 apply (conj eq_refl).
+    cbn.
+    constructor; easy.
+  - apply (ntl_delta_eq_subst tl iold vnew);
+      cbn [ntl_sums].
+    + rewrite elem_of_list_filter.
+      easy.
+    + rewrite prod_swap_eq_pair in Heq.
+      assert (vnew <> bound iold) by now clear -Hne Heq; firstorder congruence.      assert (Hvnew : vnew ∈@{gset var} list_to_set [l; r]) by (set_solver +Heq).
+      apply Hsubs in Hvnew.
+      rewrite elem_of_psets_to_varset in *.
+      destruct vnew; [|easy].
+      rewrite list_to_set_filter, elem_of_filter.
+      split; [congruence|easy].
+    + hnf; cbn.
+      split; [rewrite prod_swap_eq_pair in Heq; clear Hsubs; firstorder congruence|].
+      split; [|easy].
+      now apply NoDup_perm_filter_out.
+Qed.
+
+Lemma deltas_vars_cons lu delt :
+  deltas_vars (lu :: delt) =
+  list_to_set [lu.1; lu.2] ∪ deltas_vars delt.
+Proof.
+  destruct lu; cbn; set_solver.
+Qed.
+
+Lemma deltas_vars_relabel_delt f delt :
+  deltas_vars (relabel_delt f <$> delt) =
+  set_map f $ deltas_vars delt.
+Proof.
+  apply set_eq; intros l.
+  rewrite elem_of_deltas_vars.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite exists_pair.
+  cbn.
+  setoid_rewrite pair_eq.
+  rewrite elem_of_map.
+  setoid_rewrite elem_of_deltas_vars.
+  naive_solver.
+Qed.
+
+Lemma simplify_ntl_deltas_aux_correct_eq_aux tl sums {n} (delt : vec _ n)
+  delt_other abs sums' delt' abs' :
+  NoDup sums ->
+  deltas_vars delt ⊆ psets_to_varset (list_to_set sums) tl ->
+  simplify_ntl_deltas_aux sums delt delt_other abs =
+  (sums', delt', abs') ->
+  ntl_delta_eq tl (mk_ntl sums abs (delt ++ delt_other))
+    (mk_ntl sums' abs' delt').
+Proof.
+  revert delt sums delt_other abs sums' delt' abs'.
+  (* induction delt as [delt IHdelt] using (Nat.measure_induction _ (@length (var*var))). *)
+  induction n as [|n IHn];
+  [refine (vec_0_inv _ _)|refine (vec_S_inv _ _); intros (l & r) delt];
+  intros sums delt_other abs sums' delt' abs' Hsums Hdelt;
+  [cbn; intros [= <- <- <-]; reflexivity|].
+  cbn delta [simplify_ntl_deltas_aux Vector.hd Vector.tl Vector.caseS]
+    beta fix match zeta.
+  cbn [vec_to_list] in Hdelt.
+  rewrite deltas_vars_cons in Hdelt.
+  cbn [fst snd] in Hdelt.
+  case_decide as Hlr. 1:{
+    intros Heq.
+    rewrite <- Hlr.
+    etransitivity;
+    [instantiate (1:=mk_ntl _ _ _);
+    symmetry; apply ntl_delta_eq_idemp with l;
+      [|hnf; cbn; split_and!; f_equal; reflexivity]|].
+    - apply Hdelt.
+      set_solver.
+    - apply IHn; easy + set_solver + Hdelt.
+  }
+  destruct (get_subst sums l r) as [(iold, vnew)|] eqn:Hsubst; cycle 1.
+  - intros Heq.
+    apply IHn in Heq; [|easy + set_solver + Hdelt..].
+    rewrite <- Heq.
+    apply ntl_delta_eq_perm.
+    hnf.
+    do 2 apply (conj eq_refl).
+    cbn.
+    apply (Permutation_PermutationA _).
+    solve_Permutation.
+  - intros Heq.
+    apply union_subseteq in Hdelt as [Hlrsub Hdeltsub].
+    apply IHn in Heq; [|now apply NoDup_filter|].
+    + rewrite <- Heq.
+      cbn.
+      rewrite vec_to_list_map, <- fmap_app.
+      now apply get_subst_correct.
+    + rewrite vec_to_list_map.
+      rewrite deltas_vars_relabel_delt.
+      intros _ (v & -> & Hv%Hdeltsub)%elem_of_map.
+      rewrite fn_lookup_singleton_case.
+      case_decide as Hveq.
+      * subst v.
+        assert (vnew ∈@{gset var} list_to_set [l; r]) as Hvnew%Hlrsub by
+          (apply get_subst_correct_aux in Hsubst as [Hsubst%prod_swap_eq_pair _];
+          set_solver + Hsubst).
+        rewrite elem_of_psets_to_varset in Hvnew |- *.
+        destruct vnew; [|easy].
+        rewrite list_to_set_filter, elem_of_filter.
+        split; [|easy].
+        apply get_subst_correct_aux in Hsubst as [Hsubst%prod_swap_eq_pair _].
+        clear -Hlr Hsubst; firstorder congruence.
+      * rewrite elem_of_psets_to_varset in Hv |- *.
+        destruct v; [|easy].
+        rewrite list_to_set_filter, elem_of_filter.
+        split; [congruence|easy].
+Qed.
+
+
+
+
+Lemma simplify_ntl_deltas_aux_WF sums {n} (delt : vec _ n)
+  delt_other abs sums' delt' abs' :
+  WF_ntl (mk_ntl sums abs (delt ++ delt_other)) ->
+  simplify_ntl_deltas_aux sums delt delt_other abs =
+  (sums', delt', abs') ->
+  WF_ntl (mk_ntl sums' abs' delt').
+Proof.
+  revert delt sums delt_other abs sums' delt' abs'.
+  (* induction delt as [delt IHdelt] using (Nat.measure_induction _ (@length (var*var))). *)
+  induction n as [|n IHn];
+  [refine (vec_0_inv _ _)|refine (vec_S_inv _ _); intros (l & r) delt];
+  intros sums delt_other abs sums' delt' abs' Hsums;
+  [cbn; intros [= <- <- <-]; easy|].
+  cbn delta [simplify_ntl_deltas_aux Vector.hd Vector.tl Vector.caseS]
+    beta fix match zeta.
+  case_decide as Hlr. 1:{
+    intros Heq.
+    apply IHn in Heq; [easy|].
+    hnf; cbn -[abstracts_bound_vars deltas_bound_vars].
+    split; [apply Hsums|].
+    split; [apply Hsums|].
+    generalize (Hsums.2.2).
+    cbn -[abstracts_bound_vars deltas_bound_vars].
+    set_solver +.
+  }
+  destruct (get_subst sums l r) as [(iold, vnew)|] eqn:Hsubst; cycle 1.
+  - intros Heq.
+    apply IHn in Heq; [easy|].
+    split; [apply Hsums|].
+    split; [apply Hsums|].
+    generalize (Hsums.2.2).
+    cbn -[abstracts_bound_vars deltas_bound_vars].
+    erewrite deltas_bound_vars_perm_mor; [exact id|].
+    solve_Permutation.
+  - intros Heq.
+    apply IHn in Heq; [easy|].
+    hnf in Hsums |- *; cbn -[abstracts_bound_vars deltas_bound_vars] in Hsums |- *.
+    split; [now apply NoDup_filter|].
+    rewrite vec_to_list_map, <- fmap_app.
+    split.
+    + rewrite abstracts_bound_vars_relabel_abs.
+      rewrite abstracts_vars_decomp.
+      rewrite set_omap_union.
+      intros x [Hx|Hf]%elem_of_union. 2:{
+        exfalso.
+        rewrite elem_of_set_omap in Hf.
+        cbn in Hf.
+        setoid_rewrite v2bound_Some in Hf.
+        destruct Hf as (x' & (? & -> & _)%elem_of_map & Hxeq).
+        now rewrite fn_lookup_singleton_ne in Hxeq by easy.
+      }
+      rewrite set_omap_set_map in Hx.
+      rewrite list_to_set_filter.
+      rewrite elem_of_filter.
+      apply get_subst_correct_aux in Hsubst as Hsubst'.
+      rewrite prod_swap_eq_pair in Hsubst'.
+      apply elem_of_set_omap in Hx as (x' & Hx'%Hsums & Heqx).
+      cbn in Heqx.
+      rewrite fn_lookup_singleton_case in Heqx.
+      case_decide as Hx'iold; cbn in Heqx.
+      * destruct vnew as [inew|]; [cbn in *|easy].
+        revert Heqx; intros [= <-].
+        split; [generalize Hlr Hsubst'.1;clear; firstorder congruence|].
+        destruct Hsubst' as [[[-> ->]|[-> ->]] Hold];
+        apply Hsums.2.2; set_solver +.
+      * revert Heqx; intros [= <-].
+        split; [congruence|].
+        easy.
+    + rewrite deltas_bound_vars_relabel_delt.
+      rewrite deltas_vars_decomp.
+      rewrite set_omap_union.
+      intros x [Hx|Hf]%elem_of_union. 2:{
+        exfalso.
+        rewrite elem_of_set_omap in Hf.
+        cbn in Hf.
+        setoid_rewrite v2bound_Some in Hf.
+        destruct Hf as (x' & (? & -> & _)%elem_of_map & Hxeq).
+        now rewrite fn_lookup_singleton_ne in Hxeq by easy.
+      }
+      rewrite set_omap_set_map in Hx.
+      rewrite list_to_set_filter.
+      rewrite elem_of_filter.
+      apply get_subst_correct_aux in Hsubst as Hsubst'.
+      rewrite prod_swap_eq_pair in Hsubst'.
+      assert (Hdelt : deltas_bound_vars (delt ++ delt_other)
+          ⊆ list_to_set sums) by now rewrite <- Hsums.2.2; set_solver +.
+      apply elem_of_set_omap in Hx as (x' & Hx'%Hdelt & Heqx).
+      cbn in Heqx.
+      rewrite fn_lookup_singleton_case in Heqx.
+      case_decide as Hx'iold; cbn in Heqx.
+      * destruct vnew as [inew|]; [cbn in *|easy].
+        revert Heqx; intros [= <-].
+        split; [generalize Hlr Hsubst'.1;clear; firstorder congruence|].
+        destruct Hsubst' as [[[-> ->]|[-> ->]] Hold];
+        apply Hsums.2.2; set_solver +.
+      * revert Heqx; intros [= <-].
+        split; [congruence|].
+        easy.
+Qed.
+
+
+Definition simplify_ntl_deltas (ntl : namedtensorlist) : namedtensorlist :=
+  let '(sums, delt, abs) := simplify_ntl_deltas_aux ntl.(ntl_sums)
+    (list_to_vec ntl.(ntl_deltas)) [] ntl.(ntl_abstracts) in
+  mk_ntl sums abs delt.
+
+Lemma simplify_ntl_deltas_correct tl ntl :
+  WT_ntl tl ntl ->
+  ntl_delta_eq tl (simplify_ntl_deltas ntl) ntl.
+Proof.
+  intros Hdup.
+  unfold simplify_ntl_deltas.
+  destruct (simplify_ntl_deltas_aux _ _ _ _) as [[sums delt] abs] eqn:Hsimp.
+  apply (simplify_ntl_deltas_aux_correct_eq_aux tl) in Hsimp;
+    [|now rewrite ?vec_to_list_to_vec; apply WT_ntl_alt' in Hdup..].
+  rewrite <- Hsimp.
+  rewrite vec_to_list_to_vec, app_nil_r.
+  now destruct ntl.
+Qed.
+
+Lemma simplify_ntl_deltas_WF ntl :
+  WF_ntl ntl ->
+  WF_ntl (simplify_ntl_deltas ntl).
+Proof.
+  intros Hntl.
+  unfold simplify_ntl_deltas.
+  destruct (simplify_ntl_deltas_aux _ _ _ _) as [[sums delt] abs] eqn:Hsimp.
+  apply simplify_ntl_deltas_aux_WF in Hsimp; [easy|].
+  rewrite vec_to_list_to_vec, app_nil_r.
+  apply Hntl.
+Qed.
+
+Lemma simplify_ntl_deltas_WT tl ntl :
+  WT_ntl tl ntl ->
+  WT_ntl tl (simplify_ntl_deltas ntl).
+Proof.
+  intros Hntl.
+  eapply ntl_delta_eq_WT; [|eassumption].
+  now apply simplify_ntl_deltas_correct.
+Qed.
+
+
+Definition ntl_eq tl : relation namedtensorlist :=
+  rtc (ntl_aeq ∪ ntl_delta_eq tl).
+
+#[export] Instance union_symmetric {A} {R R' : relation A} :
+  Symmetric R -> Symmetric R' -> Symmetric (R ∪ R').
+Proof.
+  unfold Symmetric.
+  unfold union, relation_union.
+  firstorder.
+Qed.
+
+#[export] Instance ntl_eq_setoid tl : Equivalence (ntl_eq tl).
+Proof.
+  apply rtc_equivalence.
+  apply _.
+Qed.
+
+
+Add Parametric Morphism : abstracts_free_vars with signature
+  (≡ₚ) ==> eq as abstracts_free_vars_perm_mor.
+Proof.
+  intros abs abs' Habs.
+  apply set_eq.
+  intros r.
+  rewrite 2 elem_of_abstracts_free_vars.
+  now setoid_rewrite Habs.
+Qed.
+Add Parametric Morphism : deltas_free_vars with signature
+  (≡ₚ) ==> eq as deltas_free_vars_perm_mor.
+Proof.
+  intros abs abs' Habs.
+  apply set_eq.
+  intros r.
+  rewrite 2 elem_of_deltas_free_vars.
+  now setoid_rewrite Habs.
+Qed.
+
+Lemma abstracts_free_vars_relabel_bounds f abs : 
+  abstracts_free_vars (relabel_abs (relabel_bounds f) <$> abs) = 
+  abstracts_free_vars abs.
+Proof.
+  apply set_eq.
+  intros r.
+  rewrite elem_of_abstracts_free_vars.
+  setoid_rewrite elem_of_abstracts_free_vars.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite exists_pair.
+  setoid_rewrite exists_pair.
+  split.
+  - intros (_ & _ & _ & (idx & low & up & [= -> -> ->] & Hlu) & Hr).
+    rewrite <- fmap_app, elem_of_list_fmap in Hr.
+    destruct Hr as ([] & [= ->] & Hr).
+    eauto 20.
+  - intros (idx & low & up & Hlu & Hr').
+    eexists _, _, _.
+    split; [exists idx, low, up; split; [cbn; reflexivity|easy]|].
+    rewrite <- fmap_app.
+    apply (elem_of_list_fmap_1 (relabel_bounds f) _ _ Hr').
+Qed.
+
+
+Lemma deltas_free_vars_relabel_bounds (f : positive -> positive)
+  (delt : list _) :
+  deltas_free_vars (relabel_delt (relabel_bounds f) <$> delt) =
+  deltas_free_vars delt.
+Proof.
+  apply set_eq.
+  intros r.
+  rewrite elem_of_deltas_free_vars.
+  setoid_rewrite elem_of_deltas_free_vars.
+  setoid_rewrite elem_of_list_fmap.
+  setoid_rewrite exists_pair.
+  cbn.
+  split; [|set_solver].
+  intros (l & u & (a & b & [= -> ->] & Hab) & Hor).
+  destruct a, b; cbn in *; naive_solver.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma ntl_aeq_WT tl ntl ntl' :
+  ntl =ntl= ntl' -> WT_ntl tl ntl -> WT_ntl tl ntl'.
+Proof.
+  intros Heq.
+  intros (Habs & Hdelt & Hwf).
+  split; [|split; [|now eapply ntl_aeq_WF; eauto]];
+  revert Heq;
+  intros (fr & Hfr & Hfsums & Hfabs & Hfdelt).
+  - now rewrite <- Hfabs, abstracts_free_vars_relabel_bounds.
+  - now rewrite <- Hfdelt, deltas_free_vars_relabel_bounds.
+Qed.
+
+
+
 
 
 

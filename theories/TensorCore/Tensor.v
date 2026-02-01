@@ -170,6 +170,28 @@ Proof.
 Qed.
 
 
+Lemma sum_of_delta_l_1 `{!WFSummable A} {w : vec A 1}
+  `{Hw : !SummedElement w} (f : A -> R) :
+  ∑ a : A, delta_tensor [#a] w * f a == f (Vector.hd w).
+Proof.
+  erewrite sum_of_ext. 2:{
+    intros a.
+    change (f a) with (f (Vector.hd [# a])).
+    refine (reflexivity _).
+  }
+  rewrite <- (sum_of_vec_1 (λ va, delta_tensor va w * f (Vector.hd va))).
+  now rewrite sum_of_delta_l.
+Qed.
+
+Lemma sum_of_delta_r_1 `{!WFSummable A} {w : vec A 1}
+  `{Hw : !SummedElement w} (f : A -> R) :
+  ∑ a : A, delta_tensor w [#a] * f a == f (Vector.hd w).
+Proof.
+  setoid_rewrite delta_tensor_comm.
+  apply sum_of_delta_l_1.
+Qed.
+
+
 Lemma compose_delta_l `{!WFSummable A} {n m} (t : Tensor n m A) :
   compose_tensor delta_tensor t ≡ t.
 Proof.
