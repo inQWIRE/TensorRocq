@@ -7,6 +7,14 @@ From stdpp Require Export pmap gmap.
 
 (* An implementation of double pushout (DPO) rewriting *)
 
+Fixpoint vzip_with {n} {B C D} (f : B -> C -> D) (bs : vec B n) (cs : vec C n) : vec D n :=
+match n, bs, cs with
+| 0, _, _ => [#]
+| (S k), bs, cs => (f (Vector.hd bs) (Vector.hd cs)) ::: vzip_with f (Vector.tl bs) (Vector.tl cs)
+end.
+
+Notation vzip := (vzip_with pair).
+
 Section DPO.
 
 
@@ -26,12 +34,6 @@ Section DPO.
   - exact tg.2.2. *)
 
 
-  Definition positive_subst (p p' : positive) (o : positive) : positive :=
-    if decide (p = o) then p' else o.
-
-  Notation "[ p |-> p' ]" := (positive_subst p p').
-
-  Print relabel_delt.
 
   Fixpoint propogate_subst {n} (ps : vec (positive * positive) n) : vec (positive * positive) n :=
   match n, ps with
@@ -39,23 +41,14 @@ Section DPO.
   | (S k), _ => 
     let (p, p') := Vector.hd ps in
     let ps' := Vector.tl ps in
-      (p, p') ::: propogate_subst (vmap (relabel_delt ([p |-> p'])) ps')
+      (p, p') ::: propogate_subst (vmap (relabel_delt ({[p := p']})) ps')
   end.
 
-  Fixpoint vzipwith {n} {B C D} (f : B -> C -> D) (bs : vec B n) (cs : vec C n) : vec D n :=
-  match n, bs, cs with
-  | 0, _, _ => [#]
-  | (S k), bs, cs => (f (Vector.hd bs) (Vector.hd cs)) ::: vzipwith f (Vector.tl bs) (Vector.tl cs)
-  end.
-
-  Notation vzip := (vzipwith pair).
-
-  Check relabel_graph.
 
   Fixpoint subst_by_vec {n} (ps : vec (positive * positive) n) (p : positive) : positive :=
     match ps with
     | [#] => p
-    | (a, b) ::: ps' => subst_by_vec ps' ([a |-> b] p)
+    | (a, b) ::: ps' => subst_by_vec ps' ({[a := b]} p)
     end.
 
   Reserved Notation "tgl ; tgr" (at level 50).

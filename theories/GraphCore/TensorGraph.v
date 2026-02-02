@@ -582,7 +582,7 @@ Proof.
     fe (f ∘ fv ∘ invfun f (elements (dom (hedges tg))))).
   - cbn.
     intros ????; apply Hfe.
-  - cbn. 
+  - cbn.
     rewrite dom_kmap_L'.
     intros fi fj (i & -> & Hi%elem_of_elements)%elem_of_map
       (j & -> & Hj%elem_of_elements)%elem_of_map.
@@ -614,19 +614,87 @@ Add Parametric Relation {T n m} : (CospanHyperGraph T n m) isomorphic
 
 Definition stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n + n') (m + m') :=
-  cohg.(inputs) +++ cohg'.(inputs) -> cohg.(hedges) ∪ cohg'.(hedges) <- 
+  cohg.(inputs) +++ cohg'.(inputs) -> cohg.(hedges) ∪ cohg'.(hedges) <-
     cohg.(outputs) +++ cohg'.(outputs).
 
 Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n + n') (m + m') :=
-  stack_graphs_aux 
+  stack_graphs_aux
     (relabel_graph (bcons false) (reindex_graph (bcons false) cohg))
     (relabel_graph (bcons true) (reindex_graph (bcons true) cohg')).
 
 
-Definition contract_ioput {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
+(* Definition vremove {A n} (i : fin n) : vec A n -> vec A (pred n) :=
+  (* match i in fin n return vec A n -> vec A (pred n) with 
+  | 0%fin => Vector.tl
+  | FS i => 
+    match i with 
+    | 0%fin => fun v => Vector.hd v ::: Vector.tl (Vector.tl v)
+    | FS i => fun v => Vector.hd v ::: vremove (FS i) (Vector.tl v)
+    end
+  end. *)
+  Fin.t_rect (fun n _ => vec A n -> vec A (pred n)) (fun _ => Vector.tl)
+  (fun n i => match i with
+    | 0%fin => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    | FS i' => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    end) n i. *)
+
+Definition vremove {A n} (i : fin n) : vec A n -> vec A (pred n) :=
+  Fin.t_rect (fun n _ => vec A n -> vec A (pred n)) (fun _ => Vector.tl)
+  (fun n i => match i with
+    | 0%fin => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    | FS i' => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    end) n i.
+
+Lemma vec_to_list_vremove {A n} (i : fin n) (v : vec A n) :
+  vec_to_list (vremove i v) = delete (i:>nat) (v:>list A).
+Proof.
+  unfold vremove.
+  revert v; induction i.
+  - cbn.
+    now apply vec_S_inv.
+  - apply vec_S_inv.
+    intros x v.
+    cbn.
+    destruct i.
+    + cbn.
+      f_equal.
+      now destruct v using vec_S_inv.
+    + cbn.
+      f_equal.
+      apply IHi.
+Qed.
+
+
+(* TODO: Rewrite with a new Vector.remove function returning a [vec A (pred n)] *)
+Definition add_top_loop {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
   relabel_graph {[Vector.hd cohg.(outputs) := Vector.hd cohg.(inputs)]} (
   Vector.tl cohg.(inputs) -> cohg.(hedges) <- Vector.tl cohg.(outputs)).
+
+Fixpoint add_top_loops {T n m o} : forall (cohg : CospanHyperGraph T (n + m) (n + o)),
+  CospanHyperGraph T m o :=
+  match n with 
+  | 0 => fun cohg => cohg
+  | S n => 
+    fun cohg => add_top_loops (add_top_loop cohg)
+  end.
+
+
+
+Definition swapped_stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n' + n) (m + m') :=
+  cohg'.(inputs) +++ cohg.(inputs) -> cohg.(hedges) ∪ cohg'.(hedges) <-
+    cohg.(outputs) +++ cohg'.(outputs).
+
+Definition swapped_stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n' + n) (m + m') :=
+  swapped_stack_graphs_aux
+    (relabel_graph (bcons false) (reindex_graph (bcons false) cohg))
+    (relabel_graph (bcons true) (reindex_graph (bcons true) cohg')).
+
+Definition compose_graphs_alt {T n m o} (cohg : CospanHyperGraph T n m) 
+  (cohg' : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+  add_top_loops (swapped_stack_graphs cohg cohg').
 
 
 Declare Scope graph_scope.
