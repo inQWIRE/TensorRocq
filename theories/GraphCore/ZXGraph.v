@@ -77,7 +77,7 @@ Qed.
   let relabel_idx i := if i =? n then m else i in
   let edges' := (fun e : (nat * nat) =>
     let (s, d) := e in (relabel_idx s, relabel_idx d)) <$> edges in
-  mk_tg verts' edges'.
+  mk_cohg verts' edges'.
 
 
 Definition has_edge (n m : nat) (es : list edge) : Prop :=
@@ -87,16 +87,16 @@ Definition connected {T} (n m : nat) (tg : TensorGraph T) : Prop :=
   is_key tg.1 n /\ is_key tg.1 m /\ has_edge n m tg.2.
 
 Definition remove_vertex {T} (n : nat) (tg : TensorGraph T) : TensorGraph T :=
-  let '(mk_tg verts edges) := tg in
+  let '(mk_cohg verts edges) := tg in
   let verts' := delete n verts in
   let edges' :=
     filter (fun e : (nat * nat) => let (s, d) := e in negb ((s =? n) || (d =? n))) edges in
-  mk_tg verts' edges'.
+  mk_cohg verts' edges'.
 
 Definition remove_edge {T} (n m : nat) (tg : TensorGraph T) : TensorGraph T:=
-  let '(mk_tg verts edges) := tg in
+  let '(mk_cohg verts edges) := tg in
   let edges' := filter (fun e : (nat * nat) => let (s, d) := e in ((s =? n) && (d =? m) || (s =? m) && (d =? n))) edges in
-  mk_tg verts edges'.
+  mk_cohg verts edges'.
 
 Definition successors {T} (n : nat) (tg : TensorGraph T) : list nat :=
   map snd (filter (fun e => fst e =? n) (snd tg)).

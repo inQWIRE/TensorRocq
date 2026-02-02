@@ -2,6 +2,7 @@ Require Export Tensor.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
 Require Export Aux_stdpp.
+Require Export HyperGraph.
 Require Import TESyntax (relabel_abs).
 
 (* FIXME: Move *)

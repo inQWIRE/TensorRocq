@@ -22,6 +22,7 @@ Qed.
 Section TensorGraphExpr.
 
 Context {T : Type}.
+(* Context {n m : nat}. *)
 
 Let TensorGraph := (CospanHyperGraph T).
 
@@ -209,7 +210,7 @@ Proof.
   induction l; [done|cbn]; case_match; f_equal; easy.
 Qed.
 
-Lemma abstracts_bound_vars_graph {n m} (tg : TensorGraph n m) :
+Lemma abstracts_bound_vars_graph {o p} (tg : TensorGraph o p) :
   abstracts_bound_vars (graph_namedtensorlist_semantics tg).(ntl_abstracts) =
   list_to_set ('(_, low, up) ← (map_to_list tg.(hedges)).*2; low ++ up).
 Proof.
@@ -534,6 +535,181 @@ Proof.
   cbn; rewrite NoDup_cons.
   intros []; eauto.
 Qed.
+
+Lemma input_edges_ext_label_irrel lint lext lext' k :
+  lext.*2 = lext'.*2 ->
+  input_edges lint lext k = input_edges lint lext' k.
+Proof.
+  intros Hlext.
+  unfold input_edges; f_equal.
+  unfold node_input_edges.
+  rewrite 2 (list_fmap_compose snd), <- 2 list_filter_fmap.
+  now rewrite Hlext.
+Qed.
+
+Lemma output_edges_ext_label_irrel lint lext lext' k :
+  lext.*2 = lext'.*2 ->
+  output_edges lint lext k = output_edges lint lext' k.
+Proof.
+  intros Hlext.
+  unfold output_edges; f_equal.
+  unfold node_output_edges.
+  rewrite 2 (list_fmap_compose snd (_ ∘ snd)), <- 2 list_filter_fmap.
+  now rewrite Hlext.
+Qed.
+
+Lemma mk_node_ext_label_irrel lint lext lext' k :
+  lext.*2 = lext'.*2 ->
+  mk_node lint lext k = mk_node lint lext' k.
+Proof.
+  intros Hext.
+  unfold mk_node.
+  f_equal; [f_equal|];
+  [now apply input_edges_ext_label_irrel|
+   now apply output_edges_ext_label_irrel].
+Qed.
+
+Lemma zip_with_irrel_l {A B C} (f : B -> C) (l l' : list A) (k : list B) :
+  length l = length l' ->
+  zip_with (λ _ b, f b) l k = zip_with (λ _ b, f b) l' k.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert k;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
+Lemma zip_with_irrel_r {A B C} (f : A -> C) (l : list A) (k k' : list B) :
+  length k = length k' ->
+  zip_with (λ a _, f a) l k = zip_with (λ a _, f a) l k'.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert l;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_ext_lab_irrel tg int_lab ext_lab ext_lab' :
+  length ext_lab = length ext_lab' ->
+  graph_namedtensorlist_semantics tg int_lab ext_lab =
+  graph_namedtensorlist_semantics tg int_lab ext_lab'.
+Proof.
+  intros Hlen.
+  unfold graph_namedtensorlist_semantics.
+  f_equal.
+  apply list_fmap_ext; intros _ x _.
+  apply mk_node_ext_label_irrel.
+  rewrite 2 fmap_zip_with; cbn.
+  now apply zip_with_irrel_l.
+Qed.
+
+
+
+Lemma graph_namedtensorlist_semantics_perm_eq tg int_lab int_lab'
+  ext_lab ext_lab' :
+  NoDup int_lab -> length int_lab = num_internals tg ->
+  int_lab ≡ₚ int_lab' ->
+  length ext_lab = length ext_lab' ->
+  graph_namedtensorlist_semantics tg int_lab ext_lab =ntl=
+  graph_namedtensorlist_semantics tg int_lab' ext_lab'.
+Proof.
+  intros Hdup Hlen (f & Hf & <- & Hlook)%perm_exists_posperm Hext.
+  etransitivity; [apply graph_namedtensorlist_semantics_ppermute; eauto|].
+  apply eq_reflexivity.
+  now apply graph_namedtensorlist_semantics_ext_lab_irrel.
+Qed.
+
+
+Lemma graph_namedtensorlist_semantics_seq_correct' tg :
+  graph_tensorlist_semantics tg =
+  ntl2tl (graph_namedtensorlist_semantics tg (seq 0 (num_internals tg))
+	  (seq 0 (num_externals tg))).
+Proof.
+  rewrite graph_namedtensorlist_semantics_seq_correct.
+  now rewrite tl2ntl2tl.
+Qed.
+
+Lemma internal_edges_perm ns es es' :
+  es ≡ₚ es' ->
+  @internal_edges T (mk_cohg ns es) ≡ₚ internal_edges (mk_cohg ns es').
+Proof.
+  intros Hes.
+  unfold internal_edges; cbn.
+  now f_equiv.
+Qed.
+
+Lemma external_edges_perm ns es es' :
+  es ≡ₚ es' ->
+  @external_edges T (mk_cohg ns es) ≡ₚ external_edges (mk_cohg ns es').
+Proof.
+  intros Hes.
+  unfold external_edges; cbn.
+  now f_equiv.
+Qed.
+
+
+Lemma graph_tensorlist_semantics_perm_eq_pairs_elab ns es es' :
+  es ≡ₚ es' ->
+  exists idxs idxs',
+  idxs ≡ₚ seq 0 (num_internals (mk_cohg ns es)) /\
+  idxs' ≡ₚ seq 0 (num_externals (mk_cohg ns es)) /\
+  tl2ntl (graph_tensorlist_semantics (mk_cohg ns es)) ≡ntl'≡ₚ
+  graph_namedtensorlist_semantics_aux
+    (zip idxs (internal_edges (mk_cohg ns es')))
+    (zip idxs' (external_edges (mk_cohg ns es')))
+    (map_to_list ns).*1 /\
+  graph_namedtensorlist_semantics_aux
+    (zip idxs (internal_edges (mk_cohg ns es')))
+    (zip idxs' (external_edges (mk_cohg ns es')))
+    (map_to_list ns).*1
+    =ntl= tl2ntl (graph_tensorlist_semantics (mk_cohg ns es')).
+Proof.
+  intros Hes.
+  apply (internal_edges_perm ns) in Hes as Hies.
+  apply (external_edges_perm ns) in Hes as Hees.
+
+  apply perm_exists_perm_seq in Hies as Hidxs.
+  apply perm_exists_perm_seq in Hees as Hidxs'.
+
+  destruct Hidxs as (idxs & Hidxs & Himap).
+  destruct Hidxs' as (idxs' & Hidxs' & Himap').
+  exists idxs, idxs'.
+  split; [easy|].
+  split; [easy|].
+  split.
+  - rewrite <- graph_namedtensorlist_semantics_seq_correct.
+    rewrite graph_namedtensorlist_semantics_to_aux.
+    cbn [nodes].
+    eapply graph_namedtensorlist_semantics_aux_perm_eq';
+    [rewrite fst_zip by (now rewrite length_seq);
+     apply NoDup_seq|..|reflexivity].
+    + etransitivity; [|apply Himap].
+      now rewrite imap_to_zip_with_seq.
+    + etransitivity; [|apply Himap'].
+      now rewrite imap_to_zip_with_seq.
+  - rewrite <- graph_namedtensorlist_semantics_to_aux.
+    rewrite <- graph_namedtensorlist_semantics_seq_correct.
+    apply graph_namedtensorlist_semantics_perm_eq.
+    + rewrite Hidxs; apply NoDup_seq.
+    + rewrite Hidxs.
+      now rewrite length_seq, Hies.
+    + rewrite Hidxs.
+      f_equiv.
+      now rewrite Hies.
+    + rewrite Hidxs'.
+      now rewrite 2 length_seq, Hees.
+Qed.
+
+
+Lemma graph_tensorlist_semantics_perm_eq_pairs ns es es' :
+  es ≡ₚ es' ->
+  exists mid,
+  tl2ntl (graph_tensorlist_semantics (mk_cohg ns es)) ≡ntl'≡ₚ mid /\
+  mid =ntl= tl2ntl (graph_tensorlist_semantics (mk_cohg ns es')).
+Proof.
+  intros Hes.
+  apply (graph_tensorlist_semantics_perm_eq_pairs_elab ns) in Hes.
+  naive_solver.
+Qed.
+
 
 
 
