@@ -1,9 +1,9 @@
 Require Import ZXCore.
-From QuantumLib Require Import Complex.
+From QuantumLib Require Export Complex.
 Require Import TensorGraphSemantics.
 Open Scope nat_scope.
 
-Notation "'ZXG'" := (TensorGraph (bool * R)) (at level 0).
+Notation "'ZXG'" := (CospanHyperGraph (bool * R)) (at level 0).
 
 (* Check ZXG. *)
 
@@ -63,15 +63,11 @@ Next Obligation.
   intros [[] r]; cbn; apply zsp_strongly_permutative.
 Qed.
 
-Definition example_graph : TensorGraph (bool*R) :=
-  ∅G +[ 1 := (true, 0%R) ]
-     +[ 3 := (true, 0%R) ]
-     +{ (6, 1) ; (5, 1) ; (1,2) ; (1,3) ; (1,2) ; (1,3) ; (1,4) }.
 
 
 (* TODO: Rework these and put them in TensorGraph *)
 
-Definition relabel_vertex {T} (n m : nat) (tg : TensorGraph T) : TensorGraph T :=
+(* Definition relabel_vertex {T} (n m : nat) (tg : TensorGraph T) : TensorGraph T :=
   let '(mk_tg verts edges) := tg in
   let verts' :=
     match lookup n verts with
@@ -152,4 +148,4 @@ Definition fuse (n m : nat) (zxg : ZXG) : ZXG :=
     | None => zxg
     end
     else
-      zxg.
+      zxg. *)
