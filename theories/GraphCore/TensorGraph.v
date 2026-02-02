@@ -1,9 +1,9 @@
 Require Export Tensor.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
-Require Export Aux_stdpp.
+Require Export Aux_stdpp Aux_pos.
 Require Export HyperGraph.
-Require Import TESyntax (relabel_abs).
+Require Import TESyntax.
 
 (* FIXME: Move *)
 Lemma set_Forall2_map `{FinSet A SA, SemiSet B SB} P (f : A -> B) (X : SA) :
@@ -611,6 +611,22 @@ Add Parametric Relation {T n m} : (CospanHyperGraph T n m) isomorphic
   symmetry proved by isomorphic_symm
   transitivity proved by isomorphic_trans
   as isomorphic_setoid.
+
+Definition stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n + n') (m + m') :=
+  cohg.(inputs) +++ cohg'.(inputs) -> cohg.(hedges) ∪ cohg'.(hedges) <- 
+    cohg.(outputs) +++ cohg'.(outputs).
+
+Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n + n') (m + m') :=
+  stack_graphs_aux 
+    (relabel_graph (bcons false) (reindex_graph (bcons false) cohg))
+    (relabel_graph (bcons true) (reindex_graph (bcons true) cohg')).
+
+
+Definition contract_ioput {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
+  relabel_graph {[Vector.hd cohg.(outputs) := Vector.hd cohg.(inputs)]} (
+  Vector.tl cohg.(inputs) -> cohg.(hedges) <- Vector.tl cohg.(outputs)).
 
 
 Declare Scope graph_scope.
