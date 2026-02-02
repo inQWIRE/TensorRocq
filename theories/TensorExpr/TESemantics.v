@@ -3906,7 +3906,7 @@ Qed.
 
 Lemma compose_tensorlist_correct mabs {n m o} (ins : vec Idx n)
   (mids : vec Idx m) (outs : vec Idx o) (ltl rtl : tensorlist) :
-  ins ##@{list _} mids -> 
+  ins ##@{list _} mids ->
   mids ##@{list _} outs ->
   ins ##@{list _} outs ->
   tl_free_varset ltl ⊆ list_to_set (ins ++ mids) ->
@@ -3954,7 +3954,7 @@ Proof.
       unfold make_ml.
       rewrite lookup_union_r; [done|].
       apply not_elem_of_dom.
-      rewrite dom_list_to_map, elem_of_list_to_set, 
+      rewrite dom_list_to_map, elem_of_list_to_set,
         fst_zip by now rewrite 2 length_vec_to_list.
       now intros ?%Hins_mids.
   - apply tl_total_semantics_free_varset_ext.
@@ -3966,17 +3966,482 @@ Proof.
       now rewrite 3 lookup_union, 2 union_eq_l
         by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
           fst_zip by now rewrite 2 length_vec_to_list.
-    + 
-      
-      rewrite lookup_union_r. 2:{
+    + rewrite lookup_union_r. 2:{
         apply not_elem_of_dom.
         rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
           by now rewrite 2 length_vec_to_list.
         now intros ?%Hmids_outs.
       }
       unfold make_ml.
-      
-      rewrite 2 lookup_union_r by 
+      rewrite 2 lookup_union_r by
+        now apply not_elem_of_dom;
+        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+          by (now rewrite 2 length_vec_to_list);
+        now intros ?%Hmids_outs || intros ?%Hins_outs.
+      done.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma elem_of_abstracts_vars_bound r abs :
+  bound r ∈ abstracts_vars abs <-> r ∈ abstracts_bound_vars abs.
+Proof.
+  now rewrite elem_of_abstracts_bound_vars, elem_of_abstracts_vars.
+Qed.
+
+Lemma elem_of_abstracts_vars_free r abs :
+  free r ∈ abstracts_vars abs <-> r ∈ abstracts_free_vars abs.
+Proof.
+  now rewrite elem_of_abstracts_free_vars, elem_of_abstracts_vars.
+Qed.
+
+Lemma elem_of_deltas_vars_bound r delt :
+  bound r ∈ deltas_vars delt <-> r ∈ deltas_bound_vars delt.
+Proof.
+  rewrite elem_of_deltas_bound_vars, elem_of_deltas_vars; naive_solver.
+Qed.
+
+Lemma elem_of_deltas_vars_free r delt :
+  free r ∈ deltas_vars delt <-> r ∈ deltas_free_vars delt.
+Proof.
+  rewrite elem_of_deltas_free_vars, elem_of_deltas_vars; naive_solver.
+Qed.
+
+
+Definition relabel_ntl f (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl ntl.(ntl_sums) (relabel_abs f <$> ntl.(ntl_abstracts))
+    (relabel_delt f <$> ntl.(ntl_deltas)).
+
+Definition ntl_insert_sum (r : Idx) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl (r :: ntl.(ntl_sums)) ntl.(ntl_abstracts) ntl.(ntl_deltas).
+
+
+Definition ntl_insert_sums (rs : list Idx) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl (rs ++ ntl.(ntl_sums)) ntl.(ntl_abstracts) ntl.(ntl_deltas).
+
+Definition ntl_subst_free_as (l : Idx) (r : Idx) (ntl : namedtensorlist) :=
+  ntl_insert_sum r (relabel_ntl
+    (var_elim bound (λ l', if decide (l' = l) then bound r else free l')) ntl).
+
+
+Lemma ntl_subst_free_as_WF l r ntl : r ∉ ntl.(ntl_sums) ->
+  WF_ntl ntl ->
+  WF_ntl (ntl_subst_free_as l r ntl).
+Proof.
+  intros Hr [Hdup Hsubs].
+  split;
+  [now apply NoDup_cons|].
+  cbn -[abstracts_bound_vars deltas_bound_vars list_to_set].
+  split.
+  - rewrite abstracts_bound_vars_relabel_abs.
+    intros r'.
+    rewrite elem_of_set_omap.
+    cbn -[list_to_set].
+    setoid_rewrite v2bound_Some.
+    intros (v & Hvabs & Hr').
+    revert Hr'.
+    destruct v as [|l'']; [intros [= ->];
+      rewrite list_to_set_cons; apply union_subseteq_r, Hsubs.1;
+      now rewrite elem_of_abstracts_vars_bound in Hvabs|].
+    cbn -[list_to_set].
+    case_decide; [|easy].
+    intros [= <-].
+    set_solver +.
+  - rewrite deltas_bound_vars_relabel_delt.
+    intros r'.
+    rewrite elem_of_set_omap.
+    cbn -[list_to_set].
+    setoid_rewrite v2bound_Some.
+    intros (v & Hvabs & Hr').
+    revert Hr'.
+    destruct v as [|l'']; [intros [= ->];
+      rewrite list_to_set_cons; apply union_subseteq_r, Hsubs.2;
+      now rewrite elem_of_deltas_vars_bound in Hvabs|].
+    cbn -[list_to_set].
+    case_decide; [|easy].
+    intros [= <-].
+    set_solver +.
+Qed.
+
+Lemma ntl_total_semantics_ntl_subst_free_as mabs ml l r ntl :
+  r ∉ ntl.(ntl_sums) ->
+  WF_ntl ntl ->
+  ntl_total_semantics mabs ml (ntl_subst_free_as l r ntl) ==
+  ∑ a : A, ntl_total_semantics mabs (<[l:=a]> ml) ntl.
+Proof.
+  intros Hr HWF.
+  rewrite ntl_total_semantics_alt by now apply ntl_subst_free_as_WF.
+  setoid_rewrite ntl_total_semantics_alt; [|easy].
+  destruct ntl as [sums abs delt].
+  cbn -[abstracts_semantics_alt deltas_semantics_alt].
+  rewrite sum_of_Vmap_cons, sum_of_comm.
+  apply sum_of_ext; intros a.
+  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  f_equiv.
+  - apply eq_reflexivity, abstracts_semantics_alt_ext.
+    apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [[f low] up] Hflu;
+    cbn.
+    split; [reflexivity|].
+    rewrite 2 list_eq_Forall2.
+    split;
+    apply Forall2_fmap, Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall;
+    intros v Hv;
+    cbn;
+    (destruct v as [r'|l']; cbn;
+    [unfold Vmap; apply lookup_insert_ne; intros Heq;
+     apply Hr; subst r; cbn; rewrite <- (elem_of_list_to_set (C:=Pset));
+     apply HWF.2.1, elem_of_abstracts_bound_vars; set_solver +Hv Hflu|
+     rewrite lookup_insert_case; do 2 case_decide; cbn;
+      done || unfold Vmap; apply lookup_insert]).
+  - apply eq_reflexivity, deltas_semantics_alt_ext.
+    apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [lv uv] Hlu;
+    cbn.
+    split; [rename lv into v|rename uv into v];
+    (destruct v as [r'|l']; cbn;
+    [unfold Vmap; apply lookup_insert_ne; intros Heq;
+     apply Hr; subst r; cbn; rewrite <- (elem_of_list_to_set (C:=Pset));
+     apply HWF.2.2, elem_of_deltas_bound_vars; set_solver +Hlu|
+    rewrite lookup_insert_case; do 2 case_decide; cbn;
+      done || unfold Vmap; apply lookup_insert]).
+Qed.
+
+Definition ntl_subst_free (l : Idx) (ntl : namedtensorlist) :=
+  ntl_subst_free_as l (fresh ntl.(ntl_sums)) ntl.
+
+
+Lemma ntl_subst_free_WF l ntl :
+  WF_ntl ntl ->
+  WF_ntl (ntl_subst_free l ntl).
+Proof.
+  intros HWF.
+  apply ntl_subst_free_as_WF, HWF.
+  apply infinite_is_fresh.
+Qed.
+
+Lemma ntl_total_semantics_ntl_subst_free mabs ml l ntl :
+  WF_ntl ntl ->
+  ntl_total_semantics mabs ml (ntl_subst_free l ntl) ==
+  ∑ a : A, ntl_total_semantics mabs (<[l:=a]> ml) ntl.
+Proof.
+  intros HWF.
+  apply ntl_total_semantics_ntl_subst_free_as, HWF.
+  apply infinite_is_fresh.
+Qed.
+
+Lemma sum_of_Vmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
+  (sums : list positive) (fr : _ -> R) :
+  ∑ v : Vmap (f <$> sums), fr v ==
+  ∑ v : Vmap sums, fr (kmap f v).
+Proof.
+  unfold Vmap;
+  apply (sum_of_relabel'_r2l (kmap f));
+  [|apply eq_reflexivity, (kmap_Vmap_elements _)].
+  easy.
+Qed.
+
+Lemma sum_of_Vmap_nil (fr : _ -> R) :
+  ∑ v : Vmap [], fr v == fr ∅.
+Proof.
+  unfold_sum_of.
+  cbn.
+  ring.
+Qed.
+
+Lemma sum_of_Vmap_cons' ty tys f :
+  ∑ mr : Vmap (ty :: tys), f mr ==
+  ∑ vty : A, ∑ mr' : Vmap tys, f (<[ty := vty]> mr').
+Proof.
+  now rewrite sum_of_Vmap_cons, sum_of_comm.
+Qed.
+
+Lemma sum_of_Vmap_app
+  (sums sums' : list positive) (fr : _ -> R) :
+  ∑ v : Vmap (sums ++ sums'), fr v ==
+  ∑ v : Vmap sums, ∑ v' : Vmap sums', fr ((v :> Pmap _) ∪ v').
+Proof.
+  revert fr; induction sums; intros fr.
+  - rewrite sum_of_Vmap_nil.
+    cbn.
+    apply sum_of_ext; intros; unfold Vmap; now rewrite map_empty_union.
+  - cbn. 
+    rewrite 2 sum_of_Vmap_cons'.
+    apply sum_of_ext; intros va.
+    rewrite IHsums.
+    unfold Vmap.
+    setoid_rewrite insert_union_l.
+    reflexivity.
+Qed.
+
+  
+
+Lemma abstracts_bound_vars_app abs abs' : 
+  abstracts_bound_vars (abs ++ abs') = 
+  abstracts_bound_vars abs ∪ abstracts_bound_vars abs'.
+Proof.
+  set_solver.
+Qed.
+
+Lemma deltas_bound_vars_app delt delt' : 
+  deltas_bound_vars (delt ++ delt') = 
+  deltas_bound_vars delt ∪ deltas_bound_vars delt'.
+Proof.
+  set_solver.
+Qed.
+
+Definition ntl_times (l r : namedtensorlist) : namedtensorlist :=
+  mk_ntl ((bcons false <$> l.(ntl_sums)) ++
+    (bcons true <$> r.(ntl_sums)))
+    ((relabel_abs (relabel_bounds (bcons false)) <$> l.(ntl_abstracts))
+      ++ (relabel_abs (relabel_bounds (bcons true)) <$> r.(ntl_abstracts)))
+    ((relabel_delt (relabel_bounds (bcons false)) <$> l.(ntl_deltas))
+      ++ (relabel_delt (relabel_bounds (bcons true)) <$> r.(ntl_deltas))).
+
+Lemma ntl_times_WF l r :
+  WF_ntl l -> WF_ntl r ->
+  WF_ntl (ntl_times l r).
+Proof.
+  intros Hl Hr.
+  split.
+  - cbn.
+    apply NoDup_app.
+    split; [|split]; cycle 1; [|apply (NoDup_fmap _); first [apply Hl|apply Hr]..].
+    intros ? (? & -> & _)%elem_of_list_fmap (? & ? & _)%elem_of_list_fmap;
+    lia.
+  - cbn -[abstracts_bound_vars deltas_bound_vars list_to_set].
+    rewrite abstracts_bound_vars_app, deltas_bound_vars_app.
+    rewrite 2 abstracts_bound_vars_relabel_bounds, 
+      2 deltas_bound_vars_relabel_bounds.
+    rewrite list_to_set_app, <- 2 (set_map_list_to_set_L (bcons _) (SA:=Pset)).
+    split; apply union_mono; f_equiv;
+    first [apply Hl|apply Hr].
+Qed.
+
+Lemma abstracts_semantics_alt_app mabs ml mr abs abs' : 
+  abstracts_semantics_alt mabs ml mr (abs ++ abs') ==
+  abstracts_semantics_alt mabs ml mr abs *
+  abstracts_semantics_alt mabs ml mr abs'.
+Proof.
+  unfold abstracts_semantics_alt.
+  now rewrite fmap_app, Rlist_prod_app.
+Qed.
+
+
+Lemma deltas_semantics_alt_app ml mr delt delt' : 
+  deltas_semantics_alt ml mr (delt ++ delt') ==
+  deltas_semantics_alt ml mr delt *
+  deltas_semantics_alt ml mr delt'.
+Proof.
+  unfold deltas_semantics_alt.
+  now rewrite fmap_app, Rlist_prod_app.
+Qed.
+
+Lemma ntl_total_semantics_ntl_times mabs ml l r :
+  WF_ntl l -> WF_ntl r ->
+  ntl_total_semantics mabs ml (ntl_times l r) ==
+  ntl_total_semantics mabs ml l * ntl_total_semantics mabs ml r.
+Proof.
+  intros Hl Hr.
+  rewrite ntl_total_semantics_alt by now apply ntl_times_WF.
+  rewrite 2 ntl_total_semantics_alt by easy.
+  cbn -[abstracts_semantics_alt deltas_semantics_alt list_to_set].
+  rewrite sum_of_Vmap_app, (sum_of_Vmap_fmap _).
+  rewrite sum_of_distr_l.
+  apply sum_of_ext'; intros mr_l Hmr_l.
+  rewrite sum_of_distr_r, (sum_of_Vmap_fmap _).
+  apply sum_of_ext'; intros mr_r Hmr_r.
+  rewrite abstracts_semantics_alt_app, deltas_semantics_alt_app.
+  symmetry.
+  rewrite rmul_comm_double.
+  symmetry.
+  f_equiv. 
+  - f_equiv;
+    apply eq_reflexivity, abstracts_semantics_alt_ext, Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [[f low] up] _;
+    cbn;
+    (split; [easy|]);
+    split;
+    rewrite <- list_fmap_compose; apply list_fmap_ext; 
+    (intros _ [v|] _; [cbn -[bcons]|done]);
+    try (rewrite lookup_union_l by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _));
+    rewrite lookup_union_r by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _).
+  - f_equiv;
+    apply eq_reflexivity, deltas_semantics_alt_ext, Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [vl vu] _;
+    cbn;
+    (split; [rename vl into v|rename vu into v]);
+    (destruct v as [v|]; [cbn -[bcons]|done]);
+    try (rewrite lookup_union_l by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _));
+    rewrite lookup_union_r by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _).
+Qed.
+
+Definition compose_namedtensorlist (mids : list Idx)
+  (l r : namedtensorlist) : namedtensorlist :=
+  foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) (reverse mids).
+
+
+Lemma compose_namedtensorlist_WF' mids l r : 
+  WF_ntl l -> WF_ntl r -> 
+  WF_ntl (foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) mids).
+Proof.
+  intros Hl Hr.
+  induction mids; [now apply ntl_times_WF|].
+  now apply ntl_subst_free_WF.
+Qed.
+
+Lemma compose_namedtensorlist_WF mids l r : 
+  WF_ntl l -> WF_ntl r -> 
+  WF_ntl (compose_namedtensorlist mids l r).
+Proof.
+  apply compose_namedtensorlist_WF'.
+Qed.
+
+
+
+Lemma ntl_total_semantics_compose_namedtensorlist_aux mabs ml mids 
+  (l r : namedtensorlist) :
+  WF_ntl l -> WF_ntl r ->
+  ntl_total_semantics mabs ml (compose_namedtensorlist mids l r) ==
+  ∑ rmi : vec A (length (reverse (reverse mids))),
+    ntl_total_semantics mabs (list_to_map (zip mids rmi) ∪ ml) (ntl_times l r).
+Proof.
+  unfold compose_namedtensorlist.
+  erewrite sum_of_ext by now intros;
+    replace (zip mids) with (zip_with (B:=A) pair (reverse (reverse mids))) by (now rewrite (reverse_involutive mids));
+    refine (reflexivity _).
+  cbv beta.
+  generalize (reverse mids) as rmids.
+  clear mids.
+  intros mids.
+  intros Hl Hr.
+  revert ml;
+  induction mids as [|mid mids IHmid]; intros ml.
+  - rewrite sum_of_vec_0.
+    cbn.
+    now rewrite map_empty_union.
+  - cbn [foldr].
+    unshelve (rewrite (sum_of_vec_cast (m:=length (reverse mids) + 1))).
+    1: {
+      abstract (rewrite reverse_cons, length_app at 1; cbn;
+      exact eq_refl).
+    }
+    setoid_rewrite vec_to_list_cast.
+    rewrite sum_of_vec_add, sum_of_comm.
+    rewrite ntl_total_semantics_ntl_subst_free by now apply compose_namedtensorlist_WF'.
+    rewrite sum_of_vec_1.
+    apply sum_of_ext'; intros a Ha.
+    rewrite IHmid.
+    apply sum_of_ext; intros mr.
+    f_equiv.
+    rewrite reverse_cons, vec_to_list_app.
+    rewrite zip_with_app by now rewrite length_vec_to_list.
+    rewrite list_to_map_app.
+    cbn.
+    rewrite <- map_union_assoc.
+    now rewrite <- insert_union_l, map_empty_union.
+Qed.
+
+(* FIXME: Move *)
+Definition ntl_free_varset (ntl : namedtensorlist) : Pset :=
+  abstracts_free_vars ntl.(ntl_abstracts) ∪
+  deltas_free_vars ntl.(ntl_deltas).
+
+Lemma ntl_free_varset_correct ntl :
+  ntl_free_varset ntl = tl_free_varset (ntl2tl ntl).
+Proof.
+  unfold ntl_free_varset, tl_free_varset.
+  destruct ntl as [isums abs delt]; cbn -[abstracts_free_vars deltas_free_vars];
+  now rewrite abstracts_free_vars_relabel_bounds, deltas_free_vars_relabel_bounds.
+Qed.
+
+Lemma ntl_total_semantics_free_varset_ext mabs ml ml' ntl :
+  (forall l, l ∈ ntl_free_varset ntl -> ml !! l = ml' !! l) ->
+  ntl_total_semantics mabs ml ntl == ntl_total_semantics mabs ml' ntl.
+Proof.
+  intros Hml.
+  apply tl_total_semantics_free_varset_ext.
+  now rewrite <- ntl_free_varset_correct.
+Qed.
+
+Lemma compose_namedtensorlist_correct mabs {n m o} (ins : vec Idx n)
+  (mids : vec Idx m) (outs : vec Idx o) (ltl rtl : namedtensorlist) :
+  ins ##@{list _} mids ->
+  mids ##@{list _} outs ->
+  ins ##@{list _} outs ->
+  WF_ntl ltl -> WF_ntl rtl ->
+  ntl_free_varset ltl ⊆ list_to_set (ins ++ mids) ->
+  ntl_free_varset rtl ⊆ list_to_set (mids ++ outs) ->
+  namedtensorlist_to_tensor mabs ins outs (compose_namedtensorlist mids ltl rtl) ≡
+  compose_tensor (namedtensorlist_to_tensor mabs ins mids ltl)
+    (namedtensorlist_to_tensor mabs mids outs rtl).
+Proof.
+  intros Hins_mids Hmids_outs Hins_outs HWFl HWFr Hltl Hrtl.
+  intros v w Hv Hw.
+  unfold compose_tensor, namedtensorlist_to_tensor.
+  rewrite ntl_total_semantics_compose_namedtensorlist_aux by easy.
+  unshelve (rewrite (sum_of_vec_cast (m:=m))).
+  1:{
+    abstract (now rewrite reverse_involutive, length_vec_to_list).
+  }
+  apply sum_of_ext'; intros mr Hmr.
+  rewrite vec_to_list_cast.
+  rewrite ntl_total_semantics_ntl_times by easy.
+  f_equiv.
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hltl in Hl as Hl'.
+    rewrite elem_of_list_to_set, elem_of_app in Hl'.
+    destruct Hl' as [Hl'|Hl'].
+    + rewrite lookup_union_r. 2:{
+        apply not_elem_of_dom.
+        rewrite dom_list_to_map.
+        rewrite fst_zip
+          by now rewrite 2 length_vec_to_list.
+        rewrite elem_of_list_to_set.
+        now apply Hins_mids in Hl'.
+      }
+      unfold make_ml.
+      rewrite 2 lookup_union.
+      eenough (Hen : _) by now
+      rewrite 2 union_eq_l by exact Hen.
+      apply elem_of_dom.
+      rewrite dom_list_to_map.
+      rewrite elem_of_list_to_set.
+      now rewrite fst_zip by now rewrite 2 length_vec_to_list.
+    + rewrite lookup_union, union_eq_l
+        by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
+          fst_zip by now rewrite 2 length_vec_to_list.
+      unfold make_ml.
+      rewrite lookup_union_r; [done|].
+      apply not_elem_of_dom.
+      rewrite dom_list_to_map, elem_of_list_to_set,
+        fst_zip by now rewrite 2 length_vec_to_list.
+      now intros ?%Hins_mids.
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hrtl in Hl as Hl'.
+    rewrite elem_of_list_to_set, elem_of_app in Hl'.
+    destruct Hl' as [Hl'|Hl'].
+    + unfold make_ml.
+      now rewrite 3 lookup_union, 2 union_eq_l
+        by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
+          fst_zip by now rewrite 2 length_vec_to_list.
+    + rewrite lookup_union_r. 2:{
+        apply not_elem_of_dom.
+        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+          by now rewrite 2 length_vec_to_list.
+        now intros ?%Hmids_outs.
+      }
+      unfold make_ml.
+      rewrite 2 lookup_union_r by
         now apply not_elem_of_dom;
         rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
           by (now rewrite 2 length_vec_to_list);
