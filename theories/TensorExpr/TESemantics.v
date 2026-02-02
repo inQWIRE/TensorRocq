@@ -1341,8 +1341,8 @@ End Teq.
 
 
 (* FIXME: Move *)
-Notation tl_total_semantics_aux' mabs mg ml mr tl :=
-  (tl_total_semantics_aux mabs mg ml mr tl.(tl_sums) tl.(tl_abstracts)).
+Notation tl_total_semantics_aux' mabs ml mr tl :=
+  (tl_total_semantics_aux mabs ml mr tl.(tl_sums) tl.(tl_abstracts) tl.(tl_deltas)).
 
 
 (* FIXME: Find existing; consolidate *)
@@ -4168,7 +4168,7 @@ Proof.
   - rewrite sum_of_Vmap_nil.
     cbn.
     apply sum_of_ext; intros; unfold Vmap; now rewrite map_empty_union.
-  - cbn. 
+  - cbn.
     rewrite 2 sum_of_Vmap_cons'.
     apply sum_of_ext; intros va.
     rewrite IHsums.
@@ -4177,17 +4177,17 @@ Proof.
     reflexivity.
 Qed.
 
-  
 
-Lemma abstracts_bound_vars_app abs abs' : 
-  abstracts_bound_vars (abs ++ abs') = 
+
+Lemma abstracts_bound_vars_app abs abs' :
+  abstracts_bound_vars (abs ++ abs') =
   abstracts_bound_vars abs ∪ abstracts_bound_vars abs'.
 Proof.
   set_solver.
 Qed.
 
-Lemma deltas_bound_vars_app delt delt' : 
-  deltas_bound_vars (delt ++ delt') = 
+Lemma deltas_bound_vars_app delt delt' :
+  deltas_bound_vars (delt ++ delt') =
   deltas_bound_vars delt ∪ deltas_bound_vars delt'.
 Proof.
   set_solver.
@@ -4214,14 +4214,14 @@ Proof.
     lia.
   - cbn -[abstracts_bound_vars deltas_bound_vars list_to_set].
     rewrite abstracts_bound_vars_app, deltas_bound_vars_app.
-    rewrite 2 abstracts_bound_vars_relabel_bounds, 
+    rewrite 2 abstracts_bound_vars_relabel_bounds,
       2 deltas_bound_vars_relabel_bounds.
     rewrite list_to_set_app, <- 2 (set_map_list_to_set_L (bcons _) (SA:=Pset)).
     split; apply union_mono; f_equiv;
     first [apply Hl|apply Hr].
 Qed.
 
-Lemma abstracts_semantics_alt_app mabs ml mr abs abs' : 
+Lemma abstracts_semantics_alt_app mabs ml mr abs abs' :
   abstracts_semantics_alt mabs ml mr (abs ++ abs') ==
   abstracts_semantics_alt mabs ml mr abs *
   abstracts_semantics_alt mabs ml mr abs'.
@@ -4231,7 +4231,7 @@ Proof.
 Qed.
 
 
-Lemma deltas_semantics_alt_app ml mr delt delt' : 
+Lemma deltas_semantics_alt_app ml mr delt delt' :
   deltas_semantics_alt ml mr (delt ++ delt') ==
   deltas_semantics_alt ml mr delt *
   deltas_semantics_alt ml mr delt'.
@@ -4258,14 +4258,14 @@ Proof.
   symmetry.
   rewrite rmul_comm_double.
   symmetry.
-  f_equiv. 
+  f_equiv.
   - f_equiv;
     apply eq_reflexivity, abstracts_semantics_alt_ext, Forall2_fmap_l, Forall_Forall2_diag;
     rewrite Forall_forall; intros [[f low] up] _;
     cbn;
     (split; [easy|]);
     split;
-    rewrite <- list_fmap_compose; apply list_fmap_ext; 
+    rewrite <- list_fmap_compose; apply list_fmap_ext;
     (intros _ [v|] _; [cbn -[bcons]|done]);
     try (rewrite lookup_union_l by (now apply (lookup_kmap_None _); lia);
     apply (lookup_kmap _));
@@ -4288,8 +4288,8 @@ Definition compose_namedtensorlist (mids : list Idx)
   foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) (reverse mids).
 
 
-Lemma compose_namedtensorlist_WF' mids l r : 
-  WF_ntl l -> WF_ntl r -> 
+Lemma compose_namedtensorlist_WF' mids l r :
+  WF_ntl l -> WF_ntl r ->
   WF_ntl (foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) mids).
 Proof.
   intros Hl Hr.
@@ -4297,8 +4297,8 @@ Proof.
   now apply ntl_subst_free_WF.
 Qed.
 
-Lemma compose_namedtensorlist_WF mids l r : 
-  WF_ntl l -> WF_ntl r -> 
+Lemma compose_namedtensorlist_WF mids l r :
+  WF_ntl l -> WF_ntl r ->
   WF_ntl (compose_namedtensorlist mids l r).
 Proof.
   apply compose_namedtensorlist_WF'.
@@ -4306,7 +4306,7 @@ Qed.
 
 
 
-Lemma ntl_total_semantics_compose_namedtensorlist_aux mabs ml mids 
+Lemma ntl_total_semantics_compose_namedtensorlist_aux mabs ml mids
   (l r : namedtensorlist) :
   WF_ntl l -> WF_ntl r ->
   ntl_total_semantics mabs ml (compose_namedtensorlist mids l r) ==
@@ -4449,6 +4449,50 @@ Proof.
       done.
 Qed.
 
+
+
+Lemma total_semantics_aux_kmap_te_relabel_absidx mabs ml mr
+  (f : Idx -> Idx) `{Hf : !Inj eq eq f} te :
+  total_semantics_aux (kmap f mabs) ml mr (te_relabel_absidx f te) ==
+  total_semantics_aux mabs ml mr te.
+Proof.
+  revert mr; induction te; intros mr; [reflexivity..| | |apply sum_of_ext; intros; apply IHte].
+  - cbn.
+    apply eq_reflexivity, abstract_semantics_ext; [|reflexivity..].
+    apply (lookup_kmap _).
+  - cbn; f_equiv; auto.
+Qed.
+
+Lemma tl_total_semantics_aux_kmap_tl_relabel_absidx mabs ml mr
+  (f : Idx -> Idx) `{Hf : !Inj eq eq f} tl :
+  tl_total_semantics_aux' (kmap f mabs) ml mr (tl_relabel_absidx f tl) ==
+  tl_total_semantics_aux' mabs ml mr tl.
+Proof.
+  rewrite 2 tl_total_semantics_aux_alt_vec.
+  destruct tl as [sums abs delt];
+  cbn -[tl_total_semantics_aux].
+  apply sum_of_ext; intros m.
+  apply tl_total_semantics_aux_ext_base;
+  [|apply Forall_Forall2_diag; rewrite Forall_forall; intros ? _; split; done].
+  apply Forall2_fmap_l, Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros [[idx low] up] _.
+  cbn.
+  rewrite (lookup_kmap _).
+  split; [easy|].
+  split; apply Forall_Forall2_diag; rewrite Forall_forall; intros ? _; done.
+Qed.
+
+
+Lemma ntl_total_semantics_kmap_ntl_relabel_absidx mabs ml
+  (f : Idx -> Idx) `{Hf : !Inj eq eq f} ntl :
+  ntl_total_semantics (kmap f mabs) ml (ntl_relabel_absidx f ntl) ==
+  ntl_total_semantics mabs ml ntl.
+Proof.
+  unfold ntl_total_semantics.
+  rewrite ntl_relabel_absidx_correct.
+  apply (tl_total_semantics_aux_kmap_tl_relabel_absidx _ _ _ _).
+Qed.
 
 
 

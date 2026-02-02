@@ -4,14 +4,33 @@ From stdpp Require Export pmap gmap.
 Require Export Aux_stdpp.
 Require Import TESyntax (relabel_abs).
 
+(* FIXME: Move *)
+Lemma set_Forall2_map `{FinSet A SA, SemiSet B SB} P (f : A -> B) (X : SA) :
+  set_Forall2 P (set_map f X :> SB) <->
+  set_Forall2 (λ i j, P (f i) (f j)) X.
+Proof.
+  unfold set_Forall2.
+  setoid_rewrite elem_of_map.
+  naive_solver.
+Qed.
+Lemma kmap_fmap' `{FinMap K1 M1, FinMap K2 M2}
+  (f : K1 -> K2) `(g : A -> B) (m : M1 A) :
+  kmap f ((g <$> m) :> M1 B) =@{M2 B}
+  g <$> kmap f m.
+Proof.
+  induction m using map_first_key_ind;
+    [now rewrite fmap_empty, 2 kmap_empty, fmap_empty|].
+  rewrite fmap_insert, 2 TESyntax.kmap_insert_first_key,
+    fmap_insert; [congruence|easy..| |].
+  - now rewrite lookup_fmap, fmap_None.
+  - eapply map_first_key_dom'; [|eassumption].
+    intros j.
+    rewrite 2 lookup_insert_case.
+    case_decide; [easy|].
+    now rewrite lookup_fmap, fmap_is_Some.
+Qed.
+
 (* Basic definitions and structural operations on TensorGraphs *)
-
-Fixpoint test {n : nat} (l : vec nat n) : vec nat n :=
-  match n, l with
-  | 0, _ => Vector.nil
-  | S k, _ => l
-  end.
-
 
 Notation edge := (prod nat nat).
 
@@ -31,8 +50,6 @@ Record CospanHyperGraph {T : Type} {n m : nat} := mk_cohg {
 #[global] Arguments CospanHyperGraph T : clear implicits.
 #[global] Arguments mk_cohg {_} {_ _} (_ _ _) : assert.
 
-Check hedges.
-
 Notation " ins -> hedges <- outs " := (mk_cohg hedges ins outs) : cohg_scope.
 
 Open Scope cohg_scope.
@@ -44,6 +61,15 @@ Definition CospanHyperGraph2triple {T} {n m : nat} (tg : CospanHyperGraph T n m)
 
 Definition CospanHyperGraph2HyperGraph {T} {n m} (tg : CospanHyperGraph T n m) := tg.(hedges).
 #[global] Coercion CospanHyperGraph2HyperGraph : CospanHyperGraph >-> HyperGraph.
+
+Lemma cohg_ext {T} {n m} (tg tg' : CospanHyperGraph T n m) :
+  tg.(hedges) = tg'.(hedges) ->
+  tg.(inputs) = tg'.(inputs) ->
+  tg.(outputs) = tg'.(outputs) ->
+  tg = tg'.
+Proof.
+  destruct tg, tg'; cbn; congruence.
+Qed.
 
 Section CospanHyperGraph.
 
@@ -57,7 +83,7 @@ Section CospanHyperGraph.
   Definition add_vertex_r (n : positive) (v : positive) (tg : CoHyGraph) : CoHyGraph :=
   tg.(inputs) ->
     (alter
-      (fun tipop : (T * list positive * list positive) => 
+      (fun tipop : (T * list positive * list positive) =>
         match tipop with
         | (t, ip, op) => (t, ip, v::op)
         end)
@@ -68,11 +94,11 @@ Section CospanHyperGraph.
   Definition add_vertex_l {T : Type} {o p} (n : positive) (v : positive) (tg : CospanHyperGraph T o p) : CospanHyperGraph T o p :=
   tg.(inputs) ->
     (alter
-      (fun tipop : (T * list positive * list positive) => 
+      (fun tipop : (T * list positive * list positive) =>
         match tipop with
         | (t, ip, op) => (t, v::ip, op)
         end)
-      n 
+      n
       tg.1)
   <- tg.(outputs).
 
@@ -81,7 +107,7 @@ Section CospanHyperGraph.
     tg.2.1 -> (<[ n := (t, [], []) ]> tg.1) <- tg.2.2.
 
   (* Instance insert_hg {T: Type} : Insert positive T (HyperGraph T) := {
-    insert := add_edge 
+    insert := add_edge
   }. *)
 
   #[global] Instance empty_cohg {T : Type} : Empty (CospanHyperGraph T 0 0) := {
@@ -97,7 +123,7 @@ Section CospanHyperGraph.
   (* Local Open Scope positive.
   Local Open Scope vector_scope.
 
-  Definition example_cohg : CospanHyperGraph positive 0 0 := 
+  Definition example_cohg : CospanHyperGraph positive 0 0 :=
     ([#] -> {[ 1 := (1, [], []); 2:= (2, [], []) ]} <- [#]).
 
   Compute example_cohg. *)
@@ -134,13 +160,13 @@ Definition not_internal tm (e : edge) :=
 Definition is_node_input (k : nat) (e : edge) : Prop :=
   e.2 = k.
 
-#[export] Instance is_node_input_dec k e : Decision (is_node_input k e) := 
+#[export] Instance is_node_input_dec k e : Decision (is_node_input k e) :=
   decide_rel _ (e.2) k.
 
 Definition is_node_output (k : nat) (e : edge) : Prop :=
   e.1 = k.
 
-#[export] Instance is_node_output_dec k e : Decision (is_node_output k e) := 
+#[export] Instance is_node_output_dec k e : Decision (is_node_output k e) :=
   decide_rel _ (e.1) k.
 
 Definition node_input_edges (k : nat) (les : list labedge) : list labedge :=
@@ -161,7 +187,7 @@ Definition out_arity (es : list edge) (k : nat) :=
   (tg : TensorGraph) : TensorGraph :=
   tg.(inputs) -> (<[n := (t, [], [])]> tg.1) <- tg.(outputs). *)
 
-(* Definition add_vertex_r (n : positive) (v : postiive) (tg : TensorGraph) := 
+(* Definition add_vertex_r (n : positive) (v : postiive) (tg : TensorGraph) :=
   mk_cohg () *)
 
 (* Definition add_edge (e : edge)
@@ -185,7 +211,7 @@ Definition vertices (tg : CoHyGraph) : Pset :=
   list_to_set (tg.(inputs) ++ tg.(outputs)).
 
 Lemma elem_of_vertices (tg : CoHyGraph) (r : positive) :
-  r ∈ vertices tg <-> 
+  r ∈ vertices tg <->
     (exists k flu, tg.(hedges) !! k = Some flu /\
       (r ∈ flu.1.2 \/ r ∈ flu.2)) \/
     r ∈@{list _} tg.(inputs) \/ r ∈@{list _} tg.(outputs).
@@ -204,10 +230,387 @@ Qed.
 Definition relabel_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
   mk_cohg (relabel_abs f <$> tg.(hedges)) (vmap f tg.(inputs)) (vmap f tg.(outputs)).
 
+Definition reindex_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
+  mk_cohg (kmap f tg.(hedges)) tg.(inputs) tg.(outputs).
+
+Inductive isomorphic : relation CoHyGraph :=
+  | iso_relabel_reindex tg fedge fvert
+    `{Hfe : !Inj eq eq fedge} `{Hfv : !Inj eq eq fvert} :
+    isomorphic tg (relabel_graph fedge (reindex_graph fvert tg)).
 
 
+Lemma isomorphic_exists (tg tg' : CoHyGraph) :
+  isomorphic tg tg' <-> exists fedge fvert,
+    Inj eq eq fedge /\ Inj eq eq fvert /\
+    tg' = relabel_graph fedge (reindex_graph fvert tg).
+Proof.
+  split; [now intros []; eauto|].
+  firstorder (subst; econstructor; eauto).
+Qed.
+
+Import TESyntax.
+
+Lemma relabel_graph_ext_strong f g tg :
+  (forall i, i ∈ vertices tg -> f i = g i) ->
+  relabel_graph f tg = relabel_graph g tg.
+Proof.
+  intros Hfg.
+  apply cohg_ext; cbn.
+  - apply map_fmap_ext.
+    intros i x Hix.
+    apply relabel_abs_ext_strong; intros r Hr.
+    apply Hfg.
+    apply elem_of_union_l, elem_of_list_to_set.
+    apply elem_of_list_bind.
+    exists (i, x).
+    split; [|now apply elem_of_map_to_list].
+    easy.
+  - apply vec_to_list_inj2; rewrite 2 vec_to_list_map.
+    apply list_fmap_ext; intros _ i Hi%elem_of_list_lookup_2.
+    apply Hfg, elem_of_union_r, elem_of_list_to_set, elem_of_app.
+    now left.
+  - apply vec_to_list_inj2; rewrite 2 vec_to_list_map.
+    apply list_fmap_ext; intros _ i Hi%elem_of_list_lookup_2.
+    apply Hfg, elem_of_union_r, elem_of_list_to_set, elem_of_app.
+    now right.
+Qed.
+
+Lemma relabel_graph_ext f g tg :
+  (forall i, f i = g i) -> relabel_graph f tg = relabel_graph g tg.
+Proof.
+  auto using relabel_graph_ext_strong.
+Qed.
+
+Lemma relabel_graph_id tg : relabel_graph id tg = tg.
+Proof.
+  apply cohg_ext; cbn; [|apply Vector.map_id..].
+  erewrite map_fmap_ext; [apply map_fmap_id|].
+  intros; now apply relabel_abs_id.
+Qed.
+
+Lemma relabel_graph_id_strong f tg :
+  (forall i, i ∈ vertices tg -> f i = i) ->
+  relabel_graph f tg = tg.
+Proof.
+  intros ->%(relabel_graph_ext_strong f id tg).
+  apply relabel_graph_id.
+Qed.
+
+Lemma relabel_graph_id' f tg :
+  (forall i, f i = i) ->
+  relabel_graph f tg = tg.
+Proof.
+  auto using relabel_graph_id_strong.
+Qed.
+
+Lemma relabel_graph_compose f g tg :
+  relabel_graph g (relabel_graph f tg) =
+  relabel_graph (g ∘ f) tg.
+Proof.
+  apply cohg_ext; [|cbn; now rewrite Vector.map_map..].
+  cbn.
+  rewrite <- map_fmap_compose.
+  apply map_fmap_ext.
+  intros; apply relabel_abs_compose.
+Qed.
+
+
+Lemma reindex_graph_ext_strong f g tg :
+  (forall i tabs, tg.(hedges) !! i = Some tabs -> f i = g i) ->
+  reindex_graph f tg = reindex_graph g tg.
+Proof.
+  intros Hfg.
+  apply cohg_ext; [cbn|done..].
+  now apply kmap_ext.
+Qed.
+
+Lemma reindex_graph_ext f g tg :
+  (forall i, f i = g i) -> reindex_graph f tg = reindex_graph g tg.
+Proof.
+  auto using reindex_graph_ext_strong.
+Qed.
+
+Lemma reindex_graph_id tg : reindex_graph id tg = tg.
+Proof.
+  apply cohg_ext; cbn; [cbn|done..].
+  apply kmap_id.
+Qed.
+
+Lemma reindex_graph_id_strong f tg :
+  (forall i tabs, tg.(hedges) !! i = Some tabs -> f i = i) ->
+  reindex_graph f tg = tg.
+Proof.
+  intros ->%(reindex_graph_ext_strong f id tg).
+  apply reindex_graph_id.
+Qed.
+
+Lemma reindex_graph_id' f tg :
+  (forall i, f i = i) ->
+  reindex_graph f tg = tg.
+Proof.
+  auto using reindex_graph_id_strong.
+Qed.
+
+
+Lemma reindex_graph_compose_strong' f g `{Hf : !Inj eq eq f} tg :
+  (forall i j, i ∈ dom tg.(hedges) -> j ∈ dom tg.(hedges) ->
+    g (f i) = g (f j) -> f i = f j) ->
+  reindex_graph g (reindex_graph f tg) =
+  reindex_graph (g ∘ f) tg.
+Proof.
+  intros Hg.
+  apply cohg_ext; [cbn|done..].
+  apply map_eq; intros i.
+  apply option_eq; intros [[t low] up].
+  rewrite lookup_kmap_Some_full_gen_dom by
+    now rewrite dom_kmap', set_Forall2_map; exact Hg.
+  rewrite lookup_kmap_Some_full_gen_dom by now intros ? ? ? ? ?%Hg%Hf.
+  setoid_rewrite (lookup_kmap_Some _).
+  naive_solver.
+Qed.
+
+Lemma reindex_graph_compose f g `{!Inj eq eq f, !Inj eq eq g} tg :
+  reindex_graph g (reindex_graph f tg) =
+  reindex_graph (g ∘ f) tg.
+Proof.
+  apply cohg_ext; [cbn|done..].
+  apply map_eq; intros i.
+  apply option_eq; intros [[t low] up].
+  rewrite 2 (lookup_kmap_Some _).
+  setoid_rewrite (lookup_kmap_Some _).
+  naive_solver.
+Qed.
+
+
+Lemma reindex_relabel_graph fvert fedge tg :
+  reindex_graph fvert (relabel_graph fedge tg) =
+  relabel_graph fedge (reindex_graph fvert tg).
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  apply kmap_fmap'.
+Qed.
+
+Lemma vertices_relabel_graph f (tg : CoHyGraph) :
+  vertices (relabel_graph f tg) = set_map f (vertices tg).
+Proof.
+  unfold vertices.
+  cbn.
+  rewrite set_map_union_L, 2 set_map_list_to_set_L.
+  rewrite fmap_app, 2 vec_to_list_map.
+  rewrite map_to_list_fmap, list_bind_fmap, list_fmap_bind.
+  unfold compose; cbn.
+  f_equal.
+  f_equal.
+  apply list_bind_ext; [|done].
+  intros [k [[idx low] up]].
+  cbn.
+  now rewrite fmap_app.
+Qed.
+
+Lemma vertices_reindex_graph f `{Hfint : !Inj eq eq f} (tg : CoHyGraph) :
+  vertices (reindex_graph f tg) = vertices tg.
+Proof.
+  unfold vertices.
+  cbn.
+  f_equiv.
+  unfold kmap.
+  unfold_leibniz.
+  apply list_to_set_perm.
+  rewrite map_to_list_to_map by now
+    rewrite fsts_prod_map, (NoDup_fmap _); apply NoDup_fst_map_to_list.
+  rewrite list_fmap_bind.
+  reflexivity.
+Qed.
+
+Lemma isomorphic_of_partial_inj tg fedge fvert :
+  (forall i j, i ∈ vertices tg -> j ∈ vertices tg ->
+    fedge i = fedge j -> i = j) ->
+  (forall i j tabs tabs', tg.(hedges) !! i = Some tabs ->
+    tg.(hedges) !! j = Some tabs' ->
+    fvert i = fvert j -> i = j) ->
+  isomorphic tg (relabel_graph fedge (reindex_graph fvert tg)).
+Proof.
+  intros Hfe Hfv.
+  apply isomorphic_exists.
+  destruct (partial_injection_extension' (vertices tg) _ Hfe)
+    as (fe' & Hfe' & Hfe'_fe).
+  pose proof (partial_injection_extension' (dom tg.(hedges):>Pset) fvert)
+    as Hfv'.
+  tspecialize Hfv'. 1:{
+    intros i j [tabs Htabs]%elem_of_dom [tabs' Htabs']%elem_of_dom.
+    eauto.
+  }
+  destruct Hfv' as (fv' & Hfv' & Hfv'_fv).
+  exists fe', fv'.
+  split; [easy|].
+  split; [easy|].
+  symmetry.
+  erewrite relabel_graph_ext_strong; [f_equal; apply reindex_graph_ext_strong|].
+  - intros; apply Hfv'_fv, elem_of_dom; eauto.
+  - rewrite (vertices_reindex_graph _).
+    apply Hfe'_fe.
+Qed.
+
+Lemma isomorphic_of_partial_inj' tg tg' fedge fvert :
+  (forall i j, i ∈ vertices tg -> j ∈ vertices tg ->
+    fedge i = fedge j -> i = j) ->
+  (forall i j tabs tabs', tg.(hedges) !! i = Some tabs ->
+    tg.(hedges) !! j = Some tabs' ->
+    fvert i = fvert j -> i = j) ->
+  tg' = relabel_graph fedge (reindex_graph fvert tg) ->
+  isomorphic tg tg'.
+Proof.
+  intros ? ? ->.
+  eauto using isomorphic_of_partial_inj.
+Qed.
+
+Lemma isomorphic_of_partial_inj_dom' tg tg' fedge fvert :
+  (forall i j, i ∈ vertices tg -> j ∈ vertices tg ->
+    fedge i = fedge j -> i = j) ->
+  (forall i j, i ∈@{Pset} dom tg.(hedges) ->
+    j ∈@{Pset} dom tg.(hedges) ->
+    fvert i = fvert j -> i = j) ->
+  tg' = relabel_graph fedge (reindex_graph fvert tg) ->
+  isomorphic tg tg'.
+Proof.
+  intros ? Hv ->.
+  apply isomorphic_of_partial_inj; [easy|].
+  intros ? ? ? ? ? ?; apply Hv; apply elem_of_dom; eauto.
+Qed.
+
+
+Lemma isomorphic_refl tg : isomorphic tg tg.
+Proof.
+  apply isomorphic_exists.
+  exists id, id.
+  split; [apply _|].
+  split; [apply _|].
+  now rewrite reindex_graph_id, relabel_graph_id.
+Qed.
+
+Lemma isomorphic_symm tg tg' : isomorphic tg tg' -> isomorphic tg' tg.
+Proof.
+  rewrite isomorphic_exists.
+  intros (fedge & fvert & Hfe & Hfv & ->).
+  apply (isomorphic_of_partial_inj_dom' _ _
+    (invfun fedge (elements (vertices tg)))
+    (invfun fvert (elements (dom tg.(hedges))))).
+  - intros fi fj.
+    rewrite vertices_relabel_graph, (vertices_reindex_graph _).
+    intros (i & -> & Hi)%elem_of_map (j & -> & Hj)%elem_of_map.
+    rewrite 2 invfun_linv by
+      first [intros ? ? ? ?; apply Hfe|now apply elem_of_elements].
+    now intros ->.
+  - intros fi fj.
+    cbn.
+    rewrite dom_fmap, dom_kmap'.
+    intros (i & -> & Hi)%elem_of_map (j & -> & Hj)%elem_of_map.
+    rewrite 2 invfun_linv by
+      first [intros ? ? ? ?; apply Hfv|now apply elem_of_elements].
+    now intros ->.
+  - rewrite reindex_relabel_graph.
+    rewrite (reindex_graph_compose_strong' _ _ _) by
+      now intros ? ? ? ?; rewrite 2 invfun_linv by
+        first [intros ????; apply Hfv|now apply elem_of_elements];
+        intros ->.
+    rewrite relabel_graph_compose.
+    rewrite reindex_graph_id_strong. 2:{
+      intros i _ Hi%elem_of_dom_2%elem_of_elements.
+      now apply invfun_linv; try (intros ????; apply Hfv).
+    }
+    symmetry.
+    apply relabel_graph_id_strong.
+    intros i Hi%elem_of_elements.
+    now apply invfun_linv; try (intros ????; apply Hfe).
+Qed.
+
+Lemma isomorphic_trans tg tg' tg'' :
+  isomorphic tg tg' -> isomorphic tg' tg'' ->
+  isomorphic tg tg''.
+Proof.
+  rewrite 3 isomorphic_exists.
+  intros (fe & fv & Hfe & Hfv & ->)
+    (fe' & fv' & Hfe' & Hfv' & ->).
+  exists (fe' ∘ fe), (fv' ∘ fv).
+  split; [apply _|].
+  split; [apply _|].
+  rewrite reindex_relabel_graph.
+  rewrite (reindex_graph_compose _ _ _).
+  now rewrite relabel_graph_compose.
+Qed.
+
+(* TODO: Show that if [f : A -> A] injective and [g : A -> A] any
+  (maybe different types by inhab? like invfun),
+  there is a *category theory word* [h : A -> A] such that
+  (f ∘ g ≡ h ∘ f) *)
+
+Lemma relabel_graph_isomorphic f `{Hf : !Inj eq eq f} tg tg' :
+  isomorphic tg tg' ->
+  isomorphic (relabel_graph f tg) (relabel_graph f tg').
+Proof.
+  intros (fe & fv & Hfe & Hfv & ->)%isomorphic_exists.
+  (* apply isomorphic_symm. *)
+  eapply (isomorphic_of_partial_inj_dom' _ _
+    (f ∘ fe ∘ invfun f (elements (vertices tg))) fv).
+  - rewrite vertices_relabel_graph.
+    intros fi fj (i & -> & Hi%elem_of_elements)%elem_of_map
+      (j & -> & Hj%elem_of_elements)%elem_of_map.
+    cbn.
+    rewrite 2invfun_linv by first [intros ????;apply Hf|easy].
+    now intros ->%(inj f)%(inj fe).
+  - cbn.
+    intros ????; apply Hfv.
+  - rewrite relabel_graph_compose, <- 2 reindex_relabel_graph.
+    f_equal.
+    rewrite relabel_graph_compose.
+    apply relabel_graph_ext_strong.
+    intros i Hi%elem_of_elements.
+    cbn.
+    now rewrite invfun_linv by first [intros ????;apply Hf|easy].
+Qed.
+
+
+Lemma reindex_graph_isomorphic f `{Hf : !Inj eq eq f} tg tg' :
+  isomorphic tg tg' ->
+  isomorphic (reindex_graph f tg) (reindex_graph f tg').
+Proof.
+  intros (fe & fv & Hfe & Hfv & ->)%isomorphic_exists.
+  (* apply isomorphic_symm. *)
+  eapply (isomorphic_of_partial_inj_dom' _ _
+    fe (f ∘ fv ∘ invfun f (elements (dom (hedges tg))))).
+  - cbn.
+    intros ????; apply Hfe.
+  - cbn. 
+    rewrite dom_kmap_L'.
+    intros fi fj (i & -> & Hi%elem_of_elements)%elem_of_map
+      (j & -> & Hj%elem_of_elements)%elem_of_map.
+    cbn.
+    rewrite 2 invfun_linv by first [intros ????;apply Hf|easy].
+    now intros ->%(inj f)%(inj fv).
+  - rewrite (reindex_graph_compose_strong' _ _ _). 2:{
+      intros i j Hi%elem_of_elements Hj%elem_of_elements.
+      cbn.
+      rewrite 2 invfun_linv by first [intros ????;apply Hf|easy].
+      now intros ->%(inj f)%(inj fv).
+    }
+    rewrite reindex_relabel_graph.
+    f_equal.
+    rewrite (reindex_graph_compose _ _ _).
+    apply reindex_graph_ext_strong.
+    intros i _ Hi%elem_of_dom_2%elem_of_elements.
+    cbn.
+    now rewrite invfun_linv by first [intros ????;apply Hf|easy].
+Qed.
 
 End CospanHyperGraph.
+
+Add Parametric Relation {T n m} : (CospanHyperGraph T n m) isomorphic
+  reflexivity proved by isomorphic_refl
+  symmetry proved by isomorphic_symm
+  transitivity proved by isomorphic_trans
+  as isomorphic_setoid.
+
 
 Declare Scope graph_scope.
 Delimit Scope graph_scope with graph.

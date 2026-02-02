@@ -2577,7 +2577,7 @@ Proof.
 Qed.
 
 
-
+*)
 
 
 
@@ -2690,6 +2690,19 @@ Proof.
   apply (Hinj i a Hmi).
 Qed.
 
+Lemma lookup_kmap_Some_full_gen_dom `{FinMapDom K1 M1 SK1, FinMap K2 M2}
+  (f : K1 -> K2) `(m : M1 A) (j : K2) a :
+    set_Forall2 (λ i j, f i = f j -> i = j) (dom m :> SK1) ->
+    (* (forall j, m !! j = None -> map_Forall (λ k _, f k ≠ f j) m) -> *)
+    (kmap f m :> M2 A) !! j = Some a <->
+    exists i, m !! i = Some a /\ f i = j.
+Proof.
+  intros Hinj.
+  apply lookup_kmap_Some_full_gen.
+  intros i ai Hai i' ai' Hai'.
+  apply Hinj; apply elem_of_dom; eauto.
+Qed.
+
 
 Lemma map_Forall_list_to_map `{FinMap K M} {A} {P : K -> A -> Prop}
   (l : list (K * A)) :
@@ -2791,7 +2804,7 @@ Proof.
   unfold_leibniz.
   apply dom_kmap'.
 Qed.
-*)
+
 
 
 Record namedtensorlist := mk_ntl {
@@ -4246,12 +4259,6 @@ Proof.
   unfold abst_WT'.
   cbn in *.
   f_equiv; congruence.
-Qed.
-
-Lemma list_omap_fmap {A B C} (f : A -> B) (g : B -> option C) (l : list A) :
-  omap g (f <$> l) = omap (g ∘ f) l.
-Proof.
-  induction l; [done|cbn]; case_match; f_equal; easy.
 Qed.
 
 Lemma join_list_Permutation {A} (ml ml' : list (option A)) :
@@ -5929,6 +5936,48 @@ Qed.
 
 
 
+
+Fixpoint te_relabel_absidx (f : Idx -> Idx) (te : tensorexpr) :=
+  match te with
+  | tone => tone
+  | tdelta1 l r => tdelta1 l r
+  | tabstract idx low up => tabstract (f idx) low up
+  | tproduct l r =>
+    tproduct (te_relabel_absidx f l) (te_relabel_absidx f r)
+  | tsum smd => tsum (te_relabel_absidx f smd)
+  end.
+
+Definition tl_relabel_absidx (f : Idx -> Idx) (tl : tensorlist) : tensorlist :=
+  mk_tl tl.(tl_sums)
+    ((prod_map (prod_map f id) id) <$> tl.(tl_abstracts)) tl.(tl_deltas).
+
+Definition ntl_relabel_absidx (f : Idx -> Idx) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl ntl.(ntl_sums)
+    ((prod_map (prod_map f id) id) <$> ntl.(ntl_abstracts)) ntl.(ntl_deltas).
+
+Lemma tl_relabel_absidx_correct f tl :
+  tl_relabel_absidx f tl =@{tensorexpr} te_relabel_absidx f tl.
+Proof.
+  destruct tl as [sums abs delt].
+  cbn.
+  induction sums; [|cbn; f_equal; done].
+  cbn.
+  induction abs as [|[[idx l] u] abs IHabs].
+  - cbn.
+    induction delt as [|[l u] delt IHdelt]; cbn; f_equal; auto.
+  - cbn.
+    now f_equal.
+Qed.
+
+Lemma ntl_relabel_absidx_correct f ntl :
+  ntl2tl (ntl_relabel_absidx f ntl) = tl_relabel_absidx f (ntl2tl ntl).
+Proof.
+  destruct ntl as [isums abs delt];
+  unfold tl_relabel_absidx; cbn.
+  f_equal.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; intros _ [[idx low] up] _; done.
+Qed.
 
 
 
