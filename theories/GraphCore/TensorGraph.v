@@ -20,9 +20,9 @@ Notation labedge := (prod nat edge).
 
 Declare Scope cohg_scope.
 
-Definition HyperGraph (T : Type) := Pmap (T * list positive * list positive).
+Notation HyperGraph T := (Pmap (T * list positive * list positive)).
 
-(* A graph with nodes labeled by elements of [T] *)
+(* A graph with h(yper)edges labeled by elements of [T] *)
 Record CospanHyperGraph {T : Type} {n m : nat} := mk_cohg {
   hedges : HyperGraph T;
   inputs : vec positive n;
@@ -94,15 +94,15 @@ Section CospanHyperGraph.
   Definition add_output {n m} (p : positive) (tg : CospanHyperGraph T n m) : CospanHyperGraph T n (S m) :=
   tg.2.1 -> tg.1 <- Vector.cons p tg.2.2.
 
-  Local Open Scope positive.
+  (* Local Open Scope positive.
   Local Open Scope vector_scope.
 
   Definition example_cohg : CospanHyperGraph positive 0 0 := 
     ([#] -> {[ 1 := (1, [], []); 2:= (2, [], []) ]} <- [#]).
 
-  Compute example_cohg.
+  Compute example_cohg. *)
 
-(* is_key explicitly only depends on the nodes *)
+(* is_key explicitly only depends on the hedges *)
 Definition is_key (tm : gmap nat T) (n : nat) : Prop :=
   is_Some (tm !! n).
 
@@ -180,15 +180,15 @@ Definition out_arity (es : list edge) (k : nat) :=
 (* Definition sorted_outputs (tg : TensorGraph) : list nat :=
   merge_sort le $ elements (outputs tg). *)
 
-Definition vertices (tg : TensorGraph) : Pset :=
-  list_to_set (map_to_list (tg.(nodes)) ≫= λ k_flu, k_flu.2.1.2 ++ k_flu.2.2) ∪
+Definition vertices (tg : CoHyGraph) : Pset :=
+  list_to_set (map_to_list (tg.(hedges)) ≫= λ k_flu : (positive*(T*list _*list _)), (k_flu.2.1.2 ++ k_flu.2.2)) ∪
   list_to_set (tg.(inputs) ++ tg.(outputs)).
 
-Lemma elem_of_vertices (tg : TensorGraph) (r : positive) :
+Lemma elem_of_vertices (tg : CoHyGraph) (r : positive) :
   r ∈ vertices tg <-> 
-    (exists k flu, tg.(nodes) !! k = Some flu /\
+    (exists k flu, tg.(hedges) !! k = Some flu /\
       (r ∈ flu.1.2 \/ r ∈ flu.2)) \/
-    r ∈ tg.(inputs) \/ r ∈ tg.(outputs).
+    r ∈@{list _} tg.(inputs) \/ r ∈@{list _} tg.(outputs).
 Proof.
   unfold vertices.
   rewrite elem_of_union, 2 elem_of_list_to_set.
@@ -201,8 +201,8 @@ Proof.
 Qed.
 
 
-Definition relabel_graph (f : positive -> positive) (tg : TensorGraph) : TensorGraph :=
-  mk_tg (relabel_abs f <$> tg.(nodes)) (f <$> tg.(inputs)) (f <$> tg.(outputs)).
+Definition relabel_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
+  mk_cohg (relabel_abs f <$> tg.(hedges)) (vmap f tg.(inputs)) (vmap f tg.(outputs)).
 
 
 
