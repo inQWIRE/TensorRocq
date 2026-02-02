@@ -27,7 +27,7 @@ Search ((_ -> _) -> vec _ _ -> _).
 
   Reserved Notation "tgl ; tgr" (at level 50).
   Definition compose_safe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
-     (vmap xI tgl.(inputs)) -> tgl.(hedges) ⊎ tgr.(hedges) <- (vmap xO tgr.(outputs)).
+     (vmap (bcons false) tgl.(inputs)) -> tgl.(hedges) ⊎ tgr.(hedges) <- (vmap (bcons true) tgr.(outputs)).
 
   Definition compose {n m} (tgl tgr : CospanHyperGraph T n m) : CospanHyperGraph T n m :=
     tgl.(inputs) -> tgl.(hedges) ∪ tgr.(hedges) <- tgr.(outputs).
