@@ -2203,3 +2203,55 @@ Lemma list_bind_to_cprod {A B C} (f : A -> B -> list C) l k :
 Proof.
   rewrite list_bind_cprod; reflexivity.
 Qed.
+
+Fixpoint vzip_with {n} {A B C} (f : A -> B -> C) (v : vec A n) (w : vec B n) : vec C n :=
+  match n, v, w with
+  | 0, _, _ => [#]
+  | (S k), v, w => (f (Vector.hd v) (Vector.hd w)) :::
+    vzip_with f (Vector.tl v) (Vector.tl w)
+  end.
+
+Notation vzip := (vzip_with pair).
+
+Lemma vec_to_list_vzip_with {n} {A B C} (f : A -> B -> C)
+  (v : vec A n) (w : vec B n) :
+  vec_to_list (vzip_with f v w) = zip_with f v w.
+Proof.
+  vec_double_ind v w.
+  - done.
+  - cbn.
+    congruence.
+Qed.
+
+Lemma vzip_with_map_l {n} {A B C D} (f : B -> C -> D) (g : A -> B)
+  (v : vec A n) (w : vec C n) :
+  vzip_with f (vmap g v) w = 
+  vzip_with (f ∘ g) v w.
+Proof.
+  vec_double_ind v w.
+  - done.
+  - cbn.
+    congruence.
+Qed.
+
+Lemma vzip_with_map_r {n} {A B C D} (f : A -> C -> D) (g : B -> C)
+  (v : vec A n) (w : vec B n) :
+  vzip_with f v (vmap g w) = 
+  vzip_with (λ a b, f a (g b)) v w.
+Proof.
+  vec_double_ind v w.
+  - done.
+  - cbn.
+    congruence.
+Qed.
+
+Lemma vzip_with_map {n} {A B C D E} (f : B -> D -> E) (g : A -> B) (h : C -> D)
+  (v : vec A n) (w : vec C n) : 
+  vzip_with f (vmap g v) (vmap h w) = 
+  vzip_with (λ a b, f (g a) (h b)) v w.
+Proof.
+  vec_double_ind v w.
+  - done.
+  - cbn.
+    congruence.
+Qed.

@@ -64,6 +64,11 @@ Class SummedElement `{Summable A} (a : A) : Prop := {
   element_summed : a ∈ sum_elements
 }.
 
+Lemma SummedElement_iff `{Summable A} (a : A) : SummedElement a <-> a ∈ sum_elements.
+Proof.
+  now split; [intros []|constructor].
+Qed.
+
 #[export] Program Instance SummedElement_fin {n} (i : fin n) :
   SummedElement i.
 Next Obligation.
@@ -94,6 +99,23 @@ Next Obligation.
   intros a Ha.
   rewrite <- vec_to_list_to_list in Ha.
   now apply elem_of_list_In, Hv.
+Qed.
+
+#[export] Instance SummedElement_vcons `{Summable A} (a : A) {n} (v : vec A n) :
+  SummedElement a -> SummedElement v -> SummedElement (a ::: v).
+Proof.
+  rewrite 3 SummedElement_iff.
+  rewrite 3 elem_of_list_In.
+  unfold sum_elements at 2 3; cbn [Summable_vec].
+  rewrite 2 vec_elements_in.
+  rewrite Vector.Forall_cons_iff.
+  easy.
+Qed.
+
+#[export] Instance SummedElement_vnil `{Summable A} :
+  SummedElement ([#] :> vec A 0).
+Proof.
+  now apply SummedElement_vec.
 Qed.
 
 #[export] Program Instance SummedElement_sum_l `{Summable A, Summable B}
@@ -148,11 +170,6 @@ Local Existing Instance Radd_proper.
 
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
-
-Lemma SummedElement_iff `{Summable A} (a : A) : SummedElement a <-> a ∈ sum_elements.
-Proof.
-  now split; [intros []|constructor].
-Qed.
 
 Lemma sum_of_unique' `{HA : WFSummable A} (f : A -> R) (a : A) `{Ha : !SummedElement a} :
   (forall b, SummedElement b -> a <> b -> f b == 0) ->

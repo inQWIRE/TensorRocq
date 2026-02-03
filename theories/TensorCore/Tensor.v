@@ -16,7 +16,7 @@ Definition app_vsplit {A n m} (v : vec A (n + m)) :
 Proof.
   apply symmetry, Vector.append_splitat, surjective_pairing.
 Qed.
-Lemma vsplit_eq {A n m} (v w : vec A (n + m)) : 
+Lemma vsplit_eq {A n m} (v w : vec A (n + m)) :
   v = w <-> vsplitl v = vsplitl w /\ vsplitr v = vsplitr w.
 Proof.
   split; [now intros ->|].
@@ -24,13 +24,13 @@ Proof.
   rewrite <- (app_vsplit v), <- (app_vsplit w).
   congruence.
 Qed.
-Lemma vsplitl_app {A n m} (v : vec A n) (w : vec A m) : 
+Lemma vsplitl_app {A n m} (v : vec A n) (w : vec A m) :
   vsplitl (v +++ w) = v.
 Proof.
   unfold vsplitl.
   now rewrite Vector.splitat_append.
 Qed.
-Lemma vsplitr_app {A n m} (v : vec A n) (w : vec A m) : 
+Lemma vsplitr_app {A n m} (v : vec A n) (w : vec A m) :
   vsplitr (v +++ w) = w.
 Proof.
   unfold vsplitr.
@@ -51,6 +51,16 @@ Proof.
   now rewrite vec_to_list_to_list.
 Qed.
 
+Lemma SummedElement_vec_app_iff `{Summable A} {n m} (v : vec A n) (w : vec A m) :
+  SummedElement (v +++ w) <-> SummedElement v /\ SummedElement w.
+Proof.
+  rewrite 3 SummedElement_vec_iff.
+  setoid_rewrite elem_of_list_In.
+  rewrite vec_to_list_app.
+  setoid_rewrite in_app_iff.
+  naive_solver.
+Qed.
+
 Lemma SummedElement_vec_iff_Forall `{Summable A} {n} (v : vec A n) :
   SummedElement v <-> Forall SummedElement v.
 Proof.
@@ -69,6 +79,13 @@ Proof.
   rewrite 2 SummedElement_vec_iff_Forall.
   rewrite <- (app_vsplit v), vec_to_list_app, Forall_app at 1.
   easy.
+Qed.
+#[export] Instance SummedElement_vec_app `{Summable A} {n m}
+  (v : vec A n) (w : vec A m) :
+  SummedElement v -> SummedElement w -> SummedElement (v +++ w).
+Proof.
+  rewrite SummedElement_vec_app_iff.
+  auto.
 Qed.
 
 Definition Tensor {R} (n m : nat) (A : Type) :=
@@ -149,14 +166,14 @@ Context `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A}.
 Lemma tensoreq_refl {n m} (t : @Tensor R n m A) : t ≡ t.
 Proof. hnf; intros; apply SR. Qed.
 Lemma tensoreq_symm {n m} (t t' : @Tensor R n m A) : t ≡ t' -> t' ≡ t.
-Proof. 
-  intros Ht. 
+Proof.
+  intros Ht.
   hnf; intros.
-  now apply SR.(Req_equiv).(Equivalence_Symmetric), Ht. 
+  now apply SR.(Req_equiv).(Equivalence_Symmetric), Ht.
 Qed.
 Lemma tensoreq_trans {n m} (t t' t'' : @Tensor R n m A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
-Proof. 
-  intros Ht Ht'. 
+Proof.
+  intros Ht Ht'.
   hnf; intros.
   now eapply SR.(Req_equiv).(Equivalence_Transitive); [apply Ht|apply Ht'].
 Qed.
@@ -164,7 +181,7 @@ Qed.
 End tensoreq.
 
 Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} {n m} : (@Tensor R n m A) tensoreq 
+  `{SA : Summable A} {n m} : (@Tensor R n m A) tensoreq
   reflexivity proved by tensoreq_refl
   symmetry proved by tensoreq_symm
   transitivity proved by tensoreq_trans
@@ -211,34 +228,34 @@ Definition swapped_stack_tensor `{SA : Summable A,
 
 
 Definition join_stack_1_tr_bl `{SA : Summable A,
-  SR : SemiRing R rO rI radd rmul req} {n m o} 
+  SR : SemiRing R rO rI radd rmul req} {n m o}
   (t : Tensor (n + (S m)) ((S m) + o) A) : Tensor (n + m) (m + o) A :=
-  fun v w => 
+  fun v w =>
   ∑ a : A, t (vsplitl v +++ a ::: vsplitr v) (a ::: w).
 
 Fixpoint join_stack_tr_bl `{SA : Summable A,
-  SR : SemiRing R rO rI radd rmul req} {n m o} : 
+  SR : SemiRing R rO rI radd rmul req} {n m o} :
   forall (t : Tensor (n + m) (m + o) A), Tensor n o A :=
   match m with
   | 0 => fun t v w => t (v +++ [#]) w
-  | S m => fun t => 
+  | S m => fun t =>
     join_stack_tr_bl (join_stack_1_tr_bl t)
   end.
 
 
-Definition join_stack_1_tl_bl `{SA : Summable A,
-  SR : SemiRing R rO rI radd rmul req} {n m} 
+Definition join_stack_1_tl_tr `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m}
   (t : Tensor (S n) (S m) A) : Tensor n m A :=
-  fun v w => 
+  fun v w =>
   ∑ a : A, t (a ::: v) (a ::: w).
 
-Fixpoint join_stack_tl_bl `{SA : Summable A,
-  SR : SemiRing R rO rI radd rmul req} {n m o} : 
+Fixpoint join_stack_tl_tr `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m o} :
   forall (t : Tensor (n + m) (n + o) A), Tensor m o A :=
   match n with
   | 0 => fun t => t
-  | S m => fun t => 
-    join_stack_tl_bl (join_stack_1_tl_bl t)
+  | S m => fun t =>
+    join_stack_tl_tr (join_stack_1_tl_tr t)
   end.
 
 #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
@@ -247,8 +264,8 @@ Fixpoint join_stack_tl_bl `{SA : Summable A,
 #[global] Arguments swapped_stack_tensor {_ _} {_ _ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
 #[global] Arguments join_stack_1_tr_bl {_ _} {_ _ _ _ _ _} {_ _ _} (_) _ _ / : assert.
 #[global] Arguments join_stack_tr_bl {_ _} {_ _ _ _ _ _} {_ !_ _} (_) / _ _ : assert.
-#[global] Arguments join_stack_1_tl_bl {_ _} {_ _ _ _ _ _} {_ _} (_) _ _ / : assert.
-#[global] Arguments join_stack_tl_bl {_ _} {_ _ _ _ _ _} {!_ _ _} (_) / _ _ : assert.
+#[global] Arguments join_stack_1_tl_tr {_ _} {_ _ _ _ _ _} {_ _} (_) _ _ / : assert.
+#[global] Arguments join_stack_tl_tr {_ _} {_ _ _ _ _ _} {!_ _ _} (_) / _ _ : assert.
 
 
 
@@ -277,6 +294,69 @@ Proof.
   - now apply Hr; try apply _.
 Qed.
 
+
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
+    (swapped_stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
+    equiv ==> equiv ==> equiv as swapped_stack_tensor_mor.
+Proof.
+  intros l l' Hl r r' Hr v w Hv Hw.
+  cbn.
+  apply SR.
+  - now apply Hl; try apply _.
+  - now apply Hr; try apply _.
+Qed.
+
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m} :
+    (join_stack_1_tl_tr (SA:=SA) (SR:=SR) (n:=n) (m:=m)) with signature
+    equiv ==> equiv as join_stack_1_tl_tr_mor.
+Proof.
+  intros t t' Ht v w Hv Hw.
+  cbn.
+  apply sum_of_ext'; intros a Ha%SummedElement_iff.
+  apply Ht; apply _.
+Qed.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m o} :
+    (join_stack_tl_tr (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
+    equiv ==> equiv as join_stack_tl_tr_mor.
+Proof.
+  intros t t' Ht.
+  induction n; [done|].
+  cbn.
+  apply IHn.
+  now f_equiv.
+Qed.
+
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m o} :
+    (join_stack_1_tr_bl (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
+    equiv ==> equiv as join_stack_1_tr_bl_mor.
+Proof.
+  intros t t' Ht v w Hv Hw.
+  cbn.
+  apply sum_of_ext'; intros a Ha%SummedElement_iff.
+  apply Ht; apply _.
+Qed.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m o} :
+    (join_stack_tr_bl (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
+    equiv ==> equiv as join_stack_tr_bl_mor.
+Proof.
+  intros t t' Ht.
+  induction m.
+  - cbn.
+    intros v w Hv Hw; now apply Ht; apply _.
+  - cbn.
+    apply IHm.
+    now f_equiv.
+Qed.
 
 Section TensorOpFacts.
 
@@ -386,7 +466,7 @@ Proof.
   now rewrite sum_of_delta_l.
 Qed.
 
-Lemma stack_delta_tensors {n m} : 
+Lemma stack_delta_tensors {n m} :
   stack_tensor (delta_tensor (n:=n)) (delta_tensor (n:=m)) ≡
   delta_tensor.
 Proof.
@@ -397,8 +477,8 @@ Proof.
   case_decide; case_decide; case_decide; tauto + ring.
 Qed.
 
-Lemma compose_succ_mid {n m o} (t : Tensor n (S m) A) (t' : Tensor (S m) o A) : 
-  compose_tensor t t' ≡ 
+Lemma compose_succ_mid {n m o} (t : Tensor n (S m) A) (t' : Tensor (S m) o A) :
+  compose_tensor t t' ≡
   fun v w => ∑ a : A, compose_tensor (fun v w => t v (a:::w))
     (fun v w => t' (a:::v) w) v w.
 Proof.
@@ -412,10 +492,10 @@ Lemma join_stack_tr_bl_alt {n m o} (t : Tensor (n + m) (m + o) A) :
 Proof.
   induction m.
   - intros v w Hv Hw.
-    cbn. 
+    cbn.
     now rewrite sum_of_vec_0.
-  - cbn. 
-    rewrite IHm. 
+  - cbn.
+    rewrite IHm.
     intros v w Hv Hw.
     rewrite sum_of_vec_succ, sum_of_comm.
     apply sum_of_ext; intros u.
@@ -424,7 +504,7 @@ Proof.
     now rewrite vsplitl_app, vsplitr_app.
 Qed.
 
-Lemma compose_to_stack {n m o} (t : Tensor n m A) (t' : Tensor m o A) : 
+Lemma compose_to_stack {n m o} (t : Tensor n m A) (t' : Tensor m o A) :
   compose_tensor t t' ≡
   join_stack_tr_bl (stack_tensor t t').
 Proof.
@@ -436,15 +516,15 @@ Proof.
 Qed.
 
 
-Lemma join_stack_tl_bl_alt {n m o} (t : Tensor (n + m) (n + o) A) :
-  join_stack_tl_bl t ≡ fun v w => ∑ u : vec A n, t (u+++v) (u+++w).
+Lemma join_stack_tl_tr_alt {n m o} (t : Tensor (n + m) (n + o) A) :
+  join_stack_tl_tr t ≡ fun v w => ∑ u : vec A n, t (u+++v) (u+++w).
 Proof.
   induction n.
   - intros v w Hv Hw.
-    cbn. 
+    cbn.
     now rewrite sum_of_vec_0.
-  - cbn. 
-    rewrite IHn. 
+  - cbn.
+    rewrite IHn.
     intros v w Hv Hw.
     cbn.
     rewrite sum_of_vec_succ, sum_of_comm.
@@ -452,11 +532,11 @@ Proof.
 Qed.
 
 
-Lemma compose_to_swapped_stack {n m o} (t : Tensor n m A) (t' : Tensor m o A) : 
+Lemma compose_to_swapped_stack {n m o} (t : Tensor n m A) (t' : Tensor m o A) :
   compose_tensor t t' ≡
-  join_stack_tl_bl (swapped_stack_tensor t t').
+  join_stack_tl_tr (swapped_stack_tensor t t').
 Proof.
-  rewrite join_stack_tl_bl_alt.
+  rewrite join_stack_tl_tr_alt.
   intros v w Hv Hw.
   cbn.
   apply sum_of_ext; intros u.

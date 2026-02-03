@@ -7,13 +7,7 @@ From stdpp Require Export pmap gmap.
 
 (* An implementation of double pushout (DPO) rewriting *)
 
-Fixpoint vzip_with {n} {B C D} (f : B -> C -> D) (bs : vec B n) (cs : vec C n) : vec D n :=
-match n, bs, cs with
-| 0, _, _ => [#]
-| (S k), bs, cs => (f (Vector.hd bs) (Vector.hd cs)) ::: vzip_with f (Vector.tl bs) (Vector.tl cs)
-end.
 
-Notation vzip := (vzip_with pair).
 
 Section DPO.
 

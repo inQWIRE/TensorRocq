@@ -5983,5 +5983,217 @@ Qed.
 
 
 
+Definition relabel_frees (f : positive -> positive) : var -> var :=
+  var_map id f.
+
+Lemma abstracts_bound_vars_app abs abs' :
+  abstracts_bound_vars (abs ++ abs') =
+  abstracts_bound_vars abs ∪ abstracts_bound_vars abs'.
+Proof.
+  set_solver.
+Qed.
+
+Lemma deltas_bound_vars_app delt delt' :
+  deltas_bound_vars (delt ++ delt') =
+  deltas_bound_vars delt ∪ deltas_bound_vars delt'.
+Proof.
+  set_solver.
+Qed.
+
+
+Lemma elem_of_abstracts_vars_bound r abs :
+  bound r ∈ abstracts_vars abs <-> r ∈ abstracts_bound_vars abs.
+Proof.
+  now rewrite elem_of_abstracts_bound_vars, elem_of_abstracts_vars.
+Qed.
+
+Lemma elem_of_abstracts_vars_free r abs :
+  free r ∈ abstracts_vars abs <-> r ∈ abstracts_free_vars abs.
+Proof.
+  now rewrite elem_of_abstracts_free_vars, elem_of_abstracts_vars.
+Qed.
+
+Lemma elem_of_deltas_vars_bound r delt :
+  bound r ∈ deltas_vars delt <-> r ∈ deltas_bound_vars delt.
+Proof.
+  rewrite elem_of_deltas_bound_vars, elem_of_deltas_vars; naive_solver.
+Qed.
+
+Lemma elem_of_deltas_vars_free r delt :
+  free r ∈ deltas_vars delt <-> r ∈ deltas_free_vars delt.
+Proof.
+  rewrite elem_of_deltas_free_vars, elem_of_deltas_vars; naive_solver.
+Qed.
+
+
+
+Definition relabel_ntl_bound f (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl (f <$> ntl.(ntl_sums))
+    (relabel_abs (relabel_bounds f) <$> ntl.(ntl_abstracts))
+    (relabel_delt (relabel_bounds f) <$> ntl.(ntl_deltas)).
+
+Definition relabel_ntl_free f (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl ntl.(ntl_sums) (relabel_abs (relabel_frees f) <$> ntl.(ntl_abstracts))
+    (relabel_delt (relabel_frees f) <$> ntl.(ntl_deltas)).
+
+
+Definition relabel_ntl f (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl ntl.(ntl_sums) (relabel_abs f <$> ntl.(ntl_abstracts))
+    (relabel_delt f <$> ntl.(ntl_deltas)).
+
+Definition ntl_insert_sum (r : Idx) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl (r :: ntl.(ntl_sums)) ntl.(ntl_abstracts) ntl.(ntl_deltas).
+
+
+Definition ntl_insert_sums (rs : list Idx) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl (rs ++ ntl.(ntl_sums)) ntl.(ntl_abstracts) ntl.(ntl_deltas).
+
+Definition ntl_subst_free_as (l : Idx) (r : Idx) (ntl : namedtensorlist) :=
+  ntl_insert_sum r (relabel_ntl
+    (var_elim bound (λ l', if decide (l' = l) then bound r else free l')) ntl).
+
+
+Lemma ntl_subst_free_as_WF l r ntl : r ∉ ntl.(ntl_sums) ->
+  WF_ntl ntl ->
+  WF_ntl (ntl_subst_free_as l r ntl).
+Proof.
+  intros Hr [Hdup Hsubs].
+  split;
+  [now apply NoDup_cons|].
+  cbn -[abstracts_bound_vars deltas_bound_vars list_to_set].
+  split.
+  - rewrite abstracts_bound_vars_relabel_abs.
+    intros r'.
+    rewrite elem_of_set_omap.
+    cbn -[list_to_set].
+    setoid_rewrite v2bound_Some.
+    intros (v & Hvabs & Hr').
+    revert Hr'.
+    destruct v as [|l'']; [intros [= ->];
+      rewrite list_to_set_cons; apply union_subseteq_r, Hsubs.1;
+      now rewrite elem_of_abstracts_vars_bound in Hvabs|].
+    cbn -[list_to_set].
+    case_decide; [|easy].
+    intros [= <-].
+    set_solver +.
+  - rewrite deltas_bound_vars_relabel_delt.
+    intros r'.
+    rewrite elem_of_set_omap.
+    cbn -[list_to_set].
+    setoid_rewrite v2bound_Some.
+    intros (v & Hvabs & Hr').
+    revert Hr'.
+    destruct v as [|l'']; [intros [= ->];
+      rewrite list_to_set_cons; apply union_subseteq_r, Hsubs.2;
+      now rewrite elem_of_deltas_vars_bound in Hvabs|].
+    cbn -[list_to_set].
+    case_decide; [|easy].
+    intros [= <-].
+    set_solver +.
+Qed.
+
+
+
+Definition ntl_subst_free (l : Idx) (ntl : namedtensorlist) :=
+  ntl_subst_free_as l (fresh ntl.(ntl_sums)) ntl.
+
+
+Lemma ntl_subst_free_WF l ntl :
+  WF_ntl ntl ->
+  WF_ntl (ntl_subst_free l ntl).
+Proof.
+  intros HWF.
+  apply ntl_subst_free_as_WF, HWF.
+  apply infinite_is_fresh.
+Qed.
+
+Definition ntl_times_aux (l r : namedtensorlist) : namedtensorlist :=
+  mk_ntl (l.(ntl_sums) ++ r.(ntl_sums))
+    (l.(ntl_abstracts) ++ r.(ntl_abstracts))
+    (l.(ntl_deltas) ++ r.(ntl_deltas)).
+
+
+Definition ntl_times (l r : namedtensorlist) : namedtensorlist :=
+  ntl_times_aux (relabel_ntl_bound (bcons false) l) (relabel_ntl_bound (bcons true) r).
+
+Lemma ntl_times_alt l r :
+ntl_times l r = mk_ntl ((bcons false <$> l.(ntl_sums)) ++
+    (bcons true <$> r.(ntl_sums)))
+    ((relabel_abs (relabel_bounds (bcons false)) <$> l.(ntl_abstracts))
+      ++ (relabel_abs (relabel_bounds (bcons true)) <$> r.(ntl_abstracts)))
+    ((relabel_delt (relabel_bounds (bcons false)) <$> l.(ntl_deltas))
+      ++ (relabel_delt (relabel_bounds (bcons true)) <$> r.(ntl_deltas))).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma ntl_times_aux_WF l r :
+  WF_ntl l -> WF_ntl r ->
+  l.(ntl_sums) ## r.(ntl_sums) ->
+  WF_ntl (ntl_times_aux l r).
+Proof.
+  intros Hl Hr Hlr.
+  split.
+  - cbn.
+    apply NoDup_app.
+    split_and!.
+    + apply Hl.
+    + exact Hlr.
+    + apply Hr.
+  - cbn -[abstracts_bound_vars deltas_bound_vars list_to_set].
+    rewrite abstracts_bound_vars_app, deltas_bound_vars_app, list_to_set_app.
+    split; (apply union_mono; [apply Hl|apply Hr]).
+Qed.
+
+Lemma relabel_ntl_bound_WF_strong f ntl :
+  ForallPairs (fun i j => f i = f j -> i = j) ntl.(ntl_sums) ->
+  WF_ntl ntl ->
+  WF_ntl (relabel_ntl_bound f ntl).
+Proof.
+  intros Hf Hntl.
+  rewrite ForallPairs_forall in Hf.
+  split; [|split]; cbn -[abstracts_bound_vars deltas_bound_vars].
+  - apply NoDup_fmap_2_strong; [apply Hf|apply Hntl].
+  - rewrite abstracts_bound_vars_relabel_bounds, <- (set_map_list_to_set (SA:=Pset)).
+    now apply set_map_mono, Hntl.
+  - rewrite deltas_bound_vars_relabel_bounds, <- (set_map_list_to_set (SA:=Pset)).
+    now apply set_map_mono, Hntl.
+Qed.
+
+
+Lemma relabel_ntl_bound_WF f `{Hf : !Inj eq eq f} ntl :
+  WF_ntl ntl ->
+  WF_ntl (relabel_ntl_bound f ntl).
+Proof.
+  intros Hntl.
+  apply relabel_ntl_bound_WF_strong; [|easy].
+  now intros ? ? ? ?; apply Hf.
+Qed.
+
+Lemma ntl_times_WF l r :
+  WF_ntl l -> WF_ntl r ->
+  WF_ntl (ntl_times l r).
+Proof.
+  intros Hl Hr.
+  apply ntl_times_aux_WF; [now apply (relabel_ntl_bound_WF _)..|].
+  cbn.
+  intros ? []%elem_of_list_fmap []%elem_of_list_fmap.
+  lia.
+Qed.
+
+Definition add_delta_ntl (l u : var) (ntl : namedtensorlist) : namedtensorlist :=
+  mk_ntl ntl.(ntl_sums) ntl.(ntl_abstracts) ((l, u) :: ntl.(ntl_deltas)).
+
+Definition add_loop_ntl (l r : positive) (ntl : namedtensorlist) : namedtensorlist :=
+  ntl_subst_free l (ntl_subst_free r (add_delta_ntl (free l) (free r) ntl)).
+
+Definition add_loop_ntl_alt_as (l r x : positive) (ntl : namedtensorlist) : namedtensorlist :=
+  ntl_insert_sum x (
+  relabel_ntl
+    (var_elim bound (λ l', if decide (l' = l \/ l' = r) then bound x else free l'))  
+    ntl).
+
+Definition add_loop_ntl_alt (l r : positive) (ntl : namedtensorlist) : namedtensorlist :=
+  add_loop_ntl_alt_as l r (fresh ntl.(ntl_sums)) ntl.
 
 
