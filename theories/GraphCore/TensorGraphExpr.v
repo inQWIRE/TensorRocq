@@ -212,7 +212,7 @@ Qed.
 
 Lemma abstracts_bound_vars_graph {o p} (tg : TensorGraph o p) :
   abstracts_bound_vars (graph_namedtensorlist_semantics tg).(ntl_abstracts) =
-  list_to_set ('(_, low, up) ← (map_to_list tg.(hedges)).*2; low ++ up).
+  list_to_set ('(_, low, up) ← (map_to_list tg.(hedges).(hyperedges)).*2; low ++ up).
 Proof.
   cbn.
   f_equiv.
@@ -299,6 +299,7 @@ Proof.
     rewrite list_to_set_elements.
     rewrite list_fmap_bind.
     etransitivity; [|apply union_subseteq_l].
+    etransitivity; [|unfold vertices_hg; apply union_subseteq_l].
     apply list_to_set_subseteq.
     apply eq_reflexivity, list_bind_ext; [|done].
     now intros [? [[]]].

@@ -311,7 +311,7 @@ Proof.
   destruct Hflu as ([f [[t low] up]] & [= -> -> ->] & Hflu).
   rewrite <- 2 list_fmap_compose.
   unfold compose; cbn.
-  destruct (hedges tg !! f) as [[[]]|]; [|done].
+  destruct ((hedges tg).(hyperedges) !! f) as [[[]]|]; [|done].
   done.
 Qed.
 
@@ -583,9 +583,19 @@ Proof.
     apply fn_lookup_singleton_ne.
     intros [= <-].
     apply Hx.
-    set_solver.
+    destruct k_flu as [k flu].
+    cbn.
+    apply elem_of_elements.
+    apply elem_of_vertices.
+    left.
+    cbn.
+    rewrite elem_of_app in Hx'.
+    cbn in Hx'.
+    apply elem_of_map_to_list in Hflu.
+    eauto.
   }
-  rewrite (list_fmap_id' (relabel_delt {[bound x := bound o]})). 2:{
+Admitted.
+  (* rewrite (list_fmap_id' (relabel_delt {[bound x := bound o]})). 2:{
     intros [l u] [Hlu|Hlu]%elem_of_app;
     apply elem_of_lookup_imap in Hlu as (? & ? & [= -> ->] & Hx'%elem_of_list_lookup_2);
     cbn;
@@ -622,7 +632,7 @@ Proof.
     f_equal;
     rewrite 2 fn_lookup_singleton_case;
     do 2 case_decide; congruence.
-Admitted.
+Admitted. *)
 
 
 
@@ -685,12 +695,12 @@ Proof.
   apply graph_semantics_add_top_loop.
 Qed.
 
-#[export] Instance CospanHyperGraph_disj {n m} : Disjoint (CospanHyperGraph T n m) :=
+(* #[export] Instance CospanHyperGraph_disj {n m} : Disjoint (CospanHyperGraph T n m) :=
   fun cohg cohg' =>
   vertices cohg ## vertices cohg' /\
-  cohg.(hedges) ##ₘ cohg'.(hedges).
+  cohg.(hedges) ##ₘ cohg'.(hedges). *)
 
-Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
+(* Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
   (cohg : TensorGraph n m) (cohg' : TensorGraph n' m') :
   cohg ## cohg ->
   graph_semantics (SR:=SR) (swapped_stack_graphs cohg cohg') ≡
@@ -699,7 +709,7 @@ Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
 Proof.
   intros Hdisj.
 
-Admitted.
+Admitted. *)
 
 
 
