@@ -311,14 +311,6 @@ Proof.
 Qed.
 
 
-Lemma fmap_elements `{FinSet A SA, FinSet B SB} (f : A -> B) `{!Inj eq eq f} (X : SA) :
-  f <$> elements X ≡ₚ
-  elements (set_map f X :> SB).
-Proof.
-  apply NoDup_Permutation;
-  [apply (NoDup_fmap_2 _ _), NoDup_elements|apply NoDup_elements|].
-  set_solver.
-Qed.
 
 
 

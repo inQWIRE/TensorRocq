@@ -50,6 +50,41 @@ Proof.
   intros x.
   now rewrite elem_of_list_filter, 2 elem_of_elements, elem_of_filter.
 Qed.
+Lemma set_map_fn_singleton `{FinSet A SA, EqDecision A, !RelDecision (∈@{SA})}
+  (a b : A) (X : SA) :
+  set_map {[a := b]} X ≡
+  X ∖ {[a]} ∪ if decide (a ∈ X) then {[b]} else ∅.
+Proof.
+  set_unfold.
+  setoid_rewrite fn_lookup_singleton_case.
+  intros x.
+  split.
+  - intros (y & -> & Hy).
+    case_decide as Hay.
+    + subst y.
+      rewrite decide_True by easy.
+      right.
+      now apply elem_of_singleton.
+    + now left.
+  - intros [[Hx Hxa]|Hxdec].
+    + exists x.
+      now rewrite decide_False.
+    + case_decide as Ha; [|now apply elem_of_empty in Hxdec].
+      apply elem_of_singleton in Hxdec.
+      subst b.
+      exists a.
+      now rewrite decide_True.
+Qed.
+Lemma set_map_fn_singleton_L `{FinSet A SA, EqDecision A, !RelDecision (∈@{SA}),
+  !LeibnizEquiv SA}
+  (a b : A) (X : SA) :
+  set_map {[a := b]} X =
+  X ∖ {[a]} ∪ if decide (a ∈ X) then {[b]} else ∅.
+Proof.
+  unfold_leibniz.
+  apply set_map_fn_singleton.
+Qed.
+
 
 #[export] Instance from_option_dec {A} (P : Prop) (Q : A -> Prop) (ma : option A) :
   Decision P -> (forall a, Decision (Q a)) -> Decision (from_option Q P ma) :=
@@ -376,38 +411,26 @@ Qed.
   {[i; o]} ∪ vertices ((ins -> hedges <- outs) :> TensorGraph n (S m)) =
    *)
 
-(*
+
+
 Lemma vertices_add_top_loop_cup {n m} (tg : TensorGraph (S n) (S m)) :
-  vertices (add_top_loop tg) ∪ {[Vector.hd tg.(inputs)]} =
-  vertices tg ∖ {[Vector.hd tg.(outputs)]}.
+  vertices (add_top_loop tg) =
+  vertices tg ∖ {[Vector.hd tg.(outputs)]} ∪ {[Vector.hd tg.(inputs)]}.
 Proof.
   destruct tg as [hes ins outs].
   induction ins as [i ins] using vec_S_inv.
   induction outs as [o outs] using vec_S_inv.
   unfold add_top_loop.
-  cbn -[union].
-  rewrite vertices_relabel_graph.
-  replace (vertices (i ::: ins -> hes <- o ::: outs) ∖ {[o]})
-    with (({[i]} ∪ vertices (ins -> hes <- outs))∖ {[o]}) by set_solver +.
-  remember (vertices _) as vs eqn:Hvs.
-  set_unfold.
-  intros x.
-  setoid_rewrite fn_lookup_singleton_case.
-  split.
-  - intros [(? & -> & ?)| ->]; [|try naive_solver].
-
-  apply set_eq.
-  intros x.
-  rewrite 2 elem_of_difference, 2 not_elem_of_singleton.
-  rewrite elem_of_map.
+  rewrite vertices_relabel_graph; cbn -[union].
   unfold vertices.
-  cbn [inputs outputs hedges vec_to_list].
-  set_unfold.
-  firstorder idtac.
-  split; try
-  set_solver.
-
-  set_solver. *)
+  cbn -[union].
+  rewrite vertices_hg_add_vertices.
+  rewrite 2 list_to_set_app_L;
+  cbn -[union].
+  rewrite set_map_fn_singleton_L.
+  generalize (vertices_hg hes) as vs; intros vs.
+  case_decide as Hdec; [set_solver+|set_solver +Hdec].
+Qed.
 
 Import TECospan.
 
@@ -482,16 +505,39 @@ Proof.
     now apply NoDup_perm_filter_out.
 Qed.
 
+Lemma ntl_delta_eq_idemp' tl v sums abs delt :
+  v ∈ psets_to_varset (list_to_set sums) tl ->
+  ntl_delta_eq tl (mk_ntl sums abs ((v, v) :: delt))
+    (mk_ntl sums abs delt).
+Proof.
+  intros Hv.
+  symmetry.
+  apply ntl_delta_eq_idemp with v; easy.
+Qed.
+
+Lemma tg_abstracts_relabel_abs (f : positive -> positive) (hg : HyperGraph T) :
+  tg_abstracts (relabel_abs f <$> hg.(hyperedges)) =
+  relabel_abs (relabel_bounds f) <$> tg_abstracts hg.
+Proof.
+  unfold tg_abstracts.
+  rewrite map_to_list_fmap.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; intros _ [k [[? l] u]] _.
+  cbn.
+  f_equal; [f_equal|];
+  rewrite <- 2 list_fmap_compose; done.
+Qed.
+
 
 Lemma graph_namedtensorlist_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
-  vhd tg.(inputs) <> vhd tg.(outputs) ->
+  (* vhd tg.(inputs) <> vhd tg.(outputs) -> *)
   ntl_eq (list_to_set (((bcons false ∘ Pos.of_succ_nat) <$> seq 0 n)
      ++ ((bcons true ∘ Pos.of_succ_nat) <$> seq 0 m)))
      (graph_namedtensorlist_semantics (add_top_loop tg))
   (relabel_ntl_free (with_bcons Pos.pred)
     (add_loop_ntl_alt 2 3 (graph_namedtensorlist_semantics tg))).
 Proof.
-  intros Hio.
+  (* intros Hio. *)
 
   unfold add_loop_ntl_alt.
   remember (fresh _) as x eqn:Hxeq.
@@ -502,7 +548,9 @@ Proof.
   destruct tg as [hes ins outs].
   destruct ins as [i ins] using vec_S_inv.
   destruct outs as [o outs] using vec_S_inv.
-  cbn in Hio.
+  (* cbn in Hio. *)
+  unfold graph_namedtensorlist_semantics; cbn.
+  rewrite vertices_add_top_loop_cup.
 
   unfold add_top_loop, relabel_graph, graph_namedtensorlist_semantics,
     add_loop_ntl_alt, relabel_ntl_free; cbn.
@@ -594,8 +642,7 @@ Proof.
     apply elem_of_map_to_list in Hflu.
     eauto.
   }
-Admitted.
-  (* rewrite (list_fmap_id' (relabel_delt {[bound x := bound o]})). 2:{
+  rewrite (list_fmap_id' (relabel_delt {[bound x := bound o]})). 2:{
     intros [l u] [Hlu|Hlu]%elem_of_app;
     apply elem_of_lookup_imap in Hlu as (? & ? & [= -> ->] & Hx'%elem_of_list_lookup_2);
     cbn;
@@ -603,36 +650,59 @@ Admitted.
     apply fn_lookup_singleton_ne;
     set_solver + Hx' Hx.
   }
-  rewrite ntl_delta_eq_subst_NoDup by first [apply NoDup_elements|
-    apply elem_of_psets_to_varset; set_solver +|
-    now intros [= ->]|
-    set_solver +].
-  rewrite filter_elements.
+  symmetry.
+  rewrite (union_comm_L {[i]}), <- (union_assoc_L {[o]}).
+  destruct_decide (decide (i = o)) as Hio.
+  1:{
+    subst.
+    rewrite ntl_delta_eq_idemp' by now
+      apply elem_of_psets_to_varset, elem_of_list_to_set, elem_of_elements,
+       elem_of_union_l, elem_of_singleton_2.
+    apply ntl_eq_of_ntl_aeq, ntl_aeq_of_perm; cbn -[union].
+    - f_equiv.
+      remember (vertices _) as vs eqn:Hvs.
+      clear Hvs.
+      rewrite difference_union.
+      set_solver +.
+    - f_equiv.
+      symmetry.
+      etransitivity; [|apply map_fmap_id].
+      apply map_fmap_ext.
+      intros _ flu _.
+      apply relabel_abs_id'.
+      intros v.
+      rewrite fn_lookup_singleton_case; now case_decide.
+    - do 2 f_equiv; symmetry;
+      rewrite vec_to_list_map;
+      apply list_fmap_id'; intros v _;
+      rewrite fn_lookup_singleton_case; now case_decide.
+  }
+  rewrite elements_union, elements_singleton.
+  cbn [app].
+
+  rewrite ntl_delta_eq_subst' by first [
+    now intros ?%(inj bound)|
+    apply elem_of_psets_to_varset; set_solver +Hio|
+    now intros [? ?%not_elem_of_singleton]%elem_of_elements%elem_of_difference
+  ].
+
   apply ntl_eq_of_ntl_aeq, ntl_aeq_of_perm; cbn -[union].
-  - rewrite filter_union.
-    replace (filter _ {[_;_]}) with ({[i]}:>Pset) by set_solver + Hio.
-    admit. (* FIXME: Works when we have isolated vertices! *)
-  - unfold tg_abstracts.
-    rewrite map_to_list_fmap.
-    rewrite <- 2 list_fmap_compose.
-    apply eq_reflexivity, list_fmap_ext; intros _ [k flu] _.
+  - f_equiv.
+    remember (vertices _) as vs eqn:Hvs.
+    set_solver + Hio.
+  - rewrite tg_abstracts_relabel_abs.
+    apply eq_reflexivity, list_fmap_ext.
+    intros _ flu _.
+    apply relabel_abs_ext; intros [v|]; [|done].
     cbn.
-    f_equal; [f_equal|];
-    destruct flu as [[f low] up]; cbn;
-    rewrite <- 2 list_fmap_compose;
-    apply list_fmap_ext; intros _ v _;
-    cbn;
-    rewrite 2 fn_lookup_singleton_case;
+    rewrite 2 fn_lookup_singleton_case; 
     do 2 case_decide; congruence.
-  - rewrite 2 vec_to_list_map, fmap_app, 2 fmap_imap, 2 imap_fmap.
+  - rewrite fmap_app, 2 fmap_imap, 2 vec_to_list_map, 2 imap_fmap.
     unfold compose; cbn.
-    apply eq_reflexivity; 
-    f_equal; apply imap_ext;
-    intros ? ? _; cbn; 
-    f_equal;
-    rewrite 2 fn_lookup_singleton_case;
-    do 2 case_decide; congruence.
-Admitted. *)
+    apply eq_reflexivity; f_equal;
+    apply imap_ext; intros ? ? _; cbn; f_equal;
+    rewrite 2 fn_lookup_singleton_case; do 2 case_decide; congruence.
+Qed.
 
 
 
@@ -640,7 +710,7 @@ Admitted. *)
 
 
 
-(* 
+(*
 Lemma graph_contl_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
   graph_contl_semantics (add_top_loop tg) =
   relabel_contl_free (with_bcons Pos.pred) $

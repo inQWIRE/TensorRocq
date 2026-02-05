@@ -3,7 +3,7 @@ From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
 
 (* A HyperGraph representation where edges have a type T and the graph is represented as a map of positives to (edge_data, input_vertices, output_vertices) *)
-Notation HyperGraph T := (Pmap (T * list positive * list positive)).
+(* Notation HyperGraph T := (Pmap (T * list positive * list positive)).
 
 (* Instance Union_hypergraph {T} : Union (HyperGraph T) := {
   union := union
@@ -27,4 +27,4 @@ Definition example_1 : HyperGraph positive := {[ 1:= (1, [], [])]}.
 Lemma disjoint_example : example_1 ##ₘ {[ 2 := (2, [], []) ]}.
 Proof.
   compute_done.
-Qed.
+Qed. *)
