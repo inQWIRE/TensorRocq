@@ -1,6 +1,6 @@
 Require Export TensorGraph Aux_pos.
 
-Require Export TESyntax.
+Require Export TESyntax TECospan.
 
 (* FIXME: Move: *)
 Require Combinators.
