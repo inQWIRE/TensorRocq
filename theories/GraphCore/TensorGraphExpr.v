@@ -214,6 +214,7 @@ Lemma abstracts_bound_vars_graph {o p} (tg : TensorGraph o p) :
   abstracts_bound_vars (graph_namedtensorlist_semantics tg).(ntl_abstracts) =
   list_to_set ('(_, low, up) ← (map_to_list tg.(hedges).(hyperedges)).*2; low ++ up).
 Proof.
+  unfold abstracts_bound_vars. 
   cbn.
   f_equiv.
   unfold tg_abstracts.
@@ -232,6 +233,7 @@ Lemma deltas_bound_vars_graph {n m} (tg : TensorGraph n m) :
   deltas_bound_vars (graph_namedtensorlist_semantics tg).(ntl_deltas) =
   list_to_set ((vec_to_list tg.(inputs)) ++ (vec_to_list tg.(outputs))).
 Proof.
+  unfold deltas_bound_vars.
   cbn.
   rewrite bind_app.
   unfold tg_list_to_deltas.
@@ -250,7 +252,7 @@ Lemma abstracts_free_vars_graph {n m} (tg : TensorGraph n m) :
   ∅.
 Proof.
   cbn.
-  unfold tg_abstracts.
+  unfold tg_abstracts, abstracts_free_vars.
   rewrite list_fmap_bind.
   erewrite (list_bind_ext _ (λ _, nil)); [..|reflexivity]. 2:{
     intros [k [[f low] up]].
@@ -268,6 +270,7 @@ Lemma deltas_free_vars_graph {n m} (tg : TensorGraph n m) :
   list_to_set ((bcons false <$> pseq 1 (N.of_nat n)) ++
     (bcons true <$> pseq 1 (N.of_nat m))).
 Proof.
+  unfold deltas_free_vars.
   cbn.
   rewrite bind_app.
   unfold tg_list_to_deltas.

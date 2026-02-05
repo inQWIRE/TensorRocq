@@ -6,65 +6,6 @@ Require Export HyperGraph.
 Require Import TESyntax.
 
 (* FIXME: Move *)
-Lemma set_Forall2_map `{FinSet A SA, SemiSet B SB} P (f : A -> B) (X : SA) :
-  set_Forall2 P (set_map f X :> SB) <->
-  set_Forall2 (λ i j, P (f i) (f j)) X.
-Proof.
-  unfold set_Forall2.
-  setoid_rewrite elem_of_map.
-  naive_solver.
-Qed.
-Lemma kmap_fmap' `{FinMap K1 M1, FinMap K2 M2}
-  (f : K1 -> K2) `(g : A -> B) (m : M1 A) :
-  kmap f ((g <$> m) :> M1 B) =@{M2 B}
-  g <$> kmap f m.
-Proof.
-  induction m using map_first_key_ind;
-    [now rewrite fmap_empty, 2 kmap_empty, fmap_empty|].
-  rewrite fmap_insert, 2 TESyntax.kmap_insert_first_key,
-    fmap_insert; [congruence|easy..| |].
-  - now rewrite lookup_fmap, fmap_None.
-  - eapply map_first_key_dom'; [|eassumption].
-    intros j.
-    rewrite 2 lookup_insert_case.
-    case_decide; [easy|].
-    now rewrite lookup_fmap, fmap_is_Some.
-Qed.
-Lemma set_map_ext `{FinSet A SA, SemiSet B SB} (f g : A -> B) (X : SA) :
-  (forall x, x ∈ X -> f x = g x) ->
-  set_map f X ≡@{SB} set_map g X.
-Proof.
-  set_solver.
-Qed.
-Lemma set_map_ext_L `{FinSet A SA, SemiSet B SB, !LeibnizEquiv SB}
-  (f g : A -> B) (X : SA) : (forall x, x ∈ X -> f x = g x) ->
-  set_map f X =@{SB} set_map g X.
-Proof.
-  unfold_leibniz.
-  apply set_map_ext.
-Qed.
-Lemma set_map_id `{FinSet A SA} (X : SA) :
-  set_map id X ≡ X.
-Proof.
-  set_solver.
-Qed.
-Lemma set_map_id_L `{FinSet A SA, !LeibnizEquiv SA} (X : SA) :
-  set_map id X = X.
-Proof.
-  unfold_leibniz; apply set_map_id.
-Qed.
-Lemma set_map_compose `{FinSet A SA, FinSet B SB, SemiSet C SC}
-  (f : A -> B) (g : B -> C) (X : SA) :
-  set_map g (set_map f X :> SB) ≡@{SC} set_map (g ∘ f) X.
-Proof.
-  set_solver.
-Qed.
-Lemma set_map_compose_L `{FinSet A SA, FinSet B SB, SemiSet C SC, !LeibnizEquiv SC}
-  (f : A -> B) (g : B -> C) (X : SA) :
-  set_map g (set_map f X :> SB) =@{SC} set_map (g ∘ f) X.
-Proof.
-  unfold_leibniz; apply set_map_compose.
-Qed.
 
 (* Basic definitions and structural operations on TensorGraphs *)
 

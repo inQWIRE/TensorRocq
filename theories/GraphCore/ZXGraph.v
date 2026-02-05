@@ -1,5 +1,5 @@
 Require Import ZXCore.
-From QuantumLib Require Export Complex.
+From QuantumLib Require Export Complex. 
 Require Import TensorGraphSemantics.
 Open Scope nat_scope.
 

@@ -18,72 +18,7 @@ Proof.
   split; [auto|].
   now intros (?&?) [].
 Qed.
-Lemma fmap_to_map_imap `{FinMap K M} `(f : A -> B) (m : M A) :
-  f <$> m =@{M B} map_imap (λ _ a, Some (f a)) m.
-Proof.
-  apply map_eq.
-  intros k.
-  rewrite lookup_fmap, map_lookup_imap.
-  now destruct (m !! k).
-Qed.
-Lemma map_fmap_imap `{FinMap K M} `(f : K -> A -> option B) `(g : B -> C) (m : M A) :
-  g <$> map_imap f m =@{M C} map_imap (λ k a, g <$> (f k a)) m.
-Proof.
-  rewrite fmap_to_map_imap, map_imap_compose.
-  reflexivity.
-Qed.
-Lemma elements_union `{FinSet A SA, !RelDecision (∈@{SA})} (X Y : SA) :
-  elements (X ∪ Y) ≡ₚ elements X ++ elements (Y ∖ X).
-Proof.
-  rewrite <- elements_disj_union by set_solver.
-  apply elements_proper.
-  intros x.
-  destruct_decide (decide (x ∈ X));
-  set_solver.
-Qed.
-Lemma filter_elements `{FinSet A SA} (P : A -> Prop) `{HP : forall a, Decision (P a)}
-  (X : SA) :
-  filter P (elements X) ≡ₚ elements (filter P X).
-Proof.
-  apply NoDup_Permutation;
-  [apply NoDup_filter, NoDup_elements|apply NoDup_elements|].
-  intros x.
-  now rewrite elem_of_list_filter, 2 elem_of_elements, elem_of_filter.
-Qed.
-Lemma set_map_fn_singleton `{FinSet A SA, EqDecision A, !RelDecision (∈@{SA})}
-  (a b : A) (X : SA) :
-  set_map {[a := b]} X ≡
-  X ∖ {[a]} ∪ if decide (a ∈ X) then {[b]} else ∅.
-Proof.
-  set_unfold.
-  setoid_rewrite fn_lookup_singleton_case.
-  intros x.
-  split.
-  - intros (y & -> & Hy).
-    case_decide as Hay.
-    + subst y.
-      rewrite decide_True by easy.
-      right.
-      now apply elem_of_singleton.
-    + now left.
-  - intros [[Hx Hxa]|Hxdec].
-    + exists x.
-      now rewrite decide_False.
-    + case_decide as Ha; [|now apply elem_of_empty in Hxdec].
-      apply elem_of_singleton in Hxdec.
-      subst b.
-      exists a.
-      now rewrite decide_True.
-Qed.
-Lemma set_map_fn_singleton_L `{FinSet A SA, EqDecision A, !RelDecision (∈@{SA}),
-  !LeibnizEquiv SA}
-  (a b : A) (X : SA) :
-  set_map {[a := b]} X =
-  X ∖ {[a]} ∪ if decide (a ∈ X) then {[b]} else ∅.
-Proof.
-  unfold_leibniz.
-  apply set_map_fn_singleton.
-Qed.
+
 
 
 #[export] Instance from_option_dec {A} (P : Prop) (Q : A -> Prop) (ma : option A) :
@@ -440,12 +375,7 @@ Definition graph_contl_semantics {n m} (tg : TensorGraph n m) :
     (vmap (bcons false ∘ Pos.of_succ_nat) $ vseq 0 n)
     (vmap (bcons true ∘ Pos.of_succ_nat) $ vseq 0 m).
 
-Definition with_bcons (f : positive -> positive) (p : positive) :=
-  match p with
-  | xH => xH
-  | xI p => xI (f p)
-  | xO p => xO (f p)
-  end.
+
 
 #[export] Instance ntl_eq_of_ntl_aeq tl : subrelation ntl_aeq (ntl_eq tl).
 Proof.
@@ -695,7 +625,7 @@ Proof.
     intros _ flu _.
     apply relabel_abs_ext; intros [v|]; [|done].
     cbn.
-    rewrite 2 fn_lookup_singleton_case; 
+    rewrite 2 fn_lookup_singleton_case;
     do 2 case_decide; congruence.
   - rewrite fmap_app, 2 fmap_imap, 2 vec_to_list_map, 2 imap_fmap.
     unfold compose; cbn.
@@ -705,34 +635,80 @@ Proof.
 Qed.
 
 
-
-
-
-
-
-(*
-Lemma graph_contl_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
-  graph_contl_semantics (add_top_loop tg) =
-  relabel_contl_free (with_bcons Pos.pred) $
-  add_top_loop_contl_spec (graph_contl_semantics tg).
+Lemma ntl_free_varset_graph {n m} (tg : TensorGraph n m) :
+  ntl_free_varset (graph_namedtensorlist_semantics tg)
+  = list_to_set
+    (vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ++
+     vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m)).
 Proof.
-  unfold graph_contl_semantics, add_top_loop_contl_spec, relabel_contl_free;
+  unfold ntl_free_varset.
+  rewrite abstracts_free_vars_graph, deltas_free_vars_graph.
+  rewrite 2 vec_to_list_map, 2 vec_to_list_seq.
+  rewrite 2 pseq_to_seq, <- 2 list_fmap_compose.
+  rewrite union_empty_l_L.
+  now rewrite 2 Nat2N.id.
+Qed.
+
+Lemma graph_contl_semantics_WT {n m} (tg : TensorGraph n m) :
+  WT_contl (graph_contl_semantics tg).
+Proof.
+  unfold WT_contl.
   cbn.
-  f_equal; cycle 1.
-  - apply vec_to_list_inj2.
-    rewrite 3 vec_to_list_map, 2 vec_to_list_seq.
-    rewrite <- fmap_S_seq, <- 2 list_fmap_compose.
-    apply list_fmap_ext; intros _ p _.
+  rewrite WT_ntl_alt_varset.
+  rewrite ntl_free_varset_graph.
+  split; [done|].
+  apply graph_namedtensorlist_semantics_WF.
+Qed.
+
+Lemma graph_contl_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
+  contl_eq (graph_contl_semantics (add_top_loop tg))
+  (add_top_loop_contl (graph_contl_semantics tg)).
+Proof.
+  rewrite (contl_mk_surj (graph_contl_semantics (add_top_loop tg))).
+  etransitivity.
+  - apply contl_eq_of_ntl_eq.
     cbn.
-    lia.
-  - apply vec_to_list_inj2.
-    rewrite 3 vec_to_list_map, 2 vec_to_list_seq.
-    rewrite <- fmap_S_seq, <- 2 list_fmap_compose.
-    apply list_fmap_ext; intros _ p _.
-    cbn.
-    lia.
-  -
-    rewrite Vector.map_map. *)
+    rewrite 2 vec_to_list_map, 2 vec_to_list_seq.
+    apply graph_namedtensorlist_semantics_add_top_loop.
+  - cbn.
+    rewrite (@contl_eq_relabel_free (with_bcons Pos.succ) ltac:(hnf; intros [] []; cbn; lia)).
+    apply eq_reflexivity.
+    apply contl_ext.
+    + cbn.
+      rewrite relabel_ntl_free_compose.
+      etransitivity; [|apply relabel_ntl_free_id].
+      apply relabel_ntl_free_ext_strong.
+      assert (HWT : WT_contl (add_top_loop_contl (graph_contl_semantics tg))). 1:{
+        apply WT_add_top_loop_contl, graph_contl_semantics_WT.
+      }
+      apply WT_ntl_free_varset_subseteq in HWT.
+      intros i Hi%HWT.
+      cbn in Hi.
+      rewrite 2 vec_to_list_map, 2 vec_to_list_seq,
+        elem_of_list_to_set, elem_of_app,
+          2 elem_of_list_fmap in Hi.
+      setoid_rewrite elem_of_seq in Hi.
+      clear HWT.
+      cbn.
+      naive_solver subst; cbn; lia.
+    + cbn.
+      apply vec_to_list_inj2.
+      rewrite Vector.map_map.
+      rewrite 2 vec_to_list_map, 2 vec_to_list_seq,
+        <- fmap_S_seq, <- list_fmap_compose.
+      apply list_fmap_ext; intros _ ? _; cbn.
+      lia.
+    + cbn.
+      apply vec_to_list_inj2.
+      rewrite Vector.map_map.
+      rewrite 2 vec_to_list_map, 2 vec_to_list_seq,
+        <- fmap_S_seq, <- list_fmap_compose.
+      apply list_fmap_ext; intros _ ? _; cbn.
+      lia.
+Qed.
+
+
+
 
 
 

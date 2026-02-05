@@ -4093,6 +4093,50 @@ Proof.
   now rewrite fmap_app, Rlist_prod_app.
 Qed.
 
+(* 
+Lemma ntl_total_semantics_ntl_times_aux mabs ml l r :
+  WF_ntl l -> WF_ntl r ->
+  ntl_total_semantics mabs ml (ntl_times l r) ==
+  ntl_total_semantics mabs ml l * ntl_total_semantics mabs ml r.
+Proof.
+  intros Hl Hr.
+  rewrite ntl_total_semantics_alt by now apply ntl_times_WF.
+  rewrite 2 ntl_total_semantics_alt by easy.
+  cbn -[abstracts_semantics_alt deltas_semantics_alt list_to_set].
+  rewrite sum_of_Vmap_app, (sum_of_Vmap_fmap _).
+  rewrite sum_of_distr_l.
+  apply sum_of_ext'; intros mr_l Hmr_l.
+  rewrite sum_of_distr_r, (sum_of_Vmap_fmap _).
+  apply sum_of_ext'; intros mr_r Hmr_r.
+  rewrite abstracts_semantics_alt_app, deltas_semantics_alt_app.
+  symmetry.
+  rewrite rmul_comm_double.
+  symmetry.
+  f_equiv.
+  - f_equiv;
+    apply eq_reflexivity, abstracts_semantics_alt_ext, Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [[f low] up] _;
+    cbn;
+    (split; [easy|]);
+    split;
+    rewrite <- list_fmap_compose; apply list_fmap_ext;
+    (intros _ [v|] _; [cbn -[bcons]|done]);
+    try (rewrite lookup_union_l by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _));
+    rewrite lookup_union_r by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _).
+  - f_equiv;
+    apply eq_reflexivity, deltas_semantics_alt_ext, Forall2_fmap_l, Forall_Forall2_diag;
+    rewrite Forall_forall; intros [vl vu] _;
+    cbn;
+    (split; [rename vl into v|rename vu into v]);
+    (destruct v as [v|]; [cbn -[bcons]|done]);
+    try (rewrite lookup_union_l by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _));
+    rewrite lookup_union_r by (now apply (lookup_kmap_None _); lia);
+    apply (lookup_kmap _).
+Qed. *)
+
 Lemma ntl_total_semantics_ntl_times mabs ml l r :
   WF_ntl l -> WF_ntl r ->
   ntl_total_semantics mabs ml (ntl_times l r) ==
@@ -4201,11 +4245,6 @@ Proof.
     rewrite <- map_union_assoc.
     now rewrite <- insert_union_l, map_empty_union.
 Qed.
-
-(* FIXME: Move *)
-Definition ntl_free_varset (ntl : namedtensorlist) : Pset :=
-  abstracts_free_vars ntl.(ntl_abstracts) ∪
-  deltas_free_vars ntl.(ntl_deltas).
 
 Lemma ntl_free_varset_correct ntl :
   ntl_free_varset ntl = tl_free_varset (ntl2tl ntl).

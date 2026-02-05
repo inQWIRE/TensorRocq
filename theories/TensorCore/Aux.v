@@ -78,4 +78,4 @@ Proof. tauto. Qed.
 Lemma iff_True_1 {P} : P -> (P <-> True).
 Proof. tauto. Qed.
 Lemma iff_True_2 {P} : (P <-> True) -> P.
-Proof. tauto. Qed.
+Proof. tauto. Qed.  

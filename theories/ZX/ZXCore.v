@@ -120,8 +120,6 @@ Fixpoint h_stack {n : nat}
   | S k => fun bll blr => h (Vector.hd bll) (Vector.hd blr) * h_stack (Vector.tl bll) (Vector.tl blr)
   end.
 
-Check Tensor.
-
 Definition bihadamard {n m : nat} (ts : Tensor n m bool) : Tensor n m bool :=
   fun bs cs => 
     ∑ ds, ∑ es, h_stack bs ds * ts ds es * h_stack es cs.

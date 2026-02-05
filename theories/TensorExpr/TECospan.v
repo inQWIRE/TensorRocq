@@ -11,63 +11,34 @@ Require Export TESyntax.
 Notation vhd := Vector.hd.
 Notation vtl := Vector.tl.
 
-Lemma delete_list_to_map `{FinMap K M} {A}
-  (l : list (K * A)) k :
-  delete k (list_to_map l :> M A) =
-  list_to_map (filter (λ ka, ka.1 ≠ k) l).
+Lemma vzip_with_app `(f : A -> B -> C) {n m} (v w : vec _ n)
+  (v' w' : vec _ m) :
+    vzip_with f (v +++ v') (w +++ w') =
+    vzip_with f v w +++ vzip_with f v' w'.
 Proof.
-  induction l; [apply delete_empty|].
+  vec_double_ind v w; [done|].
   cbn.
-  case_decide as Hak.
-  - cbn.
-    setoid_rewrite <- IHl.
-    now apply delete_insert_ne.
-  - rewrite Hak.
-    rewrite delete_insert_delete.
-    apply IHl.
+  congruence.
 Qed.
 
-
-
-Lemma kmap_list_to_map `{FinMap K1 M1, FinMap K2 M2} {A} f `{Hf : !Inj eq eq f}
-  (l : list (K1 * A)) :
-  kmap f (list_to_map l :> M1 A) =@{M2 A}
-    list_to_map (fmap (prod_map f id) l).
+Lemma vmap_zip_with {A B C D} (f : A -> B -> C) (g : C -> D)
+  {n} (v : vec A n) (w : vec B n) :
+  vmap g (vzip_with f v w) = vzip_with (λ a b, g (f a b)) v w.
 Proof.
-  unfold kmap.
-  induction l as [l IHl] using (Nat.measure_induction _ length).
-  destruct l; [cbn; now rewrite map_to_list_empty|].
-  cbn.
-  rewrite <- insert_delete_insert.
-  erewrite list_to_map_proper.
-  2: {
-    rewrite fsts_prod_map.
-    apply (NoDup_fmap _).
-    apply NoDup_fst_map_to_list.
-  }
-  2:{
-    rewrite map_to_list_insert by now rewrite lookup_delete.
-    cbn.
-    done.
-  }
-  cbn.
-  symmetry.
-  rewrite <- insert_delete_insert.
-  change ((prod_map _ _ _).1) with (f p.1).
-  rewrite delete_list_to_map.
-  rewrite list_filter_fmap.
-  unfold compose.
-  rewrite delete_list_to_map.
-  f_equal.
-  rewrite IHl by now cbn; apply -> Nat.succ_le_mono; apply length_filter.
-  f_equal.
-  f_equal.
-  apply list_filter_iff.
-  intros []; cbn.
-  split; [now intros ? ->|].
-  now intros ? ->%(inj _).
+  vec_double_ind v w; cbn; congruence.
 Qed.
 
+Lemma vzip_map_l {A B C} (f : A -> B) {n} (v : vec A n) (w : vec C n) :
+  vzip (vmap f v) w = vmap (prod_map f id) $ vzip v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
+
+Lemma vzip_map_r {A B C} (f : B -> C) {n} (v : vec A n) (w : vec B n) :
+  vzip v (vmap f w) = vmap (prod_map id f) $ vzip v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
 
 Definition make_vecs_map {A n m} (ins : vec Idx n) (outs : vec Idx m)
   (insv : vec A n) (outsv : vec A m) : Pmap A :=
@@ -155,11 +126,14 @@ Definition relabel_contl_bound f {n m} (contl : CospanNamedTensorList n m) :=
     contl.(contl_inputs) contl.(contl_outputs).
 
 
+Definition reindex_contl f {n m} (contl : CospanNamedTensorList n m) :=
+  mk_contl (ntl_relabel_absidx f contl) contl.(contl_inputs) contl.(contl_outputs).
+
 
 Definition swapped_stack_contl_aux {n m n' m'}
   (contl : CospanNamedTensorList n m)
   (contl' : CospanNamedTensorList n' m') : CospanNamedTensorList (n' + n) (m + m') :=
-  mk_contl (ntl_times_aux contl contl')
+  mk_contl (ntl_times contl contl')
     (contl'.(contl_inputs) +++ contl.(contl_inputs))
     (contl.(contl_outputs) +++ contl'.(contl_outputs)).
 
@@ -191,6 +165,29 @@ Fixpoint add_top_loops_contl {n m o} :
     add_top_loops_contl (add_top_loop_contl contl)
   end.
 
+
+Definition ntl_cons_delta l u ntl :=
+  mk_ntl ntl.(ntl_sums) ntl.(ntl_abstracts) ((l, u) :: ntl.(ntl_deltas)).
+
+Definition ntl_app_deltas delt ntl :=
+  mk_ntl ntl.(ntl_sums) ntl.(ntl_abstracts) (delt ++ ntl.(ntl_deltas)).
+
+Definition compose_contl_aux {n m o} 
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList m o) : 
+  CospanNamedTensorList n o :=
+  mk_contl (ntl_app_deltas (vzip_with (λ l u, (free l, free u)) 
+    contl.(contl_outputs) contl'.(contl_inputs)) $
+    ntl_times_aux contl contl')
+    (contl.(contl_inputs)) (contl'.(contl_outputs)).
+
+
+Definition compose_contl {n m o} 
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList m o) : 
+  CospanNamedTensorList n o :=
+  compose_contl_aux (relabel_contl_free (bcons false) contl)
+    (relabel_contl_free (bcons true) contl').
+
+
 Lemma ntl_ext ntl ntl' :
   ntl.(ntl_sums) = ntl'.(ntl_sums) ->
   ntl.(ntl_abstracts) = ntl'.(ntl_abstracts) ->
@@ -206,9 +203,6 @@ Definition WT_contl {n m} (contl : CospanNamedTensorList n m) : Prop :=
     contl.(contl_expr).
 
 
-Definition ntl_free_varset (ntl : namedtensorlist) : Pset :=
-  abstracts_free_vars ntl.(ntl_abstracts) ∪
-    deltas_free_vars ntl.(ntl_deltas).
 
 Lemma relabel_ntl_free_ext_strong f g ntl :
   (forall i, i ∈ ntl_free_varset ntl -> f i = g i) ->
@@ -456,15 +450,6 @@ Proof.
 Qed.
 
 
-Lemma fmap_elements `{FinSet A SA, FinSet B SB} (f : A -> B) `{!Inj eq eq f} (X : SA) :
-  f <$> elements X ≡ₚ
-  elements (set_map f X :> SB).
-Proof.
-  apply NoDup_Permutation;
-  [apply (NoDup_fmap_2 _ _), NoDup_elements|apply NoDup_elements|].
-  set_solver.
-Qed.
-
 Lemma contl_interface_eq_symm {n m} (contl contl' : CospanNamedTensorList n m) :
   contl_interface_eq contl contl' -> contl_interface_eq contl' contl.
 Proof.
@@ -561,7 +546,7 @@ Inductive contl_eq_step {n m} : relation (CospanNamedTensorList n m) :=
   | interface_contl_eq_step contl contl' : contl_interface_eq contl contl' ->
     contl_eq_step contl contl'.
 
-Lemma contl_eq_step_symm {n m} (contl contl' : CospanNamedTensorList n m) : 
+Lemma contl_eq_step_symm {n m} (contl contl' : CospanNamedTensorList n m) :
   contl_eq_step contl contl' -> contl_eq_step contl' contl.
 Proof.
   intros [].
@@ -624,6 +609,241 @@ Proof.
 Qed.
 
 
+
+(* FIXME: Move *)
+Lemma contl_mk_surj {n m} (contl : CospanNamedTensorList n m) :
+  contl = mk_contl contl.(contl_expr) contl.(contl_inputs) contl.(contl_outputs).
+Proof.
+  now destruct contl.
+Qed.
+Lemma contl_eq_of_ntl_eq {n m} (ins : vec _ n) (outs : vec _ m) ntl ntl' :
+  ntl_eq (list_to_set (ins ++ outs)) ntl ntl' ->
+  contl_eq (mk_contl ntl ins outs) (mk_contl ntl' ins outs).
+Proof.
+  intros Heq.
+  apply rtc_once.
+  now constructor.
+Qed.
+Lemma contl_eq_relabel_free f `{Hf : !Inj eq eq f}
+  {n m} (contl : CospanNamedTensorList n m) :
+  contl_eq contl (relabel_contl_free f contl).
+Proof.
+  apply rtc_once.
+  constructor.
+  apply contl_interface_eq_iff_exists.
+  eauto.
+Qed.
+
+(* FIXME: Move!!! *)
+
+
+Lemma WT_ntl_free_varset_subseteq tl ntl :
+  WT_ntl tl ntl -> ntl_free_varset ntl ⊆ tl.
+Proof.
+  intros (?&?&?).
+  unfold ntl_free_varset.
+  now apply union_subseteq.
+Qed.
+
+Lemma WT_ntl_alt_varset tl ntl :
+  WT_ntl tl ntl <->
+  ntl_free_varset ntl ⊆ tl /\
+  WF_ntl ntl.
+Proof.
+  unfold WT_ntl, ntl_free_varset.
+  rewrite union_subseteq.
+  tauto.
+Qed.
+
+Lemma ntl_free_varset_insert_sum x ntl :
+  ntl_free_varset (ntl_insert_sum x ntl) = ntl_free_varset ntl.
+Proof.
+  done.
+Qed.
+
+Lemma ntl_bound_varset_insert_sum x ntl :
+  ntl_bound_varset (ntl_insert_sum x ntl) = ntl_bound_varset ntl.
+Proof.
+  done.
+Qed.
+
+
+Lemma ntl_varset_decomp ntl :
+  ntl_varset ntl = set_map bound (ntl_bound_varset ntl) ∪
+    set_map free (ntl_free_varset ntl).
+Proof.
+  unfold ntl_varset, ntl_bound_varset, ntl_free_varset.
+  rewrite 2 set_map_union_L.
+  rewrite abstracts_vars_decomp, deltas_vars_decomp.
+  apply set_eq.
+  intros x.
+  rewrite !elem_of_union.
+  tauto.
+Qed.
+
+
+#[global] Arguments abstracts_vars : simpl never.
+#[global] Arguments deltas_vars : simpl never.
+#[global] Arguments abstracts_bound_vars : simpl never.
+#[global] Arguments deltas_bound_vars : simpl never.
+#[global] Arguments abstracts_free_vars : simpl never.
+#[global] Arguments deltas_free_vars : simpl never.
+
+Lemma ntl_free_varset_relabel_ntl f ntl :
+  ntl_free_varset (relabel_ntl f ntl) =
+  set_omap (v2free ∘ f) (ntl_varset ntl).
+Proof.
+  unfold ntl_free_varset, ntl_varset.
+  cbn.
+  rewrite abstracts_free_vars_relabel_abs,
+    deltas_free_vars_relabel_delt, set_omap_union_L.
+  done.
+Qed.
+
+Lemma ntl_bound_varset_relabel_ntl f ntl :
+  ntl_bound_varset (relabel_ntl f ntl) =
+  set_omap (v2bound ∘ f) (ntl_varset ntl).
+Proof.
+  unfold ntl_bound_varset, ntl_varset.
+  cbn.
+  rewrite abstracts_bound_vars_relabel_abs,
+    deltas_bound_vars_relabel_delt, set_omap_union_L.
+  done.
+Qed.
+
+
+
+Lemma ntl_free_varset_add_loop_ntl_alt_as l r x ntl :
+  ntl_free_varset (add_loop_ntl_alt_as l r x ntl) =
+  ntl_free_varset ntl ∖ {[l; r]}.
+Proof.
+  unfold add_loop_ntl_alt_as.
+  rewrite ntl_free_varset_insert_sum.
+  rewrite ntl_free_varset_relabel_ntl.
+  rewrite ntl_varset_decomp.
+  apply leibniz_equiv_iff.
+  rewrite set_omap_union, set_omap_set_map.
+  unfold compose at 1 2.
+  cbn -[union].
+  rewrite set_omap_None, (union_empty_l _).
+  rewrite set_omap_set_map.
+  unfold compose; cbn -[union].
+  remember (ntl_free_varset ntl) as vs eqn:Hvs.
+  clear Hvs.
+  set_unfold.
+  intros k.
+  split.
+  - intros (j & Hj & Hjvs).
+    case_decide; [done|].
+    revert Hj.
+    cbn.
+    intros [= <-].
+    done.
+  - intros (Hkvs & Hk).
+    exists k.
+    now rewrite decide_False by done.
+Qed.
+
+
+Lemma ntl_bound_varset_add_loop_ntl_alt_as l r x ntl :
+  ntl_bound_varset (add_loop_ntl_alt_as l r x ntl) ⊆
+  ntl_bound_varset ntl ∪ {[x]}.
+Proof.
+  unfold add_loop_ntl_alt_as.
+  rewrite ntl_bound_varset_insert_sum.
+  rewrite ntl_bound_varset_relabel_ntl.
+  rewrite ntl_varset_decomp.
+  rewrite set_omap_union, set_omap_set_map.
+  unfold compose at 1 2.
+  cbn -[union].
+  rewrite set_omap_Some, set_map_id.
+  apply union_mono_l.
+  rewrite set_omap_set_map.
+  unfold compose; cbn -[union].
+
+  remember (ntl_free_varset ntl) as vs eqn:Hvs.
+  clear Hvs.
+  set_unfold.
+  intros k (? & Hk & _).
+  case_decide; [|done].
+  cbn in Hk.
+  congruence.
+Qed.
+
+
+Lemma WT_ntl_mono tl tl' ntl : tl ⊆ tl' ->
+  WT_ntl tl ntl -> WT_ntl tl' ntl.
+Proof.
+  intros Htl.
+  rewrite 2 WT_ntl_alt_varset.
+  intros [].
+  now split; [rewrite <- Htl|].
+Qed.
+
+Lemma WF_ntl_alt_varset ntl :
+  WF_ntl ntl <-> NoDup ntl.(ntl_sums) /\ ntl_bound_varset ntl ⊆ list_to_set ntl.(ntl_sums).
+Proof.
+  unfold WF_ntl, ntl_bound_varset.
+  rewrite union_subseteq.
+  tauto.
+Qed.
+
+Lemma add_loop_ntl_alt_as_WF ntl i o x : x ∉ ntl.(ntl_sums) ->
+  WF_ntl ntl -> WF_ntl (add_loop_ntl_alt_as i o x ntl).
+Proof.
+  intros Hx.
+  rewrite 2 WF_ntl_alt_varset.
+  intros [Hdup Hsub].
+  split.
+  - cbn.
+    now apply NoDup_cons.
+  - rewrite ntl_bound_varset_add_loop_ntl_alt_as.
+    cbn -[union].
+    set_solver +Hsub.
+Qed.
+
+Lemma add_loop_ntl_alt_as_WT tl ntl i o x : x ∉ ntl.(ntl_sums) ->
+  WT_ntl tl ntl -> WT_ntl (tl ∖ {[i;o]}) (add_loop_ntl_alt_as i o x ntl).
+Proof.
+  intros Hx.
+  rewrite 2 WT_ntl_alt_varset.
+  rewrite ntl_free_varset_add_loop_ntl_alt_as.
+  intros [Hsub Hwf].
+  split; [|now apply add_loop_ntl_alt_as_WF].
+  now apply difference_mono_r.
+Qed.
+
+Lemma add_loop_ntl_alt_WF ntl i o :
+  WF_ntl ntl ->
+  WF_ntl (add_loop_ntl_alt i o ntl).
+Proof.
+  apply add_loop_ntl_alt_as_WF, infinite_is_fresh.
+Qed.
+
+Lemma add_loop_ntl_alt_WT tl ntl i o :
+  WT_ntl tl ntl ->
+  WT_ntl (tl ∖ {[i;o]}) (add_loop_ntl_alt i o ntl).
+Proof.
+  apply add_loop_ntl_alt_as_WT, infinite_is_fresh.
+Qed.
+
+Lemma WT_add_top_loop_contl {n m} (contl : CospanNamedTensorList (S n) (S m)) :
+  WT_contl contl -> WT_contl (add_top_loop_contl contl).
+Proof.
+  destruct contl as [ntl ins outs].
+  induction ins as [i ins] using vec_S_inv.
+  induction outs as [o outs] using vec_S_inv.
+  cbn.
+  unfold add_top_loop_contl; cbn.
+  intros HWT%(add_loop_ntl_alt_WT _ _ i o).
+  cbn -[union] in HWT.
+  eapply WT_ntl_mono; [|apply HWT].
+  cbn -[union].
+  set_solver +.
+Qed.
+
+
+
 Require Export Tensor TESemantics.
 
 
@@ -668,7 +888,154 @@ Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
 
-Context `{SA : Summable A, AEQ : EqDecision A}.
+Context `{SA : Summable A, AEQ : EqDecision A, WFA : !WFSummable A}.
+
+
+
+Lemma ntl_total_semantics_add_loop_ntl_alt_as mabs ml i o x ntl :
+  WF_ntl ntl ->
+  (* i ∈ dom ml -> o ∈ dom ml ->  *)x ∉ ntl.(ntl_sums) ->
+  ntl_total_semantics mabs ml (add_loop_ntl_alt_as i o x ntl) ==
+  ∑ a : A,
+  ntl_total_semantics mabs (<[i := a]> (<[o := a]> ml)) ntl.
+Proof.
+  intros Hntl (* Hi Ho *) Hx.
+  rewrite ntl_total_semantics_alt by
+    now apply add_loop_ntl_alt_as_WF; try apply Hntl.
+  cbn -[abstracts_semantics_alt deltas_semantics_alt ntl_abstracts ntl_deltas].
+  rewrite sum_of_Vmap_cons'.
+  apply sum_of_ext; intros a.
+  rewrite ntl_total_semantics_alt by apply Hntl.
+  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  f_equiv.
+  - apply eq_reflexivity, abstracts_semantics_alt_ext.
+    apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall; intros [[f low] up] Hflu.
+    cbn.
+    split; [done|].
+    split.
+    + rewrite <- list_fmap_compose.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      cbn.
+      destruct v as [r|l].
+      * cbn.
+        unfold Vmap;
+        apply lookup_insert_ne.
+        intros ->.
+        apply Hx.
+        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.1.
+        rewrite elem_of_abstracts_bound_vars.
+        set_solver + Hflu Hv.
+      * cbn.
+        case_decide as Hl_io.
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert.
+          symmetry.
+          rewrite 2 lookup_insert_case.
+          do 2 (case_decide; [done|]).
+          now destruct Hl_io as [-> | ->].
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
+          done.
+    + rewrite <- list_fmap_compose.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      cbn.
+      destruct v as [r|l].
+      * cbn.
+        unfold Vmap;
+        apply lookup_insert_ne.
+        intros ->.
+        apply Hx.
+        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.1.
+        rewrite elem_of_abstracts_bound_vars.
+        set_solver + Hflu Hv.
+      * cbn.
+        case_decide as Hl_io.
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert.
+          symmetry.
+          rewrite 2 lookup_insert_case.
+          do 2 (case_decide; [done|]).
+          now destruct Hl_io as [-> | ->].
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
+          done.
+  - apply eq_reflexivity, deltas_semantics_alt_ext.
+    apply Forall2_fmap_l, Forall_Forall2_diag.
+    rewrite Forall_forall; intros [l u] Hflu.
+    cbn.
+    split.
+    + rename l into v.
+      destruct v as [r|l].
+      * cbn.
+        unfold Vmap;
+        apply lookup_insert_ne.
+        intros ->.
+        apply Hx.
+        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.2.
+        rewrite elem_of_deltas_bound_vars.
+        set_solver + Hflu.
+      * cbn.
+        case_decide as Hl_io.
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert.
+          symmetry.
+          rewrite 2 lookup_insert_case.
+          do 2 (case_decide; [done|]).
+          now destruct Hl_io as [-> | ->].
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
+          done.
+    + rename u into v.
+      rename l into l'.
+      destruct v as [r|l].
+      * cbn.
+        unfold Vmap;
+        apply lookup_insert_ne.
+        intros ->.
+        apply Hx.
+        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.2.
+        rewrite elem_of_deltas_bound_vars.
+        set_solver + Hflu.
+      * cbn.
+        case_decide as Hl_io.
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert.
+          symmetry.
+          rewrite 2 lookup_insert_case.
+          do 2 (case_decide; [done|]).
+          now destruct Hl_io as [-> | ->].
+        --cbn.
+          unfold Vmap.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
+          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
+          done.
+Qed.
+
+
+Lemma ntl_total_semantics_add_loop_ntl_alt mabs ml i o ntl :
+  WF_ntl ntl ->
+  ntl_total_semantics mabs ml (add_loop_ntl_alt i o ntl) ==
+  ∑ a : A,
+  ntl_total_semantics mabs (<[i := a]> (<[o := a]> ml)) ntl.
+Proof.
+  intros HWF.
+  now apply ntl_total_semantics_add_loop_ntl_alt_as, infinite_is_fresh.
+Qed.
+
+
+
+
 
 Let Tensor n m := (@Tensor R n m A).
 
@@ -782,7 +1149,7 @@ Proof.
   unfold make_vecs_map.
   symmetry.
   rewrite (kmap_list_to_map _).
-  now rewrite fmap_app, 4 vec_to_list_zip_with, 
+  now rewrite fmap_app, 4 vec_to_list_zip_with,
     2 vec_to_list_map, <- 2 zip_fmap_l.
 Qed.
 
@@ -817,7 +1184,7 @@ Qed.
 
 Lemma contl_eq_correct `{!WFSummable A} (mabs : abscontext) {n m}
   (contl contl' : CospanNamedTensorList n m) :
-  WT_contl contl -> 
+  WT_contl contl ->
   contl_eq contl contl' ->
   contl_semantics mabs contl ≡ contl_semantics mabs contl'.
 Proof.
@@ -825,6 +1192,135 @@ Proof.
   induction Heq as [|contl contl' contl'' Hstep Hsteps IHeq]; [done|].
   rewrite <- IHeq by now rewrite (contl_eq_step_WT _ _ Hstep) in HWF.
   now apply contl_eq_step_correct.
+Qed.
+
+
+
+Lemma contl_semantics_add_top_loop_gen mabs
+  {n m} (contl : CospanNamedTensorList (S n) (S m)) :
+  WF_ntl contl ->
+  vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) ->
+  contl_semantics mabs (add_top_loop_contl contl) ≡
+  join_stack_1_tl_tr (contl_semantics mabs contl).
+Proof.
+  destruct contl as [ntl ins outs].
+  induction ins as [i ins] using vec_S_inv.
+  induction outs as [o outs] using vec_S_inv.
+  unfold add_top_loop_contl; cbn.
+  intros Hwf Ho_ins.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+  unfold contl_semantics;
+  cbn -[ntl_total_semantics make_vecs_map].
+  rewrite ntl_total_semantics_add_loop_ntl_alt by easy.
+  apply sum_of_ext; intros a.
+  f_equiv.
+  cbn.
+  rewrite list_to_map_app.
+  cbn.
+  rewrite <- insert_union_r, <- list_to_map_app; [done|].
+  apply not_elem_of_dom.
+  rewrite dom_list_to_map.
+  now rewrite vec_to_list_zip_with, fst_zip, elem_of_list_to_set
+    by now rewrite 2 length_vec_to_list.
+Qed.
+
+Lemma vec_add_inv `(P : vec A (n + m) -> Prop)
+  (HP : forall v w, P (v +++ w)) : forall v, P v.
+Proof.
+  intros v.
+  rewrite <- app_vsplit.
+  apply HP.
+Qed.
+
+Definition contl_boundary {n m} (contl : CospanNamedTensorList n m) : Pset :=
+  list_to_set (contl.(contl_inputs) ++ contl.(contl_outputs)).
+
+Lemma contl_semantics_swapped_stack_aux mabs {n m n' m'}
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
+  WF_ntl contl -> WF_ntl contl' ->
+  ntl_free_varset contl ## contl_boundary contl' ->
+  ntl_free_varset contl' ## contl_boundary contl ->
+  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
+  contl_semantics mabs (swapped_stack_contl_aux contl contl') ≡
+  swapped_stack_tensor (contl_semantics mabs contl)
+    (contl_semantics mabs contl').
+Proof.
+  intros Hwf Hwf' Hdisj Hdisj' v w Hv Hw.
+  unfold contl_semantics;
+  cbn -[ntl_total_semantics ntl_times].
+  induction v as [vl vr] using vec_add_inv.
+  induction w as [wl wr] using vec_add_inv.
+  rewrite 2 vsplitl_app, 2 vsplitr_app, 2 vzip_with_app,
+    2 vec_to_list_app, 3 list_to_map_app.
+  (* rewrite 4 vzip_map_l, 4 vec_to_list_map.
+  rewrite <- 4 (kmap_list_to_map (M1:=Pmap) _). *)
+
+  rewrite ntl_total_semantics_ntl_times by easy.
+
+  f_equiv.
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hdisj in Hl as Hl'.
+    change (l ∉ contl_boundary contl') in Hl'.
+    unfold contl_boundary in Hl'.
+    rewrite list_to_set_app, not_elem_of_union in Hl'.
+    rewrite 3 lookup_union.
+    unfold make_vecs_map.
+    rewrite list_to_map_app, lookup_union.
+    rewrite (not_elem_of_dom _ _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    rewrite (left_id None _).
+    f_equal.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ wr)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    apply (right_id _ _).
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hdisj' in Hl as Hl'.
+    change (l ∉ contl_boundary contl) in Hl'.
+    unfold contl_boundary in Hl'.
+    rewrite list_to_set_app, not_elem_of_union in Hl'.
+    rewrite 3 lookup_union.
+    unfold make_vecs_map.
+    rewrite list_to_map_app, lookup_union.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ vr)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ wl)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    now rewrite (left_id None _), (right_id None _).
+Qed.
+
+Lemma contl_boundary_relabel_contl_free f {n m} 
+  (contl : CospanNamedTensorList n m) : 
+  contl_boundary (relabel_contl_free f contl) =
+  set_map f (contl_boundary contl).
+Proof.
+  unfold contl_boundary; cbn.
+  now rewrite 2 vec_to_list_map, set_map_list_to_set_L, fmap_app.
+Qed.
+
+Lemma contl_semantics_swapped_stack mabs {n m n' m'}
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
+  WT_contl contl -> WT_contl contl' ->
+  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
+  contl_semantics mabs (swapped_stack_contl contl contl') ≡
+  swapped_stack_tensor (contl_semantics mabs contl)
+    (contl_semantics mabs contl').
+Proof.
+  intros Hwf Hwf'.
+  unfold swapped_stack_contl.
+  rewrite contl_semantics_swapped_stack_aux by first [
+    now apply relabel_ntl_free_WF; apply Hwf || apply Hwf'|
+    rewrite contl_boundary_relabel_contl_free; cbn; 
+    rewrite ntl_free_varset_relabel_ntl_free;
+    intros ? []%elem_of_map []%elem_of_map; lia].
+  now apply swapped_stack_tensor_mor; 
+  apply (contl_semantics_relabel_contl_free _ _).
 Qed.
 
 End Semantics.

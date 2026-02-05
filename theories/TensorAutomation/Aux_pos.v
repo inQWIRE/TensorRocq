@@ -377,44 +377,6 @@ Proof.
   lia.
 Qed.
 
-Lemma NoDup_fmap_1_strong {A B} (f : A -> B) (l : list A) :
-  NoDup (f <$> l) ->
-  forall a b, a ∈ l -> b ∈ l -> f a = f b -> a = b.
-Proof.
-  rewrite NoDup_alt.
-  intros Hdup a b
-    (i & Ha)%elem_of_list_lookup (j & Hb)%elem_of_list_lookup Hfab.
-  specialize (Hdup i j (f a)).
-  rewrite 2 list_lookup_fmap in Hdup.
-  tspecialize Hdup by now rewrite Ha.
-  tspecialize Hdup by now rewrite Hb, Hfab.
-  subst.
-  congruence.
-Qed.
-
-Lemma NoDup_subseteq_same_length_Permutation {A} (l l' : list A) :
-  NoDup l' -> l' ⊆ l -> length l' = length l ->
-  l ≡ₚ l'.
-Proof.
-  intros Hl'; revert l;
-  induction Hl' as [|a l' IHl']; [now intros []|].
-  intros l Hl.
-  specialize (Hl a ltac:(constructor)) as Hal.
-  apply elem_of_list_split in Hal as (l1 & l2 & ->).
-  specialize (IHHl' (l1 ++ l2)).
-  tspecialize IHHl'.
-  - intros b Hb.
-    assert (b <> a) by congruence.
-    specialize (Hl _ (elem_of_list_further _ _ _ Hb)).
-    rewrite elem_of_app, elem_of_cons in Hl.
-    rewrite elem_of_app.
-    tauto.
-  - simpl_list; cbn.
-    intros Heq.
-    rewrite <- IHHl' by now simpl_list; lia.
-    solve_Permutation.
-Qed.
-
 
 Lemma surj_is_posperm n f :
   (forall p, p < n -> exists q, q < n /\ f q = p) ->
@@ -2204,4 +2166,16 @@ Qed.
 Proof.
   intros ? ?.
   apply vec_to_map_inj_iff.
+Qed.
+
+Definition with_bcons (f : positive -> positive) (p : positive) :=
+  match p with
+  | xH => xH
+  | xI p => xI (f p)
+  | xO p => xO (f p)
+  end.
+
+#[export] Instance with_bcons_inj f `{Hf : !Inj eq eq f} : Inj eq eq (with_bcons f).
+Proof.
+  intros [] [] [= ]; f_equal; now apply Hf.
 Qed.
