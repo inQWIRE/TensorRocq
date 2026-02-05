@@ -84,6 +84,186 @@ Definition zsp {n m : nat} (phase: R) : Tensor (R:=C) n m bool :=
     (if allb false bs && allb false cs then C1 else C0) +
     (if allb true bs && allb true cs then Cexp phase else C0).
 
+Definition parity  {n : nat} (bs : Vector.t bool n) : bool :=
+  Vector.fold_left (xorb) false bs.  
+
+Lemma parity_false {n : nat} (bs : Vector.t bool n) :
+  parity (false :: bs) = parity bs.
+Proof. reflexivity. Qed.
+
+
+Lemma parity_true {n : nat} (bs : Vector.t bool n) :
+  parity (true :: bs) = negb (parity bs).
+Proof. 
+  unfold parity. 
+  simpl.
+  induction bs.
+  - easy.
+  - destruct h; simpl; rewrite IHbs.
+    + rewrite negb_involutive; reflexivity.
+    + reflexivity.
+Qed.
+
+Definition xsp {n m : nat} 
+  (phase : R) (bs : Vector.t bool n) (cs : vec bool m) : C :=
+  (1/√2)^(n + m) * (1 + Cexp (if parity (bs ++ cs) 
+                       then (PI + phase) 
+                       else phase)).
+
+Definition h (bl : bool) (br : bool) : C :=
+  1/sqrt(2) * (if bl && br then -1 else 1).
+
+Fixpoint h_stack {n : nat} 
+  : Vector.t bool n -> Vector.t bool n -> C :=
+  match n with 
+  | 0 => fun bll blr => 1
+  | S k => fun bll blr => h (Vector.hd bll) (Vector.hd blr) * h_stack (Vector.tl bll) (Vector.tl blr)
+  end.
+
+Check Tensor.
+
+Definition bihadamard {n m : nat} (ts : Tensor n m bool) : Tensor n m bool :=
+  fun bs cs => 
+    ∑ ds, ∑ es, h_stack bs ds * ts ds es * h_stack es cs.
+
+Definition xsp_by_h {n m : nat} (phase : R) : Tensor n m bool :=
+  bihadamard (zsp phase).
+
+
+
+Lemma zsp_all_left {n m : nat} (bs : vec bool n) (cs : vec bool m) :
+  forall phase,
+    zsp phase bs cs = zsp phase (bs ++ cs) [].
+Proof.
+  intros.
+  unfold zsp.
+  simpl.
+  rewrite 2 andb_true_r.
+  rewrite 2 allb_append.
+  reflexivity. 
+Qed.
+
+Lemma h_stack_comm {n : nat} (bs : vec bool n) (cs : vec bool n) :
+  h_stack bs cs = h_stack cs bs.
+Proof.
+  induction bs.
+  - simpl.
+    C_field.
+  - simpl.
+    rewrite IHbs.
+    unfold h.
+    rewrite andb_comm.
+    reflexivity.
+Qed.
+
+Lemma h_stack_mul {n m : nat} 
+  (bs cs : vec bool n) (ds es : vec bool m) :
+  h_stack bs cs * h_stack ds es = h_stack (bs ++ ds) (cs ++ es).
+Proof.
+  intros.
+  induction bs.
+  - simpl.
+    rewrite (nil_spec cs).
+    C_field.
+  - simpl.
+    rewrite <- Cmult_assoc.
+    rewrite IHbs.
+    rewrite (VectorSpec.eta cs).
+    reflexivity.
+Qed.
+
+Lemma xsp_by_h_all_left {n m : nat} (bs : vec bool n) (cs : vec bool m) : 
+  forall phase,
+    xsp_by_h phase bs cs = xsp_by_h phase (bs ++ cs) [].
+Proof.
+  intros.
+  unfold xsp_by_h, bihadamard.
+  simpl.
+  unfold bihadamard.
+  symmetry.
+  rewrite sum_of_comm.
+  rewrite sum_of_vec_0.
+  rewrite sum_of_vec_add.
+  apply sum_of_ext; intros; apply sum_of_ext; intros.
+  rewrite <- zsp_all_left.
+  rewrite <- h_stack_mul.
+  rewrite (h_stack_comm cs).
+  C_field.
+Qed.
+
+Lemma xsp_by_h_ind_l {n : nat} (bs : Vector.t bool (S n)) :
+  forall phase,
+  xsp_by_h phase bs [] = 1/√2 * xsp_by_h (if hd bs then (PI + phase) else phase) (tl bs) [].
+Proof.
+  intros.
+  unfold xsp_by_h, bihadamard.
+  rewrite sum_of_vec_succ.
+  rewrite sum_of_bool_defn.
+  rewrite <- sum_of_add.
+  rewrite sum_of_distr_r.
+  apply sum_of_ext; intros.
+  rewrite 3 sum_of_vec_0.
+  simpl.
+  destruct (hd bs).
+  - C_field_simplify.
+    unfold h, zsp.
+    simpl.
+    rewrite 2 andb_true_r.
+    C_field_simplify.
+    destruct (allb true x).
+    + rewrite <- Cexp_PI.
+      rewrite Cexp_add.
+      lca.
+    + lca.
+    + nonzero.
+    + nonzero.
+  - C_field_simplify.
+    unfold h, zsp. 
+    simpl.
+    rewrite 2 andb_true_r.
+    C_field_simplify.
+    reflexivity.
+    all: nonzero.
+Qed.
+
+Lemma xsp_all_right {n m : nat} : forall (phase : R) (bs : vec bool n) (cs : vec bool m),
+  xsp phase bs cs = xsp phase [] (bs ++ cs).
+Proof. reflexivity. Qed. 
+
+Lemma xsp_colorswap {n m : nat} : forall (phase : R) (bs : vec bool n) (cs : vec bool m),
+  xsp phase bs cs = xsp_by_h phase bs cs.
+Proof.
+  intros.
+  rewrite xsp_all_right.
+  rewrite xsp_by_h_all_left.
+  generalize dependent phase.
+  induction (bs ++ cs); intros.
+  - unfold xsp, xsp_by_h, bihadamard, zsp.
+    simpl.
+    rewrite 2 sum_of_vec_0.
+    lca.
+  - rewrite xsp_by_h_ind_l.
+    rewrite <- IHt. 
+    simpl.
+    destruct h0.
+    + unfold xsp.
+      simpl.
+      rewrite parity_true.
+      rewrite negb_if.
+      destruct (parity t).
+      * C_field_simplify; [|nonzero].
+        replace (Cexp (PI + (PI + phase))) with (Cexp phase).
+        reflexivity.
+        rewrite 2 Cexp_add.
+        rewrite Cexp_PI.
+        lca.
+      * C_field.
+    + unfold xsp.
+      simpl.
+      rewrite parity_false.
+      C_field.
+Qed.
+
 Lemma flip_spider {n m} phase v w : 
   @zsp n m phase v w = zsp phase w v.
 Proof.
