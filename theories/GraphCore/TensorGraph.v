@@ -213,6 +213,104 @@ Section CospanHyperGraph.
 
 
 
+(* Definition is_input (tm : gmap nat T) (nm : positive * positive) : Prop :=
+  is_key tm (fst nm).
+
+Definition is_output (tm : gmap nat T) (nm : edge) : Prop :=
+  is_key tm (snd nm).
+
+Definition is_internal tm (e : edge) :=
+  is_key tm (fst e) /\ is_key tm (snd e).
+
+Definition not_internal tm (e : edge) :=
+  ~ is_internal tm e. *)
+
+Definition wrapover_r {n m} (tg : CospanHyperGraph T n m) :=
+  match tg with
+  | l -> hg <- r => [#] -> hg <- l +++ r
+  end.
+
+Definition wrapover_l {n m} (tg : CospanHyperGraph T n m) :=
+  match tg with
+  | l -> hg <- r => r +++ l -> hg <- [#]
+  end.
+
+Definition wrapunder_r {n m} (tg : CospanHyperGraph T n m) :=
+  match tg with
+  | l -> hg <- r => [#]-> hg <- r +++ l
+  end.
+
+Definition wrapunder_l {n m} (tg : CospanHyperGraph T n m) :=
+  match tg with
+  | l -> hg <- r => l +++ r -> hg <- [#]
+  end.
+
+Notation "⌊ chg" := (wrapunder_r chg) (at level 50).
+Notation "⌈ chg" := (wrapover_r chg) (at level 50).
+Notation "chg ⌉" := (wrapover_l chg) (at level 50).
+Notation "chg ⌋" := (wrapunder_l chg) (at level 50).
+
+(* Definition internal_edges tg :=
+  filter (is_internal tg.1) tg.2. *)
+
+(* Definition external_edges tg :=
+  tg.2.1 +++ tg.2.2. *)
+
+(* Definition i_internal_edges tg :=
+  enumerate (internal_edges tg). *)
+
+(* Definition i_external_edges tg :=
+  enumerate (external_edges tg). *)
+
+(* Definition is_node_input (k : nat) (e : edge) : Prop :=
+  e.2 = k.
+
+#[export] Instance is_node_input_dec k e : Decision (is_node_input k e) :=
+  decide_rel _ (e.2) k.
+
+Definition is_node_output (k : nat) (e : edge) : Prop :=
+  e.1 = k.
+
+#[export] Instance is_node_output_dec k e : Decision (is_node_output k e) :=
+  decide_rel _ (e.1) k.
+
+Definition node_input_edges (k : nat) (les : list labedge) : list labedge :=
+  filter (is_node_input k ∘ snd) les.
+
+Definition node_output_edges (k : nat) (les : list labedge) : list labedge :=
+  filter (is_node_output k ∘ snd) les.
+
+
+
+Definition in_arity (es : list edge) (k : nat) :=
+  length (filter (is_node_input k) es).
+
+Definition out_arity (es : list edge) (k : nat) :=
+  length (filter (is_node_output k) es). *)
+
+(* Definition add_edge (n : positive) (t : T)
+  (tg : TensorGraph) : TensorGraph :=
+  tg.(inputs) -> (<[n := (t, [], [])]> tg.1) <- tg.(outputs). *)
+
+(* Definition add_vertex_r (n : positive) (v : postiive) (tg : TensorGraph) :=
+  mk_cohg () *)
+
+(* Definition add_edge (e : edge)
+  (tg : TensorGraph) : TensorGraph :=
+  mk_cohg tg.1 (e :: tg.2). *)
+
+(* Definition empty_graph : TensorGraph := mk_cohg ∅ []. *)
+
+(* Definition graph_insize (tg : TensorGraph) : nat := size (inputs tg). *)
+(* Definition graph_outsize (tg : TensorGraph) : nat := size (outputs tg). *)
+
+
+(* Definition sorted_inputs (tg : TensorGraph) : list nat :=
+  merge_sort le $ elements (inputs tg). *)
+
+(* Definition sorted_outputs (tg : TensorGraph) : list nat :=
+  merge_sort le $ elements (outputs tg). *)
+
 Definition vertices (tg : CoHyGraph) : Pset :=
   vertices_hg (tg.(hedges)) ∪
   list_to_set (tg.(inputs) ++ tg.(outputs)).
