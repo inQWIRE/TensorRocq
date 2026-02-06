@@ -2,11 +2,10 @@ Require Import TensorGraph.
 Require Import HyperGraph.
 Require Import TESyntax.
 Require Import Aux_pos.
-From stdpp Require Export pmap gmap.
+From stdpp Require Export pmap gmap decidable.
 
 
 (* An implementation of double pushout (DPO) rewriting *)
-
 
 Lemma vsplitl_map {A B n m} (f : A -> B) (v : vec A (n + m)) :
   vsplitl (vmap f v) = vmap f (vsplitl v).
@@ -192,23 +191,7 @@ Qed.
 
 Section DPO.
 
-
   Context {T : Type}.
-
-
-  (* Definition new_vertex_between {n m} (l r : positive) (tg : CospanHyperGraph T n m) : CospanHyperGraph T n m. *)
-
-  (* Definition disjoint_union (hg : Pmap (T * list positive * list positive))
-
-  Definition add_vertex (tg : CospanHyperGraph T) (e : positive * positive) : CospanHyperGraph T.
-  apply mk_cohg.
-  - destruct e.
-
-    admit.
-  - exact tg.2.1.
-  - exact tg.2.2. *)
-
-
 
   Fixpoint propogate_subst {n} (ps : vec (positive * positive) n) : vec (positive * positive) n :=
   match n, ps with
@@ -218,7 +201,6 @@ Section DPO.
     let ps' := Vector.tl ps in
       (p, p') ::: propogate_subst (vmap (prod_map {[p := p']} {[p := p']}) ps')
   end.
-
 
   Fixpoint subst_by_vec {n} (ps : vec (positive * positive) n) (p : positive) : positive :=
     match ps with
@@ -240,6 +222,9 @@ Section DPO.
         hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs)) 
           <- tgr.(outputs)).
 
+  Definition compose_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs))) <- tgr.(outputs).
+
 Lemma compose_safe_to_compose {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
   compose_safe tgl tgr = compose
@@ -247,6 +232,43 @@ Lemma compose_safe_to_compose {n m o}
     (reindex_graph (bcons true) (relabel_graph (bcons true) tgr)).
 Proof.
   reflexivity.
+Qed.
+
+Lemma subst_by_vec_id {n} : forall v : vec positive n, forall p : positive,
+  subst_by_vec (propogate_subst (vzip_with pair v v)) p = p.
+Proof.
+  induction v.
+  - easy.
+  - intros.
+    simpl.
+    rewrite Vector.map_ext with (g:=(λ x : _, x)).
+    + rewrite Vector.map_id.
+      rewrite fn_lookup_singleton_case.
+      case_decide; subst; auto.
+    + intros.
+      destruct a.
+      simpl.
+      rewrite 2 fn_lookup_singleton_case.
+      case_decide; case_decide; subst; reflexivity.
+Qed.
+
+Lemma compose_to_compose_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : 
+  tgl.(outputs) = tgr.(inputs) -> 
+  compose tgl tgr = compose_unsafe tgl tgr.
+Proof.
+  intros.
+  unfold compose.
+  rewrite H.
+  unfold relabel_graph.
+  rewrite Vector.map_ext with (g:=(λ x : _, x)).
+  rewrite Vector.map_id.
+  simpl.
+  rewrite Vector.map_ext with (g:=(λ x : _, x)).
+  rewrite Vector.map_id.
+  simpl.
+  rewrite relabel_hg_id'.
+  reflexivity.
+  all: apply subst_by_vec_id.
 Qed.
 
 
@@ -480,6 +502,58 @@ Proof.
   rewrite <- 2 reindex_relabel_hg.
   done.
 Qed.
+
+Print HyperGraph.
+
+Section Paths.
+
+  Context (H : HyperGraph T).
+
+  Definition successor (h h' : HyperEdge T) :=
+    exists p, In p (h.1.2) /\ In p (h'.2).
+
+  Definition predecessor (h h' : HyperEdge T) :=
+    exists p, In p (h'.1.2) /\ In p (h.2).
+
+  Lemma succ_pred_symm (h h' : HyperEdge T) :
+    successor h h' <-> predecessor h' h.
+  Proof.
+    split;
+      intros [x []];
+      exists x;
+      auto.
+  Qed.
+
+  Search relation.
+
+  Definition path (h h' : HyperEdge T) : Prop :=
+    (tc successor) h h'.
+
+  Definition pred_path (h h' : HyperEdge T) :=
+    (tc predecessor) h h'.
+
+  Definition path_pred_path_symm (h h' : HyperEdge T) :
+    path h h' <-> pred_path h' h.
+  Proof.
+    split.
+    intros.
+    - induction H0.
+      + apply tc_once.
+        now rewrite succ_pred_symm in H0.
+      + 
+        Search tc.
+        rewrite IHtc.
+    - intros [x y | x y].
+      + 
+
+
+End Paths.
+
+Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) : CospanHyperGraph T n m :=
+  G.(inputs) -> {|
+    hyperedges := ∅;
+    hypervertices := ∅
+  |} <- G.(outputs).
 
 
 End DPO.
