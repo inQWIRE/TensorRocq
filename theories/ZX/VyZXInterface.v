@@ -1,1 +1,3 @@
-Require Export ZXGraph.
+Require Export TensorGraphSemantics ZXGraph VyZXTensor.
+
+

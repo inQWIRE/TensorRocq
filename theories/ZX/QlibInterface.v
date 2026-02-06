@@ -166,10 +166,6 @@ Proof.
     reflexivity.
 Qed.
 
-Require stdpp.fin.
-Require stdpp.vector.
-Import Modulus.
-
 
 Lemma nth_nat_to_bits_gen start len n p :
   (Vector.map (Nat.testbit n) (vseq start len)) !!! p =
@@ -557,7 +553,7 @@ Proof.
   by_cell; cbn -[Cmult]; lca.
 Qed.
 
-Lemma matrix_of_stack_tensors_1 n (t : Tensor 1 1 bool) :
+Lemma matrix_of_tensor_stack_tensors_1 n (t : Tensor 1 1 bool) :
   @matrix_of_tensor n n (stack_n_tensor_1 t) =
   kron_n n (matrix_of_tensor t).
 Proof.
@@ -568,4 +564,31 @@ Proof.
   rewrite (@matrix_of_tensor_stack 1 1).
   rewrite IHn.
   reflexivity.
+Qed.
+
+Lemma stack_tensor_h_stack n m : 
+  stack_tensor (@h_stack n) (@h_stack m) ≡ h_stack.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  now rewrite h_stack_mul, 2 app_vsplit.
+Qed.
+
+Lemma stack_n_tensor_1_h n :
+  stack_n_tensor_1 h_stack ≡ h_stack (n:=n).
+Proof.
+  induction n; [now do 2 refine (vec_0_inv _ _)|].
+  rewrite stack_n_tensor_1_succ.
+  erewrite stack_tensor_mor by first [eassumption|reflexivity].
+  now rewrite stack_tensor_h_stack.
+Qed.
+
+Lemma matrix_of_tensor_h_stack n :
+  matrix_of_tensor (h_stack (n:=n)) = kron_n n hadamard.
+Proof.
+  prep_matrix_equivalence.
+  rewrite <- stack_n_tensor_1_h.
+  rewrite matrix_of_tensor_stack_tensors_1.
+  f_equiv.
+  apply matrix_of_tensor_H.
 Qed.
