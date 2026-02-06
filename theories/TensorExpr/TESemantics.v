@@ -1345,55 +1345,6 @@ Notation tl_total_semantics_aux' mabs ml mr tl :=
   (tl_total_semantics_aux mabs ml mr tl.(tl_sums) tl.(tl_abstracts) tl.(tl_deltas)).
 
 
-(* FIXME: Find existing; consolidate *)
-Lemma cast_id {n} (v : vec A n) H :
-  Vector.cast v H = v.
-Proof.
-  revert H; induction v; intros ?; cbn; f_equal; auto.
-Qed.
-(* FIXME: Move *)
-Lemma sum_of_vec_cast {n m} (f : vec A n -> R) (H : m = n) :
-  ∑ v : _, f v == ∑ v : vec A m, f (Vector.cast v H).
-Proof.
-  subst.
-  now setoid_rewrite cast_id.
-Qed.
-Lemma vec_to_list_rev {n} (v : vec A n) :
-  vec_to_list (Vector.rev v) = reverse v.
-Proof.
-  rewrite 2 vec_to_list_to_list, Vector.to_list_rev.
-  now rewrite rev_reverse.
-Qed.
-Lemma vec_to_list_cast {n m} (v : vec A n) (H : n = m) :
-  vec_to_list (Vector.cast v H) = v.
-Proof.
-  subst.
-  now rewrite cast_id.
-Qed.
-Lemma vec_rev_cons_alt {n} (a : A) (v : vec A n) :
-  Vector.rev (a ::: v) = Vector.cast (Vector.rev v +++ [#a]) (Nat.add_comm n 1).
-Proof.
-  apply vec_to_list_inj2.
-  rewrite vec_to_list_rev, vec_to_list_cast, vec_to_list_app,
-    vec_to_list_rev.
-  cbn -[reverse].
-  rewrite reverse_cons.
-  reflexivity.
-Qed.
-Lemma sum_of_vec_rev {n} (f : vec A n -> R) :
-  ∑ v : _, f v == ∑ v : _, f (Vector.rev v).
-Proof.
-  induction n.
-  - now rewrite 2 sum_of_vec_0, Vector.rev_nil.
-  - erewrite (sum_of_vec_cast f (Nat.add_comm n 1)).
-    rewrite sum_of_vec_add.
-    rewrite sum_of_comm.
-    rewrite sum_of_vec_1, sum_of_vec_succ.
-    f_equiv; intros a.
-    rewrite IHn.
-    f_equiv; intros v.
-    now rewrite vec_rev_cons_alt.
-Qed.
 
 
 

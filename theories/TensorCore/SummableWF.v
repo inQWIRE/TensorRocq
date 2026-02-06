@@ -1,4 +1,5 @@
 Require Export Summable.
+Require Export Aux_stdpp.
 From stdpp Require Import vector fin.
 From stdpp Require Export list.
 
@@ -23,23 +24,6 @@ Class WFSummable (A : Type) `{Summable A} := mk_WF_sum {
 Next Obligation.
   cbn.
   compute_done.
-Qed.
-
-(* FIXME: Move *)
-Lemma NoDup_list_prod {A B} (l : list A) (l' : list B) :
-  NoDup l -> NoDup l' -> NoDup (list_prod l l').
-Proof.
-  intros Hl Hl'.
-  induction Hl; [constructor|].
-  cbn.
-  apply NoDup_app.
-  split_and!.
-  - now apply (NoDup_fmap _).
-  - intros (a, b) (? & [= <- <-] & Hb)%elem_of_list_fmap.
-    rewrite <- list_cprod_list_prod.
-    rewrite elem_of_list_cprod.
-    cbn; tauto.
-  - easy.
 Qed.
 
 #[export] Program Instance SummableWF_prod `{WFSummable A, WFSummable B}
@@ -80,13 +64,6 @@ Qed.
   SummedElement b.
 Next Obligation.
   intros []; cbn; compute_done.
-Qed.
-
-(* FIXME: Move *)
-Lemma vec_to_list_to_list {A n} (v : vec A n) :
-  vec_to_list v = Vector.to_list v.
-Proof.
-  induction v; cbn; f_equal; easy.
 Qed.
 
 #[export] Program Instance SummedElement_vec `{Summable A}

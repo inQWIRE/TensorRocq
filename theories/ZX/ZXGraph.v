@@ -1,5 +1,5 @@
 Require Import ZXCore.
-From QuantumLib Require Export Complex. 
+From QuantumLib Require Export Complex.
 Require Import TensorGraphSemantics.
 Open Scope nat_scope.
 
@@ -9,8 +9,8 @@ Notation "'ZXG'" := (CospanHyperGraph (bool * R)) (at level 0).
 
 Instance ZXCALC : TensorLike C bool (bool * R) := {
   interpretTensor (x : bool * R) := match x with
-  | (true, r)  => fun n m => @zsp n m r
-  | (false, r) => fun n m => @zsp n m r
+  | (false, r)  => fun n m => @zsp n m r
+  | (true, r) => fun n m => @xsp n m r
   end
 }.
 
@@ -34,20 +34,47 @@ Proof.
 Qed.
 
 
+
+Lemma parity_perm {n m} (v : vec bool n) (w : vec bool m) :
+  v ≡ₚ w ->
+  parity v = parity w.
+Proof.
+  intros Hperm.
+  apply Permutation_length in Hperm as Hnm.
+  rewrite 2 length_vec_to_list in Hnm.
+  subst m.
+  unfold parity.
+  rewrite 2 Vector.to_list_fold_left.
+  rewrite 2 fold_symmetric by now intros; Btauto.btauto.
+  apply (foldr_permutation_proper _ _).
+  - solve_proper.
+  - intros; Btauto.btauto.
+  - now rewrite <- 2 vec_to_list_to_list.
+Qed.
+
 Lemma zsp_permutative n m r : permutative_tensor (@zsp n m r).
 Proof.
   intros v v' w w' Hv Hw.
   apply zsp_allb; rewrite 2 allb_forallb; now first [rewrite Hv|rewrite Hw].
 Qed.
 
-Lemma zsp_allb_app {n m n' m'} r v w v' w' : 
+Lemma xsp_permutative n m r : permutative_tensor (@xsp n m r).
+Proof.
+  intros v v' w w' Hv Hw.
+  unfold xsp.
+  do 3 f_equal.
+  erewrite parity_perm; [reflexivity|].
+  rewrite 2 vec_to_list_app; now f_equiv.
+Qed.
+
+Lemma zsp_allb_app {n m n' m'} r v w v' w' :
   allb false (v +++ w) = allb false (v' +++ w') ->
   allb true (v +++ w) = allb true (v' +++ w') ->
   @zsp n m r v w = @zsp n' m' r v' w'.
 Proof.
   intros Hfalse Htrue.
   unfold zsp.
-  rewrite ! allb_forallb, <- ! forallb_app, <- ! vec_to_list_app, 
+  rewrite ! allb_forallb, <- ! forallb_app, <- ! vec_to_list_app,
     <- ! allb_forallb.
   now rewrite Hfalse, Htrue.
 Qed.
@@ -58,9 +85,20 @@ Proof.
   now apply zsp_allb_app; rewrite 2 allb_forallb, 2 vec_to_list_app, Hvw.
 Qed.
 
+Lemma xsp_strongly_permutative r : strongly_permutative_tensor (fun n m => @xsp n m r).
+Proof.
+  intros n n' m m' v w v' w' Hvw.
+  unfold xsp.
+  apply Permutation_length in Hvw as Hlen.
+  rewrite 2 length_app, 4 length_vec_to_list in Hlen.
+  f_equal; [now rewrite Hlen|].
+  erewrite parity_perm; [reflexivity|].
+  now rewrite 2 vec_to_list_app.
+Qed.
+
 #[global] Program Instance ZXCALC_SP : StronglyPermutativeTensorLike ZXCALC.
 Next Obligation.
-  intros [[] r]; cbn; apply zsp_strongly_permutative.
+  intros [[] r]; cbn; [apply xsp_strongly_permutative|apply zsp_strongly_permutative].
 Qed.
 
 

@@ -265,6 +265,29 @@ Fixpoint join_stack_tl_tr `{SA : Summable A,
     join_stack_tl_tr (join_stack_1_tl_tr t)
   end.
 
+Definition cup_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n} : 
+  Tensor 0 (n + n) A := fun v w => 
+  delta_tensor (vsplitl w) (vsplitr w).
+
+Definition cap_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n} : 
+  Tensor (n + n) 0 A := fun v w => 
+  delta_tensor (vsplitl v) (vsplitr v).
+
+Definition swap_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n m} : 
+  Tensor (n + m) (m + n) A := fun v w => 
+  delta_tensor v (vsplitr w +++ vsplitl w).
+
+Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
+  fun a b => t [# a] [# b].
+
+Definition stack_n_tensor_1 `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n} (t : Tensor 1 1 A) : Tensor n n A :=
+  fun v w => 
+  Vector.fold_right rmul (vzip_with (tensor_11_to_fun t) v w) rI.
+
 #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
 #[global] Arguments compose_tensor {_ _} {_ _ _ _ _ _} {_ _ _} (_ _) _ _ / : assert.
 #[global] Arguments stack_tensor {_ _} {_ _ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
@@ -274,6 +297,11 @@ Fixpoint join_stack_tl_tr `{SA : Summable A,
 #[global] Arguments join_stack_1_tl_tr {_ _} {_ _ _ _ _ _} {_ _} (_) _ _ / : assert.
 #[global] Arguments join_stack_tl_tr {_ _} {_ _ _ _ _ _} {!_ _ _} (_) / _ _ : assert.
 
+#[global] Arguments cup_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
+#[global] Arguments cap_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
+#[global] Arguments swap_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
+#[global] Arguments stack_n_tensor_1 
+  {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
 
 
 Add Parametric Morphism `{SA : Summable A,
@@ -548,6 +576,18 @@ Proof.
   cbn.
   apply sum_of_ext; intros u.
   now rewrite !vsplitl_app, !vsplitr_app.
+Qed.
+
+Lemma stack_n_tensor_1_succ {n} (t : Tensor 1 1 A) : 
+  stack_n_tensor_1 (n:=S n) t ≡
+  stack_tensor t (stack_n_tensor_1 t).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  induction v as [vh v] using vec_S_inv.
+  induction w as [wh w] using vec_S_inv.
+  cbn.
+  done.
 Qed.
 
 (* TODO: More *)

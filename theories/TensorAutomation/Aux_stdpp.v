@@ -2208,7 +2208,7 @@ Notation vzip := (vzip_with pair).
 
 Lemma vzip_with_map_l {n} {A B C D} (f : B -> C -> D) (g : A -> B)
   (v : vec A n) (w : vec C n) :
-  vzip_with f (vmap g v) w = 
+  vzip_with f (vmap g v) w =
   vzip_with (f ∘ g) v w.
 Proof.
   vec_double_ind v w.
@@ -2219,7 +2219,7 @@ Qed.
 
 Lemma vzip_with_map_r {n} {A B C D} (f : A -> C -> D) (g : B -> C)
   (v : vec A n) (w : vec B n) :
-  vzip_with f v (vmap g w) = 
+  vzip_with f v (vmap g w) =
   vzip_with (λ a b, f a (g b)) v w.
 Proof.
   vec_double_ind v w.
@@ -2229,8 +2229,8 @@ Proof.
 Qed.
 
 Lemma vzip_with_map {n} {A B C D E} (f : B -> D -> E) (g : A -> B) (h : C -> D)
-  (v : vec A n) (w : vec C n) : 
-  vzip_with f (vmap g v) (vmap h w) = 
+  (v : vec A n) (w : vec C n) :
+  vzip_with f (vmap g v) (vmap h w) =
   vzip_with (λ a b, f (g a) (h b)) v w.
 Proof.
   vec_double_ind v w.
@@ -2268,7 +2268,7 @@ Proof.
   vec_double_ind v w; cbn; congruence.
 Qed.
 
-Lemma vzip_map {A B C D} (f : A -> B) (g : C -> D) 
+Lemma vzip_map {A B C D} (f : A -> B) (g : C -> D)
   {n} (v : vec A n) (w : vec C n) :
   vzip (vmap f v) (vmap g w) = vmap (prod_map f g) $ vzip v w.
 Proof.
@@ -2823,4 +2823,139 @@ Lemma set_map_compose_L `{FinSet A SA, FinSet B SB, SemiSet C SC, !LeibnizEquiv 
   set_map g (set_map f X :> SB) =@{SC} set_map (g ∘ f) X.
 Proof.
   unfold_leibniz; apply set_map_compose.
+Qed.
+
+Lemma NoDup_list_prod {A B} (l : list A) (l' : list B) :
+  NoDup l -> NoDup l' -> NoDup (list_prod l l').
+Proof.
+  intros Hl Hl'.
+  induction Hl; [constructor|].
+  cbn.
+  apply NoDup_app.
+  split_and!.
+  - now apply (NoDup_fmap _).
+  - intros (a, b) (? & [= <- <-] & Hb)%elem_of_list_fmap.
+    rewrite <- list_cprod_list_prod.
+    rewrite elem_of_list_cprod.
+    cbn; tauto.
+  - easy.
+Qed.
+
+
+Lemma vec_to_list_to_list {A n} (v : vec A n) :
+  vec_to_list v = Vector.to_list v.
+Proof.
+  induction v; cbn; f_equal; easy.
+Qed.
+
+Fixpoint vseq (start len : nat) : vec nat len :=
+  match len with
+  | O => [#]
+  | S len => start ::: vseq (S start) len
+  end.
+Lemma vec_to_list_seq start len :
+  vec_to_list (vseq start len) = seq start len.
+Proof.
+  revert start; induction len; intros start; cbn; f_equal; done.
+Qed.
+Lemma vlookup_seq start len (i : fin len) :
+  vseq start len !!! i =
+  start + i.
+Proof.
+  pose proof (lookup_seq_lt start len i (fin_to_nat_lt i)) as Hlook.
+  rewrite <- vec_to_list_seq, <- vlookup_lookup' in Hlook.
+  destruct Hlook as (Hlt & <-).
+  f_equal.
+  apply fin_to_nat_inj.
+  now rewrite fin_to_nat_to_fin.
+Qed.
+Lemma vseq_app len1 len2 start :
+  vseq start (len1 + len2) =
+  vseq start len1 +++ vseq (start + len1) len2.
+Proof.
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_app, 3 vec_to_list_seq.
+  apply seq_app.
+Qed.
+
+Lemma vseq_fun_to_vec start len :
+  vseq start len =
+  fun_to_vec (fun i => start + i).
+Proof.
+  revert start; induction len; [done|intros start].
+  cbn.
+  f_equal; [lia|].
+  rewrite IHlen.
+  apply vec_eq.
+  intros i.
+  rewrite 2 lookup_fun_to_vec.
+  cbn.
+  lia.
+Qed.
+
+Lemma cast_id {A n} (v : vec A n) H :
+  Vector.cast v H = v.
+Proof.
+  revert H; induction v; intros ?; cbn; f_equal; auto.
+Qed.
+Lemma vec_to_list_rev {A} {n} (v : vec A n) :
+  vec_to_list (Vector.rev v) = reverse v.
+Proof.
+  rewrite 2 vec_to_list_to_list, Vector.to_list_rev.
+  now rewrite rev_reverse.
+Qed.
+Lemma vec_to_list_cast {A} {n m} (v : vec A n) (H : n = m) :
+  vec_to_list (Vector.cast v H) = v.
+Proof.
+  subst.
+  now rewrite cast_id.
+Qed.
+Lemma vec_rev_cons_alt {A} {n} (a : A) (v : vec A n) :
+  Vector.rev (a ::: v) = Vector.cast (Vector.rev v +++ [#a]) (Nat.add_comm n 1).
+Proof.
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_rev, vec_to_list_cast, vec_to_list_app,
+    vec_to_list_rev.
+  cbn -[reverse].
+  rewrite reverse_cons.
+  reflexivity.
+Qed.
+
+Lemma fin_rev_pf {i n} : i < n -> n - S i < n.
+Proof.
+  lia.
+Qed.
+
+Definition fin_rev {n} (i : fin n) : fin n :=
+  nat_to_fin (fin_rev_pf $ fin_to_nat_lt i).
+
+Lemma fin_to_nat_rev {n} (i : fin n) : 
+  fin_rev i =@{nat} n - S i.
+Proof.
+  apply fin_to_nat_to_fin.
+Qed.
+
+Lemma vlookup_rev {A n} (v : vec A n) i : 
+  Vector.rev v !!! i = 
+  v !!! fin_rev i.
+Proof.
+  symmetry.
+  apply vlookup_lookup.
+  assert (Hvi : is_Some (vec_to_list (Vector.rev v) !! (i:>nat))) by now 
+    apply lookup_lt_is_Some;
+    rewrite length_vec_to_list; 
+    apply fin_to_nat_lt.
+
+  destruct Hvi as [vi Hvi].
+  replace (_ !!! i) with vi. 2:{
+    symmetry.
+    apply vlookup_lookup' in Hvi as [? <-];
+    f_equal;
+    apply fin_to_nat_inj; 
+    now rewrite fin_to_nat_to_fin.
+  }
+  rewrite vec_to_list_rev, reverse_lookup in Hvi by 
+    now rewrite length_vec_to_list; apply fin_to_nat_lt.
+  rewrite <- Hvi.
+  now rewrite fin_to_nat_rev, length_vec_to_list.
 Qed.

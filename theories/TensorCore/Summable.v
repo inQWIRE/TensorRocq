@@ -750,6 +750,29 @@ Proof.
     reflexivity.
 Qed.
 
+
+Lemma sum_of_vec_cast {n m} (f : vec A n -> R) (H : m = n) :
+  ∑ v : _, f v == ∑ v : vec A m, f (Vector.cast v H).
+Proof.
+  subst.
+  now setoid_rewrite cast_id.
+Qed.
+
+Lemma sum_of_vec_rev {n} (f : vec A n -> R) :
+  ∑ v : _, f v == ∑ v : _, f (Vector.rev v).
+Proof.
+  induction n.
+  - now rewrite 2 sum_of_vec_0, Vector.rev_nil.
+  - erewrite (sum_of_vec_cast f (Nat.add_comm n 1)).
+    rewrite sum_of_vec_add.
+    rewrite sum_of_comm.
+    rewrite sum_of_vec_1, sum_of_vec_succ.
+    f_equiv; intros a.
+    rewrite IHn.
+    f_equiv; intros v.
+    now rewrite vec_rev_cons_alt.
+Qed.
+
 End Vector.
 
 Lemma sum_of_prod_defn `{Summable A, Summable B} (f : A * B -> R) : 

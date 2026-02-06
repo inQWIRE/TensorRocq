@@ -15,28 +15,6 @@ Proof.
   rewrite pseq_to_seq.
   do 2 f_equal; lia.
 Qed.
-(* FIXME: Move*)
-Fixpoint vseq (start len : nat) : vec nat len :=
-  match len with
-  | O => [#]
-  | S len => start ::: vseq (S start) len
-  end.
-Lemma vec_to_list_seq start len :
-  vec_to_list (vseq start len) = seq start len.
-Proof.
-  revert start; induction len; intros start; cbn; f_equal; done.
-Qed.
-Lemma vlookup_seq start len (i : fin len) :
-  vseq start len !!! i =
-  start + i.
-Proof.
-  pose proof (lookup_seq_lt start len i (fin_to_nat_lt i)) as Hlook.
-  rewrite <- vec_to_list_seq, <- vlookup_lookup' in Hlook.
-  destruct Hlook as (Hlt & <-).
-  f_equal.
-  apply fin_to_nat_inj.
-  now rewrite fin_to_nat_to_fin.
-Qed.
 Lemma map_to_list_disj_union `{FinMap K M} {A} (m1 m2 : M A) :
   m1 ##ₘ m2 ->
   map_to_list (m1 ∪ m2) ≡ₚ map_to_list m1 ++ map_to_list m2.
@@ -745,14 +723,6 @@ Proof.
   apply contl_eq_of_ntl_eq.
 Qed.
 
-Lemma vseq_app len1 len2 start : 
-  vseq start (len1 + len2) =
-  vseq start len1 +++ vseq (start + len1) len2.
-Proof.
-  apply vec_to_list_inj2.
-  rewrite vec_to_list_app, 3 vec_to_list_seq.
-  apply seq_app.
-Qed.
 
 Lemma graph_contl_semantics_stack {n m n' m'} (tg : TensorGraph n m)
   (tg' : TensorGraph n' m') :
