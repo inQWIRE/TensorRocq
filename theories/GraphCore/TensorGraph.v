@@ -62,7 +62,7 @@ Definition vertices_hg {T} (hg : HyperGraph T) : Pset :=
 #[export] Instance hypergraph_disjunion {T} : DisjUnion (HyperGraph T) :=
   fun hg hg' =>
   reindex_hg (bcons false) (relabel_hg (bcons false) hg) ∪
-  reindex_hg (bcons false) (relabel_hg (bcons false) hg').
+  reindex_hg (bcons true) (relabel_hg (bcons true) hg').
 
 
 (* A graph with h(yper)edges labeled by elements of [T] *)

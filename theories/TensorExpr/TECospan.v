@@ -11,38 +11,6 @@ Require Export TESyntax.
 Notation vhd := Vector.hd.
 Notation vtl := Vector.tl.
 
-Lemma vzip_with_app `(f : A -> B -> C) {n m} (v w : vec _ n)
-  (v' w' : vec _ m) :
-    vzip_with f (v +++ v') (w +++ w') =
-    vzip_with f v w +++ vzip_with f v' w'.
-Proof.
-  vec_double_ind v w; [done|].
-  cbn.
-  congruence.
-Qed.
-
-Lemma vmap_zip_with {A B C D} (f : A -> B -> C) (g : C -> D)
-  {n} (v : vec A n) (w : vec B n) :
-  vmap g (vzip_with f v w) = vzip_with (λ a b, g (f a b)) v w.
-Proof.
-  vec_double_ind v w; cbn; congruence.
-Qed.
-
-Lemma vzip_map_l {A B C} (f : A -> B) {n} (v : vec A n) (w : vec C n) :
-  vzip (vmap f v) w = vmap (prod_map f id) $ vzip v w.
-Proof.
-  vec_double_ind v w; cbn; congruence.
-Qed.
-
-Lemma vzip_map_r {A B C} (f : B -> C) {n} (v : vec A n) (w : vec B n) :
-  vzip v (vmap f w) = vmap (prod_map id f) $ vzip v w.
-Proof.
-  vec_double_ind v w; cbn; congruence.
-Qed.
-
-Definition make_vecs_map {A n m} (ins : vec Idx n) (outs : vec Idx m)
-  (insv : vec A n) (outsv : vec A m) : Pmap A :=
-  list_to_map (vzip ins insv ++ vzip outs outsv).
 
 
 Lemma dom_make_vecs_map {A n m} (ins : vec _ n) (outs : vec _ m)
@@ -52,8 +20,8 @@ Lemma dom_make_vecs_map {A n m} (ins : vec _ n) (outs : vec _ m)
 Proof.
   unfold_leibniz.
   unfold make_vecs_map.
-  rewrite dom_list_to_map.
-  rewrite fmap_app, 2 vec_to_list_zip_with.
+  rewrite dom_union, 2 dom_list_to_map.
+  rewrite 2 vec_to_list_zip_with, list_to_set_app.
   now rewrite 2 fst_zip by now rewrite 2 length_vec_to_list.
 Qed.
 
@@ -855,6 +823,8 @@ Lemma make_vecs_map_SummedElements `{SA : Summable A} {n m}
   (make_vecs_map ins outs v w).
 Proof.
   intros Hv Hw.
+  unfold make_vecs_map.
+  rewrite <- list_to_map_app.
   intros i a Hia%elem_of_list_to_map_2%(elem_of_list_fmap_1 snd).
   cbn in Hia.
   rewrite fmap_app, 2 vec_to_list_zip_with,
@@ -1147,6 +1117,7 @@ Proof.
   rewrite <- (relabel_ntl_free_semantics_kmap _ _ f contl).
   f_equiv.
   unfold make_vecs_map.
+  rewrite <- 2 list_to_map_app.
   symmetry.
   rewrite (kmap_list_to_map _).
   now rewrite fmap_app, 4 vec_to_list_zip_with,
@@ -1216,9 +1187,8 @@ Proof.
   apply sum_of_ext; intros a.
   f_equiv.
   cbn.
-  rewrite list_to_map_app.
-  cbn.
-  rewrite <- insert_union_r, <- list_to_map_app; [done|].
+  unfold make_vecs_map.
+  rewrite <- insert_union_l, <- insert_union_r, <- list_to_map_app; [done|].
   apply not_elem_of_dom.
   rewrite dom_list_to_map.
   now rewrite vec_to_list_zip_with, fst_zip, elem_of_list_to_set
@@ -1252,7 +1222,7 @@ Proof.
   induction v as [vl vr] using vec_add_inv.
   induction w as [wl wr] using vec_add_inv.
   rewrite 2 vsplitl_app, 2 vsplitr_app, 2 vzip_with_app,
-    2 vec_to_list_app, 3 list_to_map_app.
+    2 vec_to_list_app, 2 list_to_map_app.
   (* rewrite 4 vzip_map_l, 4 vec_to_list_map.
   rewrite <- 4 (kmap_list_to_map (M1:=Pmap) _). *)
 
@@ -1267,7 +1237,7 @@ Proof.
     rewrite list_to_set_app, not_elem_of_union in Hl'.
     rewrite 3 lookup_union.
     unfold make_vecs_map.
-    rewrite list_to_map_app, lookup_union.
+    rewrite lookup_union.
     rewrite (not_elem_of_dom _ _).1 by now
       rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
         now rewrite 2 length_vec_to_list.
@@ -1285,7 +1255,7 @@ Proof.
     rewrite list_to_set_app, not_elem_of_union in Hl'.
     rewrite 3 lookup_union.
     unfold make_vecs_map.
-    rewrite list_to_map_app, lookup_union.
+    rewrite lookup_union.
     rewrite (not_elem_of_dom (list_to_map (vzip _ vr)) _).1 by now
       rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
         now rewrite 2 length_vec_to_list.

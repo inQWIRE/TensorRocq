@@ -2239,6 +2239,42 @@ Proof.
     congruence.
 Qed.
 
+Lemma vzip_with_app `(f : A -> B -> C) {n m} (v w : vec _ n)
+  (v' w' : vec _ m) :
+    vzip_with f (v +++ v') (w +++ w') =
+    vzip_with f v w +++ vzip_with f v' w'.
+Proof.
+  vec_double_ind v w; [done|].
+  cbn.
+  congruence.
+Qed.
+
+Lemma vmap_zip_with {A B C D} (f : A -> B -> C) (g : C -> D)
+  {n} (v : vec A n) (w : vec B n) :
+  vmap g (vzip_with f v w) = vzip_with (λ a b, g (f a b)) v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
+
+Lemma vzip_map_l {A B C} (f : A -> B) {n} (v : vec A n) (w : vec C n) :
+  vzip (vmap f v) w = vmap (prod_map f id) $ vzip v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
+
+Lemma vzip_map_r {A B C} (f : B -> C) {n} (v : vec A n) (w : vec B n) :
+  vzip v (vmap f w) = vmap (prod_map id f) $ vzip v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
+
+Lemma vzip_map {A B C D} (f : A -> B) (g : C -> D) 
+  {n} (v : vec A n) (w : vec C n) :
+  vzip (vmap f v) (vmap g w) = vmap (prod_map f g) $ vzip v w.
+Proof.
+  vec_double_ind v w; cbn; congruence.
+Qed.
+
 
 
 Lemma delete_list_to_map `{FinMap K M} {A}

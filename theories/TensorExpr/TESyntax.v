@@ -9,6 +9,11 @@ Require Import Aux_stdpp Aux_pos.
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.
 
+(* FIXME: Move *)
+
+Definition make_vecs_map {A n m} (ins : vec positive n) (outs : vec positive m)
+  (insv : vec A n) (outsv : vec A m) : Pmap A :=
+  list_to_map (vzip ins insv) ∪ list_to_map (vzip outs outsv).
 
 (* Section TensorExprDB.  *)
 
@@ -4100,9 +4105,6 @@ Proof.
   split; [now intros []|].
   destruct ma, mb; easy + now constructor.
 Qed.
-Definition abstracts_indices {A} (abs : list (Idx * list A * list A)) : Pset :=
-  list_to_set ((fst ∘ fst) <$> abs).
-
 Lemma eqlistA_cons_iff `{eqA : relation A} {x x' : A} {l l' : list A} :
   eqlistA eqA (x :: l) (x' :: l') <-> eqA x x' /\ eqlistA eqA l l'.
 Proof.
@@ -4157,37 +4159,6 @@ Proof.
   symmetry; apply relabel_abs_WT'_iff.
 Qed.
 
-Lemma abstracts_indices_ntl2tl ntl :
-  abstracts_indices (ntl2tl ntl).(tl_abstracts) =
-  abstracts_indices ntl.(ntl_abstracts).
-Proof.
-  destruct ntl as [isums abs].
-  cbn.
-  rewrite <- list_fmap_compose.
-  f_equal.
-  apply list_fmap_ext; now intros _ [[]] _.
-Qed.
-
-Lemma abstracts_indices_relabel_abs `(f : A -> B) abs :
-  abstracts_indices (relabel_abs f <$> abs) = abstracts_indices abs.
-Proof.
-  unfold abstracts_indices.
-  rewrite <- list_fmap_compose.
-  f_equal.
-  now apply list_fmap_ext; intros _ [[]] _.
-Qed.
-
-Lemma abstracts_indices_ntl_aeq ntl ntl' :
-  ntl =ntl= ntl' ->
-  abstracts_indices ntl.(ntl_abstracts) =
-  abstracts_indices ntl'.(ntl_abstracts).
-Proof.
-  intros (f & _ & _ & Habs).
-  unfold abstracts_indices.
-  rewrite <- Habs.
-  symmetry.
-  apply abstracts_indices_relabel_abs.
-Qed.
 
 *)
 

@@ -2179,3 +2179,36 @@ Definition with_bcons (f : positive -> positive) (p : positive) :=
 Proof.
   intros [] [] [= ]; f_equal; now apply Hf.
 Qed.
+
+
+Definition pos_elim (fO fI : positive -> positive) (p : positive) : positive :=
+  match p with
+  | xI p => fI p
+  | xO p => fO p
+  | xH => xH
+  end.
+
+Definition pos_map (fO fI : positive -> positive) (p : positive) : positive :=
+  match p with
+  | xI p => xI (fI p)
+  | xO p => xO (fO p)
+  | xH => xH
+  end.
+
+#[export] Instance pos_map_inj fO fI `{HfO : !Inj eq eq fO, HfI : !Inj eq eq fI} :
+  Inj eq eq (pos_map fO fI).
+Proof.
+  intros [] [] [=]; f_equal; (eapply inj; [|eassumption]); eauto.
+Qed.
+
+Notation pos_nat_add n :=
+  (λ p, pos_add_N p (N.of_nat n)).
+
+Notation pos_nat_sub n :=
+  (λ p, pos_sub_N p (N.of_nat n)).
+
+#[export] Instance pos_nat_add_inj n :
+  Inj eq eq (pos_nat_add n).
+Proof.
+  hnf; lia.
+Qed.

@@ -3679,31 +3679,26 @@ Lemma vec_to_list_join `{A : Type} {n} (v : vec (option A) n) :
   vec_to_list <$> join_vec v = join_list v.
 Proof. *)
 
-Definition make_ml {n m} (inputs : vec Idx n) (outputs : vec Idx m)
-  (ins : vec A n) (outs : vec A m) : varcontext :=
-  list_to_map (zip inputs ins) ∪
-  list_to_map (zip outputs outs).
-
 (* Semantics of a tensorexpr as a (dimensioned) tensor, based on
   vectors of input and output vertices *)
 Definition tensorexpr_to_tensor (mabs : abscontext)
   {n m} (inputs : vec Idx n) (outputs : vec Idx m)
     (te : tensorexpr) : @Tensor R n m A :=
   fun ins outs =>
-    total_semantics mabs (make_ml inputs outputs ins outs) te.
+    total_semantics mabs (make_vecs_map inputs outputs ins outs) te.
 
 
 Definition tensorlist_to_tensor (mabs : abscontext)
   {n m} (inputs : vec Idx n) (outputs : vec Idx m)
     (tl : tensorlist) : @Tensor R n m A :=
   fun ins outs =>
-    tl_total_semantics mabs (make_ml inputs outputs ins outs) tl.
+    tl_total_semantics mabs (make_vecs_map inputs outputs ins outs) tl.
 
 Definition namedtensorlist_to_tensor (mabs : abscontext)
   {n m} (inputs : vec Idx n) (outputs : vec Idx m)
     (ntl : namedtensorlist) : @Tensor R n m A :=
   fun ins outs =>
-    ntl_total_semantics mabs (make_ml inputs outputs ins outs) ntl.
+    ntl_total_semantics mabs (make_vecs_map inputs outputs ins outs) ntl.
 
 Definition tl_subst_free (l : Idx) (tl : tensorlist) :=
   tl_add_sums 1 (relabel_tl
@@ -3924,19 +3919,19 @@ Proof.
         rewrite elem_of_list_to_set.
         now apply Hins_mids in Hl'.
       }
-      unfold make_ml.
+      unfold make_vecs_map.
       rewrite 2 lookup_union.
       eenough (Hen : _) by now
       rewrite 2 union_eq_l by exact Hen.
       apply elem_of_dom.
       rewrite dom_list_to_map.
       rewrite elem_of_list_to_set.
-      now rewrite fst_zip by now rewrite 2 length_vec_to_list.
+      now rewrite vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list.
     + rewrite lookup_union, union_eq_l
         by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
           fst_zip by now rewrite 2 length_vec_to_list.
-      unfold make_ml.
-      rewrite lookup_union_r; [done|].
+      unfold make_vecs_map.
+      rewrite 2 vec_to_list_zip_with, lookup_union_r; [done|].
       apply not_elem_of_dom.
       rewrite dom_list_to_map, elem_of_list_to_set,
         fst_zip by now rewrite 2 length_vec_to_list.
@@ -3946,20 +3941,20 @@ Proof.
     apply Hrtl in Hl as Hl'.
     rewrite elem_of_list_to_set, elem_of_app in Hl'.
     destruct Hl' as [Hl'|Hl'].
-    + unfold make_ml.
-      now rewrite 3 lookup_union, 2 union_eq_l
-        by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
-          fst_zip by now rewrite 2 length_vec_to_list.
+    + unfold make_vecs_map.
+      now rewrite 3 lookup_union, 2 union_eq_l, <- vec_to_list_zip_with by now 
+        rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
+          ?vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list.
     + rewrite lookup_union_r. 2:{
         apply not_elem_of_dom.
         rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
           by now rewrite 2 length_vec_to_list.
         now intros ?%Hmids_outs.
       }
-      unfold make_ml.
+      unfold make_vecs_map.
       rewrite 2 lookup_union_r by
         now apply not_elem_of_dom;
-        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+        rewrite dom_list_to_map, ?vec_to_list_zip_with, fst_zip, elem_of_list_to_set
           by (now rewrite 2 length_vec_to_list);
         now intros ?%Hmids_outs || intros ?%Hins_outs.
       done.
@@ -4300,19 +4295,19 @@ Proof.
         rewrite elem_of_list_to_set.
         now apply Hins_mids in Hl'.
       }
-      unfold make_ml.
+      unfold make_vecs_map.
       rewrite 2 lookup_union.
       eenough (Hen : _) by now
       rewrite 2 union_eq_l by exact Hen.
       apply elem_of_dom.
       rewrite dom_list_to_map.
       rewrite elem_of_list_to_set.
-      now rewrite fst_zip by now rewrite 2 length_vec_to_list.
+      now rewrite vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list.
     + rewrite lookup_union, union_eq_l
         by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
           fst_zip by now rewrite 2 length_vec_to_list.
-      unfold make_ml.
-      rewrite lookup_union_r; [done|].
+      unfold make_vecs_map.
+      rewrite 2 vec_to_list_zip_with, lookup_union_r; [done|].
       apply not_elem_of_dom.
       rewrite dom_list_to_map, elem_of_list_to_set,
         fst_zip by now rewrite 2 length_vec_to_list.
@@ -4322,20 +4317,20 @@ Proof.
     apply Hrtl in Hl as Hl'.
     rewrite elem_of_list_to_set, elem_of_app in Hl'.
     destruct Hl' as [Hl'|Hl'].
-    + unfold make_ml.
-      now rewrite 3 lookup_union, 2 union_eq_l
+    + unfold make_vecs_map.
+      now rewrite 3 lookup_union, 2 union_eq_l, vec_to_list_zip_with
         by now rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
-          fst_zip by now rewrite 2 length_vec_to_list.
+          ?vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list.
     + rewrite lookup_union_r. 2:{
         apply not_elem_of_dom.
         rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
           by now rewrite 2 length_vec_to_list.
         now intros ?%Hmids_outs.
       }
-      unfold make_ml.
+      unfold make_vecs_map.
       rewrite 2 lookup_union_r by
         now apply not_elem_of_dom;
-        rewrite dom_list_to_map, fst_zip, elem_of_list_to_set
+        rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip, elem_of_list_to_set
           by (now rewrite 2 length_vec_to_list);
         now intros ?%Hmids_outs || intros ?%Hins_outs.
       done.

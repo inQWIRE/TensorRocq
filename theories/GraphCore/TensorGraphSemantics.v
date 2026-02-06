@@ -2,17 +2,7 @@ Require Export TensorGraphExpr.
 Require Export TESemantics.
 
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
-(* FIXME: Move*)
-Fixpoint vseq (start len : nat) : vec nat len :=
-  match len with 
-  | O => [#]
-  | S len => start ::: vseq (S start) len
-  end.
-Lemma vec_to_list_seq start len : 
-  vec_to_list (vseq start len) = seq start len.
-Proof.
-  revert start; induction len; intros start; cbn; f_equal; done.
-Qed.
+
 
 Section TensorGraphSemantics.
 
@@ -49,5 +39,14 @@ Definition graph_semantics `{SR : SemiRing R rO rI radd rmul req}
     (vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m))
     (graph_namedtensorlist_semantics tg).
 
+
+Lemma graph_semantics_to_contl `{SR : SemiRing R rO rI radd rmul req} 
+  `{!Summable A, !EqDecision A} `{TensT : TensorLike R A T}
+  {n m} (tg : TensorGraph n m) :
+  graph_semantics (SR:=SR) tg = 
+  contl_semantics (graph_mabs tg.(hedges)) (graph_contl_semantics tg).
+Proof.
+  reflexivity.
+Qed.
 
 End TensorGraphSemantics.

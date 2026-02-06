@@ -5,6 +5,8 @@ Require Export TESyntax TECospan.
 (* FIXME: Move: *)
 Require Combinators.
 
+
+
 (* FIXME: Move: *)
 Lemma pseq_to_seq_inv (start len : nat) :
   Pos.of_succ_nat <$> seq start len =
@@ -13,6 +15,87 @@ Proof.
   rewrite pseq_to_seq.
   do 2 f_equal; lia.
 Qed.
+(* FIXME: Move*)
+Fixpoint vseq (start len : nat) : vec nat len :=
+  match len with
+  | O => [#]
+  | S len => start ::: vseq (S start) len
+  end.
+Lemma vec_to_list_seq start len :
+  vec_to_list (vseq start len) = seq start len.
+Proof.
+  revert start; induction len; intros start; cbn; f_equal; done.
+Qed.
+Lemma vlookup_seq start len (i : fin len) :
+  vseq start len !!! i = 
+  start + i.
+Proof.
+  pose proof (lookup_seq_lt start len i (fin_to_nat_lt i)) as Hlook.
+  rewrite <- vec_to_list_seq, <- vlookup_lookup' in Hlook.
+  destruct Hlook as (Hlt & <-).
+  f_equal.
+  apply fin_to_nat_inj.
+  now rewrite fin_to_nat_to_fin.
+Qed.
+
+
+Lemma list_fmap_subseteq {A B} (f : A -> B) (l1 l2 : list A) :
+  l1 ⊆ l2 -> f <$> l1 ⊆ f <$> l2.
+Proof.
+  intros Hl b (a & -> & ?%Hl)%elem_of_list_fmap.
+  now apply elem_of_list_fmap_1.
+Qed.
+
+Lemma list_subseteq_app {A} {l1 l1' l2 l2' : list A} :
+  l1 ⊆ l1' -> l2 ⊆ l2' -> l1 ++ l2 ⊆ l1' ++ l2'.
+Proof.
+  intros;
+  apply list_subseteq_app_iff_l, conj;
+    [apply list_subseteq_app_l|apply list_subseteq_app_r];
+  done.
+Qed.
+
+Lemma uncurry_alt {A B C} (f : A -> B -> C) p :
+  uncurry f p = f p.1 p.2.
+Proof.
+  now destruct p.
+Qed.
+
+Lemma list_omap_fmap {A B C} (f : A -> B) (g : B -> option C) (l : list A) :
+  omap g (f <$> l) = omap (g ∘ f) l.
+Proof.
+  induction l; [done|cbn]; case_match; f_equal; easy.
+Qed.
+
+
+Lemma NoDup_fmap_ind `(f : A -> B) (P : list A -> Prop)
+  (Pnil : P []) (Pcons : forall a l, f a ∉ f <$> l -> NoDup (f <$> l) ->
+    P l -> P (a :: l)) : forall l, NoDup (f <$> l) -> P l.
+Proof.
+  intros l.
+  induction l; [easy|].
+  cbn; rewrite NoDup_cons.
+  intros []; eauto.
+Qed.
+
+Lemma zip_with_irrel_l {A B C} (f : B -> C) (l l' : list A) (k : list B) :
+  length l = length l' ->
+  zip_with (λ _ b, f b) l k = zip_with (λ _ b, f b) l' k.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert k;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
+Lemma zip_with_irrel_r {A B C} (f : A -> C) (l : list A) (k k' : list B) :
+  length k = length k' ->
+  zip_with (λ a _, f a) l k = zip_with (λ a _, f a) l k'.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert l;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 
@@ -49,172 +132,52 @@ Definition graph_namedtensorlist_semantics {n m} (tg : TensorGraph n m) : namedt
 |}.
 
 
-(*
-Definition graph_tensorlist_semantics (tg : TensorGraph) : tensorlist :=
-  mk_tl (const 0%nat <$> internal_edges tg)
-    (mk_node (i_internal_edges tg) (i_external_edges tg) <$>
-      (map_to_list (fst tg)).*1).
+Definition graph_contl_semantics {n m} (tg : TensorGraph n m) :
+  CospanNamedTensorList n m :=
+  mk_contl (graph_namedtensorlist_semantics tg)
+    (vmap (bcons false ∘ Pos.of_succ_nat) $ vseq 0 n)
+    (vmap (bcons true ∘ Pos.of_succ_nat) $ vseq 0 m).
 
-Definition num_internals (tg : TensorGraph) : nat :=
-  length (internal_edges tg).
+Definition tg_list_to_deltas_offset (offset : nat) (is_output : bool)
+  idxs : list (var * var) :=
+  imap (λ idx input, (free $ bcons is_output
+    (Pos.of_succ_nat (offset + idx)), bound input))
+    idxs.
 
-Definition num_externals (tg : TensorGraph) : nat :=
-  length (external_edges tg).
 
-#[global] Arguments num_internals !_ /.
-#[global] Arguments num_externals !_ /.
+Definition graph_namedtensorlist_semantics_offset (noff moff : nat) {n m}
+  (tg : TensorGraph n m) : namedtensorlist := {|
+    ntl_sums := elements (vertices tg);
+    ntl_abstracts := tg_abstracts tg.(hedges);
+    ntl_deltas := tg_list_to_deltas_offset noff false tg.(inputs)
+      ++ tg_list_to_deltas_offset moff true tg.(outputs);
+  |}.
 
-Definition graph_namedtensorlist_semantics_aux
-  (lint lext : list labedge) (ks : list nat) :=
-  mk_ntl ((., O) ∘ Pos.of_succ_nat ∘ fst <$>
-    lint)
-    (mk_node lint
-      lext <$>
-      ks).
+Definition graph_contl_semantics_offset (noff moff : nat) {n m} (tg : TensorGraph n m) :
+  CospanNamedTensorList n m :=
+  mk_contl (graph_namedtensorlist_semantics_offset noff moff tg)
+    (vmap (bcons false ∘ Pos.of_succ_nat) $ vseq noff n)
+    (vmap (bcons true ∘ Pos.of_succ_nat) $ vseq moff m).
 
-Definition graph_namedtensorlist_semantics (tg : TensorGraph)
-  (int_labs ext_labs : list nat) : namedtensorlist :=
-  mk_ntl (zip_with (λ i _, (Pos.of_succ_nat i, O)) int_labs $ internal_edges tg)
-    (mk_node (zip int_labs (internal_edges tg))
-      (zip ext_labs (external_edges tg)) <$>
-      (map_to_list (hedges tg)).*1).
-
-Lemma graph_namedtensorlist_semantics_to_aux tg int_labs ext_labs :
-  graph_namedtensorlist_semantics tg int_labs ext_labs =
-  graph_namedtensorlist_semantics_aux
-    (zip int_labs (internal_edges tg)) (zip ext_labs (external_edges tg))
-    (map_to_list (hedges tg)).*1.
+Lemma tg_list_to_deltas_to_offset out idxs :
+  tg_list_to_deltas out idxs = tg_list_to_deltas_offset 0 out idxs.
 Proof.
-  unfold graph_namedtensorlist_semantics, graph_namedtensorlist_semantics_aux.
-  rewrite fmap_zip_with.
-  reflexivity.
-Qed.
-
-
-Definition graph_tabst (tg : TensorGraph) : Pmap (nat * nat) :=
-  kmap Pos.of_succ_nat $
-  map_imap (λ (k : nat) (_ : T), Some (length (filter (is_node_input k) (edges tg)),
-    length (filter (is_node_output k) (edges tg)))) (hedges tg).
-
-
-Lemma fold_internal_edges tg :
-  filter (is_internal (hedges tg)) (edges tg) = internal_edges tg.
-Proof. reflexivity. Qed.
-
-Lemma fold_external_edges tg :
-  filter (not_internal (hedges tg)) (edges tg) = external_edges tg.
-Proof. reflexivity. Qed.
-
-Lemma fold_num_internals tg :
-  length (internal_edges tg) = num_internals tg.
-Proof. reflexivity. Qed.
-
-Lemma fold_num_externals tg :
-  length (external_edges tg) = num_externals tg.
-Proof. reflexivity. Qed.
-
-Lemma graph_namedtensorlist_semantics_seq_correct tg :
-  graph_namedtensorlist_semantics tg (seq 0 (num_internals tg))
-    (seq 0 (num_externals tg)) = tl2ntl (graph_tensorlist_semantics tg).
-Proof.
-  cbn -[reverse].
-  rewrite fmap_const, reverse_replicate.
-  rewrite fold_internal_edges; fold (num_internals tg) (num_externals tg).
-  rewrite fold_external_edges.
-  unfold graph_namedtensorlist_semantics.
-  f_equal.
-  - rewrite imap_to_zip_with_seq, length_replicate.
-    unfold num_internals.
-    rewrite <- fmap_const, zip_with_fmap_r.
-    reflexivity.
-  - now rewrite 2 imap_to_zip_with_seq.
-Qed.
-
-Lemma list_fmap_subseteq {A B} (f : A -> B) (l1 l2 : list A) :
-  l1 ⊆ l2 -> f <$> l1 ⊆ f <$> l2.
-Proof.
-  intros Hl b (a & -> & ?%Hl)%elem_of_list_fmap.
-  now apply elem_of_list_fmap_1.
-Qed.
-
-Lemma list_subseteq_app {A} {l1 l1' l2 l2' : list A} :
-  l1 ⊆ l1' -> l2 ⊆ l2' -> l1 ++ l2 ⊆ l1' ++ l2'.
-Proof.
-  intros;
-  apply list_subseteq_app_iff_l, conj;
-    [apply list_subseteq_app_l|apply list_subseteq_app_r];
   done.
 Qed.
 
-Lemma input_edges_subseteq_labels lint lext k :
-  input_edges lint lext k ⊆
-    (rel ∘ Pos.of_succ_nat ∘ fst <$> lint) ++
-    (loc ∘ bcons false ∘ Pos.of_succ_nat ∘ fst ∘ snd <$> lext).
+Lemma graph_namedtensorlist_semantics_to_offset `(tg : TensorGraph n m) :
+  graph_namedtensorlist_semantics tg =
+  graph_namedtensorlist_semantics_offset 0 0 tg.
 Proof.
-  unfold input_edges.
-  apply list_subseteq_app;
-  apply list_fmap_subseteq, list_filter_subseteq.
+  done.
 Qed.
 
-Lemma output_edges_subseteq_labels lint lext k :
-  output_edges lint lext k ⊆
-    (rel ∘ Pos.of_succ_nat ∘ fst <$> lint) ++
-    (loc ∘ bcons true ∘ Pos.of_succ_nat ∘ snd ∘ snd <$> lext).
-Proof.
-  unfold output_edges.
-  apply list_subseteq_app;
-  apply list_fmap_subseteq, list_filter_subseteq.
-Qed.
-
-
-Lemma graph_tensorlist_semantics_WF tg :
-  WF_tl (graph_tensorlist_semantics tg).
-Proof.
-  intros i.
-  rewrite elem_of_abstracts_rel_vars.
-  cbn -[internal_edges external_edges].
-  rewrite length_fmap, fold_num_internals.
-  intros (f & low & up & (k & [= -> -> ->] & Hk)%elem_of_list_fmap & Hi).
-  apply (elem_of_list_to_set (C:=gset nat)) in Hk.
-  rewrite <- dom_alt in Hk.
-  apply (list_subseteq_app (input_edges_subseteq_labels _ _ _)
-    (output_edges_subseteq_labels _ _ _)) in Hi.
-  rewrite Permutation_swap_app_app, elem_of_app in Hi.
-  destruct Hi as [Hi|HF]. 2:{
-    rewrite !Combinators.compose_assoc in HF.
-    rewrite 2 (list_fmap_compose _ loc), <- fmap_app in HF.
-    apply elem_of_list_fmap in HF as (? & [=] & _).
-  }
-  revert Hi.
-  rewrite elem_of_app, (or_idemp _).
-  rewrite Combinators.compose_assoc, list_fmap_compose.
-  rewrite elem_of_list_fmap_inj by apply _.
-  unfold i_internal_edges, enumerate.
-  rewrite fmap_imap.
-  unfold compose; cbn -[internal_edges].
-  rewrite imap_seq_0, pseq_to_seq_inv.
-  intros ?%elem_of_pseq_1.
-  rewrite fold_num_internals in Hi.
-  lia.
-Qed.
-
-Lemma uncurry_alt {A B C} (f : A -> B -> C) p :
-  uncurry f p = f p.1 p.2.
-Proof.
-  now destruct p.
-Qed.*)
-
-Lemma list_omap_fmap {A B C} (f : A -> B) (g : B -> option C) (l : list A) :
-  omap g (f <$> l) = omap (g ∘ f) l.
-Proof.
-  induction l; [done|cbn]; case_match; f_equal; easy.
-Qed.
 
 Lemma abstracts_bound_vars_graph {o p} (tg : TensorGraph o p) :
   abstracts_bound_vars (graph_namedtensorlist_semantics tg).(ntl_abstracts) =
   list_to_set ('(_, low, up) ← (map_to_list tg.(hedges).(hyperedges)).*2; low ++ up).
 Proof.
-  unfold abstracts_bound_vars. 
+  unfold abstracts_bound_vars.
   cbn.
   f_equiv.
   unfold tg_abstracts.
@@ -436,35 +399,63 @@ Proof.
   apply Hfr; specialize (HWF.2); [set_solver +Hx|set_solver +Hy].
 Qed. *)
 
-Lemma NoDup_fmap_ind `(f : A -> B) (P : list A -> Prop)
-  (Pnil : P []) (Pcons : forall a l, f a ∉ f <$> l -> NoDup (f <$> l) ->
-    P l -> P (a :: l)) : forall l, NoDup (f <$> l) -> P l.
+Lemma relabel_frees_tg_abstracts f (hg : Pmap (T * _ * _)) :
+  relabel_abs (relabel_frees f) <$> tg_abstracts hg = tg_abstracts hg.
 Proof.
-  intros l.
-  induction l; [easy|].
-  cbn; rewrite NoDup_cons.
-  intros []; eauto.
+  apply list_fmap_id'.
+  intros _ ((k & [[idx low] up]) & -> & _)%elem_of_list_fmap.
+  cbn.
+  now rewrite <- 2 list_fmap_compose.
 Qed.
 
-Lemma zip_with_irrel_l {A B C} (f : B -> C) (l l' : list A) (k : list B) :
-  length l = length l' ->
-  zip_with (λ _ b, f b) l k = zip_with (λ _ b, f b) l' k.
+(* Lemma tg_list_to_deltas_offset_correct off out idxs :
+  tg_list_to_deltas off out idxs =
+   *)
+
+Lemma graph_namedtensorlist_semantics_offset_correct noff moff `(tg : TensorGraph n m) :
+  graph_namedtensorlist_semantics_offset noff moff tg =
+  relabel_ntl_free (pos_map (pos_nat_add noff) (pos_nat_add moff))
+  (graph_namedtensorlist_semantics tg).
 Proof.
-  intros Hall%Forall2_same_length.
-  revert k;
-  induction Hall; intros []; cbn; congruence.
+  apply ntl_ext; cbn.
+  - done.
+  - rewrite relabel_frees_tg_abstracts.
+    done.
+  - symmetry; rewrite fmap_app.
+    unfold tg_list_to_deltas, tg_list_to_deltas_offset.
+    rewrite 2 fmap_imap.
+    f_equal; apply imap_ext; intros ? ? _; f_equal/=; f_equal; lia.
 Qed.
 
-Lemma zip_with_irrel_r {A B C} (f : A -> C) (l : list A) (k k' : list B) :
-  length k = length k' ->
-  zip_with (λ a _, f a) l k = zip_with (λ a _, f a) l k'.
+Lemma graph_contl_semantics_offset_correct' noff moff `(tg : TensorGraph n m) :
+  contl_interface_eq (graph_contl_semantics_offset noff moff tg)
+    (graph_contl_semantics tg).
 Proof.
-  intros Hall%Forall2_same_length.
-  revert l;
-  induction Hall; intros []; cbn; congruence.
+  symmetry.
+  apply contl_interface_eq_iff_exists.
+  exists (pos_map (pos_nat_add noff) (pos_nat_add moff)).
+  split; [apply _|].
+  apply contl_ext; cbn.
+  - now rewrite graph_namedtensorlist_semantics_offset_correct.
+  - apply vec_eq.
+    intros i.
+    rewrite 3 vlookup_map, 2 vlookup_seq.
+    cbn.
+    lia.
+  - apply vec_eq.
+    intros i.
+    rewrite 3 vlookup_map, 2 vlookup_seq.
+    cbn.
+    lia.
 Qed.
 
-
+Lemma graph_contl_semantics_offset_correct noff moff `(tg : TensorGraph n m) :
+  contl_eq (graph_contl_semantics_offset noff moff tg)
+    (graph_contl_semantics tg).
+Proof.
+  apply rtc_once; constructor.
+  apply graph_contl_semantics_offset_correct'.
+Qed.
 
 
 
