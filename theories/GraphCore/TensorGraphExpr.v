@@ -27,7 +27,7 @@ Proof.
   revert start; induction len; intros start; cbn; f_equal; done.
 Qed.
 Lemma vlookup_seq start len (i : fin len) :
-  vseq start len !!! i = 
+  vseq start len !!! i =
   start + i.
 Proof.
   pose proof (lookup_seq_lt start len i (fin_to_nat_lt i)) as Hlook.
@@ -37,7 +37,85 @@ Proof.
   apply fin_to_nat_inj.
   now rewrite fin_to_nat_to_fin.
 Qed.
+Lemma map_to_list_disj_union `{FinMap K M} {A} (m1 m2 : M A) :
+  m1 ##ₘ m2 ->
+  map_to_list (m1 ∪ m2) ≡ₚ map_to_list m1 ++ map_to_list m2.
+Proof.
+  intros Hdisj.
+  pose proof Hdisj as Hdisj'.
+  rewrite map_disjoint_alt in Hdisj'.
+  apply NoDup_Permutation.
+  - apply NoDup_map_to_list.
+  - apply NoDup_app; split_and!; try apply NoDup_map_to_list.
+    intros (k, a) Hka%elem_of_map_to_list Hka'%elem_of_map_to_list.
+    destruct (Hdisj' k); congruence.
+  - intros (k, a).
+    rewrite elem_of_app, 3 elem_of_map_to_list.
+    rewrite lookup_union_Some by done.
+    done.
+Qed.
+Lemma map_to_list_kmap `{FinMap K1 M1, FinMap K2 M2} (f : K1 -> K2)
+  `{Hf : !Inj eq eq f} {A} (m : M1 A) :
+  map_to_list (kmap f m :> M2 A) ≡ₚ prod_map f id <$> map_to_list m.
+Proof.
+  unfold kmap.
+  apply map_to_list_to_map.
+  rewrite fsts_prod_map, (NoDup_fmap _).
+  apply NoDup_fst_map_to_list.
+Qed.
+Lemma map_disjoint_alt_neg `{FinMap K M} {A} (m1 m2 : M A) :
+  m1 ##ₘ m2 <-> forall k a b, m1 !! k = Some a -> m2 !! k = Some b -> False.
+Proof.
+  rewrite map_disjoint_alt.
+  apply forall_proper; intros k.
+  rewrite 2 eq_None_not_Some.
+  unfold is_Some.
+  destruct (m1 !! k), (m2 !! k); naive_solver.
+Qed.
+Lemma kmap_inj2_disjoint `{FinMap K1 M1, FinMap K2 M2} {I} `{R : relation I} {A}
+  (f : I -> K1 -> K2) `{Hf : !Inj2 R eq eq f} (m m' : M1 A) i j :
+  ~ R i j ->
+  (kmap (f i) m :> M2 A) ##ₘ kmap (f j) m'.
+Proof.
+  intros Hrij.
+  rewrite map_disjoint_alt_neg.
+  intros k a b (? & _ & Hfij)%lookup_kmap_Some_2
+    (? & _ & <-)%lookup_kmap_Some_2.
+  now apply Hf in Hfij.
+Qed.
 
+Lemma set_map_inj2_disjoint `{FinSet A SA, SemiSet B SB}
+  {I} `{R : relation I}
+  (f : I -> A -> B) `{Hf : !Inj2 R eq eq f} (X Y : SA) i j :
+  ~ R i j ->
+  (set_map (f i) X :> SB) ## set_map (f j) Y.
+Proof.
+  set_solver.
+Qed.
+
+
+#[export] Instance ntl_eq_of_ntl_aeq tl : subrelation ntl_aeq (ntl_eq tl).
+Proof.
+  intros ntl ntl' Hntl.
+  hnf.
+  apply rtc_once.
+  now left.
+Qed.
+
+#[export] Instance ntl_eq_of_ntl_delta_eq tl :
+  subrelation (ntl_delta_eq tl) (ntl_eq tl).
+Proof.
+  intros ntl ntl' Hntl.
+  hnf.
+  apply rtc_once.
+  now right.
+Qed.
+
+Add Parametric Morphism : mk_ntl with signature
+  Permutation ==> Permutation ==> Permutation ==> ntl_aeq as mk_ntl_perm_eq.
+Proof.
+  intros; now apply ntl_aeq_of_perm.
+Qed.
 
 Lemma list_fmap_subseteq {A B} (f : A -> B) (l1 l2 : list A) :
   l1 ⊆ l2 -> f <$> l1 ⊆ f <$> l2.
@@ -414,7 +492,7 @@ Qed.
 
 Lemma graph_namedtensorlist_semantics_offset_correct noff moff `(tg : TensorGraph n m) :
   graph_namedtensorlist_semantics_offset noff moff tg =
-  relabel_ntl_free (pos_map (pos_nat_add noff) (pos_nat_add moff))
+  ntl_relabel_free (pos_map (pos_nat_add noff) (pos_nat_add moff))
   (graph_namedtensorlist_semantics tg).
 Proof.
   apply ntl_ext; cbn.
@@ -455,6 +533,240 @@ Lemma graph_contl_semantics_offset_correct noff moff `(tg : TensorGraph n m) :
 Proof.
   apply rtc_once; constructor.
   apply graph_contl_semantics_offset_correct'.
+Qed.
+
+
+Lemma vertices_hg_union (hg hg' : HyperGraph T) :
+  (hg :> Pmap _) ##ₘ (hg' :> Pmap _) ->
+  vertices_hg (hg ∪ hg') =
+  vertices_hg hg ∪ vertices_hg hg'.
+Proof.
+  intros Hdisj.
+  apply set_eq.
+  intros x.
+  rewrite elem_of_union, 3 elem_of_vertices_hg.
+  change (hypervertices (_ ∪ _)) with (hypervertices hg ∪ hypervertices hg').
+  rewrite elem_of_union.
+  setoid_rewrite lookup_union_Some; [|done].
+  naive_solver.
+Qed.
+
+Lemma tg_abstracts_relabel_abs (f : positive -> positive)
+  (hg : Pmap (T * _ * _)) :
+  tg_abstracts (relabel_abs f <$> hg) =
+  relabel_abs (relabel_bounds f) <$> tg_abstracts hg.
+Proof.
+  unfold tg_abstracts.
+  rewrite map_to_list_fmap.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; intros _ [k [[? l] u]] _.
+  cbn.
+  f_equal; [f_equal|];
+  rewrite <- 2 list_fmap_compose; done.
+Qed.
+
+Lemma tg_abstracts_union (hg hg' : Pmap (T * _ * _)) :
+  (hg :> Pmap _) ##ₘ (hg' :> Pmap _) ->
+  tg_abstracts (hg ∪ hg') ≡ₚ
+  tg_abstracts hg ++ tg_abstracts hg'.
+Proof.
+  intros Hdisj.
+  unfold tg_abstracts.
+  cbn.
+  rewrite map_to_list_disj_union by done.
+  now rewrite fmap_app.
+Qed.
+
+Lemma tg_abstracts_kmap f `{Hf : !Inj eq eq f} (hg : Pmap (T * _ * _)) :
+  tg_abstracts (kmap f hg) ≡ₚ
+  prod_map (prod_map f id) id <$> tg_abstracts hg.
+Proof.
+  unfold tg_abstracts.
+  rewrite (map_to_list_kmap _).
+  rewrite <- 2 list_fmap_compose.
+  done.
+Qed.
+
+Lemma vertices_swapped_stack_graphs_aux {n m n' m'}
+  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
+  tg.(hedges).(hyperedges) ##ₘ tg'.(hedges).(hyperedges) ->
+  vertices (swapped_stack_graphs_aux tg tg') =
+  vertices tg ∪ vertices tg'.
+Proof.
+  intros Hdisj.
+  unfold vertices; cbn.
+  rewrite vertices_hg_union by done.
+  rewrite 2 vec_to_list_app, 5 list_to_set_app_L.
+  apply set_eq; intros x.
+  rewrite 10 elem_of_union. tauto.
+Qed.
+
+Lemma vertices_swapped_stack_graphs {n m n' m'}
+  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
+  vertices (swapped_stack_graphs tg tg') =
+  set_map (bcons false) (vertices tg) ∪
+  set_map (bcons true) (vertices tg').
+Proof.
+  unfold swapped_stack_graphs.
+  rewrite vertices_swapped_stack_graphs_aux.
+  - now rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
+  - cbn.
+    rewrite map_disjoint_fmap.
+    now apply (kmap_inj2_disjoint _).
+Qed.
+
+Lemma vertices_stack_graphs_aux {n m n' m'}
+  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
+  tg.(hedges).(hyperedges) ##ₘ tg'.(hedges).(hyperedges) ->
+  vertices (stack_graphs_aux tg tg') =
+  vertices tg ∪ vertices tg'.
+Proof.
+  intros Hdisj.
+  unfold vertices; cbn.
+  rewrite vertices_hg_union by done.
+  rewrite 2 vec_to_list_app, 5 list_to_set_app_L.
+  apply set_eq; intros x.
+  rewrite 10 elem_of_union. tauto.
+Qed.
+
+Lemma vertices_stack_graphs {n m n' m'}
+  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
+  vertices (stack_graphs tg tg') =
+  set_map (bcons false) (vertices tg) ∪
+  set_map (bcons true) (vertices tg').
+Proof.
+  unfold stack_graphs.
+  rewrite vertices_stack_graphs_aux.
+  - now rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
+  - cbn.
+    rewrite map_disjoint_fmap.
+    now apply (kmap_inj2_disjoint _).
+Qed.
+
+
+Lemma ntl_relabel_absidx_relabel_free f g ntl :
+  ntl_relabel_absidx f (ntl_relabel_free g ntl) =
+  ntl_relabel_free g (ntl_relabel_absidx f ntl).
+Proof.
+  unfold ntl_relabel_absidx, ntl_relabel_free.
+  cbn.
+  f_equal.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; now intros _ [[]] _.
+Qed.
+
+Lemma ntl_relabel_absidx_relabel_bound f g ntl :
+  ntl_relabel_absidx f (ntl_relabel_bound g ntl) =
+  ntl_relabel_bound g (ntl_relabel_absidx f ntl).
+Proof.
+  unfold ntl_relabel_absidx, ntl_relabel_bound.
+  cbn.
+  f_equal.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; now intros _ [[]] _.
+Qed.
+
+Lemma ntl_relabel_absidx_relabel f g ntl :
+  ntl_relabel_absidx f (relabel_ntl g ntl) =
+  relabel_ntl g (ntl_relabel_absidx f ntl).
+Proof.
+  unfold ntl_relabel_absidx, relabel_ntl.
+  cbn.
+  f_equal.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; now intros _ [[]] _.
+Qed.
+
+Lemma tg_list_to_deltas_fmap b f ioputs :
+  tg_list_to_deltas b (f <$> ioputs) =
+  relabel_delt (relabel_bounds f) <$> tg_list_to_deltas b ioputs.
+Proof.
+  unfold tg_list_to_deltas.
+  rewrite fmap_imap, imap_fmap.
+  reflexivity.
+Qed.
+
+Lemma tg_list_to_deltas_offset_fmap off b f ioputs :
+  tg_list_to_deltas_offset off b (f <$> ioputs) =
+  relabel_delt (relabel_bounds f) <$> tg_list_to_deltas_offset off b ioputs.
+Proof.
+  unfold tg_list_to_deltas_offset.
+  rewrite fmap_imap, imap_fmap.
+  reflexivity.
+Qed.
+
+Lemma tg_list_to_deltas_app out idxs idxs' :
+  tg_list_to_deltas out (idxs ++ idxs') =
+  tg_list_to_deltas out idxs ++
+  tg_list_to_deltas_offset (length idxs) out idxs'.
+Proof.
+  refine (imap_app _ _ _).
+Qed.
+
+Lemma graph_namedtensorlist_semantics_stack {n m n' m'} (tg : TensorGraph n m)
+  (tg' : TensorGraph n' m') :
+  graph_namedtensorlist_semantics (stack_graphs tg tg') =ntl=
+  ntl_times
+    (ntl_relabel_absidx (bcons false)
+      (graph_namedtensorlist_semantics tg))
+    (ntl_relabel_absidx (bcons true)
+      (graph_namedtensorlist_semantics_offset n m tg')).
+Proof.
+  apply ntl_aeq_of_perm.
+  - cbn.
+    rewrite vertices_stack_graphs.
+    rewrite elements_disj_union by now apply (set_map_inj2_disjoint _).
+    rewrite <- 2 (fmap_elements _).
+    done.
+  - cbn.
+    rewrite tg_abstracts_union by now rewrite map_disjoint_fmap; apply (kmap_inj2_disjoint _).
+    rewrite 2 tg_abstracts_relabel_abs, 2 (tg_abstracts_kmap _).
+    (* rewrite 2 relabel_frees_tg_abstracts. *)
+    done.
+  - cbn -[tg_list_to_deltas].
+    rewrite 2 vec_to_list_app, 4 vec_to_list_map.
+    rewrite 2 tg_list_to_deltas_app.
+    rewrite 2 tg_list_to_deltas_fmap, 2 tg_list_to_deltas_offset_fmap.
+    rewrite 2 length_fmap, 2 length_vec_to_list.
+    rewrite 2 fmap_app.
+    solve_Permutation.
+Qed.
+
+Lemma contl_eq_of_ntl_eq' {n m}
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n m) :
+  contl.(contl_inputs) = contl'.(contl_inputs) ->
+  contl.(contl_outputs) = contl'.(contl_outputs) ->
+  ntl_eq (contl_boundary contl) contl contl' ->
+  contl_eq contl contl'.
+Proof.
+  destruct contl as [ntl ins outs], contl' as [ntl' ins' outs'].
+  cbn.
+  intros <- <-.
+  apply contl_eq_of_ntl_eq.
+Qed.
+
+Lemma vseq_app len1 len2 start : 
+  vseq start (len1 + len2) =
+  vseq start len1 +++ vseq (start + len1) len2.
+Proof.
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_app, 3 vec_to_list_seq.
+  apply seq_app.
+Qed.
+
+Lemma graph_contl_semantics_stack {n m n' m'} (tg : TensorGraph n m)
+  (tg' : TensorGraph n' m') :
+  contl_eq (graph_contl_semantics (stack_graphs tg tg'))
+  (stack_contl_aux (reindex_contl (bcons false) $ graph_contl_semantics tg)
+    (reindex_contl (bcons true) $ graph_contl_semantics_offset n m tg')).
+Proof.
+  apply contl_eq_of_ntl_eq'.
+  - cbn.
+    now rewrite vseq_app, Vector.map_append.
+  - cbn.
+    now rewrite vseq_app, Vector.map_append.
+  - apply ntl_eq_of_ntl_aeq.
+    apply graph_namedtensorlist_semantics_stack.
 Qed.
 
 

@@ -86,11 +86,11 @@ Definition relabel_cotl f {n m} (cotl : CospanTensorList n m) :=
     (vmap f cotl.(cotl_inputs)) (vmap f cotl.(cotl_outputs)).
 
 Definition relabel_contl_free f {n m} (contl : CospanNamedTensorList n m) :=
-  mk_contl (relabel_ntl_free f contl)
+  mk_contl (ntl_relabel_free f contl)
     (vmap f contl.(contl_inputs)) (vmap f contl.(contl_outputs)).
 
 Definition relabel_contl_bound f {n m} (contl : CospanNamedTensorList n m) :=
-  mk_contl (relabel_ntl_bound f contl)
+  mk_contl (ntl_relabel_bound f contl)
     contl.(contl_inputs) contl.(contl_outputs).
 
 
@@ -111,6 +111,19 @@ Definition swapped_stack_contl {n m n' m'}
   swapped_stack_contl_aux (relabel_contl_free (bcons false) contl)
     (relabel_contl_free (bcons true) contl').
 
+
+Definition stack_contl_aux {n m n' m'}
+  (contl : CospanNamedTensorList n m)
+  (contl' : CospanNamedTensorList n' m') : CospanNamedTensorList (n + n') (m + m') :=
+  mk_contl (ntl_times contl contl')
+    (contl.(contl_inputs) +++ contl'.(contl_inputs))
+    (contl.(contl_outputs) +++ contl'.(contl_outputs)).
+
+Definition stack_contl {n m n' m'}
+  (contl : CospanNamedTensorList n m)
+  (contl' : CospanNamedTensorList n' m') : CospanNamedTensorList (n + n') (m + m') :=
+  stack_contl_aux (relabel_contl_free (bcons false) contl)
+    (relabel_contl_free (bcons true) contl').
 
 Definition add_top_loop_contl_spec {n m}
   (contl : CospanNamedTensorList (S n) (S m)) :
@@ -172,9 +185,9 @@ Definition WT_contl {n m} (contl : CospanNamedTensorList n m) : Prop :=
 
 
 
-Lemma relabel_ntl_free_ext_strong f g ntl :
+Lemma ntl_relabel_free_ext_strong f g ntl :
   (forall i, i ∈ ntl_free_varset ntl -> f i = g i) ->
-  relabel_ntl_free f ntl = relabel_ntl_free g ntl.
+  ntl_relabel_free f ntl = ntl_relabel_free g ntl.
 Proof.
   intros Hfg.
   apply ntl_ext; cbn.
@@ -204,8 +217,8 @@ Proof.
     destruct lu as []; cbn in *; naive_solver.
 Qed.
 
-Lemma relabel_ntl_free_id ntl :
-  relabel_ntl_free id ntl = ntl.
+Lemma ntl_relabel_free_id ntl :
+  ntl_relabel_free id ntl = ntl.
 Proof.
   apply ntl_ext; cbn.
   - done.
@@ -217,9 +230,9 @@ Proof.
     now intros [].
 Qed.
 
-Lemma relabel_ntl_free_compose f g ntl :
-  relabel_ntl_free g (relabel_ntl_free f ntl) =
-  relabel_ntl_free (g ∘ f) ntl.
+Lemma ntl_relabel_free_compose f g ntl :
+  ntl_relabel_free g (ntl_relabel_free f ntl) =
+  ntl_relabel_free (g ∘ f) ntl.
 Proof.
   apply ntl_ext; cbn.
   - done.
@@ -255,7 +268,7 @@ Lemma relabel_contl_free_ext_strong f g {n m} (contl : CospanNamedTensorList n m
 Proof.
   intros Hfg.
   apply contl_ext; cbn.
-  - apply relabel_ntl_free_ext_strong.
+  - apply ntl_relabel_free_ext_strong.
     intros i Hi.
     apply Hfg.
     set_solver +Hi.
@@ -275,7 +288,7 @@ Lemma relabel_contl_free_id {n m} (contl : CospanNamedTensorList n m) :
   relabel_contl_free id contl = contl.
 Proof.
   apply contl_ext; [|apply Vector.map_id..].
-  apply relabel_ntl_free_id.
+  apply ntl_relabel_free_id.
 Qed.
 
 Lemma relabel_contl_free_compose f g {n m} (contl : CospanNamedTensorList n m) :
@@ -283,7 +296,7 @@ Lemma relabel_contl_free_compose f g {n m} (contl : CospanNamedTensorList n m) :
   relabel_contl_free (g ∘ f) contl.
 Proof.
   apply contl_ext; cbn; [|now rewrite Vector.map_map..].
-  apply relabel_ntl_free_compose.
+  apply ntl_relabel_free_compose.
 Qed.
 
 
@@ -291,7 +304,7 @@ Inductive contl_interface_eq {n m} : relation (CospanNamedTensorList n m) :=
   | interface_contl_eq_of_inj f `{Hf : !Inj eq eq f}
     (ins : vec _ n) (outs : vec _ m) ntl :
     contl_interface_eq (mk_contl ntl ins outs)
-      (mk_contl (relabel_ntl_free f ntl) (vmap f ins) (vmap f outs)).
+      (mk_contl (ntl_relabel_free f ntl) (vmap f ins) (vmap f outs)).
 
 
 Lemma contl_interface_eq_iff_exists {n m} (contl contl' : CospanNamedTensorList n m) :
@@ -406,12 +419,12 @@ Proof.
   now intros [] _.
 Qed.
 
-Lemma ntl_free_varset_relabel_ntl_free f ntl :
-  ntl_free_varset (relabel_ntl_free f ntl) =
+Lemma ntl_free_varset_ntl_relabel_free f ntl :
+  ntl_free_varset (ntl_relabel_free f ntl) =
   set_map f (ntl_free_varset ntl).
 Proof.
   destruct ntl as [isums abs delt].
-  unfold ntl_free_varset; cbn [ntl_abstracts ntl_deltas relabel_ntl_free].
+  unfold ntl_free_varset; cbn [ntl_abstracts ntl_deltas ntl_relabel_free].
   rewrite abstracts_free_vars_relabel_frees,
     deltas_free_vars_relabel_frees.
   now rewrite set_map_union_L.
@@ -427,7 +440,7 @@ Proof.
       list_to_set (contl.(contl_inputs) ++ contl.(contl_outputs))))).
   split.
   - cbn.
-    rewrite ntl_free_varset_relabel_ntl_free.
+    rewrite ntl_free_varset_ntl_relabel_free.
     rewrite 2 vec_to_list_map, <- fmap_app,
       <- (set_map_list_to_set_L (SA:=Pset)).
     rewrite <- set_map_union_L.
@@ -464,8 +477,8 @@ Add Parametric Relation {n m} : (CospanNamedTensorList n m) contl_interface_eq
   as contl_interface_eq_setoid.
 
 
-Lemma relabel_ntl_free_WF f ntl :
-  WF_ntl (relabel_ntl_free f ntl) <-> WF_ntl ntl.
+Lemma ntl_relabel_free_WF f ntl :
+  WF_ntl (ntl_relabel_free f ntl) <-> WF_ntl ntl.
 Proof.
   unfold WF_ntl.
   cbn -[abstracts_bound_vars deltas_bound_vars].
@@ -474,11 +487,11 @@ Proof.
   done.
 Qed.
 
-Lemma relabel_ntl_free_WT tl f ntl :
-  WT_ntl tl ntl -> WT_ntl (set_map f tl) (relabel_ntl_free f ntl).
+Lemma ntl_relabel_free_WT tl f ntl :
+  WT_ntl tl ntl -> WT_ntl (set_map f tl) (ntl_relabel_free f ntl).
 Proof.
   unfold WT_ntl.
-  rewrite relabel_ntl_free_WF.
+  rewrite ntl_relabel_free_WF.
   cbn -[abstracts_free_vars deltas_free_vars].
   rewrite abstracts_free_vars_relabel_frees,
     deltas_free_vars_relabel_frees.
@@ -494,7 +507,7 @@ Proof.
   intros [].
   cbn [contl_inputs contl_outputs contl_expr].
   rewrite 2 vec_to_list_map, <- fmap_app, <- (set_map_list_to_set_L (SA:=Pset)).
-  apply relabel_ntl_free_WT.
+  apply ntl_relabel_free_WT.
 Qed.
 
 
@@ -1078,8 +1091,8 @@ Proof.
   apply (relabel_tl_free_semantics_aux_kmap _).
 Qed.
 
-Lemma ntl2tl_relabel_ntl_free f ntl :
-  ntl2tl (relabel_ntl_free f ntl) = relabel_tl_free f (ntl2tl ntl).
+Lemma ntl2tl_ntl_relabel_free f ntl :
+  ntl2tl (ntl_relabel_free f ntl) = relabel_tl_free f (ntl2tl ntl).
 Proof.
   destruct ntl as [isums abs delt];
   apply tl_ext; cbn.
@@ -1095,12 +1108,12 @@ Proof.
     intros _ [[] []] _; done.
 Qed.
 
-Lemma relabel_ntl_free_semantics_kmap mabs ml f `{Hf : !Inj eq eq f} ntl :
-  ntl_total_semantics mabs (kmap f ml) (relabel_ntl_free f ntl) ==
+Lemma ntl_relabel_free_semantics_kmap mabs ml f `{Hf : !Inj eq eq f} ntl :
+  ntl_total_semantics mabs (kmap f ml) (ntl_relabel_free f ntl) ==
   ntl_total_semantics mabs ml ntl.
 Proof.
   unfold ntl_total_semantics.
-  rewrite ntl2tl_relabel_ntl_free.
+  rewrite ntl2tl_ntl_relabel_free.
   apply (relabel_tl_free_semantics_kmap _).
 Qed.
 
@@ -1114,7 +1127,7 @@ Proof.
   intros Hwf v w Hv Hw.
   unfold contl_semantics.
   cbn -[ntl_total_semantics].
-  rewrite <- (relabel_ntl_free_semantics_kmap _ _ f contl).
+  rewrite <- (ntl_relabel_free_semantics_kmap _ _ f contl).
   f_equiv.
   unfold make_vecs_map.
   rewrite <- 2 list_to_map_app.
@@ -1277,13 +1290,92 @@ Proof.
   intros Hwf Hwf'.
   unfold swapped_stack_contl.
   rewrite contl_semantics_swapped_stack_aux by first [
-    now apply relabel_ntl_free_WF; apply Hwf || apply Hwf'|
+    now apply ntl_relabel_free_WF; apply Hwf || apply Hwf'|
     rewrite contl_boundary_relabel_contl_free; cbn; 
-    rewrite ntl_free_varset_relabel_ntl_free;
+    rewrite ntl_free_varset_ntl_relabel_free;
     intros ? []%elem_of_map []%elem_of_map; lia].
   now apply swapped_stack_tensor_mor; 
   apply (contl_semantics_relabel_contl_free _ _).
 Qed.
+
+
+Lemma contl_semantics_stack_aux mabs {n m n' m'}
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
+  WF_ntl contl -> WF_ntl contl' ->
+  ntl_free_varset contl ## contl_boundary contl' ->
+  ntl_free_varset contl' ## contl_boundary contl ->
+  contl_semantics mabs (stack_contl_aux contl contl') ≡
+  stack_tensor (contl_semantics mabs contl)
+    (contl_semantics mabs contl').
+Proof.
+  intros Hwf Hwf' Hdisj Hdisj' v w Hv Hw.
+  unfold contl_semantics;
+  cbn -[ntl_total_semantics ntl_times].
+  induction v as [vl vr] using vec_add_inv.
+  induction w as [wl wr] using vec_add_inv.
+  rewrite 2 vsplitl_app, 2 vsplitr_app, 2 vzip_with_app,
+    2 vec_to_list_app, 2 list_to_map_app.
+  (* rewrite 4 vzip_map_l, 4 vec_to_list_map.
+  rewrite <- 4 (kmap_list_to_map (M1:=Pmap) _). *)
+
+  rewrite ntl_total_semantics_ntl_times by easy.
+
+  f_equiv.
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hdisj in Hl as Hl'.
+    change (l ∉ contl_boundary contl') in Hl'.
+    unfold contl_boundary in Hl'.
+    rewrite list_to_set_app, not_elem_of_union in Hl'.
+    rewrite 3 lookup_union.
+    unfold make_vecs_map.
+    rewrite lookup_union.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ vr)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    rewrite (right_id_L None _).
+    f_equal.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ wr)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    apply (right_id_L _ _).
+  - apply ntl_total_semantics_free_varset_ext.
+    intros l Hl.
+    apply Hdisj' in Hl as Hl'.
+    change (l ∉ contl_boundary contl) in Hl'.
+    unfold contl_boundary in Hl'.
+    rewrite list_to_set_app, not_elem_of_union in Hl'.
+    rewrite 3 lookup_union.
+    unfold make_vecs_map.
+    rewrite lookup_union.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ vl)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    rewrite (not_elem_of_dom (list_to_map (vzip _ wl)) _).1 by now
+      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
+        now rewrite 2 length_vec_to_list.
+    now rewrite 2 (left_id_L None _).
+Qed.
+
+Lemma contl_semantics_stack mabs {n m n' m'}
+  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
+  WT_contl contl -> WT_contl contl' ->
+  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
+  contl_semantics mabs (stack_contl contl contl') ≡
+  stack_tensor (contl_semantics mabs contl)
+    (contl_semantics mabs contl').
+Proof.
+  intros Hwf Hwf'.
+  unfold stack_contl.
+  rewrite contl_semantics_stack_aux by first [
+    now apply ntl_relabel_free_WF; apply Hwf || apply Hwf'|
+    rewrite contl_boundary_relabel_contl_free; cbn; 
+    rewrite ntl_free_varset_ntl_relabel_free;
+    intros ? []%elem_of_map []%elem_of_map; lia].
+  now apply stack_tensor_mor; 
+  apply (contl_semantics_relabel_contl_free _ _).
+Qed.
+
 
 End Semantics.
 

@@ -5742,12 +5742,12 @@ Qed.
 
 
 
-Definition relabel_ntl_bound f (ntl : namedtensorlist) : namedtensorlist :=
+Definition ntl_relabel_bound f (ntl : namedtensorlist) : namedtensorlist :=
   mk_ntl (f <$> ntl.(ntl_sums))
     (relabel_abs (relabel_bounds f) <$> ntl.(ntl_abstracts))
     (relabel_delt (relabel_bounds f) <$> ntl.(ntl_deltas)).
 
-Definition relabel_ntl_free f (ntl : namedtensorlist) : namedtensorlist :=
+Definition ntl_relabel_free f (ntl : namedtensorlist) : namedtensorlist :=
   mk_ntl ntl.(ntl_sums) (relabel_abs (relabel_frees f) <$> ntl.(ntl_abstracts))
     (relabel_delt (relabel_frees f) <$> ntl.(ntl_deltas)).
 
@@ -5829,7 +5829,7 @@ Definition ntl_times_aux (l r : namedtensorlist) : namedtensorlist :=
 
 
 Definition ntl_times (l r : namedtensorlist) : namedtensorlist :=
-  ntl_times_aux (relabel_ntl_bound (bcons false) l) (relabel_ntl_bound (bcons true) r).
+  ntl_times_aux (ntl_relabel_bound (bcons false) l) (ntl_relabel_bound (bcons true) r).
 
 Lemma ntl_times_alt l r :
 ntl_times l r = mk_ntl ((bcons false <$> l.(ntl_sums)) ++
@@ -5860,10 +5860,10 @@ Proof.
     split; (apply union_mono; [apply Hl|apply Hr]).
 Qed.
 
-Lemma relabel_ntl_bound_WF_strong f ntl :
+Lemma ntl_relabel_bound_WF_strong f ntl :
   ForallPairs (fun i j => f i = f j -> i = j) ntl.(ntl_sums) ->
   WF_ntl ntl ->
-  WF_ntl (relabel_ntl_bound f ntl).
+  WF_ntl (ntl_relabel_bound f ntl).
 Proof.
   intros Hf Hntl.
   rewrite ForallPairs_forall in Hf.
@@ -5876,12 +5876,12 @@ Proof.
 Qed.
 
 
-Lemma relabel_ntl_bound_WF f `{Hf : !Inj eq eq f} ntl :
+Lemma ntl_relabel_bound_WF f `{Hf : !Inj eq eq f} ntl :
   WF_ntl ntl ->
-  WF_ntl (relabel_ntl_bound f ntl).
+  WF_ntl (ntl_relabel_bound f ntl).
 Proof.
   intros Hntl.
-  apply relabel_ntl_bound_WF_strong; [|easy].
+  apply ntl_relabel_bound_WF_strong; [|easy].
   now intros ? ? ? ?; apply Hf.
 Qed.
 
@@ -5890,7 +5890,7 @@ Lemma ntl_times_WF l r :
   WF_ntl (ntl_times l r).
 Proof.
   intros Hl Hr.
-  apply ntl_times_aux_WF; [now apply (relabel_ntl_bound_WF _)..|].
+  apply ntl_times_aux_WF; [now apply (ntl_relabel_bound_WF _)..|].
   cbn.
   intros ? []%elem_of_list_fmap []%elem_of_list_fmap.
   lia.
