@@ -11,7 +11,7 @@ Definition vsplitl {A n m} (v : vec A (n + m)) : vec A n :=
   (Vector.splitat n v).1.
 Definition vsplitr {A n m} (v : vec A (n + m)) : vec A m :=
   (Vector.splitat n v).2.
-Definition app_vsplit {A n m} (v : vec A (n + m)) :
+Lemma app_vsplit {A n m} (v : vec A (n + m)) :
   vsplitl v +++ vsplitr v = v.
 Proof.
   apply symmetry, Vector.append_splitat, surjective_pairing.
@@ -35,6 +35,13 @@ Lemma vsplitr_app {A n m} (v : vec A n) (w : vec A m) :
 Proof.
   unfold vsplitr.
   now rewrite Vector.splitat_append.
+Qed.
+Lemma vec_add_inv `(P : vec A (n + m) -> Prop)
+  (HP : forall v w, P (v +++ w)) : forall v, P v.
+Proof.
+  intros v.
+  rewrite <- app_vsplit.
+  apply HP.
 Qed.
 
 Require Export SummableWF.

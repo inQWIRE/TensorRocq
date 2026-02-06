@@ -1195,14 +1195,6 @@ Proof.
     by now rewrite 2 length_vec_to_list.
 Qed.
 
-Lemma vec_add_inv `(P : vec A (n + m) -> Prop)
-  (HP : forall v w, P (v +++ w)) : forall v, P v.
-Proof.
-  intros v.
-  rewrite <- app_vsplit.
-  apply HP.
-Qed.
-
 Definition contl_boundary {n m} (contl : CospanNamedTensorList n m) : Pset :=
   list_to_set (contl.(contl_inputs) ++ contl.(contl_outputs)).
 

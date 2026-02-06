@@ -4,7 +4,7 @@ From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
 Require Import ZXCore.
 Require ZifyBool.
-Require Import TensorGraphExpr TensorGraphSemantics.
+Require Import TensorGraphExpr TensorGraphSemantics GraphRewriting.
 Require TECospan.
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
@@ -1383,28 +1383,15 @@ Proof.
   symmetry; apply compose_to_swapped_stack.
 Qed.
 
-(* #[export] Instance CospanHyperGraph_disj {n m} : Disjoint (CospanHyperGraph T n m) :=
-  fun cohg cohg' =>
-  vertices cohg ## vertices cohg' /\
-  cohg.(hedges) ##ₘ cohg'.(hedges). *)
-
-(* Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
-  (cohg : TensorGraph n m) (cohg' : TensorGraph n' m') :
-  cohg ## cohg ->
-  graph_semantics (SR:=SR) (swapped_stack_graphs cohg cohg') ≡
-  swapped_stack_tensor (graph_semantics cohg)
-    (graph_semantics cohg').
+Lemma graph_semantics_compose_safe {n m o}
+  (cohg : TensorGraph n m) (cohg' : TensorGraph m o) :
+  graph_semantics (SR:=SR) (compose_safe cohg cohg') ≡
+  compose_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
-  intros Hdisj.
+  rewrite <- compose_graphs_alt_correct.
+  apply graph_semantics_compose_graphs_alt.
+Qed.
 
-Admitted. *)
-
-
-
-
-(* Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
-  (cohg : TensorGraph n m) (cohg' : TensorGraph n' m') :
-  graph_semantics (swapped_stack_graphs) *)
 
 
 

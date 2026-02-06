@@ -7,6 +7,22 @@ From stdpp Require Export pmap gmap.
 
 (* An implementation of double pushout (DPO) rewriting *)
 
+
+Lemma vsplitl_map {A B n m} (f : A -> B) (v : vec A (n + m)) :
+  vsplitl (vmap f v) = vmap f (vsplitl v).
+Proof.
+  induction v using vec_add_inv.
+  rewrite Vector.map_append.
+  now rewrite 2 vsplitl_app.
+Qed.
+Lemma vsplitr_map {A B n m} (f : A -> B) (v : vec A (n + m)) :
+  vsplitr (vmap f v) = vmap f (vsplitr v).
+Proof.
+  induction v using vec_add_inv.
+  rewrite Vector.map_append.
+  now rewrite 2 vsplitr_app.
+Qed.
+
 Definition fun_to_map `{Insert A B M, Empty M, Elements A SA}
   (f : A -> B) (X : SA) : M :=
   set_to_map (fun a => (a, f a)) X.
@@ -200,7 +216,7 @@ Section DPO.
   | (S k), _ =>
     let (p, p') := Vector.hd ps in
     let ps' := Vector.tl ps in
-      (p, p') ::: propogate_subst (vmap (relabel_delt ({[p := p']})) ps')
+      (p, p') ::: propogate_subst (vmap (prod_map {[p := p']} {[p := p']}) ps')
   end.
 
 
@@ -214,12 +230,15 @@ Section DPO.
   Definition compose_safe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs :=
         propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
-     relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) -> tgl.(hedges) ⊎ tgr.(hedges) <- (vmap (bcons true) tgr.(outputs))).
+     relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) -> 
+      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) (list_to_set (vmap (bcons true) tgr.(inputs))) <- (vmap (bcons true) tgr.(outputs))).
 
   Definition compose {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
     relabel_graph (subst_by_vec connected_substs)
-      (tgl.(inputs) -> tgl.(hedges) ∪ tgr.(hedges) <- tgr.(outputs)).
+      (tgl.(inputs) -> 
+        hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs)) 
+          <- tgr.(outputs)).
 
 Lemma compose_safe_to_compose {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
@@ -230,9 +249,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* Definition graph_disj {n m n' m'} (tg : CospanHyperGraph T n m)
-  (tg' : CospanHyperGraph T n' m') : Prop :=
-   *)
 
 Lemma relabel_hg_union f (hg hg' : HyperGraph T) :
   relabel_hg f (hg ∪ hg') =
@@ -243,18 +259,30 @@ Proof.
   - now rewrite set_map_union_L.
 Qed.
 
-(* Lemma propogate_subst_vmap {n} (fl fr : positive -> positive)
-  `{Hfl : !Inj eq eq fl, Hfr : !Inj eq eq fr} 
-  (Hf : forall i j, fl i <> fr j) (v : vec _ n) :
-  v.*1 ## v.*2 ->
-  propogate_subst (vmap (prod_map fl fr) v) =
-  vmap (prod_map fl fr) (propogate_subst v).
+
+
+Lemma apply_fn_lookup_singleton `{EqDecision A, EqDecision B}
+  (f : A -> B) `{Hf : !Inj eq eq f} (a b c : A) :
+  f ({[a := b]} c) = {[f a := f b]} (f c).
+Proof.
+  rewrite fn_lookup_singleton_case.
+  case_decide as Hac.
+  - subst.
+    now rewrite fn_lookup_singleton.
+  - now rewrite fn_lookup_singleton_ne by now intros ?%(inj f).
+Qed.
+
+Lemma propogate_subst_vmap {n} (fl : positive -> positive)
+  `{Hfl : !Inj eq eq fl} (v : vec _ n) :
+  (* v.*1 ## v.*2 -> *)
+  propogate_subst (vmap (prod_map fl fl) v) =
+  vmap (prod_map fl fl) (propogate_subst v).
 Proof.
   revert v; induction n as [|n IHn]; [refine (vec_0_inv _ _);done|
     refine (vec_S_inv _ _)].
   intros (p, q) v.
   cbn.
-  intros Hdisj.
+  (* intros Hdisj. *)
   f_equal.
   rewrite <- IHn.
   f_equal.
@@ -262,54 +290,196 @@ Proof.
   rewrite 2 Vector.map_map, 2 vlookup_map.
   destruct (v !!! i) as (pi, qi).
   cbn.
-  rewrite fn_lookup_singleton_case.
-  rewrite fn_lookup_singleton_ne by eauto.
+  now rewrite 2 (apply_fn_lookup_singleton fl).
+Qed.
 
-  rewrite fnlookup
-  f_equiv.
-
-
-Lemma compose_relabel_graph {n m o} fl fr
-  `{Hfl : !Inj eq eq fl, Hfr : !Inj eq eq fr}
-  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
-  vertices tgl ## vertices tgr ->
-  compose (relabel_graph fl tgl) (relabel_graph fr tgr) =
-  relabel_graph (
-    Pmap_map (fun_to_map fl (vertices tgl) ∪
-      fun_to_map fr (vertices tgr))) (compose tgl tgr).
+Lemma susbt_by_vec_propogate_helper n i o
+  (insl outsl : vec positive n) (p' : positive) :
+  subst_by_vec (propogate_subst
+       (vzip_with pair (vmap {[o := i]} outsl) (vmap {[o := i]} insl))) p' =
+  subst_by_vec (propogate_subst
+      (vmap (prod_map {[o := i]} {[o := i]}) (vzip_with pair outsl insl))) p'.
 Proof.
-  intros Hdisj.
+  revert i o insl outsl p'.
+  induction n; intros i o;
+  [do 2 refine (vec_0_inv _ _); done|].
+  refine (vec_S_inv _ _).
+  intros i' insl.
+  refine (vec_S_inv _ _).
+  intros o' outsl p.
+  cbn.
+  rewrite <- vzip_map.
+  rewrite IHn.
+  f_equal.
+  f_equal.
+  rewrite vzip_map.
+  done.
+Qed.
+
+Lemma inputs_add_top_loops {n m m'}
+  (tg : CospanHyperGraph T (n + m) (n + m')) :
+  (add_top_loops tg).(inputs) =
+  vmap (subst_by_vec (propogate_subst
+    (vzip (vsplitl tg.(outputs))
+      (vsplitl tg.(inputs)))))
+      (vsplitr tg.(inputs)).
+Proof.
+  induction n; [cbn; now rewrite Vector.map_id|].
+  cbn [add_top_loops].
+  rewrite IHn.
+  destruct tg as [hg ins outs].
+  (* cbn in ins, outs. *)
+  induction ins as [insl insr] using vec_add_inv.
+  induction outs as [outsl outsr] using vec_add_inv.
+  induction insl as [i insl] using vec_S_inv.
+  induction outsl as [o outsl] using vec_S_inv.
+  cbn -[Vector.append].
+  rewrite 2 vsplitl_app, vsplitr_app.
+  cbn.
+  rewrite 2 vsplitl_map, 2 vsplitl_app.
+  rewrite vsplitr_map, vsplitr_app.
+  rewrite Vector.map_map.
+  apply Vector.map_ext.
+  intros p.
+  apply susbt_by_vec_propogate_helper.
+Qed.
+
+
+Lemma outputs_add_top_loops {n m m'}
+  (tg : CospanHyperGraph T (n + m) (n + m')) :
+  (add_top_loops tg).(outputs) =
+  vmap (subst_by_vec (propogate_subst
+    (vzip (vsplitl tg.(outputs))
+      (vsplitl tg.(inputs)))))
+      (vsplitr tg.(outputs)).
+Proof.
+  induction n; [cbn; now rewrite Vector.map_id|].
+  cbn [add_top_loops].
+  rewrite IHn.
+  destruct tg as [hg ins outs].
+  (* cbn in ins, outs. *)
+  induction ins as [insl insr] using vec_add_inv.
+  induction outs as [outsl outsr] using vec_add_inv.
+  induction insl as [i insl] using vec_S_inv.
+  induction outsl as [o outsl] using vec_S_inv.
+  cbn -[Vector.append].
+  rewrite 2 vsplitl_app, vsplitr_app.
+  cbn.
+  rewrite 2 vsplitl_map, 2 vsplitl_app.
+  rewrite vsplitr_map, vsplitr_app.
+  rewrite Vector.map_map.
+  apply Vector.map_ext.
+  intros p.
+  apply susbt_by_vec_propogate_helper.
+Qed.
+
+Lemma hg_add_vertices_empty (hg : HyperGraph T) :
+  hg_add_vertices hg ∅ = hg.
+Proof.
+  apply hg_ext; [done|].
+  cbn -[union].
+  apply union_empty_l_L.
+Qed.
+
+Lemma hg_add_vertices_union (hg : HyperGraph T) vs vs' :
+  hg_add_vertices (hg_add_vertices hg vs) vs' =
+  hg_add_vertices hg (vs ∪ vs').
+Proof.
+  apply hg_ext; [done|].
+  cbn -[union].
+  rewrite (union_assoc_L _).
+  f_equal.
+  apply union_comm_L.
+Qed.
+
+Lemma relabel_hg_add_vertices f (hg : HyperGraph T) vs :
+  relabel_hg f (hg_add_vertices hg vs) =
+  hg_add_vertices (relabel_hg f hg) (set_map f vs).
+Proof.
+  apply hg_ext; [done|].
+  cbn.
+  now rewrite set_map_union_L.
+Qed.
+
+
+Lemma hedges_add_top_loops {n m m'}
+  (tg : CospanHyperGraph T (n + m) (n + m')) :
+  (add_top_loops tg).(hedges) =
+  relabel_hg (subst_by_vec (propogate_subst
+    (vzip (vsplitl tg.(outputs))
+      (vsplitl tg.(inputs)))))
+      (hg_add_vertices tg.(hedges)
+      (list_to_set (vsplitl tg.(inputs)))).
+Proof.
+  induction n; [cbn; now rewrite relabel_hg_id, hg_add_vertices_empty|].
+  cbn [add_top_loops].
+  rewrite IHn.
+  destruct tg as [hg ins outs].
+  (* cbn in ins, outs. *)
+  induction ins as [insl insr] using vec_add_inv.
+  induction outs as [outsl outsr] using vec_add_inv.
+  induction insl as [i insl] using vec_S_inv.
+  induction outsl as [o outsl] using vec_S_inv.
+  cbn -[Vector.append union].
+  rewrite 2 vsplitl_app.
+  cbn -[union].
+  rewrite 2 vsplitl_map, 2 vsplitl_app.
+  rewrite 4 relabel_hg_add_vertices, hg_add_vertices_union.
+  f_equal.
+  - rewrite relabel_hg_compose.
+    apply relabel_hg_ext.
+    intros p; cbn.
+    now rewrite susbt_by_vec_propogate_helper.
+  - rewrite <- set_map_union_L.
+    rewrite vec_to_list_map, <- (set_map_list_to_set_L (SA:=Pset)).
+    rewrite <- set_map_union_L.
+    rewrite set_map_compose_L.
+    apply set_map_ext_L.
+    intros ? _.
+    cbn.
+    apply susbt_by_vec_propogate_helper.
+Qed.
+
+Lemma add_top_loops_alt {n m m'}
+  (tg : CospanHyperGraph T (n + m) (n + m')) :
+  add_top_loops tg = 
+  relabel_graph (subst_by_vec (propogate_subst
+    (vzip (vsplitl tg.(outputs))
+      (vsplitl tg.(inputs)))))
+    (vsplitr tg.(inputs) -> 
+      hg_add_vertices tg.(hedges) (list_to_set (vsplitl tg.(inputs))) 
+      <- vsplitr tg.(outputs)).
+Proof.
   apply cohg_ext.
-  - cbn.
-    rewrite relabel_hg_compose.
-    rewrite 2 relabel_hg_union, 2 relabel_hg_compose.
-    f_equal.
-    + apply relabel_hg_ext_strong.
-      intros i Hi.
-      rewrite vzip_map.
+  - apply hedges_add_top_loops.
+  - apply inputs_add_top_loops.
+  - apply outputs_add_top_loops.
+Qed.
 
 
 
-
-Lemma compose_isomorphic {n m o}
-  (tgl tgl' : CospanHyperGraph T n m) (tgr tgr' : CospanHyperGraph T m o) :
-  isomorphic tgl tgl' -> isomorphic tgr tgr' ->
-  isomorphic (compose tgl tgr) (compose tgl' tgr').
+Lemma compose_graphs_alt_aux_correct {n m o}
+  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
+  add_top_loops (swapped_stack_graphs_aux tgl tgr) =
+    compose tgl tgr.
 Proof.
-  intros (fle & flv & Hfle & Hflv & ->)%isomorphic_exists
-    (fre & frv & Hfre & Hfrv & ->)%isomorphic_exists.
-  apply isomorphic_exists.
-  exists (pos_map fle fre), (pos_map flv frv).
-  split; [apply _|].
-  split; [apply _|].
-
+  rewrite add_top_loops_alt.
+  cbn.
+  rewrite 2 vsplitl_app, 2 vsplitr_app.
+  reflexivity.
+Qed.
 
 Lemma compose_graphs_alt_correct {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
-  isomorphic (compose_graphs_alt tgl tgr)
-    (compose_safe tgl tgr).
-Proof. *)
-
+  add_top_loops (swapped_stack_graphs tgl tgr) =
+    compose_safe tgl tgr.
+Proof.
+  rewrite add_top_loops_alt.
+  cbn.
+  rewrite 2 vsplitl_app, 2 vsplitr_app.
+  rewrite <- 2 reindex_relabel_hg.
+  done.
+Qed.
 
 
 End DPO.
