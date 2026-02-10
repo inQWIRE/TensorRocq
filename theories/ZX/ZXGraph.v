@@ -1,4 +1,4 @@
-Require Import ZXCore.
+Require Import Tensor ZXCore.
 From QuantumLib Require Export Complex.
 Require Import TensorGraphSemantics.
 Open Scope nat_scope.
@@ -6,11 +6,107 @@ Open Scope nat_scope.
 Notation "'ZXG'" := (CospanHyperGraph (bool * R)) (at level 0).
 
 (* Check ZXG. *)
+Definition h_stack' : @DimensionlessTensor C bool :=
+  fun n m v w =>
+  default C0 (uncurry h_stack ∘ Vector.splitat ((n+m)/2) <$>
+  vec_cast_opt (v +++ w) ((n + m)/2 + (n+m)/2)).
 
-Instance ZXCALC : TensorLike C bool (bool * R) := {
-  interpretTensor (x : bool * R) := match x with
-  | (false, r)  => fun n m => @zsp n m r
-  | (true, r) => fun n m => @xsp n m r
+Lemma h_stack'_refl n : h_stack' n n ≡ h_stack.
+Proof.
+  intros v w Hv Hw.
+  unfold h_stack'.
+  replace ((n + n) / 2) with n by (symmetry;
+    etransitivity; [|apply (Nat.div_mul _ 2); lia];
+    f_equal; lia).
+  rewrite vec_cast_opt_refl.
+  cbn.
+  now rewrite Vector.splitat_append.
+Qed.
+
+Definition h_stack1' : @DimensionlessTensor C bool :=
+  fun n m v w =>
+  default C0 (uncurry h_stack ∘ Vector.splitat 1 <$>
+  vec_cast_opt (v +++ w) (1 + 1)).
+
+Lemma h_stack1'_11 : h_stack1' 1 1 ≡ h_stack.
+Proof.
+  exact (h_stack'_refl 1).
+Qed.
+
+Lemma h_stack1'_ne n m : n + m <> 2 ->
+  h_stack1' n m ≡ const_tensor C0.
+Proof.
+  intros Hnm v w Hv Hw.
+  unfold h_stack1'.
+  now rewrite vec_cast_opt_ne by done.
+Qed.
+
+Lemma h_stack1'_ne_gen n m v w : n + m <> 2 ->
+  h_stack1' n m v w = C0.
+Proof.
+  intros Hnm.
+  unfold h_stack1'.
+  now rewrite vec_cast_opt_ne by done.
+Qed.
+
+Lemma h_stack1'_spec {n m} (H : n + m = 2) (v : vec bool n) (w : vec bool m) : 
+  h_stack1' n m v w =
+  h ((v+++w)!!!Fin.cast 0 (eq_sym H))
+    ((v+++w)!!!Fin.cast 1 (eq_sym H)).
+Proof.
+  unfold h_stack1'.
+  generalize (v +++ w) as vw.
+  clear v w.
+  rewrite H.
+  cbn.
+  intros vw.
+  induction vw as [v w'] using vec_S_inv.
+  induction w' as [w ?] using vec_S_inv.
+  apply Cmult_1_r.
+Qed.
+
+Require Import QlibInterface.
+
+Lemma vlookup_lookup_total `{Inhabited A} {n} (v : vec A n) (i : fin n) :
+  v !!! i = vec_to_list v !!! (i:>nat).
+Proof.
+  rewrite list_lookup_total_alt.
+  now rewrite lookup_vec_to_list_fin.
+Qed.
+
+Lemma h_stack1'_strong_perm : strongly_permutative_tensor h_stack1'.
+Proof.
+  intros n m n' m' v w v' w' Hperm.
+  apply Permutation_length in Hperm as Hlen.
+  rewrite 2 length_app, 4 length_vec_to_list in Hlen.
+  destruct_decide (decide (n + m = 2)) as Hnm; 
+    [|now rewrite 2 h_stack1'_ne_gen by lia].
+  rewrite (h_stack1'_spec Hnm).
+  assert (Hnm' : n' + m' = 2) by lia.
+  rewrite (h_stack1'_spec Hnm').
+  revert Hperm.
+  rewrite <- 2 vec_to_list_app.
+  rewrite 4 vlookup_lookup_total.
+  generalize (v +++ w) as vw, (v' +++ w') as vw'.
+  rewrite Hnm, Hnm'.
+  cbn.
+  clear.
+  intros vw vw' Hperm.
+  induction vw as [v vw] using vec_S_inv.
+  induction vw as [w vw] using vec_S_inv.
+  induction vw using vec_0_inv.
+  cbn in Hperm.
+  apply Permutation_length_2_inv in Hperm as [-> | ->]; [done|].
+  cbn.
+  unfold h.
+  now rewrite andb_comm.
+Qed.
+
+Instance ZXCALC : TensorLike C bool (option (bool * R)) := {
+  interpretTensor (x : option (bool * R)) := match x with
+  | None => h_stack1'
+  | Some (false, r)  => fun n m => @zsp n m r
+  | Some (true, r) => fun n m => @xsp n m r
   end
 }.
 
@@ -98,7 +194,9 @@ Qed.
 
 #[global] Program Instance ZXCALC_SP : StronglyPermutativeTensorLike ZXCALC.
 Next Obligation.
-  intros [[] r]; cbn; [apply xsp_strongly_permutative|apply zsp_strongly_permutative].
+  intros [[[] r]|]; cbn; 
+  [apply xsp_strongly_permutative|apply zsp_strongly_permutative|
+  apply h_stack1'_strong_perm].
 Qed.
 
 

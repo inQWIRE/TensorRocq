@@ -2959,3 +2959,6 @@ Proof.
   rewrite <- Hvi.
   now rewrite fin_to_nat_rev, length_vec_to_list.
 Qed.
+
+Notation vhd := Vector.hd.
+Notation vtl := Vector.tl.

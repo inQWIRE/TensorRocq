@@ -925,3 +925,22 @@ Bind Scope graph_scope with CospanHyperGraph.
 (* Open Scope graph_scope.
 Open Scope nat. *)
 
+
+Definition id_graph {T} (n : nat) : CospanHyperGraph T n n :=
+  vmap (Pos.of_succ_nat) (vseq 0 n) -> ∅ <- vmap (Pos.of_succ_nat) (vseq 0 n).
+
+Definition swap_graph {T} n m : CospanHyperGraph T (n + m) (m + n) :=
+  vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq n m) -> ∅ 
+    <- vmap (Pos.of_succ_nat) (vseq n m +++ vseq 0 n).
+
+Definition cup_graph {T} n : CospanHyperGraph T 0 (n + n) :=
+  [#] -> ∅ <- vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq 0 n).
+
+Definition cap_graph {T} n : CospanHyperGraph T (n + n) 0 :=
+  vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq 0 n) -> ∅ <- [#].
+
+Definition graph_of_tensor {T} (t : T) (n m : nat) : CospanHyperGraph T n m :=
+  vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ->
+    {[xH := (t, (bcons false ∘ Pos.of_succ_nat) <$> (seq 0 n), 
+      (bcons true ∘ Pos.of_succ_nat) <$> (seq 0 m))]} <- 
+  vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m).

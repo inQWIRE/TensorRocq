@@ -8,8 +8,6 @@ Require Import Aux_stdpp Aux_pos.
 
 Require Export TESyntax.
 
-Notation vhd := Vector.hd.
-Notation vtl := Vector.tl.
 
 
 

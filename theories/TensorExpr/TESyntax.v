@@ -5041,6 +5041,19 @@ Proof.
   apply IHHl.
 Qed.
 
+Lemma list_filter_none {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  (forall a, a ∈ l -> ~ P a) ->
+  filter P l = [].
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; [reflexivity|].
+  cbn.
+  rewrite decide_False by easy.
+  apply IHHl.
+Qed.
+
 Lemma NoDup_perm_filter_out `{EqDecision A} (l : list A) (a : A) :
   NoDup l -> a ∈ l ->
   l ≡ₚ a :: filter (.≠ a) l.
@@ -5553,6 +5566,351 @@ Proof.
   now apply simplify_ntl_deltas_correct.
 Qed.
 
+(* FIXME: Move *)
+Lemma vmap_id' {A n} (f : A -> A) (v : vec A n) :
+  (forall a, a ∈ vec_to_list v -> f a = a) ->
+  vmap f v = v.
+Proof.
+  rewrite <- Forall_forall, vec_to_list_to_list, <- Vector.to_list_Forall.
+  intros Hall.
+  induction Hall; [done|].
+  cbn.
+  congruence.
+Qed.
+Lemma zip_with_to_fmap_l {A B C} (f : A -> C) (l : list A) (k : list B) :
+  length l = length k ->
+  zip_with (λ a _, f a) l k = f <$> l.
+Proof.
+  intros Hall%Forall2_same_length.
+  induction Hall; cbn; congruence.
+Qed.
+Lemma zip_with_to_fmap_r {A B C} (f : B -> C) (l : list A) (k : list B) :
+  length l = length k ->
+  zip_with (λ _ b, f b) l k = f <$> k.
+Proof.
+  intros Hall%Forall2_same_length.
+  induction Hall; cbn; congruence.
+Qed.
+
+Lemma simplify_ntl_deltas_aux_full_subst_l_aux sums {n}
+  (dbound dfree : vec positive n)
+  delt_other abs :
+  vec_to_list dbound ⊆ sums ->
+  NoDup dbound ->
+  simplify_ntl_deltas_aux sums
+    (vzip_with (λ a b, (bound a, free b)) dbound dfree) delt_other abs =
+  let f := gmap_map (list_to_map (vzip_with (λ a b, (bound a, free b)) dbound dfree)) in
+  (* let f := (λ v : var, default v (free ∘ fv <$> v2bound v)) in *)
+  (filter (.∉ vec_to_list dbound) sums,
+    (relabel_delt f <$> delt_other), (relabel_abs f <$> abs)).
+Proof.
+  revert sums delt_other abs;
+  induction n; intros sums delt_other abs.
+  - induction dbound using vec_0_inv.
+    induction dfree using vec_0_inv.
+    cbn.
+    intros _ _.
+    eenough (Hen : _);
+    [symmetry; f_equal; [f_equal;
+    [|apply list_fmap_id'; intros; apply relabel_delt_id'; exact Hen]|
+    apply list_fmap_id'; intros; apply relabel_abs_id'; exact Hen]|].
+    + apply list_filter_all; now intros * [].
+    + done.
+  - induction dbound as [r dbound] using vec_S_inv.
+    induction dfree as [l dfree] using vec_S_inv.
+    cbn [vec_to_list].
+    intros Hsubs [Hrnin Hdup]%NoDup_cons.
+    cbn.
+    rewrite decide_False by done.
+    rewrite decide_True by now apply Hsubs; left.
+
+    rewrite vmap_id', IHn.
+    + cbv zeta.
+      rewrite <- 2 list_fmap_compose.
+      eenough (Hen : _);
+      [f_equal; [f_equal|]|].
+      * rewrite list_filter_filter.
+        apply list_filter_iff.
+        set_solver +.
+      * apply list_fmap_ext; intros _ lu _.
+        cbn.
+        rewrite relabel_delt_compose; apply relabel_delt_ext.
+        exact Hen.
+      * apply list_fmap_ext; intros _ flu _.
+        cbn.
+        rewrite relabel_abs_compose; apply relabel_abs_ext.
+        exact Hen.
+      * intros v.
+        rewrite gmap_map_insert.
+        unfold compose.
+        rewrite fn_lookup_insert_case, fn_lookup_singleton_case.
+        case_decide as Hv; [|done].
+        apply gmap_map_idemp.
+        rewrite dom_list_to_map, elem_of_list_to_set,
+          vec_to_list_zip_with, fmap_zip_with.
+          cbn.
+        rewrite zip_with_to_fmap_l by now rewrite 2 length_vec_to_list.
+        set_solver +.
+    + intros r' Hr'.
+      rewrite elem_of_list_filter.
+      split; [congruence|now apply Hsubs; right].
+    + done.
+    + intros rl.
+      rewrite vec_to_list_zip_with.
+      intros (r' & l' & -> & Hr' & _)%elem_of_zip_with.
+      cbn.
+      rewrite fn_lookup_singleton_ne by congruence.
+      done.
+Qed.
+
+
+Lemma simplify_ntl_deltas_aux_full_subst_r_aux sums {n}
+  (dbound dfree : vec positive n)
+  delt_other abs :
+  vec_to_list dbound ⊆ sums ->
+  NoDup dbound ->
+  simplify_ntl_deltas_aux sums
+    (vzip_with (λ a b, (free a, bound b)) dfree dbound) delt_other abs =
+  let f := gmap_map (list_to_map (vzip_with (λ a b, (bound a, free b)) dbound dfree)) in
+  (* let f := (λ v : var, default v (free ∘ fv <$> v2bound v)) in *)
+  (filter (.∉ vec_to_list dbound) sums,
+    (relabel_delt f <$> delt_other), (relabel_abs f <$> abs)).
+Proof.
+  revert sums delt_other abs;
+  induction n; intros sums delt_other abs.
+  - induction dbound using vec_0_inv.
+    induction dfree using vec_0_inv.
+    cbn.
+    intros _ _.
+    eenough (Hen : _);
+    [symmetry; f_equal; [f_equal;
+    [|apply list_fmap_id'; intros; apply relabel_delt_id'; exact Hen]|
+    apply list_fmap_id'; intros; apply relabel_abs_id'; exact Hen]|].
+    + apply list_filter_all; now intros * [].
+    + done.
+  - induction dbound as [r dbound] using vec_S_inv.
+    induction dfree as [l dfree] using vec_S_inv.
+    cbn [vec_to_list].
+    intros Hsubs [Hrnin Hdup]%NoDup_cons.
+    cbn.
+    rewrite decide_False by done.
+    rewrite decide_True by now apply Hsubs; left.
+
+    rewrite vmap_id', IHn.
+    + cbv zeta.
+      rewrite <- 2 list_fmap_compose.
+      eenough (Hen : _);
+      [f_equal; [f_equal|]|].
+      * rewrite list_filter_filter.
+        apply list_filter_iff.
+        set_solver +.
+      * apply list_fmap_ext; intros _ lu _.
+        cbn.
+        rewrite relabel_delt_compose; apply relabel_delt_ext.
+        exact Hen.
+      * apply list_fmap_ext; intros _ flu _.
+        cbn.
+        rewrite relabel_abs_compose; apply relabel_abs_ext.
+        exact Hen.
+      * intros v.
+        rewrite gmap_map_insert.
+        unfold compose.
+        rewrite fn_lookup_insert_case, fn_lookup_singleton_case.
+        case_decide as Hv; [|done].
+        apply gmap_map_idemp.
+        rewrite dom_list_to_map, elem_of_list_to_set,
+          vec_to_list_zip_with, fmap_zip_with.
+          cbn.
+        rewrite zip_with_to_fmap_l by now rewrite 2 length_vec_to_list.
+        set_solver +.
+    + intros r' Hr'.
+      rewrite elem_of_list_filter.
+      split; [congruence|now apply Hsubs; right].
+    + done.
+    + intros rl.
+      rewrite vec_to_list_zip_with.
+      intros (r' & l' & -> & _ & Hl')%elem_of_zip_with.
+      cbn.
+      rewrite 2 fn_lookup_singleton_ne by congruence.
+      done.
+Qed.
+
+
+Lemma simplify_ntl_deltas_aux_ext sums {n n'} (delt : vec _ n) (delt' : vec _ n')
+  delt_other abs :
+  vec_to_list delt = vec_to_list delt' ->
+  simplify_ntl_deltas_aux sums delt delt_other abs =
+  simplify_ntl_deltas_aux sums delt' delt_other abs.
+Proof.
+  intros Heq.
+  apply vec_to_list_inj1 in Heq as Hnn'.
+  subst n'.
+  now apply vec_to_list_inj2 in Heq as <-.
+Qed.
+
+
+
+Definition vec_to_list_ind {A} (P : list A -> Type)
+  (HP : forall n (v : vec A n), P v) : forall l, P l :=
+  fun l => eq_rect _ P (HP _ (list_to_vec l)) _ (vec_to_list_to_vec l).
+
+Lemma simplify_ntl_deltas_aux_full_subst_l sums {n}
+  (dv : vec _ n) (dbound dfree : list positive)
+  delt_other abs :
+  dbound ⊆ sums ->
+  NoDup dbound ->
+  length dbound = length dfree ->
+  vec_to_list dv = zip_with (λ a b, (bound a, free b)) dbound dfree ->
+  simplify_ntl_deltas_aux sums
+    dv delt_other abs =
+  let f := gmap_map (list_to_map (zip_with (λ a b, (bound a, free b)) dbound dfree)) in
+  (* let f := (λ v : var, default v (free ∘ fv <$> v2bound v)) in *)
+  (filter (.∉ dbound) sums,
+    (relabel_delt f <$> delt_other), (relabel_abs f <$> abs)).
+Proof.
+  intros Hbound Hdup.
+  induction dbound as [n' dbound] using vec_to_list_ind.
+  induction dfree as [m' dfree] using vec_to_list_ind.
+  rewrite 2 length_vec_to_list.
+  intros <-.
+  rewrite <- vec_to_list_zip_with.
+  intros Heq.
+  erewrite simplify_ntl_deltas_aux_ext by eassumption.
+  rewrite simplify_ntl_deltas_aux_full_subst_l_aux by done.
+  done.
+Qed.
+
+
+Lemma simplify_ntl_deltas_aux_full_subst_r sums {n}
+  (dv : vec _ n) (dbound dfree : list positive)
+  delt_other abs :
+  dbound ⊆ sums ->
+  NoDup dbound ->
+  length dbound = length dfree ->
+  vec_to_list dv = zip_with (λ a b, (free a, bound b)) dfree dbound ->
+  simplify_ntl_deltas_aux sums
+    dv delt_other abs =
+  let f := gmap_map (list_to_map (zip_with (λ a b, (bound a, free b)) dbound dfree)) in
+  (* let f := (λ v : var, default v (free ∘ fv <$> v2bound v)) in *)
+  (filter (.∉ dbound) sums,
+    (relabel_delt f <$> delt_other), (relabel_abs f <$> abs)).
+Proof.
+  intros Hbound Hdup.
+  induction dbound as [n' dbound] using vec_to_list_ind.
+  induction dfree as [m' dfree] using vec_to_list_ind.
+  rewrite 2 length_vec_to_list.
+  intros <-.
+  rewrite <- vec_to_list_zip_with.
+  intros Heq.
+  erewrite simplify_ntl_deltas_aux_ext by eassumption.
+  rewrite simplify_ntl_deltas_aux_full_subst_r_aux by done.
+  rewrite vec_to_list_zip_with.
+  done.
+Qed.
+
+(* Lemma list_to_vec zip_with {A B C} (f : A -> B -> C) :  *)
+
+
+
+Lemma simplify_ntl_deltas_full_subst_l ntl dbound dfree :
+  ntl.(ntl_deltas) = zip_with (λ a b, (bound a, free b)) dbound dfree ->
+  length dbound = length dfree ->
+  dbound ⊆ ntl.(ntl_sums) ->
+  NoDup dbound ->
+  simplify_ntl_deltas ntl =
+    mk_ntl (filter (.∉ dbound) ntl.(ntl_sums))
+      (relabel_abs (gmap_map (list_to_map (zip_with (λ a b, (bound a, free b)) dbound dfree))) <$>
+        ntl.(ntl_abstracts))
+      [].
+Proof.
+  destruct ntl as [sums abs delt].
+  cbn.
+  unfold simplify_ntl_deltas.
+  cbn.
+  intros ->.
+  induction dbound as [n dbound] using vec_to_list_ind.
+  induction dfree as [m dfree] using vec_to_list_ind.
+  rewrite 2 length_vec_to_list.
+  intros <-.
+  intros Hbound Hdup.
+  erewrite simplify_ntl_deltas_aux_ext.
+  2:{
+    rewrite vec_to_list_to_vec, <- vec_to_list_zip_with.
+    reflexivity.
+  }
+  rewrite simplify_ntl_deltas_aux_full_subst_l_aux by done.
+  cbn.
+  rewrite vec_to_list_zip_with.
+  done.
+Qed.
+
+Lemma simplify_ntl_deltas_full_subst_r ntl dbound dfree :
+  ntl.(ntl_deltas) = zip_with (λ a b, (free a, bound b)) dfree dbound ->
+  length dbound = length dfree ->
+  dbound ⊆ ntl.(ntl_sums) ->
+  NoDup dbound ->
+  simplify_ntl_deltas ntl =
+    mk_ntl (filter (.∉ dbound) ntl.(ntl_sums))
+      (relabel_abs (gmap_map (list_to_map (zip_with (λ a b, (bound a, free b)) dbound dfree))) <$>
+        ntl.(ntl_abstracts))
+      [].
+Proof.
+  destruct ntl as [sums abs delt].
+  cbn.
+  unfold simplify_ntl_deltas.
+  cbn.
+  intros ->.
+  induction dbound as [n dbound] using vec_to_list_ind.
+  induction dfree as [m dfree] using vec_to_list_ind.
+  rewrite 2 length_vec_to_list.
+  intros <-.
+  intros Hbound Hdup.
+  erewrite simplify_ntl_deltas_aux_ext.
+  2:{
+    rewrite vec_to_list_to_vec, <- vec_to_list_zip_with.
+    reflexivity.
+  }
+  rewrite simplify_ntl_deltas_aux_full_subst_r_aux by done.
+  cbn.
+  rewrite vec_to_list_zip_with.
+  done.
+Qed.
+
+
+Lemma simplify_ntl_deltas_app_left tl sums delt
+  delt_other abs :
+  NoDup sums ->
+  deltas_vars delt ⊆ psets_to_varset (list_to_set sums) tl ->
+  ntl_delta_eq tl (mk_ntl sums abs (delt ++ delt_other))
+    (uncurry3 (λ s d a, mk_ntl s a d)
+    (simplify_ntl_deltas_aux sums (list_to_vec delt) delt_other abs)).
+Proof.
+  intros Hdup Hvars.
+  destruct (simplify_ntl_deltas_aux _ _ _ _) as [[sums' delt'] abs'] eqn:Heq.
+  rewrite <- (vec_to_list_to_vec delt).
+  erewrite simplify_ntl_deltas_aux_correct_eq_aux by first [eassumption|
+    rewrite vec_to_list_to_vec; assumption].
+  reflexivity.
+Qed.
+
+Lemma simplify_ntl_deltas_app_right tl sums delt
+  delt_other abs :
+  NoDup sums ->
+  deltas_vars delt ⊆ psets_to_varset (list_to_set sums) tl ->
+  ntl_delta_eq tl (mk_ntl sums abs (delt_other ++ delt))
+    (uncurry3 (λ s d a, mk_ntl s a d)
+    (simplify_ntl_deltas_aux sums (list_to_vec delt) delt_other abs)).
+Proof.
+  intros Hdup Hvars.
+  rewrite <- simplify_ntl_deltas_app_left by done.
+  eapply ntl_delta_eq_perm.
+  hnf.
+  cbn.
+  split; [easy|].
+  split; [easy|].
+  apply (Permutation_PermutationA _).
+  apply Permutation_app_comm.
+Qed.
 
 Definition ntl_eq tl : relation namedtensorlist :=
   rtc (ntl_aeq ∪ ntl_delta_eq tl).
@@ -5591,8 +5949,8 @@ Proof.
   now setoid_rewrite Habs.
 Qed.
 
-Lemma abstracts_free_vars_relabel_bounds f abs : 
-  abstracts_free_vars (relabel_abs (relabel_bounds f) <$> abs) = 
+Lemma abstracts_free_vars_relabel_bounds f abs :
+  abstracts_free_vars (relabel_abs (relabel_bounds f) <$> abs) =
   abstracts_free_vars abs.
 Proof.
   apply set_eq.
@@ -5905,7 +6263,7 @@ Definition add_loop_ntl (l r : positive) (ntl : namedtensorlist) : namedtensorli
 Definition add_loop_ntl_alt_as (l r x : positive) (ntl : namedtensorlist) : namedtensorlist :=
   ntl_insert_sum x (
   relabel_ntl
-    (var_elim bound (λ l', if decide (l' = l \/ l' = r) then bound x else free l'))  
+    (var_elim bound (λ l', if decide (l' = l \/ l' = r) then bound x else free l'))
     ntl).
 
 Definition add_loop_ntl_alt (l r : positive) (ntl : namedtensorlist) : namedtensorlist :=

@@ -4333,7 +4333,17 @@ Proof.
 Qed.
 
 
-
+Lemma simplify_ntl_deltas_correct_sem mabs ml ntl : 
+  map_Forall (λ (_ : positive) (a : A), SummedElement a) ml ->
+  WT_ntl (dom ml) ntl ->
+  ntl_total_semantics mabs ml ntl == 
+  ntl_total_semantics mabs ml (simplify_ntl_deltas ntl).
+Proof.
+  intros Hsum HWT.
+  eapply ntl_delta_eq_correct; [done..|].
+  symmetry.
+  now apply simplify_ntl_deltas_correct.
+Qed.
 
 
 

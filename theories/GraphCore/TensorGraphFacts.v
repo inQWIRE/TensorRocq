@@ -1,11 +1,13 @@
+Require Import TensorGraphExpr TensorGraphSemantics GraphRewriting.
 Require Import Aux_pos.
 Require Import Tensor.
 From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
 Require Import ZXCore.
 Require ZifyBool.
-Require Import TensorGraphExpr TensorGraphSemantics GraphRewriting.
 Require TECospan.
+Import TECospan.
+
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 
@@ -443,9 +445,6 @@ Proof.
   generalize (vertices_hg hes) as vs; intros vs.
   case_decide as Hdec; [set_solver+|set_solver +Hdec].
 Qed.
-
-Import TECospan.
-
 
 
 Lemma ntl_delta_eq_subst' tl lb r sums abs delt :
@@ -1096,7 +1095,7 @@ Proof.
         rewrite (lookup_kmap_None (bcons true ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
         cbn.
-        replace (_~0) with ((bcons false ∘ Pos.of_succ_nat) (n' + i)) by now cbn; lia.
+        replace (_~0) with ((bcons false ∘ Pos.of_succ_nat) (n' + i)%nat) by now cbn; lia.
         rewrite (lookup_kmap _).
         rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
         f_equal.
@@ -1143,7 +1142,7 @@ Proof.
         rewrite (lookup_kmap_None (bcons false ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
         cbn.
-        replace (_~1) with ((bcons true ∘ Pos.of_succ_nat) (m + i)) by now cbn; lia.
+        replace (_~1) with ((bcons true ∘ Pos.of_succ_nat) (m + i)%nat) by now cbn; lia.
         (* change (?x~1) with ((bcons true ∘ Pos.of_succ_nat) i). *)
         rewrite (lookup_kmap _).
         rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
@@ -1213,8 +1212,8 @@ Proof.
   apply graph_semantics_compose_graphs_alt.
 Qed.
 
-Lemma graph_semantics_stack_graphs {n m n' m'} 
-  (tg : TensorGraph n m) (tg' : TensorGraph n' m') : 
+Lemma graph_semantics_stack_graphs {n m n' m'}
+  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
   graph_semantics (SR:=SR) (stack_graphs tg tg') ≡
   stack_tensor (graph_semantics tg) (graph_semantics tg').
 Proof.
@@ -1339,7 +1338,7 @@ Proof.
         rewrite (lookup_kmap_None (bcons false ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
         cbn.
-        replace (_~1) with ((bcons true ∘ Pos.of_succ_nat) (m + i)) by now cbn; lia.
+        replace (_~1) with ((bcons true ∘ Pos.of_succ_nat) (m + i)%nat) by now cbn; lia.
         (* change (?x~1) with ((bcons true ∘ Pos.of_succ_nat) i). *)
         rewrite (lookup_kmap _).
         rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
@@ -1362,7 +1361,7 @@ Proof.
         rewrite (lookup_kmap_None (bcons true ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
         cbn.
-        replace (_~0) with ((bcons false ∘ Pos.of_succ_nat) (n + i)) by now cbn; lia.
+        replace (_~0) with ((bcons false ∘ Pos.of_succ_nat) (n + i)%nat) by now cbn; lia.
         rewrite (lookup_kmap _).
         rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
         f_equal.
@@ -1385,6 +1384,636 @@ Proof.
 Qed.
 
 
+(* TODO: General for perm graph *)
+
+
+Lemma graph_namedtensorlist_semantics_WT' {n m} (tg : TensorGraph n m) :
+  WT_ntl (list_to_set
+     (vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ++
+      vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m)))
+    (graph_namedtensorlist_semantics tg).
+Proof.
+  rewrite WT_ntl_alt_varset.
+  split; [|apply graph_namedtensorlist_semantics_WF].
+  now rewrite ntl_free_varset_graph.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_WT {n m} (tg : TensorGraph n m)
+  (v w : vec A _) :
+  WT_ntl (dom $ make_vecs_map
+    (vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n))
+    (vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m))
+    v w)
+    (graph_namedtensorlist_semantics tg).
+Proof.
+  rewrite dom_make_vecs_map.
+  apply graph_namedtensorlist_semantics_WT'.
+Qed.
+
+
+Lemma graph_namedtensorlist_semantics_WT'' {n m} (tg : TensorGraph n m) :
+  WT_ntl (list_to_set
+     (((bcons false ∘ Pos.of_succ_nat) <$> (seq 0 n)) ++
+      ((bcons true ∘ Pos.of_succ_nat) <$> (seq 0 m))))
+    (graph_namedtensorlist_semantics tg).
+Proof.
+  rewrite <- 2 vec_to_list_seq, <- 2 vec_to_list_map.
+  apply graph_namedtensorlist_semantics_WT'.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_id_graph n :
+  ntl_eq (list_to_set ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 n)))
+    (graph_namedtensorlist_semantics (@id_graph T n))
+    (mk_ntl [] []
+      (((λ i, (free $ bcons false i, free $ bcons true i)) ∘ Pos.of_succ_nat)
+      <$> seq 0 n)).
+Proof.
+  unfold graph_namedtensorlist_semantics; cbn.
+  unfold vertices.
+  cbn.
+  rewrite simplify_ntl_deltas_app_right; [|apply NoDup_elements|].
+  2:{
+    pose proof (graph_namedtensorlist_semantics_WT'' (@id_graph T n))
+    as HWT.
+    rewrite WT_ntl_alt in HWT.
+    rewrite <- HWT.2.
+    rewrite <- union_subseteq_r.
+    cbn.
+    unfold deltas_vars.
+    rewrite bind_app, list_to_set_app.
+    apply union_subseteq_r.
+  }
+  erewrite simplify_ntl_deltas_aux_full_subst_r.
+  5:{
+    rewrite imap_to_zip_with_seq.
+    rewrite vec_to_list_to_vec.
+    rewrite length_vec_to_list.
+    rewrite <- (zip_with_fmap_l (λ a b, (free a, bound b)) (λ n, (Pos.of_succ_nat n)~1)).
+    reflexivity.
+  }
+  2:{
+    apply (list_to_set_subseteq (C:=Pset)).
+    rewrite list_to_set_elements.
+    rewrite <- union_subseteq_r.
+    rewrite list_to_set_app.
+    apply union_subseteq_l.
+  }
+  2:{
+    rewrite vec_to_list_map, vec_to_list_seq.
+    rewrite (NoDup_fmap _); apply NoDup_seq.
+  }
+  2:{
+    now rewrite length_vec_to_list, length_fmap, length_seq.
+  }
+  cbn.
+  apply eq_reflexivity.
+  f_equal.
+  - apply list_filter_none.
+    intros a.
+    rewrite elem_of_elements.
+    change (vertices_hg ∅) with (∅ :> Pset).
+    rewrite union_empty_l_L.
+    rewrite list_to_set_app, union_idemp_L.
+    rewrite elem_of_list_to_set.
+    easy.
+  - apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite 2 length_fmap, length_imap, length_vec_to_list, length_seq|].
+    intros i lu lu'.
+    rewrite length_fmap, length_seq.
+    intros Hi.
+    rewrite 2 list_lookup_fmap, list_lookup_imap.
+    rewrite vec_to_list_map, vec_to_list_seq.
+    rewrite list_lookup_fmap.
+    rewrite lookup_seq_lt by done.
+    rewrite zip_with_fmap_l, zip_with_fmap_r, zip_with_diag.
+    cbn.
+    rewrite gmap_map_idemp. 2:{
+      rewrite dom_list_to_map.
+      rewrite <- list_fmap_compose; unfold compose; cbn.
+      set_solver +.
+    }
+    erewrite gmap_map_correct; [now intros [= <-] [= <-]; reflexivity|].
+    apply elem_of_list_to_map.
+    + rewrite <- list_fmap_compose; unfold compose; cbn.
+      rewrite (NoDup_fmap _); apply NoDup_seq.
+    + refine (elem_of_list_fmap_1 _ _ i _).
+      now apply elem_of_seq; lia.
+Qed.
+
+Lemma imap_vec_to_list {B C} (f : nat -> B -> C) {n} (v : vec B n) :
+  imap f v = fun_to_vec (λ i, f i (v !!! i)).
+Proof.
+  apply (list_eq_same_length _ _ _ eq_refl);
+  [now rewrite length_imap, 2 length_vec_to_list|].
+  rewrite length_vec_to_list.
+  intros i a b Hi.
+  rewrite list_lookup_imap.
+  rewrite fmap_Some.
+  intros (fia & (Hi' & Hvi)%vlookup_lookup' & ->).
+  intros (Hi'' & <-)%vlookup_lookup'.
+  rewrite lookup_fun_to_vec, fin_to_nat_to_fin.
+  f_equal.
+  rewrite <- Hvi.
+  f_equal.
+  apply fin_to_nat_inj.
+  now rewrite 2 fin_to_nat_to_fin.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_swap_graph n m :
+  ntl_eq (list_to_set ((bcons false ∘ Pos.of_succ_nat <$> seq 0 (n + m)) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 (m + n))))
+    (graph_namedtensorlist_semantics (@swap_graph T n m))
+    (mk_ntl [] []
+      ((((λ i, (free $ bcons false (Pos.of_succ_nat i),
+        free $ bcons true (Pos.of_succ_nat (m + i))))) <$> seq 0 n)
+      ++ (((λ i, (free $ bcons false (Pos.of_succ_nat (n + i)),
+        free $ bcons true (Pos.of_succ_nat i)))) <$> seq 0 m) )).
+Proof.
+  unfold graph_namedtensorlist_semantics; cbn.
+  rewrite <- vseq_app.
+  (* unfold vertices. *)
+  (* cbn. *)
+  rewrite simplify_ntl_deltas_app_right; [|apply NoDup_elements|].
+  2:{
+    pose proof (graph_namedtensorlist_semantics_WT'' (@swap_graph T n m))
+    as HWT.
+    rewrite WT_ntl_alt in HWT.
+    rewrite <- HWT.2.
+    rewrite <- union_subseteq_r.
+    cbn.
+    unfold deltas_vars.
+    rewrite bind_app, list_to_set_app.
+    apply union_subseteq_r.
+  }
+  erewrite simplify_ntl_deltas_aux_full_subst_r.
+  5:{
+    rewrite imap_to_zip_with_seq.
+    rewrite vec_to_list_to_vec.
+    rewrite length_vec_to_list.
+    rewrite <- (zip_with_fmap_l (λ a b, (free a, bound b)) (λ n, (Pos.of_succ_nat n)~1)).
+    reflexivity.
+  }
+  2:{
+    apply (list_to_set_subseteq (C:=Pset)).
+    rewrite list_to_set_elements.
+    unfold vertices.
+    rewrite <- union_subseteq_r.
+    rewrite list_to_set_app, <- union_subseteq_l.
+    cbn.
+    rewrite 2 vec_to_list_map, 2 vec_to_list_app, Permutation_app_comm.
+    done.
+  }
+  2:{
+    rewrite vec_to_list_map, vec_to_list_app, Permutation_app_comm,
+      2 vec_to_list_seq, <- seq_app.
+    rewrite (NoDup_fmap _); apply NoDup_seq.
+  }
+  2:{
+    now rewrite length_vec_to_list, length_fmap, length_seq.
+  }
+  cbn.
+  apply eq_reflexivity.
+  f_equal.
+  - apply list_filter_none.
+    intros a.
+    unfold vertices.
+    rewrite elem_of_elements.
+    cbn.
+    change (vertices_hg ∅) with (∅ :> Pset).
+    rewrite union_empty_l_L.
+    rewrite 2 vec_to_list_map, 2 vec_to_list_app, list_to_set_app,
+      Permutation_app_comm.
+    rewrite union_idemp_L.
+    rewrite elem_of_list_to_set.
+    easy.
+  - apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite length_app, 3 length_fmap, length_imap,
+      length_vec_to_list, 2 length_seq|].
+    intros i lu lu'.
+    rewrite length_app, 2 length_fmap, 2 length_seq.
+    intros Hi.
+    rewrite list_lookup_fmap, list_lookup_imap.
+    rewrite 2 vec_to_list_map, vec_to_list_seq, list_lookup_fmap.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    rewrite gmap_map_idemp. 2:{
+      rewrite dom_list_to_map.
+      rewrite fmap_zip_with; cbn.
+      rewrite elem_of_list_to_set.
+      intros (?&?&[=]&_)%elem_of_zip_with.
+    }
+    intros [= <-].
+    destruct_decide (decide (i < n)) as Hin.
+    + rewrite lookup_app_l by now rewrite length_fmap, length_seq.
+      rewrite list_lookup_fmap, lookup_seq_lt by done.
+      cbn.
+      intros [= <-].
+      f_equal.
+      apply gmap_map_correct.
+      apply elem_of_list_to_map. 1:{
+        rewrite fmap_zip_with; cbn.
+        rewrite zip_with_to_fmap_l by
+          now rewrite 2 length_fmap, length_vec_to_list, length_seq.
+        rewrite 2 (NoDup_fmap _).
+        rewrite vec_to_list_app, 2 vec_to_list_seq, Permutation_app_comm.
+        rewrite <- seq_app.
+        apply NoDup_seq.
+      }
+      apply elem_of_list_lookup.
+      exists (m + i)%nat.
+      rewrite lookup_zip_with.
+      rewrite 2 list_lookup_fmap.
+      rewrite vec_to_list_app, lookup_app_r by now rewrite length_vec_to_list; lia.
+      rewrite length_vec_to_list.
+      rewrite vec_to_list_seq, 2 lookup_seq_lt by lia.
+      cbn.
+      repeat first [lia|f_equal].
+    + rewrite lookup_app_r by now rewrite length_fmap, length_seq; lia.
+      rewrite length_fmap, length_seq.
+      rewrite list_lookup_fmap, lookup_seq_lt by lia.
+      cbn.
+      intros [= <-].
+      f_equal; [f_equal; lia|].
+      apply gmap_map_correct.
+      apply elem_of_list_to_map. 1:{
+        rewrite fmap_zip_with; cbn.
+        rewrite zip_with_to_fmap_l by
+          now rewrite 2 length_fmap, length_vec_to_list, length_seq.
+        rewrite 2 (NoDup_fmap _).
+        rewrite vec_to_list_app, 2 vec_to_list_seq, Permutation_app_comm.
+        rewrite <- seq_app.
+        apply NoDup_seq.
+      }
+      apply elem_of_list_lookup.
+      exists (i - n).
+      rewrite lookup_zip_with.
+      rewrite 2 list_lookup_fmap.
+      rewrite lookup_seq_lt by lia.
+      rewrite vec_to_list_app, lookup_app_l by now rewrite length_vec_to_list; lia.
+      rewrite vec_to_list_seq, lookup_seq_lt by lia.
+      cbn.
+      repeat first [lia|f_equal].
+Qed.
+
+Lemma hyperedges_singleton k abs :
+  hyperedges (T:=T) {[k := abs]} = {[k := abs]}.
+Proof.
+  done.
+Qed.
+
+Lemma vertices_graph_of_tensor (t : T) n m :
+  vertices (graph_of_tensor t n m) =
+  list_to_set ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 m)).
+Proof.
+  unfold vertices.
+  cbn.
+  unfold vertices_hg.
+  rewrite hyperedges_singleton.
+  rewrite map_to_list_singleton.
+  cbn.
+  rewrite app_nil_r.
+  rewrite union_empty_r_L.
+  rewrite 2 vec_to_list_map, 2 vec_to_list_seq.
+  apply union_idemp_L.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_graph_of_tensor (t : T) n m :
+  ntl_eq ((list_to_set ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 m))))
+    (graph_namedtensorlist_semantics (graph_of_tensor t n m))
+    (mk_ntl [] [(xH, (free ∘ bcons false ∘ Pos.of_succ_nat <$> seq 0 n),
+      (free ∘ bcons true ∘ Pos.of_succ_nat <$> seq 0 m))] []).
+Proof.
+  unfold graph_namedtensorlist_semantics; cbn -[insert].
+  rewrite hyperedges_singleton.
+  rewrite <- simplify_ntl_deltas_correct by
+    apply graph_namedtensorlist_semantics_WT''.
+  rewrite (simplify_ntl_deltas_full_subst_r _
+    ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 m))
+    ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n) ++
+    (bcons true ∘ Pos.of_succ_nat <$> seq 0 m))). 2:{
+    cbn.
+    rewrite zip_with_diag.
+    rewrite 2 vec_to_list_map, 2 vec_to_list_seq,
+      2 imap_fmap, 2 imap_to_zip_with_seq, 2 length_seq, 2 zip_with_diag.
+    cbn.
+    rewrite fmap_app.
+    rewrite <- 2 list_fmap_compose.
+    done.
+  }
+  2: done.
+  2:{
+    cbn.
+    rewrite vertices_graph_of_tensor.
+    intros x Hx.
+    now rewrite elem_of_elements, elem_of_list_to_set.
+  }
+  2:{
+    rewrite NoDup_app.
+    split; [|split]; cycle 1; [|apply (NoDup_fmap _), NoDup_seq..].
+    set_solver +.
+  }
+  cbn.
+  apply eq_reflexivity.
+  f_equal.
+  - apply list_filter_none.
+    rewrite vertices_graph_of_tensor.
+    intros a.
+    now rewrite elem_of_elements, elem_of_list_to_set.
+  - unfold tg_abstracts.
+    rewrite map_to_list_singleton.
+    cbn.
+    f_equal.
+    rewrite zip_with_diag.
+    f_equal; [f_equal|];
+    rewrite <- 2 list_fmap_compose; apply list_fmap_ext;
+    intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq;
+    cbn; apply gmap_map_correct;
+    (apply elem_of_list_to_map; [
+        rewrite <- list_fmap_compose; unfold compose at 1; cbn;
+        rewrite (NoDup_fmap _); apply NoDup_app;
+        (split; [|split]; cycle 1; [set_solver|apply (NoDup_fmap _), NoDup_seq..])|]);
+    refine (elem_of_list_fmap_1 _ _ _ _);
+    rewrite elem_of_app; [left|right];
+    refine (elem_of_list_fmap_1 _ _ _ _);
+    rewrite elem_of_seq; lia.
+Qed.
+
+
+
+
+
+
+Lemma Rlist_prod_vec_if_eq `{EqA : EqDecision A} {n} (v w : vec A n) :
+  Rlist_prod ((fun i => if decide (vec_to_list v !! i = vec_to_list w !! i)
+  then rI else rO) <$> seq 0 n) == if decide (v = w) then rI else rO.
+Proof.
+  revert v w; induction n; [do 2 refine (vec_0_inv _ _); done|].
+  refine (vec_S_inv _ _).
+  intros vh v.
+  refine (vec_S_inv _ _).
+  intros wh w.
+  cbn.
+  rewrite <- fmap_S_seq, <- list_fmap_compose.
+  unfold compose.
+  cbn.
+  rewrite IHn.
+  symmetry.
+  case_decide as Hboth.
+  - apply Vector.cons_inj in Hboth as [-> ->].
+    rewrite 2 decide_True by done.
+    ring.
+  - case_decide; [|ring].
+    case_decide; [|ring].
+    congruence.
+Qed.
+
+Lemma graph_semantics_id {n} :
+  graph_semantics (SR:=SR) (@id_graph T n) ≡ delta_tensor.
+Proof.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+  unfold namedtensorlist_to_tensor.
+  erewrite ntl_eq_correct; try first [
+    now apply make_vecs_map_SummedElements|
+    apply graph_namedtensorlist_semantics_WT|
+    rewrite dom_make_vecs_map, 2 vec_to_list_map, vec_to_list_seq;
+    try apply graph_namedtensorlist_semantics_id_graph].
+  rewrite ntl_total_semantics_alt by now eapply ntl_eq_WF;
+    [apply symmetry, graph_namedtensorlist_semantics_id_graph|
+    apply graph_namedtensorlist_semantics_WF].
+  cbn -[deltas_semantics_alt].
+  rewrite sum_of_Vmap_nil.
+  rewrite rmul_1_l.
+  unfold deltas_semantics_alt.
+  rewrite <- list_fmap_compose.
+  rewrite <- Rlist_prod_vec_if_eq.
+  apply Rlist_prod_Forall2_ext.
+  apply Forall2_fmap, Forall_Forall2_diag, Forall_seq.
+  intros j [_ Hj].
+  cbn.
+  unfold make_vecs_map.
+  rewrite 2 vec_to_list_zip_with, 2 vec_to_list_map, vec_to_list_seq,
+    2 zip_fmap_l, <- 2 (kmap_list_to_map _).
+  rewrite 2 lookup_union.
+  change ((Pos.of_succ_nat j)~0) with ((bcons false ∘ Pos.of_succ_nat) j).
+  rewrite (lookup_kmap _).
+  rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
+  rewrite (lookup_kmap_None (bcons true ∘ Pos.of_succ_nat) _
+    ((bcons false ∘ Pos.of_succ_nat) j)).2 by now cbn; lia.
+  rewrite (right_id_L None _), (left_id_L None _).
+  change ((Pos.of_succ_nat j)~1) with ((bcons true ∘ Pos.of_succ_nat) j).
+  rewrite (lookup_kmap _).
+
+  rewrite <- (length_vec_to_list v) at 1.
+  rewrite <- imap_to_zip_with_seq.
+  rewrite (lookup_list_to_map_imap id id _ j).
+  replace (seq 0 n) with (seq 0 (length w)) by now rewrite length_vec_to_list.
+  rewrite <- imap_to_zip_with_seq.
+  rewrite (lookup_list_to_map_imap id id _ j).
+  rewrite 2 option_fmap_id.
+  assert (Hjv : j < length v) by now rewrite length_vec_to_list.
+  assert (Hjw : j < length w) by now rewrite length_vec_to_list.
+  rewrite <- lookup_lt_is_Some in Hjv, Hjw.
+  destruct Hjv as [jv Hjv].
+  destruct Hjw as [jw Hjw].
+  rewrite Hjv, Hjw.
+  cbn.
+  apply eq_reflexivity.
+  apply decide_ext.
+  split; now intros [= ->].
+Qed.
+
+Lemma graph_semantics_swap_1_1 :
+  graph_semantics (SR:=SR) (@swap_graph T 1 1) ≡ swap_tensor.
+Proof.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+  unfold namedtensorlist_to_tensor.
+  etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
+    refine (graph_namedtensorlist_semantics_WT _ _ _)|
+    apply ntl_eq_of_ntl_delta_eq;
+    symmetry; apply simplify_ntl_deltas_correct;
+    refine (graph_namedtensorlist_semantics_WT _ _ _)]|].
+  evar (sem : namedtensorlist).
+  replace (simplify_ntl_deltas _) with sem by (vm_compute; reflexivity).
+  subst sem.
+  unfold Pos.succ;
+  cbn -[ntl_total_semantics make_vecs_map].
+  cbn in v, w.
+  induction v as [v1 v] using vec_S_inv.
+  induction v as [v2 v] using vec_S_inv.
+  induction v using vec_0_inv.
+  induction w as [w1 w] using vec_S_inv.
+  induction w as [w2 w] using vec_S_inv.
+  induction w using vec_0_inv.
+  cbn.
+  change (_ !! 5%positive) with (Some w2).
+  change (_ !! 2%positive) with (Some v1).
+  change (_ !! 3%positive) with (Some w1).
+  change (_ !! 4%positive) with (Some v2).
+  cbn.
+  symmetry.
+  case_decide as Heq; [revert Heq; intros [= -> ->]; now rewrite 2 decide_True by done; ring|].
+  do 2 case_decide; [|ring..].
+  congruence.
+Qed.
+
+Lemma graph_semantics_cup_1_1 :
+  graph_semantics (SR:=SR) (@cup_graph T 1) ≡ cup_tensor.
+Proof.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+  unfold namedtensorlist_to_tensor.
+  etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
+    refine (graph_namedtensorlist_semantics_WT _ _ _)|
+    apply ntl_eq_of_ntl_delta_eq;
+    symmetry; apply simplify_ntl_deltas_correct;
+    refine (graph_namedtensorlist_semantics_WT _ _ _)]|].
+  evar (sem : namedtensorlist).
+  replace (simplify_ntl_deltas _) with sem by (vm_compute; reflexivity).
+  subst sem.
+  unfold Pos.succ;
+  cbn -[ntl_total_semantics make_vecs_map].
+  cbn in v, w.
+  induction v using vec_0_inv.
+  induction w as [w1 w] using vec_S_inv.
+  induction w as [w2 w] using vec_S_inv.
+  induction w using vec_0_inv.
+  cbn.
+  change (_ !! 5%positive) with (Some w2).
+  change (_ !! 3%positive) with (Some w1).
+  cbn.
+  rewrite rmul_1_l, rmul_1_r.
+  apply eq_reflexivity, decide_ext.
+  done.
+Qed.
+
+Lemma graph_semantics_cap_1_1 :
+  graph_semantics (SR:=SR) (@cap_graph T 1) ≡ cap_tensor.
+Proof.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+  unfold namedtensorlist_to_tensor.
+  etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
+    refine (graph_namedtensorlist_semantics_WT _ _ _)|
+    apply ntl_eq_of_ntl_delta_eq;
+    symmetry; apply simplify_ntl_deltas_correct;
+    refine (graph_namedtensorlist_semantics_WT _ _ _)]|].
+  evar (sem : namedtensorlist).
+  replace (simplify_ntl_deltas _) with sem by (vm_compute; reflexivity).
+  subst sem.
+  unfold Pos.succ;
+  cbn -[ntl_total_semantics make_vecs_map].
+  cbn in v, w.
+  induction v as [v1 v] using vec_S_inv.
+  induction v as [v2 v] using vec_S_inv.
+  induction v using vec_0_inv.
+  induction w using vec_0_inv.
+  cbn.
+  change (_ !! 2%positive) with (Some v1).
+  change (_ !! 4%positive) with (Some v2).
+  cbn.
+  rewrite rmul_1_l, rmul_1_r.
+  apply eq_reflexivity, decide_ext.
+  done.
+Qed.
+
+#[global] Hint Mode TensorLike ! - - : typeclass_instances.
+#[global] Hint Mode TensorLike - - ! : typeclass_instances.
+
+Lemma graph_semantics_graph_of_tensor t n m :
+  graph_semantics (SR:=SR) (graph_of_tensor t n m) ≡ interpretTensor t n m.
+Proof.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics insert].
+  rewrite hyperedges_singleton.
+  unfold namedtensorlist_to_tensor.
+  etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
+    refine (graph_namedtensorlist_semantics_WT _ _ _)|
+    rewrite dom_make_vecs_map, 2 vec_to_list_map, 2 vec_to_list_seq;
+    apply graph_namedtensorlist_semantics_graph_of_tensor]|].
+
+  cbn.
+  rewrite 2 rmul_1_r.
+  unfold abstract_semantics.
+  change (_ !! xH) with (Some (interpretTensor t)).
+  replace (join_list (fmap _ (fmap _ (fmap _ (seq 0 n))))) with (Some (vec_to_list v));
+  [replace (join_list _) with (Some (vec_to_list w))|].
+  - cbn.
+    unfold Vapplys.
+    rewrite 2 list_to_vec_to_list.
+    case (eq_sym (length_vec_to_list v)).
+    case (eq_sym (length_vec_to_list w)).
+    done.
+  - symmetry.
+    apply join_list_Some.
+    apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite 4 length_fmap, length_seq, length_vec_to_list|].
+    rewrite length_fmap, length_vec_to_list.
+    intros i x y Him.
+    rewrite 4 list_lookup_fmap.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    destruct ((vec_to_list w) !! i) as [wi|] eqn:Hwi; [|done].
+    cbn.
+    intros [= <-] [= <-].
+    apply vlookup_lookup' in Hwi as Hwi'.
+    unfold make_vecs_map.
+    rewrite lookup_union.
+    rewrite 2 vec_to_list_zip_with, 2 vec_to_list_map, 2 zip_fmap_l,
+      <- 2 (kmap_list_to_map _).
+    rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
+    rewrite (left_id_L None union).
+    change (_~1) with ((bcons true ∘ Pos.of_succ_nat) i).
+    rewrite (lookup_kmap _).
+    rewrite vec_to_list_seq.
+    apply elem_of_list_to_map;
+    [rewrite fst_zip by (now rewrite length_vec_to_list, length_seq);
+      apply NoDup_seq|].
+    apply elem_of_list_lookup.
+    exists i.
+    rewrite lookup_zip_with.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    rewrite Hwi.
+    done.
+  - symmetry.
+    apply join_list_Some.
+    apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite 4 length_fmap, length_seq, length_vec_to_list|].
+    rewrite length_fmap, length_vec_to_list.
+    intros i x y Him.
+    rewrite 4 list_lookup_fmap.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    destruct ((vec_to_list v) !! i) as [vi|] eqn:Hvi; [|done].
+    cbn.
+    intros [= <-] [= <-].
+    apply vlookup_lookup' in Hvi as Hvi'.
+    unfold make_vecs_map.
+    rewrite lookup_union.
+    rewrite 2 vec_to_list_zip_with, 2 vec_to_list_map, 2 zip_fmap_l,
+      <- 2 (kmap_list_to_map _).
+    change (_~0) with ((bcons false ∘ Pos.of_succ_nat) i).
+    rewrite (lookup_kmap _).
+    rewrite (lookup_kmap_None _ _ _).2 by now cbn; lia.
+    rewrite (right_id_L None union).
+    rewrite vec_to_list_seq.
+    apply elem_of_list_to_map;
+    [rewrite fst_zip by (now rewrite length_vec_to_list, length_seq);
+      apply NoDup_seq|].
+    apply elem_of_list_lookup.
+    exists i.
+    rewrite lookup_zip_with.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    rewrite Hvi.
+    done.
+Qed.
 
 
 End TensorGraphFacts.

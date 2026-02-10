@@ -3,6 +3,7 @@ Require Import Relation_Definitions.
 Require Import Classes.Morphisms.
 Require Import Btauto.
 Set Warnings "-stdlib-vector".
+Require Import Aux_stdpp.
 From stdpp Require vector.
 Import vector.
 
@@ -42,6 +43,68 @@ Proof.
   intros v.
   rewrite <- app_vsplit.
   apply HP.
+Qed.
+Fixpoint vec_cast_opt {A n} (v : vec A n) : forall (m : nat), option (vec A m) :=
+  match n, v with
+  | 0, _ => fun m => match m with
+    | 0 => Some [#]
+    | S _ => None
+    end
+  | S n, _ => fun m => match m with
+    | 0 => None
+    | S m => (vhd v :::.) <$> vec_cast_opt (vtl v) m
+    end
+  end.
+Lemma vec_cast_opt_spec {A n} (v : vec A n) m :
+  vec_cast_opt v m = (guard (n = m) ≫= λ H, Some (Vector.cast v H)).
+Proof.
+  revert m; induction v; intros [|m]; [done..|].
+  cbn.
+  rewrite IHv.
+  case_guard; case_guard; [|congruence..|done].
+  cbn.
+  do 3 f_equal; apply proof_irrel.
+Qed.
+Lemma vec_cast_opt_ne {A n} (v : vec A n) m :
+  n <> m -> vec_cast_opt v m = None.
+Proof.
+  intros Hne.
+  rewrite vec_cast_opt_spec.
+  case_guard; done.
+Qed.
+Lemma vec_cast_opt_refl {A n} (v : vec A n) :
+  vec_cast_opt v n = Some v.
+Proof.
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  now rewrite cast_id.
+Qed.
+Lemma vec_cast_opt_eq {A n} (v : vec A n) {m} (H : n = m) :
+  vec_cast_opt v m = Some (Vector.cast v H).
+Proof.
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  do 2 f_equal; apply proof_irrel.
+Qed.
+Lemma vec_cast_opt_Some {A n} (v : vec A n) m w : 
+  vec_cast_opt v m = Some w <->
+  exists H, w = Vector.cast v H.
+Proof.
+  split; [|now intros (Hw & ->); apply (vec_cast_opt_eq v Hw)].
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  intros [= <-].
+  eauto.
+Qed.
+Lemma vec_cast_opt_is_Some {A n} (v : vec A n) m :  
+  is_Some (vec_cast_opt v m) <-> n = m.
+Proof.
+  rewrite is_Some_alt.
+  rewrite vec_cast_opt_spec.
+  case_guard; cbn; naive_solver.
 Qed.
 
 Require Export SummableWF.
@@ -166,6 +229,14 @@ Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
 #[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
   `{Summable A} {n m} : Equiv (@Tensor R n m A) := tensoreq.
 
+Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A} : relation (@DimensionlessTensor R A) :=
+  fun t t' => forall n m, t n m ≡@{@Tensor R n m A} t' n m.
+
+#[global] Instance DimensionlessTensor_equiv `{SemiRing R rO rI radd rmul req}
+  `{Summable A} : Equiv (@DimensionlessTensor R A) := dimensionlesstensoreq.
+
+
 Section tensoreq.
 
 Context `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A}.
@@ -185,6 +256,21 @@ Proof.
   now eapply SR.(Req_equiv).(Equivalence_Transitive); [apply Ht|apply Ht'].
 Qed.
 
+Lemma dimensionlesstensoreq_refl (t : @DimensionlessTensor R A) : t ≡ t.
+Proof. hnf; intros; apply tensoreq_refl. Qed.
+Lemma dimensionlesstensoreq_symm (t t' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t.
+Proof.
+  intros Ht.
+  hnf; intros.
+  now apply tensoreq_symm.
+Qed.
+Lemma dimensionlesstensoreq_trans (t t' t'' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
+Proof.
+  intros Ht Ht'.
+  hnf; intros.
+  now eapply tensoreq_trans; [apply Ht|apply Ht'].
+Qed.
+
 End tensoreq.
 
 Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
@@ -193,6 +279,15 @@ Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
   symmetry proved by tensoreq_symm
   transitivity proved by tensoreq_trans
   as tensoreq_setoid.
+
+Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A} : (@DimensionlessTensor R A) dimensionlesstensoreq
+  reflexivity proved by dimensionlesstensoreq_refl
+  symmetry proved by dimensionlesstensoreq_symm
+  transitivity proved by dimensionlesstensoreq_trans
+  as dimensionlesstensoreq_setoid.
+
+
 
 (* TODO: refl, sym, trans lemmas, and Add Parametric Relation
   Also, do we want to factor as summable_relation (same type
@@ -204,6 +299,9 @@ Section TensorOps.
 Context {R : Type}.
 
 Let Tensor := (@Tensor R).
+
+Definition const_tensor {A} {n m} (r : R) : @Tensor n m A :=
+  fun _ _ => r.
 
 Definition delta_tensor `{SA : Summable A, EqA : EqDecision A,
   SR : SemiRing R rO rI radd rmul req}
@@ -266,18 +364,18 @@ Fixpoint join_stack_tl_tr `{SA : Summable A,
   end.
 
 Definition cup_tensor `{SA : Summable A, EqA : EqDecision A,
-  SR : SemiRing R rO rI radd rmul req} {n} : 
-  Tensor 0 (n + n) A := fun v w => 
+  SR : SemiRing R rO rI radd rmul req} {n} :
+  Tensor 0 (n + n) A := fun v w =>
   delta_tensor (vsplitl w) (vsplitr w).
 
 Definition cap_tensor `{SA : Summable A, EqA : EqDecision A,
-  SR : SemiRing R rO rI radd rmul req} {n} : 
-  Tensor (n + n) 0 A := fun v w => 
+  SR : SemiRing R rO rI radd rmul req} {n} :
+  Tensor (n + n) 0 A := fun v w =>
   delta_tensor (vsplitl v) (vsplitr v).
 
 Definition swap_tensor `{SA : Summable A, EqA : EqDecision A,
-  SR : SemiRing R rO rI radd rmul req} {n m} : 
-  Tensor (n + m) (m + n) A := fun v w => 
+  SR : SemiRing R rO rI radd rmul req} {n m} :
+  Tensor (n + m) (m + n) A := fun v w =>
   delta_tensor v (vsplitr w +++ vsplitl w).
 
 Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
@@ -285,9 +383,15 @@ Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
 
 Definition stack_n_tensor_1 `{SA : Summable A,
   SR : SemiRing R rO rI radd rmul req} {n} (t : Tensor 1 1 A) : Tensor n n A :=
-  fun v w => 
+  fun v w =>
   Vector.fold_right rmul (vzip_with (tensor_11_to_fun t) v w) rI.
 
+Definition tensor_to_dimensionless `{SR : SemiRing R rO rI radd rmul req}
+  {A n m} (t : Tensor n m A) : @DimensionlessTensor R A :=
+  fun n' m' v' w' =>
+  default rO (vec_cast_opt v' n ≫= λ v, vec_cast_opt w' m ≫= λ w, Some (t v w)).
+
+#[global] Arguments const_tensor {_} {_ _} _ _ _ / : assert.
 #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
 #[global] Arguments compose_tensor {_ _} {_ _ _ _ _ _} {_ _ _} (_ _) _ _ / : assert.
 #[global] Arguments stack_tensor {_ _} {_ _ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
@@ -300,8 +404,17 @@ Definition stack_n_tensor_1 `{SA : Summable A,
 #[global] Arguments cup_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
 #[global] Arguments cap_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
 #[global] Arguments swap_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
-#[global] Arguments stack_n_tensor_1 
-  {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
+#[global] Arguments stack_n_tensor_1 {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
+#[global] Arguments tensor_to_dimensionless {_ _ _ _ _ _} {_} {_ _} _ _ _ _ _ / : assert.
+#[global] Arguments tensor_11_to_fun {_} _ _ _ / : assert.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m} :
+    (@const_tensor A n m) with signature
+    req ==> equiv as const_tensor_mor.
+Proof.
+  intros r r' Hr v w _ _; apply Hr.
+Qed.
 
 
 Add Parametric Morphism `{SA : Summable A,
@@ -392,6 +505,40 @@ Proof.
     apply IHm.
     now f_equiv.
 Qed.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n} :
+  (stack_n_tensor_1 (SA:=SA) (SR:=SR) (n:=n)) with signature
+  (≡) ==> (≡) as stack_n_tensor_1_mor.
+Proof.
+  intros f g Hfg v w Hv Hw.
+  cbn.
+  rewrite SummedElement_vec_iff_Forall, vec_to_list_to_list, 
+    <- Vector.to_list_Forall in Hv, Hw.
+  revert Hv Hw.
+  vec_double_ind v w; [intros; apply SR|].
+  intros n v w IHvw hv hw [Hvh Hv]%Vector.Forall_cons_iff
+    [Hwh Hw]%Vector.Forall_cons_iff.
+  cbn.
+  apply SR.
+  - cbn.
+    apply Hfg; apply _.
+  - now apply IHvw.
+Qed.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m} :
+  (tensor_to_dimensionless (SR:=SR) (A:=A) (n:=n) (m:=m)) with signature
+  (≡) ==> (≡) as tensor_to_dimensionless_mor.
+Proof.
+  intros f g Hfg n' m' v w Hv Hw.
+  cbn.
+  rewrite 2 vec_cast_opt_spec.
+  do 2 (case_guard; [subst; cbn|apply SR]).
+  apply Hfg; now rewrite cast_id.
+Qed.
+
+
 
 Section TensorOpFacts.
 
@@ -578,7 +725,7 @@ Proof.
   now rewrite !vsplitl_app, !vsplitr_app.
 Qed.
 
-Lemma stack_n_tensor_1_succ {n} (t : Tensor 1 1 A) : 
+Lemma stack_n_tensor_1_succ {n} (t : Tensor 1 1 A) :
   stack_n_tensor_1 (n:=S n) t ≡
   stack_tensor t (stack_n_tensor_1 t).
 Proof.
@@ -589,6 +736,36 @@ Proof.
   cbn.
   done.
 Qed.
+
+Lemma tensor_to_dimensionless_refl {n m} (t : Tensor n m A) :
+  tensor_to_dimensionless t n m ≡ t.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  now rewrite 2 vec_cast_opt_refl.
+Qed.
+
+Lemma tensor_to_dimensionless_ne_l {n m} (t : Tensor n m A) n' m' :
+  n <> n' ->
+  tensor_to_dimensionless t n' m' ≡ const_tensor 0.
+Proof.
+  intros Hn v w Hv Hw.
+  cbn.
+  rewrite (vec_cast_opt_ne v) by done.
+  done.
+Qed.
+
+Lemma tensor_to_dimensionless_ne_r {n m} (t : Tensor n m A) n' m' :
+  m <> m' ->
+  tensor_to_dimensionless t n' m' ≡ const_tensor 0.
+Proof.
+  intros Hn v w Hv Hw.
+  cbn.
+  rewrite (vec_cast_opt_ne w) by done.
+  now destruct (vec_cast_opt _ _).
+Qed.
+
+
 
 (* TODO: More *)
 

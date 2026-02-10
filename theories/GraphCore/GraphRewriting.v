@@ -1,8 +1,8 @@
+From stdpp Require Export pmap gmap decidable.
 Require Import TensorGraph.
 Require Import HyperGraph.
 Require Import TESyntax.
 Require Import Aux_pos.
-From stdpp Require Export pmap gmap decidable.
 
 
 (* An implementation of double pushout (DPO) rewriting *)
@@ -188,6 +188,8 @@ Proof.
   - left.
     now intros ?; apply (HXY k).
 Qed.
+
+Local Open Scope nat_scope.
 
 Section DPO.
 
@@ -503,8 +505,6 @@ Proof.
   done.
 Qed.
 
-Print HyperGraph.
-
 Section Paths.
 
   Context (H : HyperGraph T).
@@ -524,15 +524,13 @@ Section Paths.
       auto.
   Qed.
 
-  Search relation.
-
   Definition path (h h' : HyperEdge T) : Prop :=
     (tc successor) h h'.
 
   Definition pred_path (h h' : HyperEdge T) :=
     (tc predecessor) h h'.
 
-  Definition path_pred_path_symm (h h' : HyperEdge T) :
+  (* Definition path_pred_path_symm (h h' : HyperEdge T) :
     path h h' <-> pred_path h' h.
   Proof.
     split.
@@ -541,10 +539,9 @@ Section Paths.
       + apply tc_once.
         now rewrite succ_pred_symm in H0.
       + 
-        Search tc.
         rewrite IHtc.
     - intros [x y | x y].
-      + 
+      +  *)
 
 
 End Paths.
