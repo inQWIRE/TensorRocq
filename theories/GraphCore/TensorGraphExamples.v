@@ -7,9 +7,9 @@ Local Open Scope positive_scope.
      +{ (1,2) ; (1,3) ; (1,2) ; (1,3) ; (1,4) }. *)
 
 
-Definition example_graph' : CospanHyperGraph (bool*R) 0 2 :=
-  [#] -> {[ 1 := ((false, 0%R), [], [2;1]) ; 
-        3 := ((false, 0%R), [1], [3])]} <- [# 2;3].
+Definition example_graph' : CospanHyperGraph (option (bool*R)) 0 2 :=
+  [#] -> {[ 1 := (Some (false, 0%R), [], [2;1]) ; 
+        3 := (Some (false, 0%R), [1], [3])]} <- [# 2;3].
 
 (* Compute graph_tensorlist_semantics example_graph.
 
