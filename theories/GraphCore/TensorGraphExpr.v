@@ -1,4 +1,4 @@
-Require Export TensorGraph Aux_pos.
+Require Export TensorGraph IsomorphismTesting Aux_pos.
 
 Require Export TESyntax TECospan.
 
@@ -739,6 +739,24 @@ Proof.
     apply graph_namedtensorlist_semantics_stack.
 Qed.
 
+
+
+Lemma graph_namedtensorlist_semantics_norm_verts {n m} (cohg : TensorGraph n m) : 
+  graph_namedtensorlist_semantics (norm_verts cohg) = 
+  graph_namedtensorlist_semantics cohg.
+Proof.
+  unfold graph_namedtensorlist_semantics.
+  rewrite vertices_norm_verts.
+  done.
+Qed.
+
+Lemma graph_contl_semantics_norm_verts {n m} (cohg : TensorGraph n m) : 
+  graph_contl_semantics (norm_verts cohg) = 
+  graph_contl_semantics cohg.
+Proof.
+  unfold graph_contl_semantics.
+  now rewrite graph_namedtensorlist_semantics_norm_verts.
+Qed.
 
 
 End TensorGraphExpr.

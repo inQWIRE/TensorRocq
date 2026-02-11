@@ -49,4 +49,16 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma graph_semantics_norm_verts `{SR : SemiRing R rO rI radd rmul req} 
+  `{!Summable A, !EqDecision A} `{TensT : TensorLike R A T}
+  {n m} (cohg : TensorGraph n m) :
+  graph_semantics (norm_verts cohg) = 
+  graph_semantics cohg.
+Proof.
+  unfold graph_semantics.
+  rewrite graph_namedtensorlist_semantics_norm_verts.
+  reflexivity.
+Qed.
+
+
 End TensorGraphSemantics.

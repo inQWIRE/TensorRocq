@@ -44,3 +44,60 @@ Proof.
     rewrite graph_semantics_compose_safe.
     now apply compose_tensor_mor.
 Qed.
+
+
+Example iso_test_example α : 
+  (⊂ ↕ Z 1 1 α) ⟷ (— ↕ ⊃) ∝= Z 1 1 α.
+Proof.
+  unfold proportional_by_1.
+  rewrite <- 2 ZX_tensor_semantics_correct.
+  prep_matrix_equivalence.
+  apply matrix_of_tensor_of_equiv.
+  rewrite <- 2 ZX_graph_semantics_correct.
+  rewrite <- 2 (graph_semantics_norm_verts (ZX_graph_semantics _)).
+  eapply graph_semantics_isomorphic.
+  Time
+  eapply (graph_iso_conditions_correct _ _ 0);
+  vm_compute;
+  reflexivity.
+Qed.
+
+
+Example iso_test_example' α β : 
+  (⊂ ↕ Z 1 1 α) ⟷ (Z 1 1 β ↕ ⊃) ∝= 
+    (Z 1 1 α ↕ ⊂) ⟷ (⊃ ↕ Z 1 1 β).
+Proof.
+  unfold proportional_by_1.
+  rewrite <- 2 ZX_tensor_semantics_correct.
+  prep_matrix_equivalence.
+  apply matrix_of_tensor_of_equiv.
+  rewrite <- 2 ZX_graph_semantics_correct.
+  rewrite <- 2 (graph_semantics_norm_verts (ZX_graph_semantics _)).
+  eapply graph_semantics_isomorphic.
+  Time
+  eapply (graph_iso_conditions_correct _ _ 0);
+  vm_compute;
+  reflexivity.
+Qed.
+
+
+Example iso_test_example'' α β : 
+  (Z 0 0 α) ⟷ (Z 0 0 β) ∝= 
+  (Z 0 0 α) ↕ (Z 0 0 β).
+Proof.
+  unfold proportional_by_1.
+  rewrite <- 2 ZX_tensor_semantics_correct.
+  prep_matrix_equivalence.
+  apply matrix_of_tensor_of_equiv.
+  rewrite <- 2 ZX_graph_semantics_correct.
+  rewrite <- 2 (graph_semantics_norm_verts (ZX_graph_semantics _)).
+  eapply graph_semantics_isomorphic.
+  Fail eapply (graph_iso_conditions_correct _ _ 1);
+  vm_compute;
+  reflexivity.
+  eapply (graph_iso_conditions_correct _ _ 0);
+  vm_compute;
+  reflexivity.
+Qed.
+
+
