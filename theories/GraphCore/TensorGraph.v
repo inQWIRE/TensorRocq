@@ -9,7 +9,6 @@ Require Import TESyntax.
 
 (* Basic definitions and structural operations on TensorGraphs *)
 
-Declare Scope cohg_scope.
 
 
 
@@ -21,6 +20,11 @@ Record CospanHyperGraph {T : Type} {n m : nat} := mk_cohg {
 }.
 #[global] Arguments CospanHyperGraph T : clear implicits.
 #[global] Arguments mk_cohg {_} {_ _} (_ _ _) : assert.
+
+
+Declare Scope cohg_scope.
+Delimit Scope cohg_scope with cohg.
+Bind Scope cohg_scope with CospanHyperGraph.
 
 Notation " ins -> hedges <- outs " := (mk_cohg hedges ins outs) : cohg_scope.
 
@@ -822,9 +826,9 @@ Definition compose_graphs_alt {T n m o} (cohg : CospanHyperGraph T n m)
   add_top_loops (swapped_stack_graphs cohg cohg').
 
 
-Declare Scope graph_scope.
+(* Declare Scope graph_scope.
 Delimit Scope graph_scope with graph.
-Bind Scope graph_scope with CospanHyperGraph.
+Bind Scope graph_scope with CospanHyperGraph. *)
 (* Notation "g +[ n := t ]" := (add_vertex n t g) (at level 50, left associativity) : graph_scope. *)
 (* Notation "g +{ e }" := (add_edge e g) (at level 50, left associativity) : graph_scope. *)
 (* Notation "g +{ e0 ; .. ; en }" := (add_edge en .. (add_edge e0 g) ..) (at level 50, left associativity) : graph_scope. *)
