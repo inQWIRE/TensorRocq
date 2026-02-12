@@ -1,6 +1,15 @@
 Require Import SPTensorGraph SPIsomorphismTesting SPGraphRewriting.
 Require Import TEPerm TensorGraph TensorGraphSP GraphRewriting.
 
+(* FIXME: Move *)
+Lemma option_relation_Forall2 {A B} (P : A -> B -> Prop) ma mb :
+  option_relation P (λ _, False) (λ _, False) ma mb <->
+  option_Forall2 P ma mb.
+Proof.
+  rewrite option_Forall2_alt.
+  done.
+Qed.
+
 
 Definition abs2tv {A} `{Countable B} (abs : A * list B * list B) : A * gmultiset B :=
   (abs.1.1, list_to_set_disj (abs.1.2 ++ abs.2) :> gmultiset B).
@@ -69,6 +78,34 @@ Proof.
   rewrite 2 lookup_fmap.
   destruct (_ !! i) as [hi|]; [cbn|done].
   now rewrite tv2abs2tv.
+Qed.
+
+Add Parametric Morphism {A} `{Countable B} : (@abs2tv A B _ _) with signature
+  abs_strongperm_eq ==> eq as abs2tv_strongperm_mor.
+Proof.
+  intros [[t l] u] [[t' l'] u'].
+  cbn.
+  intros [[= <-] Hperm].
+  cbn in Hperm.
+  f_equal.
+  now apply list_to_set_disj_perm.
+Qed.
+
+Add Parametric Morphism {T n m} : (@cohg2cosphg T n m) with signature
+  hg_strongperm_eq ==> eq as cohg2cosphg_strongperm_mor.
+Proof.
+  intros cohg cohg' (Hins & Houts & Hverts & Hrel).
+  apply cosphg_ext; [|done..].
+  apply sphg_ext; [|done].
+  cbn.
+  apply map_eq; intros i.
+  rewrite 2 lookup_fmap.
+  specialize (Hrel i).
+  apply option_relation_Forall2 in Hrel.
+  induction Hrel; [|done].
+  cbn.
+  f_equal.
+  now apply abs2tv_strongperm_mor.
 Qed.
 
 
@@ -180,6 +217,87 @@ Proof.
   now constructor.
 Qed.
 
+Lemma cohg2cosphg_id_graph {T n} :
+  cohg2cosphg (@id_graph T n) = @id_spgraph T n.
+Proof.
+  apply cosphg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cohg2cosphg_swap_graph {T n m} :
+  cohg2cosphg (@swap_graph T n m) = @swap_spgraph T n m.
+Proof.
+  apply cosphg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cohg2cosphg_cup_graph {T n} :
+  cohg2cosphg (@cup_graph T n) = @cup_spgraph T n.
+Proof.
+  apply cosphg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cohg2cosphg_cap_graph {T n} :
+  cohg2cosphg (@cap_graph T n) = @cap_spgraph T n.
+Proof.
+  apply cosphg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cohg2cosphg_graph_of_tensor {T} (t : T) n m :
+  cohg2cosphg (@graph_of_tensor T t n m) =
+  spgraph_of_tensor t n m.
+Proof.
+  apply cosphg_ext; [|done..].
+  apply sphg_ext; [|done].
+  cbn -[insert].
+  etransitivity; [apply map_fmap_singleton|].
+  done.
+Qed.
+
+Lemma spreferrenced_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
+  spreferrenced_vertices (cohg2cosphg cohg) = 
+  referrenced_vertices cohg.
+Proof.
+  unfold referrenced_vertices, spreferrenced_vertices.
+  f_equal.
+  cbn.
+  rewrite map_to_list_fmap, list_fmap_bind.
+  rewrite 2 list_to_set_bind_L.
+  f_equal.
+  apply list_fmap_ext.
+  intros _ [k [[t l] u]] _.
+  cbn.
+  apply list_to_set_perm_L.
+  apply elements_list_to_set_disj.
+Qed.
+
+Lemma spisolated_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
+  spisolated_vertices (cohg2cosphg cohg) = 
+  isolated_vertices cohg.
+Proof.
+  unfold isolated_vertices, spisolated_vertices.
+  rewrite spreferrenced_vertices_cohg2cosphg.
+  done.
+Qed.
+
+Lemma cohg2cosphg_norm_spverts {T n m} (cohg : CospanHyperGraph T n m) :
+  cohg2cosphg (norm_verts cohg) = 
+  norm_spverts (cohg2cosphg cohg).
+Proof.
+  apply cosphg_ext; [|done..].
+  apply sphg_ext; [done|].
+  cbn.
+  now rewrite spisolated_vertices_cohg2cosphg.
+Qed.
+
+
+
 
 
 Lemma tv2abs_relabel {A} `{Countable B, Countable C}
@@ -244,7 +362,7 @@ Proof.
   done.
 Qed.
 
-Lemma cosphg2cohg_compose {T n m o}
+Lemma cosphg2cohg_spcompose {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
   hg_strongperm_eq (cosphg2cohg (spcompose cosphg cosphg'))
     (compose (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
@@ -259,18 +377,18 @@ Proof.
   now rewrite map_fmap_union.
 Qed.
 
-Lemma cosphg2cohg_compose_safe {T n m o}
+Lemma cosphg2cohg_spcompose_safe {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
   hg_strongperm_eq (cosphg2cohg (spcompose_safe cosphg cosphg'))
     (compose_safe (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
 Proof.
   rewrite compose_safe_to_compose, spcompose_safe_to_spcompose.
-  rewrite cosphg2cohg_compose, 2 cosphg2cohg_reindex_spgraph,
+  rewrite cosphg2cohg_spcompose, 2 cosphg2cohg_reindex_spgraph,
     2 cosphg2cohg_relabel_spgraph.
   reflexivity.
 Qed.
 
-Lemma cosphg2cohg_compose_unsafe {T n m o}
+Lemma cosphg2cohg_spcompose_unsafe {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
   cosphg2cohg (spcompose_unsafe cosphg cosphg') =
   compose_unsafe (cosphg2cohg cosphg) (cosphg2cohg cosphg').
@@ -280,5 +398,111 @@ Proof.
   now rewrite map_fmap_union.
 Qed.
 
+Lemma cosphg2cohg_spisomorphic_gen {T n m} (cosphg cosphg' : CospanSPHyperGraph T n m) :
+  spisomorphic cosphg cosphg' ->
+  exists cohg,
+  hg_strongperm_eq cohg (cosphg2cohg cosphg') /\
+  isomorphic (cosphg2cohg cosphg) cohg.
+Proof.
+  intros (fe & fv & Hfe & Hfv & ->)%spisomorphic_exists.
+  eexists.
+  rewrite cosphg2cohg_relabel_spgraph, cosphg2cohg_reindex_spgraph.
+  split; [done|].
+  now constructor.
+Qed.
+
+(* TODO: Make relation extending isomorphic for this to be true.
+
+Lemma cohg2cosphg_spisomorphic {T n m} (cosphg cosphg' : CospanSPHyperGraph T n m) :
+  spisomorphic cosphg cosphg' ->
+  isomorphic (cosphg2cohg cosphg) (cosphg2cohg cosphg').
+Proof.
+  intros (fe & fv & Hfe & Hfv & ->)%spisomorphic_exists.
+  rewrite cosphg2cohg_relabel_spgraph, cohg2cosphg_reindex_graph.
+  now constructor.
+Qed. *)
+
+Lemma cosphg2cohg_id_spgraph {T n} :
+  cosphg2cohg (@id_spgraph T n) = @id_graph T n.
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cosphg2cohg_swap_spgraph {T n m} :
+  cosphg2cohg (@swap_spgraph T n m) = @swap_graph T n m.
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cosphg2cohg_cup_spgraph {T n} :
+  cosphg2cohg (@cup_spgraph T n) = @cup_graph T n.
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cosphg2cohg_cap_spgraph {T n} :
+  cosphg2cohg (@cap_spgraph T n) = @cap_graph T n.
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  now rewrite fmap_empty.
+Qed.
+
+Lemma cosphg2cohg_spgraph_of_tensor {T} (t : T) n m :
+  hg_strongperm_eq (cosphg2cohg (@spgraph_of_tensor T t n m))
+  (graph_of_tensor t n m).
+Proof.
+  apply mk_hg_strongperm_eq'; try done.
+  cbn -[insert].
+  setoid_rewrite map_fmap_singleton.
+  intros i.
+  rewrite hyperedges_singleton.
+  rewrite <- 2 insert_empty.
+  rewrite 2 lookup_insert_case.
+  case_decide; [|done].
+  cbn.
+  split; [done|].
+  cbn.
+  now rewrite elements_list_to_set_disj, app_nil_r.
+Qed.
+
+Lemma referrenced_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  referrenced_vertices (cosphg2cohg cosphg) = 
+  spreferrenced_vertices cosphg.
+Proof.
+  unfold referrenced_vertices, spreferrenced_vertices.
+  f_equal.
+  cbn.
+  rewrite map_to_list_fmap, list_fmap_bind.
+  rewrite 2 list_to_set_bind_L.
+  f_equal.
+  apply list_fmap_ext.
+  intros _ [k [t v]] _.
+  cbn.
+  now rewrite app_nil_r.
+Qed.
+
+Lemma isolated_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  isolated_vertices (cosphg2cohg cosphg) = 
+  spisolated_vertices cosphg.
+Proof.
+  unfold isolated_vertices, spisolated_vertices.
+  now rewrite referrenced_vertices_cosphg2cohg.
+Qed.
 
 
+Lemma cosphg2cohg_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) : 
+  cosphg2cohg (norm_spverts cosphg) = 
+  norm_verts (cosphg2cohg cosphg).
+Proof.
+  apply cohg_ext; [|done..].
+  apply hg_ext; [done|].
+  cbn.
+  now rewrite isolated_vertices_cosphg2cohg.
+Qed.

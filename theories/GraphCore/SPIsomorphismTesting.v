@@ -746,7 +746,7 @@ Proof.
   rewrite 4 elem_of_union; tauto.
 Qed.
 
-Lemma isolated_referrenced_disjoint {T n m} (cosphg : CospanSPHyperGraph T n m) :
+Lemma spisolated_referrenced_disjoint {T n m} (cosphg : CospanSPHyperGraph T n m) :
   spisolated_vertices cosphg ## spreferrenced_vertices cosphg.
 Proof.
   unfold spisolated_vertices.
@@ -757,38 +757,38 @@ Definition set_spverts {T n m} (cosphg : CospanSPHyperGraph T n m)
   (vs : Pset) : CospanSPHyperGraph T n m :=
   mk_cosphg (mk_sphg cosphg.(sphedges).(sphyperedges) vs) cosphg.(spinputs) cosphg.(spoutputs).
 
-Definition norm_verts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+Definition norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
   CospanSPHyperGraph T n m := set_spverts cosphg (spisolated_vertices cosphg).
 
-Lemma spreferrenced_vertices_norm_verts {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  spreferrenced_vertices (norm_verts cosphg) = spreferrenced_vertices cosphg.
+Lemma spreferrenced_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spreferrenced_vertices (norm_spverts cosphg) = spreferrenced_vertices cosphg.
 Proof.
   reflexivity.
 Qed.
 
-Lemma spisolated_vertices_norm_verts {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  spisolated_vertices (norm_verts cosphg) = spisolated_vertices cosphg.
+Lemma spisolated_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spisolated_vertices (norm_spverts cosphg) = spisolated_vertices cosphg.
 Proof.
   unfold spisolated_vertices.
   cbn.
   unfold spisolated_vertices.
-  rewrite spreferrenced_vertices_norm_verts.
+  rewrite spreferrenced_vertices_norm_spverts.
   apply difference_twice_L.
 Qed.
 
 
-Lemma vertices_norm_verts {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  vertices (norm_verts cosphg) = vertices cosphg.
+Lemma vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  vertices (norm_spverts cosphg) = vertices cosphg.
 Proof.
   now rewrite 2 vertices_decomp,
-    spisolated_vertices_norm_verts, spreferrenced_vertices_norm_verts.
+    spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
 Qed.
 
 Lemma spgraph_pre_isos_correct {T n m} (cosphg cosphg' : CospanSPHyperGraph T n m) :
   Forall (λ '(ts, mhe, mv),
     Forall (uncurry eq) ts ->
     size (dom mv :> Pset) = size (map_img mv :> Pset) ->
-    spisomorphic (norm_verts cosphg) (norm_verts cosphg'))
+    spisomorphic (norm_spverts cosphg) (norm_spverts cosphg'))
     (spgraph_pre_isos cosphg cosphg').
 Proof.
   eapply Forall_impl; [apply spgraph_pre_isos_correct_aux|].
@@ -804,7 +804,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply isolated_referrenced_disjoint.
+    apply spisolated_referrenced_disjoint.
   }
   eapply (spisomorphic_of_partial_inj_dom' _ _
     (Pmap_map (misol ∪ mv)) (Pmap_map mhe)).
@@ -812,7 +812,7 @@ Proof.
     1:{
       rewrite dom_union.
       rewrite Hdom_misol, Hdom_mv.
-      now rewrite vertices_norm_verts, vertices_decomp.
+      now rewrite vertices_norm_spverts, vertices_decomp.
     }
     apply map_disjoint_union_inj.
     * done.
@@ -824,7 +824,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply isolated_referrenced_disjoint.
+      apply spisolated_referrenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - symmetry.
@@ -898,7 +898,7 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%isolated_referrenced_disjoint; apply Href.
+        intros Href%spisolated_referrenced_disjoint; apply Href.
         unfold spreferrenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
@@ -954,7 +954,7 @@ Definition spgraph_iso_conditions {T n m}
 Lemma spgraph_iso_conditions_correct_aux {T n m}
   (cosphg cosphg' : CospanSPHyperGraph T n m) :
   Forall (λ ts, ts.*1 = ts.*2 ->
-    spisomorphic (norm_verts cosphg) (norm_verts cosphg'))
+    spisomorphic (norm_spverts cosphg) (norm_spverts cosphg'))
     (spgraph_iso_conditions cosphg cosphg').
 Proof.
   rewrite Forall_forall.
@@ -982,7 +982,7 @@ Lemma spgraph_iso_conditions_correct {T n m}
   | None => False
   | Some ts => ts.*1 = ts.*2
   end ->
-  spisomorphic (norm_verts cosphg) (norm_verts cosphg').
+  spisomorphic (norm_spverts cosphg) (norm_spverts cosphg').
 Proof.
   case_match eqn:Hmi; [|done].
   apply elem_of_list_lookup_2 in Hmi.
