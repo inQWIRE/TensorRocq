@@ -3,7 +3,7 @@ Require Import SPTensorGraph SPTensorGraphGraph
   SPIsomorphismTesting TensorGraph TensorGraphSemantics
   TensorGraphFacts TensorGraphSP GraphRewriting SPGraphRewriting ZXGraph.
 Require Import VyZXHyperGraph.
-From stdpp Require Import vector.
+From stdpp Require Import vector pretty.
 
 Fixpoint ZX_spgraph_semantics {n m} (zx : ZX n m) :
   @CospanSPHyperGraph (option (bool * R)) n m :=
@@ -74,3 +74,81 @@ Proof.
   reflexivity.
 Qed.
 
+Ltac spgraph_iso_with n :=
+  apply (spgraph_iso_conditions_correct _ _ n);
+  vm_compute;
+  reflexivity.
+
+Ltac zx_ocm_with n :=
+  apply ZX_propeq_of_spgraph_spisomorphic;
+  spgraph_iso_with n.
+  
+
+Ltac zx_ocm :=
+  apply ZX_propeq_of_spgraph_spisomorphic;
+  let rec go n :=
+    tryif (
+      apply (spgraph_iso_conditions_correct _ _ n);
+      vm_compute;
+      lazymatch goal with 
+      | [|- False] => fail 2 "zx_ocm: No isomorphism found!"
+      | [|- _] => refine ((λ 
+      (_ : (String.concat "" ["Use 'zx_ocm_with "; pretty n; "'"] = "")%string), eq_refl) _);
+        vm_compute
+      end
+    ) then idtac else go constr:(S n) in 
+  go constr:(O). 
+
+
+Example ocm_example : 
+  (Z 1 1 0 ↕ X 1 2 0 ↕ Z 1 1 0) ⟷
+  (X 2 2 0 ↕ X 2 2 0) ⟷ 
+  (Z 1 1 0 ↕ ⊃ ↕ Z 1 1 0) ∝=
+  (Z 1 1 0 ↕ (⨉ ⟷ (Z 1 1 0 ↕ X 1 2 0))) ⟷
+  (— ↕ ⨉ ↕ —) ⟷
+  (X 2 2 0 ↕ n_wire 2) ⟷
+  (Z 1 1 0 ↕ (X 3 1 0 ⟷ Z 1 1 0)).
+Proof.
+  zx_ocm_with 0.
+Qed.
+
+
+Example ocm_example' α β γ : 
+  (Z 1 1 γ ↕ X 1 2 α ↕ Z 1 1 β) ⟷
+  (X 2 2 0 ↕ X 2 2 0) ⟷ 
+  (Z 1 1 0 ↕ ⊃ ↕ Z 1 1 0) ∝=
+  (Z 1 1 γ ↕ (⨉ ⟷ (Z 1 1 β ↕ X 1 2 α))) ⟷
+  (— ↕ ⨉ ↕ —) ⟷
+  (X 2 2 0 ↕ n_wire 2) ⟷
+  (Z 1 1 0 ↕ (X 3 1 0 ⟷ Z 1 1 0)).
+Proof.
+  zx_ocm_with 0.
+Qed.
+
+Fixpoint example_Z_stack_prf (n : nat) : S n = n + 1 :=
+  match n with
+  | O => eq_refl
+  | S n' => f_equal S (example_Z_stack_prf n')
+  end.
+
+Fixpoint example_Z_stack (n : nat) : ZX n n :=
+  match n with 
+  | O => ⦰
+  | S n' => cast _ _ (example_Z_stack_prf n') (example_Z_stack_prf n')
+    $ example_Z_stack n' ↕ Z 1 1 (INR n')
+  end.
+
+Fixpoint example_Z_stack_rev (n : nat) : ZX n n :=
+  match n with 
+  | O => ⦰
+  | S n' => Z 1 1 (INR n') ↕ example_Z_stack_rev n'
+  end.
+
+Example ocm_example'' : forall n, 
+  Z 1 n 0 ⟷ example_Z_stack n ⟷ Z n 1 0 ∝=
+  Z 1 n 0 ⟷ example_Z_stack_rev n ⟷ Z n 1 0.
+Proof.
+  intros n.
+  assert (n = 5) by admit.
+  subst.
+  Time zx_ocm.
