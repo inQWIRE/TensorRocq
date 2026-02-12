@@ -11,58 +11,6 @@ Require Import TESyntax.
 
 Declare Scope cohg_scope.
 
-Record HyperGraph {T} := mk_hg {
-  (* The edges of the hypergraph *)
-  hyperedges : Pmap (T * list positive * list positive);
-  (* Additional vertices of the hypergraph, which are often
-    disjoint from the referrenced vertices of [hyperedges]
-    (in practice, we only care about the subset of [hypervertices]
-    not referrenced in [hyperedges], but do not enforce disjointness) *)
-  hypervertices : Pset;
-}.
-
-#[global] Arguments HyperGraph (_) : clear implicits, assert.
-#[global] Arguments mk_hg {_} _ _ : assert.
-
-#[global] Coercion hyperedges : HyperGraph >-> Pmap.
-
-Lemma hg_ext {T} (hg hg' : HyperGraph T) :
-  hg.(hyperedges) = hg'.(hyperedges) ->
-  hg.(hypervertices) = hg'.(hypervertices) ->
-  hg = hg'.
-Proof.
-  destruct hg, hg'; cbn; congruence.
-Qed.
-
-#[export] Instance hypergraph_empty {T} :
-  Empty (HyperGraph T) := mk_hg ∅ ∅.
-
-#[export] Instance hypergraph_partialalter {T} :
-  PartialAlter positive (T * list positive * list positive) (HyperGraph T) :=
-  fun f i hg => mk_hg (partial_alter f i hg.(hyperedges)) hg.(hypervertices).
-
-Definition reindex_hg {T} (f : positive -> positive) (hg : HyperGraph T) :
-  HyperGraph T :=
-  mk_hg (kmap f hg.(hyperedges)) hg.(hypervertices).
-
-Definition relabel_hg {T} (f : positive -> positive) (hg : HyperGraph T) :
-  HyperGraph T :=
-  mk_hg (relabel_abs f <$> hg.(hyperedges)) (set_map f hg.(hypervertices)).
-
-Definition vertices_hg {T} (hg : HyperGraph T) : Pset :=
-  list_to_set (map_to_list (hg.(hyperedges)) ≫=
-    λ k_flu : (positive*(T*list _*list _)), (k_flu.2.1.2 ++ k_flu.2.2)) ∪
-  hg.(hypervertices).
-
-#[export] Instance hypergraph_union {T} : Union (HyperGraph T) :=
-  fun hg hg' =>
-    mk_hg (hg.(hyperedges) ∪ hg'.(hyperedges))
-      (hg.(hypervertices) ∪ hg'.(hypervertices)).
-
-#[export] Instance hypergraph_disjunion {T} : DisjUnion (HyperGraph T) :=
-  fun hg hg' =>
-  reindex_hg (bcons false) (relabel_hg (bcons false) hg) ∪
-  reindex_hg (bcons true) (relabel_hg (bcons true) hg').
 
 
 (* A graph with h(yper)edges labeled by elements of [T] *)
@@ -828,46 +776,6 @@ Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
     (relabel_graph (bcons true) (reindex_graph (bcons true) cohg')).
 
 
-(* Definition vremove {A n} (i : fin n) : vec A n -> vec A (pred n) :=
-  (* match i in fin n return vec A n -> vec A (pred n) with
-  | 0%fin => Vector.tl
-  | FS i =>
-    match i with
-    | 0%fin => fun v => Vector.hd v ::: Vector.tl (Vector.tl v)
-    | FS i => fun v => Vector.hd v ::: vremove (FS i) (Vector.tl v)
-    end
-  end. *)
-  Fin.t_rect (fun n _ => vec A n -> vec A (pred n)) (fun _ => Vector.tl)
-  (fun n i => match i with
-    | 0%fin => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
-    | FS i' => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
-    end) n i. *)
-
-Definition vremove {A n} (i : fin n) : vec A n -> vec A (pred n) :=
-  Fin.t_rect (fun n _ => vec A n -> vec A (pred n)) (fun _ => Vector.tl)
-  (fun n i => match i with
-    | 0%fin => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
-    | FS i' => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
-    end) n i.
-
-Lemma vec_to_list_vremove {A n} (i : fin n) (v : vec A n) :
-  vec_to_list (vremove i v) = delete (i:>nat) (v:>list A).
-Proof.
-  unfold vremove.
-  revert v; induction i.
-  - cbn.
-    now apply vec_S_inv.
-  - apply vec_S_inv.
-    intros x v.
-    cbn.
-    destruct i.
-    + cbn.
-      f_equal.
-      now destruct v using vec_S_inv.
-    + cbn.
-      f_equal.
-      apply IHi.
-Qed.
 
 Definition hg_add_vertices {T} (hg : HyperGraph T) (vs : Pset) : HyperGraph T :=
   mk_hg hg.(hyperedges) (vs ∪ hg.(hypervertices)).

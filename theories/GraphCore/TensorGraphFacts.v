@@ -108,89 +108,6 @@ Qed.
 
 
 
-#[export] Instance from_option_dec {A} (P : Prop) (Q : A -> Prop) (ma : option A) :
-  Decision P -> (forall a, Decision (Q a)) -> Decision (from_option Q P ma) :=
-  fun HP HQ =>
-  match ma with
-  | Some a => (HQ a)
-  | None => HP
-  end.
-
-Lemma filter_snd_imap_pair_compose {A B} (P : A -> Prop) `{HP : forall a, Decision (P a)}
-  (f : nat -> B) (l : list A) :
-  filter (P ∘ snd) (imap (pair ∘ f) l) =
-  (prod_map f id) <$> filter (P ∘ snd) (imap pair l).
-Proof.
-  revert B f;
-  induction l; intros B f; [reflexivity|].
-  cbn.
-  case_decide as HPa.
-  - cbn.
-    f_equal.
-    rewrite Combinators.compose_assoc, 2 IHl.
-    rewrite <- list_fmap_compose.
-    reflexivity.
-  - rewrite Combinators.compose_assoc, 2 IHl.
-    rewrite <- list_fmap_compose.
-    reflexivity.
-Qed.
-
-Lemma from_option_fmap {A B C} (f : A -> B) (g : B -> C) (d : C) (ma : option A) :
-  from_option g d (f <$> ma) = from_option (g ∘ f) d ma.
-Proof.
-  now destruct ma.
-Qed.
-
-
-Lemma filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
-  (l : list A) :
-  filter (P ∘ snd) (imap pair l) =
-  imap (λ idx v, ((filter (λ i, from_option P False (l !! i)) (seq 0 (length l))) !!! idx, v))
-    (filter P l).
-Proof.
-  induction l; [reflexivity|].
-  cbn.
-  eenough (Hen : _).
-  - case_decide as HPa; [|exact Hen].
-    cbn.
-    f_equal.
-    apply Hen.
-  - rewrite (filter_snd_imap_pair_compose P S).
-    rewrite IHl.
-    rewrite fmap_imap.
-    apply imap_ext.
-    intros i x Hi.
-    cbn.
-    f_equal.
-    rewrite <- fmap_S_seq.
-    symmetry.
-    rewrite (list_filter_fmap S).
-    unfold compose; cbn.
-    apply list_lookup_total_fmap.
-    apply lookup_lt_Some in Hi as Hilt.
-    eapply Nat.lt_le_trans; [apply Hilt|].
-    apply eq_reflexivity.
-    clear.
-    induction l; [reflexivity|].
-    cbn.
-    eenough (Heq : _).
-    + case_decide as HPa; [|exact Heq].
-      cbn.
-      rewrite Heq.
-      reflexivity.
-    + rewrite <- fmap_S_seq, (list_filter_fmap S).
-      rewrite length_fmap.
-      apply IHl.
-Qed.
-
-
-Lemma length_filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
-  (l : list A) :
-  length (filter (P ∘ snd) (imap pair l)) =
-  length (filter P l).
-Proof.
-  now rewrite filter_snd_imap_pair, length_imap.
-Qed.
 
 
 
@@ -1017,11 +934,6 @@ Proof.
 Qed.
 
 
-
-(* FIXME: Move *)
-#[global] Arguments graph_semantics {_ _ _}
-  {_ _ _ _ _ _} {_ _ _} {_ _} _ _ _ / : assert.
-
 Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
   (cohg : TensorGraph n m) (cohg' : TensorGraph n' m') :
   graph_semantics (SR:=SR) (swapped_stack_graphs cohg cohg') ≡
@@ -1791,7 +1703,7 @@ Proof.
   unfold deltas_semantics_alt.
   rewrite <- list_fmap_compose.
   rewrite <- Rlist_prod_vec_if_eq.
-  apply Rlist_prod_Forall2_ext.
+  apply Rlist_prod_ext.
   apply Forall2_fmap, Forall_Forall2_diag, Forall_seq.
   intros j [_ Hj].
   cbn.

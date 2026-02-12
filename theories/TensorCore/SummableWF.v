@@ -1,6 +1,6 @@
 Require Export Summable.
 Require Export Aux_stdpp.
-From stdpp Require Import vector fin.
+From stdpp Require Import vector fin fin_maps.
 From stdpp Require Export list.
 
 (* A Summable instance is WF if its list of elements is
@@ -125,6 +125,73 @@ Next Obligation.
   now apply elem_of_list_cprod.
 Qed.
 
+
+Lemma SummedElement_vec_iff `{Summable A} {n} (v : vec A n) :
+  SummedElement v <-> (forall a, a ∈@{list _} v -> SummedElement a).
+Proof.
+  split; [|apply SummedElement_vec].
+  setoid_rewrite SummedElement_iff.
+  setoid_rewrite elem_of_list_In.
+  intros Hv%vec_elements_in%Vector.to_list_Forall.
+  apply List.Forall_forall.
+  revert Hv.
+  now rewrite vec_to_list_to_list.
+Qed.
+
+Lemma SummedElement_vec_app_iff `{Summable A} {n m} (v : vec A n) (w : vec A m) :
+  SummedElement (v +++ w) <-> SummedElement v /\ SummedElement w.
+Proof.
+  rewrite 3 SummedElement_vec_iff.
+  setoid_rewrite elem_of_list_In.
+  rewrite vec_to_list_app.
+  setoid_rewrite in_app_iff.
+  naive_solver.
+Qed.
+
+Lemma SummedElement_vec_iff_Forall `{Summable A} {n} (v : vec A n) :
+  SummedElement v <-> Forall SummedElement v.
+Proof.
+  now rewrite SummedElement_vec_iff, <- Forall_forall.
+Qed.
+#[export] Instance SummedElement_vsplitl `{Summable A} {n m} (v : vec A (n + m)) :
+  SummedElement v -> SummedElement (vsplitl v).
+Proof.
+  rewrite 2 SummedElement_vec_iff_Forall.
+  rewrite <- (app_vsplit v), vec_to_list_app, Forall_app at 1.
+  easy.
+Qed.
+#[export] Instance SummedElement_vsplitr `{Summable A} {n m} (v : vec A (n + m)) :
+  SummedElement v -> SummedElement (vsplitr v).
+Proof.
+  rewrite 2 SummedElement_vec_iff_Forall.
+  rewrite <- (app_vsplit v), vec_to_list_app, Forall_app at 1.
+  easy.
+Qed.
+#[export] Instance SummedElement_vec_app `{Summable A} {n m}
+  (v : vec A n) (w : vec A m) :
+  SummedElement v -> SummedElement w -> SummedElement (v +++ w).
+Proof.
+  rewrite SummedElement_vec_app_iff.
+  auto.
+Qed.
+
+Lemma make_vecs_map_SummedElements `{SA : Summable A} {n m}
+  (ins : vec _ n) (outs : vec _ m) (v w : vec A _) :
+  SummedElement v -> SummedElement w ->
+  map_Forall (λ _ a, SummedElement a)
+  (make_vecs_map ins outs v w).
+Proof.
+  intros Hv Hw.
+  unfold make_vecs_map.
+  rewrite <- list_to_map_app.
+  intros i a Hia%elem_of_list_to_map_2%(elem_of_list_fmap_1 snd).
+  cbn in Hia.
+  rewrite fmap_app, 2 vec_to_list_zip_with,
+    2 snd_zip in Hia by now rewrite 2 length_vec_to_list.
+  rewrite SummedElement_vec_iff in Hw.
+  rewrite SummedElement_vec_iff in Hv.
+  apply elem_of_app in Hia as []; auto.
+Qed.
 
 Section SummableWF_theory.
 

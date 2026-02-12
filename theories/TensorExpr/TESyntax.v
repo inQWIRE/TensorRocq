@@ -11,10 +11,6 @@ Require Import Aux_stdpp Aux_pos.
 
 (* FIXME: Move *)
 
-Definition make_vecs_map {A n m} (ins : vec positive n) (outs : vec positive m)
-  (insv : vec A n) (outsv : vec A m) : Pmap A :=
-  list_to_map (vzip ins insv) ∪ list_to_map (vzip outs outsv).
-
 (* Section TensorExprDB.  *)
 
 Notation Idx := positive (only parsing).
@@ -664,10 +660,6 @@ Fixpoint tensorlist_of_tensorexpr (te : tensorexpr) : tensorlist :=
 
 (* Matching on [tensorlist]s *)
 
-(* FIXME: Move *)
-Definition Pmap_map (m : Pmap Idx) : Idx -> Idx :=
-  fun v => default v (m !! v).
-
 
 Definition var_subst_frees (f : Idx -> var) (v : var) : var :=
   match v with
@@ -1160,12 +1152,6 @@ Proof.
 Qed. *)
 
 
-Lemma pos_swap_alt p :
-  pos_swap p = (if decide (p = 1) then 2 else if decide (p = 2) then 1 else p)%positive.
-Proof.
-  unfold pos_swap.
-  destruct p as [| []|]; reflexivity.
-Qed.
 
 
 (*
@@ -1542,13 +1528,6 @@ Qed.
 (* FIXME: Move *)
 (* Lemma Pmap_posperm_of *)
 
-Lemma map_inverses_empty `{FinMap A MA, FinMap B MB} :
-  map_inverses (∅ :> MA B) (∅ :> MB A).
-Proof.
-  intros ? ?.
-  rewrite 2 lookup_empty.
-  easy.
-Qed.
 
 
 (* FIXME: Move!!!! *)
@@ -1733,44 +1712,6 @@ Proof.
     destruct (_ !! _); reflexivity.
 Qed.
 
-Lemma map_inverses_comm `{Lookup A B MA, Lookup B A MB} (ma : MA) (mb : MB) :
-  map_inverses ma mb <-> map_inverses mb ma.
-Proof.
-  unfold map_inverses. firstorder.
-Qed.
-
-Lemma map_inverses_card_img `{FinMapDom A MA SA, !Elements A SA,
-  !FinSet A SA, FinMap B MB, FinSet B SB, !boundDecision (∈@{SB}) }
-  (ma : MA B) (mb : MB A) :
-  map_inverses ma mb ->
-  size (dom ma :> SA) = size (map_img ma :> SB).
-Proof.
-  intros Hinv.
-  rewrite map_dom_img_eq_card_iff_inj.
-  intros ? ? ? ?%Hinv ?%Hinv.
-  congruence.
-Qed.
-
-Lemma map_inverses_img `{FinMap A MA, FinMapDom B MB SB}
-  (ma : MA B) (mb : MB A) :
-    map_inverses ma mb ->
-    map_img ma ≡@{SB} dom mb.
-Proof.
-  intros Hab x.
-  rewrite elem_of_map_img, elem_of_dom.
-  setoid_rewrite (fun x => Hab x).
-  reflexivity.
-Qed.
-
-
-Lemma map_inverses_img_L `{FinMap A MA, FinMapDom B MB SB, !LeibnizEquiv SB}
-  (ma : MA B) (mb : MB A) :
-    map_inverses ma mb ->
-    map_img ma =@{SB} dom mb.
-Proof.
-  unfold_leibniz.
-  apply map_inverses_img.
-Qed.
 
 Definition tl_well_typed_aux tc sums abs :=
   let tc' := tc_app_types (reverse sums) tc in
@@ -2906,21 +2847,10 @@ Add Parametric Relation : namedtensorlist ntl_aeq
   transitivity proved by ntl_aeq_trans
   as ntl_aeq_setoid.
 
-Lemma union_eq_l `{SemiSet A C} (X Y : C) : Y ⊆ X ->
-  X ∪ Y ≡ X.
-Proof.
-  set_solver.
-Qed.
 
 
 
 (* FIXME: Move *)
-#[export]
-Instance pos_to_nat_pred_inj : Inj (=) (=) pos_to_nat_pred.
-Proof.
-  intros p p'.
-  lia.
-Qed.
 
 Lemma ntl2tl2ntl ntl :
   WF_ntl ntl ->
@@ -2939,7 +2869,7 @@ Proof.
   - erewrite union_mono; [|apply union_mono; [reflexivity|]|];
     [|(eapply set_map_mono; [apply reflexivity|apply Hbnd])..].
     rewrite <- (union_assoc _), (union_idemp _).
-    rewrite union_eq_l. 2:{
+    rewrite set_union_eq_l. 2:{
       rewrite set_map_list_to_set.
       apply list_to_set_subseteq.
 
@@ -3106,186 +3036,6 @@ Proof.
       reflexivity.
 Qed.
 
-Fixpoint infinite_injection_aux `{Infinite A} (n : nat) : A * list A :=
-  match n with
-  | 0 => (fresh [], [])
-  | S n' => let fn' := infinite_injection_aux n' in
-    (fresh (fn'.1 :: fn'.2), fn'.1 :: fn'.2)
-  end%nat.
-
-Lemma infinite_injection_aux_fresh `{Infinite A} (n : nat):
-  ((infinite_injection_aux n).1 :> A) ∉ (infinite_injection_aux n).2.
-Proof.
-  destruct n; apply infinite_is_fresh.
-Qed.
-
-Lemma infinite_injection_aux_contains `{Infinite A} (n m : nat) :
-  (n < m)%nat ->
-  uncurry cons (infinite_injection_aux n) ⊆@{list A} (infinite_injection_aux m).2.
-Proof.
-  intros Hlt.
-  induction Hlt.
-  - cbn.
-    now destruct (infinite_injection_aux _).
-  - cbn.
-    rewrite IHHlt.
-    now apply list_subseteq_cons.
-Qed.
-
-Definition infinite_injection `{Infinite A} (n : nat) : A :=
-  (infinite_injection_aux n).1.
-
-#[global] Instance infinite_injection_inj `{Infinite A} :
-  Inj (=) (@eq A) infinite_injection.
-Proof.
-  eenough (Hen : _) by
-  (intros n m; destruct (Nat.lt_trichotomy n m) as [Hnm | [-> | Hmn]];
-  [exact (Hen n m Hnm)|easy|exact (fun H => eq_sym (Hen m n Hmn (eq_sym H)))]).
-  intros n m Hnm.
-  unfold infinite_injection.
-  pose proof (infinite_injection_aux_fresh (A:=A) m) as Hfresh.
-  pose proof (infinite_injection_aux_contains (A:=A) n m Hnm) as Hcont.
-  rewrite (surjective_pairing (infinite_injection_aux n)) in Hcont.
-  cbn in Hcont.
-  intros Heq.
-  rewrite Heq in Hcont.
-  specialize (Hcont (infinite_injection_aux m).1 ltac:(constructor)).
-  easy.
-Qed.
-
-
-Fixpoint infinite_injection_avoiding_aux `{Infinite A} (l : list A) (n : nat) :
-  A * list A :=
-  match n with
-  | 0 => (fresh l, l)
-  | S n' => let fn' := infinite_injection_avoiding_aux l n' in
-    (fresh (fn'.1 :: fn'.2), fn'.1 :: fn'.2)
-  end%nat.
-
-Lemma infinite_injection_avoiding_aux_fresh `{Infinite A} (l : list A) (n : nat) :
-  (infinite_injection_avoiding_aux l n).1 ∉ (infinite_injection_avoiding_aux l n).2.
-Proof.
-  destruct n; apply infinite_is_fresh.
-Qed.
-
-Lemma infinite_injection_avoiding_aux_contains `{Infinite A}
-  (l : list A) (n m : nat) :
-  (n < m)%nat ->
-  uncurry cons (infinite_injection_avoiding_aux l n) ⊆
-    (infinite_injection_avoiding_aux l m).2.
-Proof.
-  intros Hlt.
-  induction Hlt.
-  - cbn.
-    now destruct (infinite_injection_avoiding_aux _).
-  - cbn.
-    rewrite IHHlt.
-    now apply list_subseteq_cons.
-Qed.
-
-
-Lemma infinite_injection_avoiding_aux_contains_avoid `{Infinite A}
-  (l : list A) (n : nat) :
-  l ⊆ (infinite_injection_avoiding_aux l n).2.
-Proof.
-  induction n; [reflexivity|].
-  cbn.
-  now apply list_subseteq_cons.
-Qed.
-
-Definition infinite_injection_avoiding `{Infinite A} (l : list A) (n : nat) : A :=
-  (infinite_injection_avoiding_aux l n).1.
-
-#[global] Instance infinite_injection_avoiding_inj `{Infinite A} l :
-  Inj (=) (@eq A) (infinite_injection_avoiding l).
-Proof.
-  eenough (Hen : _) by
-  (intros n m; destruct (Nat.lt_trichotomy n m) as [Hnm | [-> | Hmn]];
-  [exact (Hen n m Hnm)|easy|exact (fun H => eq_sym (Hen m n Hmn (eq_sym H)))]).
-  intros n m Hnm.
-  unfold infinite_injection_avoiding.
-  pose proof (infinite_injection_avoiding_aux_fresh l m) as Hfresh.
-  pose proof (infinite_injection_avoiding_aux_contains l n m Hnm) as Hcont.
-  rewrite (surjective_pairing (infinite_injection_avoiding_aux l n)) in Hcont.
-  cbn in Hcont.
-  intros Heq.
-  rewrite Heq in Hcont.
-  specialize (Hcont (infinite_injection_avoiding_aux l m).1 ltac:(constructor)).
-  easy.
-Qed.
-
-Lemma infinite_injection_avoiding_avoids `{Infinite A} (l : list A) (n : nat) :
-  infinite_injection_avoiding l n ∉ l.
-Proof.
-  pose proof (infinite_injection_avoiding_aux_fresh l n) as Hfresh.
-  now intros ?%(infinite_injection_avoiding_aux_contains_avoid l n).
-Qed.
-
-
-
-Lemma partial_injection_extension `{Countable A, Infinite B}
-  (l : list A) (f : A -> B) :
-    ForallPairs (λ i j, f i = f j → i = j) l ->
-    exists (g : A -> B), Inj (=) (=) g /\ Forall (fun a => g a = f a) l.
-Proof.
-  intros Hlinj.
-  set (g := infinite_injection_avoiding (f <$> l) ∘ pos_to_nat_pred).
-  exists (λ a, if decide (a ∈ l) then f a else g (encode a)).
-  split; [|now rewrite Forall_forall; intros a Ha; rewrite decide_True].
-  intros a b.
-  case_decide as Ha; case_decide as Hb.
-  - now apply Hlinj; apply elem_of_list_In.
-  - intros Heq%eq_sym.
-    exfalso.
-    apply (infinite_injection_avoiding_avoids (f <$> l) (encode b)).
-    subst g.
-    cbn in Heq.
-    rewrite Heq.
-    now apply elem_of_list_fmap_1.
-  - intros Heq.
-    exfalso.
-    apply (infinite_injection_avoiding_avoids (f <$> l) (encode a)).
-    subst g.
-    cbn in Heq.
-    rewrite Heq.
-    now apply elem_of_list_fmap_1.
-  - intros Heq.
-    apply (inj encode).
-    revert Heq.
-    apply inj.
-    unfold g; apply _.
-Qed.
-
-Lemma set_Forall2_elements `{FinSet A SA} (R : relation A) (X : SA) :
-  set_Forall2 R X <-> ForallPairs R (elements X).
-Proof.
-  rewrite <- (set_Forall2_list_to_set (C:=SA)).
-  now rewrite list_to_set_elements.
-Qed.
-
-Lemma partial_injection_extension' `{Countable A, Infinite B, FinSet A SA}
-  (X : SA) (f : A -> B) :
-  set_Forall2 (λ i j, f i = f j → i = j) X ->
-    exists (g : A -> B), Inj (=) (=) g /\ set_Forall (fun a => g a = f a) X.
-Proof.
-  rewrite set_Forall2_elements.
-  intros (g & Hg & Hgeq%set_Forall_elements)%partial_injection_extension.
-  eauto.
-Qed.
-
-
-Lemma kmap_ext `{FinMap K1 M1, FinMap K2 M2} {A}
-  (f g : K1 -> K2) (m : M1 A) :
-  (forall k a, m !! k = Some a -> f k = g k) ->
-  kmap f m =@{M2 A} kmap g m.
-Proof.
-  intros Hfg.
-  unfold kmap.
-  f_equal.
-  apply list_fmap_ext; intros _ (k, a) Hka%elem_of_list_lookup_2%elem_of_map_to_list.
-  cbn.
-  f_equal; eauto.
-Qed.
 
 Lemma ntl_aeq_alt ntl ntl' :
   WF_ntl ntl ->
@@ -3572,26 +3322,6 @@ Proof.
 Qed.
 
 
-Lemma imap_to_imap_pair {A B} (f : nat -> A -> B) l :
-  imap f l = uncurry f <$> imap pair l.
-Proof.
-  rewrite fmap_imap.
-  reflexivity.
-Qed.
-
-Lemma zip_with_ext_strong {A B C} (f g : A -> B -> C)
-  (l1 l2 : list A) (k1 k2 : list B) :
-  (forall a b, a ∈ l1 -> b ∈ k1 -> f a b = g a b) ->
-  l1 = l2 -> k1 = k2 ->
-  zip_with f l1 k1 = zip_with g l2 k2.
-Proof.
-  intros Hfg <- <-.
-  revert k1 Hfg; induction l1; intros k1 Hfg; [done|].
-  destruct k1; [done|].
-  cbn.
-  f_equal; [|now apply IHl1; eauto using elem_of_list_further].
-  apply Hfg; constructor.
-Qed.
 
 
 Lemma make_pwf_inj n f :
@@ -3737,21 +3467,6 @@ Add Parametric Relation : tensorlist tl_perm_eq
   symmetry proved by tl_perm_eq_symm
   transitivity proved by tl_perm_eq_trans as tl_perm_eq_setoid.
 
-Lemma fmap_eqlistA `{RA : relation A, RB : relation B}
-  (f : A -> B) {Hf : Proper (RA ==> RB) f} (l l' : list A) :
-  eqlistA RA l l' -> eqlistA RB (f <$> l) (f <$> l').
-Proof.
-  intros Hl.
-  induction Hl; cbn; eauto using eqlistA.
-Qed.
-
-Lemma fmap_PermutationA `{RA : relation A, RB : relation B}
-  (f : A -> B) (Hf : Proper (RA ==> RB) f) (l l' : list A) :
-  PermutationA RA l l' -> PermutationA RB (f <$> l) (f <$> l').
-Proof.
-  intros Hl.
-  induction Hl; cbn; eauto using PermutationA.
-Qed.
 
 
 
@@ -3863,116 +3578,6 @@ Proof.
     f_equal; apply proof_irbound.
 Qed.
 
-Lemma option_bind_comm {A B C} (f : A -> B -> option C)
-  (ma : option A) (mb : option B) :
-  (ma ≫= λ a, mb ≫= λ b, f a b) =
-  (mb ≫= λ b, ma ≫= λ a, f a b).
-Proof.
-  now destruct ma, mb.
-Qed.
-
-Lemma option_bind_fmap {A B C} (f : A -> option B) (g : B -> C)
-  (ma : option A) :
-  g <$> (ma ≫= f) = ma ≫= λ a, g <$> f a.
-Proof.
-  now destruct ma.
-Qed.
-
-Lemma option_fmap_bind {A B C} (f : A -> B) (g : B -> option C)
-  (ma : option A) :
-  ((f <$> ma) ≫= g) = ma ≫= g ∘ f.
-Proof.
-  now destruct ma.
-Qed.
-
-Lemma option_bind_assoc' {A B C} (f : A -> option B) (g : B -> option C)
-  (ma : option A) :
-  (ma ≫= f) ≫= g = ma ≫= λ a, f a ≫= g.
-Proof.
-  now destruct ma.
-Qed.
-
-Lemma join_list_fmap_mbind {A B} (f : A -> option B) (lm : list (option A)) :
-  join_list (mbind f <$> lm) =
-  l ← join_list lm;
-  join_list (f <$> l).
-Proof.
-  induction lm as [|ma lm IHlm]; [reflexivity|].
-  cbn.
-  rewrite IHlm.
-  destruct ma as [a|]; [|reflexivity].
-  cbn.
-  rewrite option_bind_assoc.
-  destruct (join_list lm) as [l|]; [|now case_match].
-  reflexivity.
-Qed.
-
-Add Parametric Morphism {A B} : (@mbind option _ A B) with signature
-  pointwise_relation A eq ==> eq ==> eq as option_bind_mor.
-Proof.
-  intros; now apply option_bind_ext.
-Qed.
-
-Lemma join_list_app {A} (ml ml' : list (option A)) :
-  join_list (ml ++ ml') =
-  l ← join_list ml;
-  (l ++.) <$> join_list ml'.
-Proof.
-  induction ml as [|ma ml IHml]; [cbn; now rewrite option_fmap_id|].
-  cbn.
-  rewrite IHml.
-  case_match; [|reflexivity].
-  cbn.
-  rewrite 2 option_bind_assoc.
-  unfold compose.
-  cbn.
-  setoid_rewrite option_fmap_bind.
-  reflexivity.
-Qed.
-
-Lemma join_list_app' {A} (ml ml' : list (option A)) :
-  join_list (ml ++ ml') =
-  l' ← join_list ml';
-  (.++ l') <$> join_list ml.
-Proof.
-  induction ml as [|ma ml IHml]; [cbn; now destruct (join_list ml')|].
-  cbn.
-  rewrite IHml.
-  destruct ma as [a|].
-  - rewrite option_bind_assoc.
-    unfold compose.
-    setoid_rewrite option_fmap_bind.
-    reflexivity.
-  - cbn.
-    now destruct (join_list ml').
-Qed.
-Lemma option_fmap_to_bind {A B} (f : A -> B) (ma : option A) :
-  f <$> ma = ma ≫= λ a, Some (f a).
-Proof.
-  reflexivity.
-Qed.
-
-Lemma option_bind_None_r {A B} (ma : option A) :
-  (ma ≫= λ a, @None B) = None.
-Proof.
-  now destruct ma.
-Qed.
-
-
-
-
-
-
-
-
-
-Lemma join_list_Some_length {A} (ml : list (option A)) l :
-  join_list ml = Some l ->
-  length ml = length l.
-Proof.
-  intros Hlen%join_list_Some%(f_equal length).
-  now rewrite length_fmap in Hlen.
-Qed.
 
 Lemma list2vec_plus n m {A} (l : list A) :
   list2vec (n + m) l =
@@ -4049,32 +3654,7 @@ Proof.
   f_equiv; congruence.
 Qed.
 
-Lemma join_list_Permutation {A} (ml ml' : list (option A)) :
-  ml ≡ₚ ml' -> option_Forall2 Permutation (join_list ml) (join_list ml').
-Proof.
-  intros Hperm.
-  pose proof (join_list_is_Some ml) as Hsome.
-  rewrite Hperm in Hsome at 2.
-  rewrite <- join_list_is_Some in Hsome.
-  rewrite 2 is_Some_alt in Hsome.
-  destruct (join_list ml) as [l|] eqn:Hl;
-  destruct (join_list ml') as [l'|] eqn:Hl'; [|tauto..|];
-  constructor.
-  apply join_list_Some in Hl, Hl'.
-  apply (f_equal (omap id)) in Hl, Hl'.
-  rewrite list_omap_fmap in Hl, Hl'.
-  unfold compose, id in Hl, Hl'.
-  rewrite <- list_fmap_alt, list_fmap_id in Hl, Hl'.
-  subst l l'.
-  apply omap_Permutation.
-  now rewrite Hperm.
-Qed.
 
-Lemma vec_to_list_cast {A m} (v : vec A m) {n} (H : m = n) :
-  vec_to_list (Vector.cast v H) = v.
-Proof.
-  revert n H; induction v; intros ? <-; cbn; f_equal; auto.
-Qed.
 
 
 
@@ -4094,45 +3674,6 @@ Proof.
 Qed.
 
 
-Lemma option_Forall2_alt {A B} (P : A -> B -> Prop) ma mb :
-  option_Forall2 P ma mb <->
-  match ma, mb with
-  | Some a, Some b => P a b
-  | None, None => True
-  | _, _ => False
-  end.
-Proof.
-  split; [now intros []|].
-  destruct ma, mb; easy + now constructor.
-Qed.
-Lemma eqlistA_cons_iff `{eqA : relation A} {x x' : A} {l l' : list A} :
-  eqlistA eqA (x :: l) (x' :: l') <-> eqA x x' /\ eqlistA eqA l l'.
-Proof.
-  split; [|now intros []; apply eqlistA_cons].
-  intros Heq.
-  inversion Heq; now subst.
-Qed.
-Lemma PermutationA_iff_exists_Forall2_Permutation
-  `{RA : relation A} `{!Equivalence RA} l l' :
-  PermutationA RA l l' <-> exists l'', l ≡ₚ l'' /\ Forall2 RA l'' l'.
-Proof.
-  split.
-  - intros (l'' & Hl'' & Heq%eqlistA_altdef)%PermutationA_decompose; eauto.
-  - intros (l'' & Hperm & Heq%eqlistA_altdef).
-    etransitivity;
-    [now apply Permutation_PermutationA; eauto|].
-    now apply eqlistA_PermutationA.
-Qed.
-
-
-
-Lemma Forall2_iff_pred {A B} (P : A -> Prop) (Q : B -> Prop) (l : list A) l' :
-  Forall2 (λ a b, P a <-> Q b) l l' ->
-  Forall P l <-> Forall Q l'.
-Proof.
-  intros Hl.
-  induction Hl; rewrite ?Forall_cons, ?Forall_nil; tauto.
-Qed.
 
 Lemma relabel_abs_WT'_iff {A B} mabst (f : A -> B) abs :
   abst_WT' mabst (relabel_abs f abs) <->
@@ -5566,32 +5107,6 @@ Proof.
   now apply simplify_ntl_deltas_correct.
 Qed.
 
-(* FIXME: Move *)
-Lemma vmap_id' {A n} (f : A -> A) (v : vec A n) :
-  (forall a, a ∈ vec_to_list v -> f a = a) ->
-  vmap f v = v.
-Proof.
-  rewrite <- Forall_forall, vec_to_list_to_list, <- Vector.to_list_Forall.
-  intros Hall.
-  induction Hall; [done|].
-  cbn.
-  congruence.
-Qed.
-Lemma zip_with_to_fmap_l {A B C} (f : A -> C) (l : list A) (k : list B) :
-  length l = length k ->
-  zip_with (λ a _, f a) l k = f <$> l.
-Proof.
-  intros Hall%Forall2_same_length.
-  induction Hall; cbn; congruence.
-Qed.
-Lemma zip_with_to_fmap_r {A B C} (f : B -> C) (l : list A) (k : list B) :
-  length l = length k ->
-  zip_with (λ _ b, f b) l k = f <$> k.
-Proof.
-  intros Hall%Forall2_same_length.
-  induction Hall; cbn; congruence.
-Qed.
-
 Lemma simplify_ntl_deltas_aux_full_subst_l_aux sums {n}
   (dbound dfree : vec positive n)
   delt_other abs :
@@ -5750,9 +5265,6 @@ Qed.
 
 
 
-Definition vec_to_list_ind {A} (P : list A -> Type)
-  (HP : forall n (v : vec A n), P v) : forall l, P l :=
-  fun l => eq_rect _ P (HP _ (list_to_vec l)) _ (vec_to_list_to_vec l).
 
 Lemma simplify_ntl_deltas_aux_full_subst_l sums {n}
   (dv : vec _ n) (dbound dfree : list positive)

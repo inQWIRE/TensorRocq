@@ -1,13 +1,13 @@
-From stdpp Require Export pmap gmap decidable.
-Require Import TensorGraph.
-Require Import HyperGraph.
+From stdpp Require Export gmultiset pmap gmap decidable.
+Require Import SPTensorGraph.
+Require Import SPHyperGraph.
 Require Import TESyntax.
 Require Import Aux_pos.
 
 
 (* An implementation of double pushout (DPO) rewriting *)
 
-
+(* 
 Local Open Scope nat_scope.
 
 Section DPO.
@@ -450,4 +450,4 @@ Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signatu
 Proof.
   intros; now apply stack_graphs_isomorphic.
 Qed.
-  
+   *)

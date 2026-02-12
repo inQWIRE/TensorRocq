@@ -105,6 +105,12 @@ Proof. rewrite rmul_comm. apply RSRth. Qed.
 Lemma distr_r r s t : r * (s + t) == r * s + r * t.
 Proof. rewrite 3(rmul_comm r). apply distr_l. Qed.
 
+Lemma rmul_comm_double (r0 r1 r2 r3 : R) :
+  (r0 * r1) * (r2 * r3) == (r0 * r2) * (r1 * r3).
+Proof.
+  ring.
+Qed.
+
 End SemiRing.
 
 Import List ListNotations Permutation SetoidPermutation.

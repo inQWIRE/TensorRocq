@@ -2212,3 +2212,235 @@ Notation pos_nat_sub n :=
 Proof.
   hnf; lia.
 Qed.
+
+
+Definition Pmap_map (m : Pmap positive) : positive -> positive :=
+  fun v => default v (m !! v).
+
+Lemma Pmap_map_inj_on (X : Pset) (m : Pmap positive) :
+  X ⊆ dom m ->
+  (forall i j a, m !! i = Some a -> m !! j = Some a -> i = j) ->
+  (forall i j, i ∈ X -> j ∈ X -> Pmap_map m i = Pmap_map m j -> i = j).
+Proof.
+  intros HX Hminj i j [mi Hmi]%HX%elem_of_dom [mj Hmj]%HX%elem_of_dom.
+  unfold Pmap_map.
+  rewrite Hmi, Hmj.
+  cbn.
+  intros <-.
+  eauto.
+Qed.
+
+
+#[export]
+Instance pos_to_nat_pred_inj : Inj (=) (=) pos_to_nat_pred.
+Proof.
+  intros p p'.
+  lia.
+Qed.
+
+
+Lemma pos_swap_alt p :
+  pos_swap p = (if decide (p = 1) then 2 else if decide (p = 2) then 1 else p)%positive.
+Proof.
+  unfold pos_swap.
+  destruct p as [| []|]; reflexivity.
+Qed.
+
+
+
+
+
+
+Section list_index.
+Context `{EqDecision A}.
+Implicit Type l : list A.
+
+Definition list_index (x : A) l :=
+  fst <$> list_find (eq x) l.
+
+Lemma list_index_is_Some x l :
+  is_Some (list_index x l) <-> x ∈ l.
+Proof.
+  unfold list_index.
+  rewrite fmap_is_Some.
+  split; [|intros Hx; apply (list_find_elem_of _ _ x Hx eq_refl)].
+  now intros [[] (?%elem_of_list_lookup_2 & <- & _)%list_find_Some].
+Qed.
+
+Lemma list_index_Some x l i :
+  list_index x l = Some i <->
+  l !! i = Some x /\ forall j y, l !! j = Some y -> j < i -> x <> y.
+Proof.
+  unfold list_index.
+  rewrite fmap_Some, exists_pair.
+  setoid_rewrite list_find_Some.
+  naive_solver.
+Qed.
+
+Lemma list_index_Some_NoDup x l i :
+  NoDup l ->
+  list_index x l = Some i <-> l !! i = Some x.
+Proof.
+  intros Hdup.
+  rewrite list_index_Some.
+  rewrite <- (and_True (l !! i = Some x)) at 2.
+  apply and_iff_from_l; [reflexivity|intros Hli _].
+  apply iff_True_1.
+  intros j y Hlj Hji ->.
+  enough (i = j) by lia.
+  revert Hli Hlj.
+  now apply NoDup_lookup.
+Qed.
+
+Lemma list_index_inj x y l i :
+  list_index x l = Some i -> list_index y l = Some i -> x = y.
+Proof.
+  rewrite 2 list_index_Some.
+  intros [] [].
+  congruence.
+Qed.
+
+Lemma list_index_lt x l i :
+  list_index x l = Some i -> i < length l.
+Proof.
+  now intros [?%lookup_lt_Some _]%list_index_Some.
+Qed.
+
+Lemma list_index_ppermute_NoDup x l f : posperm (lengthP l) f ->
+  NoDup l ->
+  list_index x (ppermute f l) =
+  (pos_to_nat_pred ∘ posperm_inv (lengthP l) f ∘ Pos.of_succ_nat) <$> list_index x l.
+Proof.
+  intros Hf Hl.
+  apply option_eq; intros i.
+  rewrite list_index_Some_NoDup by now rewrite ppermute_permutation.
+  pose proof (lengthN_correct l).
+  split.
+  - intros Hlook.
+    apply lookup_lt_Some in Hlook as Hi.
+    rewrite length_ppermute in Hi.
+    rewrite lookup_ppermute_alt_bdd in Hlook by now easy + apply posperm_bounded.
+    replace (list_index x l) with (Some (f (Pos.of_succ_nat i) :> nat)) by
+      now symmetry; apply list_index_Some_NoDup.
+    cbn.
+    rewrite pos_to_nat_pred_to_pos.
+    rewrite posperm_inv_linv by now easy + lia.
+    f_equal; lia.
+  - destruct (list_index x l) as [fi|] eqn:Hfi; [|easy].
+    apply list_index_Some in Hfi as [Hfi _].
+    apply lookup_lt_Some in Hfi as Hfilt.
+    cbn.
+    intros [= <-].
+    rewrite lookup_ppermute_alt_bdd by first [
+      now apply posperm_bounded|
+      specialize (posperm_inv_bounded (lengthP l) f (Pos.of_succ_nat fi));
+      lia
+    ].
+    rewrite pos_to_nat_pred_to_pos.
+    rewrite posperm_inv_rinv by now easy || lia.
+    now rewrite pos_to_nat_pred_of_nat.
+Qed.
+
+Lemma list_lookup_omap_all_is_Some `(f : A -> option B) (l : list A) (i : nat)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l !! i = l !! i ≫= f.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  revert i;
+  induction Hf; [now intros []|intros i].
+  cbn.
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  destruct i; [cbn; now rewrite Hfx|].
+  cbn.
+  apply IHHf.
+Qed.
+
+Lemma length_omap_all_is_Some `(f : A -> option B) (l : list A)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  length (omap f l) = length l.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  induction Hf; [done|cbn].
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  cbn.
+  f_equal; apply IHHf.
+Qed.
+
+Lemma omap_all_is_Some_default `(f : A -> option B) (l : list A) (g : A -> B)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l = (λ i, default (g i) (f i)) <$> l.
+Proof.
+  apply (list_eq_same_length _ _ _ eq_refl).
+  - now rewrite length_fmap; apply length_omap_all_is_Some.
+  - intros i x y.
+    rewrite length_fmap.
+    intros Hi.
+    rewrite list_lookup_omap_all_is_Some by easy.
+    rewrite list_lookup_fmap.
+    destruct (l !! i) as [li|]; [|easy].
+    cbn.
+    destruct (f li); [|easy].
+    cbn; congruence.
+Qed.
+
+Lemma ppermute_alt_list_index_aux_Some f l : posbdd (lengthP l) f -> NoDup l ->
+  forall x, x ∈ l ->
+    is_Some (i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat)).
+Proof.
+  intros Hf Hl x Hx.
+  pose proof (lengthN_correct l).
+  apply elem_of_list_lookup in Hx as Hi.
+  destruct Hi as [i Hi].
+  apply list_index_Some_NoDup in Hi as Hi'; [|easy].
+  rewrite Hi'.
+  cbn.
+  apply lookup_lt_Some in Hi as Hilt.
+  apply lookup_lt_is_Some.
+  specialize (Hf (Pos.of_succ_nat i)).
+  lia.
+Qed.
+
+Lemma ppermute_alt_list_index f l : posbdd (lengthP l) f -> NoDup l ->
+  ppermute f l = omap (λ x, i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat)) l.
+Proof.
+  intros Hf Hl.
+  pose proof (lengthN_correct l).
+  specialize (ppermute_alt_list_index_aux_Some f l Hf Hl) as Hsome.
+  apply length_omap_all_is_Some in Hsome as Hlen.
+  apply (λ H, list_eq_same_length _ _ _ H eq_refl);
+  [now rewrite length_ppermute, Hlen|].
+  intros i x y.
+  rewrite length_ppermute.
+  intros Hi.
+  rewrite lookup_ppermute_alt_bdd by easy.
+  rewrite list_lookup_omap_all_is_Some by easy.
+  apply lookup_lt_is_Some in Hi as Hli.
+  destruct Hli as [li Hli].
+  rewrite Hli.
+  cbn.
+  apply list_index_Some_NoDup in Hli as Hli'; [|easy].
+  rewrite Hli'.
+  cbn.
+  congruence.
+Qed.
+
+Lemma ppermute_alt_list_index_total
+  f l : posbdd (lengthP l) f -> NoDup l ->
+  ppermute f l = (λ x, default x
+    (i ← list_index x l; l !! (f (Pos.of_succ_nat i):>nat))) <$> l.
+Proof.
+  intros Hf Hl.
+  rewrite ppermute_alt_list_index by easy.
+  now apply omap_all_is_Some_default, ppermute_alt_list_index_aux_Some.
+Qed.
+
+End list_index.
+
+
+Lemma pseq_to_seq_inv (start len : nat) :
+  Pos.of_succ_nat <$> seq start len =
+  pseq (Pos.of_succ_nat start) (N.of_nat len).
+Proof.
+  rewrite pseq_to_seq.
+  do 2 f_equal; lia.
+Qed.

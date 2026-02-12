@@ -39,6 +39,8 @@ Definition graph_semantics `{SR : SemiRing R rO rI radd rmul req}
     (vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m))
     (graph_namedtensorlist_semantics tg).
 
+#[global] Arguments graph_semantics
+  {_ _ _ _ _ _} {_ _ _} {_ _} _ _ _ / : assert.
 
 Lemma graph_semantics_to_contl `{SR : SemiRing R rO rI radd rmul req} 
   `{!Summable A, !EqDecision A} `{TensT : TensorLike R A T}

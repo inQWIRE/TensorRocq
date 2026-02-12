@@ -11,17 +11,6 @@ Require Export TESyntax.
 
 
 
-Lemma dom_make_vecs_map {A n m} (ins : vec _ n) (outs : vec _ m)
-  (v w : vec A _) :
-  dom (make_vecs_map ins outs v w) =
-  list_to_set (ins ++ outs).
-Proof.
-  unfold_leibniz.
-  unfold make_vecs_map.
-  rewrite dom_union, 2 dom_list_to_map.
-  rewrite 2 vec_to_list_zip_with, list_to_set_app.
-  now rewrite 2 fst_zip by now rewrite 2 length_vec_to_list.
-Qed.
 
 
 
@@ -827,23 +816,6 @@ Require Export Tensor TESemantics.
 
 
 
-Lemma make_vecs_map_SummedElements `{SA : Summable A} {n m}
-  (ins : vec _ n) (outs : vec _ m) (v w : vec A _) :
-  SummedElement v -> SummedElement w ->
-  map_Forall (λ _ a, SummedElement a)
-  (make_vecs_map ins outs v w).
-Proof.
-  intros Hv Hw.
-  unfold make_vecs_map.
-  rewrite <- list_to_map_app.
-  intros i a Hia%elem_of_list_to_map_2%(elem_of_list_fmap_1 snd).
-  cbn in Hia.
-  rewrite fmap_app, 2 vec_to_list_zip_with,
-    2 snd_zip in Hia by now rewrite 2 length_vec_to_list.
-  rewrite SummedElement_vec_iff in Hw.
-  rewrite SummedElement_vec_iff in Hv.
-  apply elem_of_app in Hia as []; auto.
-Qed.
 
 
 Section Semantics.
@@ -1047,6 +1019,11 @@ Definition contl_semantics (mabs : abscontext)
   ntl_total_semantics mabs
     (make_vecs_map contl.(contl_inputs) contl.(contl_outputs) v w)
     contl.(contl_expr).
+
+#[global] Arguments cote_semantics _ {_ _} _ _ _ / : assert.
+#[global] Arguments cotl_semantics _ {_ _} _ _ _ / : assert.
+#[global] Arguments contl_semantics _ {_ _} _ _ _ / : assert.
+
 
 Lemma contl_semantics_WT_alt {n m} (contl : CospanNamedTensorList n m) (v w : vec A _) :
   WT_contl contl ->

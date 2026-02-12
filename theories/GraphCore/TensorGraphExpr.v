@@ -8,68 +8,6 @@ Require Combinators.
 
 
 (* FIXME: Move: *)
-Lemma pseq_to_seq_inv (start len : nat) :
-  Pos.of_succ_nat <$> seq start len =
-  pseq (Pos.of_succ_nat start) (N.of_nat len).
-Proof.
-  rewrite pseq_to_seq.
-  do 2 f_equal; lia.
-Qed.
-Lemma map_to_list_disj_union `{FinMap K M} {A} (m1 m2 : M A) :
-  m1 ##ₘ m2 ->
-  map_to_list (m1 ∪ m2) ≡ₚ map_to_list m1 ++ map_to_list m2.
-Proof.
-  intros Hdisj.
-  pose proof Hdisj as Hdisj'.
-  rewrite map_disjoint_alt in Hdisj'.
-  apply NoDup_Permutation.
-  - apply NoDup_map_to_list.
-  - apply NoDup_app; split_and!; try apply NoDup_map_to_list.
-    intros (k, a) Hka%elem_of_map_to_list Hka'%elem_of_map_to_list.
-    destruct (Hdisj' k); congruence.
-  - intros (k, a).
-    rewrite elem_of_app, 3 elem_of_map_to_list.
-    rewrite lookup_union_Some by done.
-    done.
-Qed.
-Lemma map_to_list_kmap `{FinMap K1 M1, FinMap K2 M2} (f : K1 -> K2)
-  `{Hf : !Inj eq eq f} {A} (m : M1 A) :
-  map_to_list (kmap f m :> M2 A) ≡ₚ prod_map f id <$> map_to_list m.
-Proof.
-  unfold kmap.
-  apply map_to_list_to_map.
-  rewrite fsts_prod_map, (NoDup_fmap _).
-  apply NoDup_fst_map_to_list.
-Qed.
-Lemma map_disjoint_alt_neg `{FinMap K M} {A} (m1 m2 : M A) :
-  m1 ##ₘ m2 <-> forall k a b, m1 !! k = Some a -> m2 !! k = Some b -> False.
-Proof.
-  rewrite map_disjoint_alt.
-  apply forall_proper; intros k.
-  rewrite 2 eq_None_not_Some.
-  unfold is_Some.
-  destruct (m1 !! k), (m2 !! k); naive_solver.
-Qed.
-Lemma kmap_inj2_disjoint `{FinMap K1 M1, FinMap K2 M2} {I} `{R : relation I} {A}
-  (f : I -> K1 -> K2) `{Hf : !Inj2 R eq eq f} (m m' : M1 A) i j :
-  ~ R i j ->
-  (kmap (f i) m :> M2 A) ##ₘ kmap (f j) m'.
-Proof.
-  intros Hrij.
-  rewrite map_disjoint_alt_neg.
-  intros k a b (? & _ & Hfij)%lookup_kmap_Some_2
-    (? & _ & <-)%lookup_kmap_Some_2.
-  now apply Hf in Hfij.
-Qed.
-
-Lemma set_map_inj2_disjoint `{FinSet A SA, SemiSet B SB}
-  {I} `{R : relation I}
-  (f : I -> A -> B) `{Hf : !Inj2 R eq eq f} (X Y : SA) i j :
-  ~ R i j ->
-  (set_map (f i) X :> SB) ## set_map (f j) Y.
-Proof.
-  set_solver.
-Qed.
 
 
 #[export] Instance ntl_eq_of_ntl_aeq tl : subrelation ntl_aeq (ntl_eq tl).
@@ -93,63 +31,6 @@ Add Parametric Morphism : mk_ntl with signature
   Permutation ==> Permutation ==> Permutation ==> ntl_aeq as mk_ntl_perm_eq.
 Proof.
   intros; now apply ntl_aeq_of_perm.
-Qed.
-
-Lemma list_fmap_subseteq {A B} (f : A -> B) (l1 l2 : list A) :
-  l1 ⊆ l2 -> f <$> l1 ⊆ f <$> l2.
-Proof.
-  intros Hl b (a & -> & ?%Hl)%elem_of_list_fmap.
-  now apply elem_of_list_fmap_1.
-Qed.
-
-Lemma list_subseteq_app {A} {l1 l1' l2 l2' : list A} :
-  l1 ⊆ l1' -> l2 ⊆ l2' -> l1 ++ l2 ⊆ l1' ++ l2'.
-Proof.
-  intros;
-  apply list_subseteq_app_iff_l, conj;
-    [apply list_subseteq_app_l|apply list_subseteq_app_r];
-  done.
-Qed.
-
-Lemma uncurry_alt {A B C} (f : A -> B -> C) p :
-  uncurry f p = f p.1 p.2.
-Proof.
-  now destruct p.
-Qed.
-
-Lemma list_omap_fmap {A B C} (f : A -> B) (g : B -> option C) (l : list A) :
-  omap g (f <$> l) = omap (g ∘ f) l.
-Proof.
-  induction l; [done|cbn]; case_match; f_equal; easy.
-Qed.
-
-
-Lemma NoDup_fmap_ind `(f : A -> B) (P : list A -> Prop)
-  (Pnil : P []) (Pcons : forall a l, f a ∉ f <$> l -> NoDup (f <$> l) ->
-    P l -> P (a :: l)) : forall l, NoDup (f <$> l) -> P l.
-Proof.
-  intros l.
-  induction l; [easy|].
-  cbn; rewrite NoDup_cons.
-  intros []; eauto.
-Qed.
-
-Lemma zip_with_irrel_l {A B C} (f : B -> C) (l l' : list A) (k : list B) :
-  length l = length l' ->
-  zip_with (λ _ b, f b) l k = zip_with (λ _ b, f b) l' k.
-Proof.
-  intros Hall%Forall2_same_length.
-  revert k;
-  induction Hall; intros []; cbn; congruence.
-Qed.
-
-Lemma zip_with_irrel_r {A B C} (f : A -> C) (l : list A) (k k' : list B) :
-  length k = length k' ->
-  zip_with (λ a _, f a) l k = zip_with (λ a _, f a) l k'.
-Proof.
-  intros Hall%Forall2_same_length.
-  revert l;
-  induction Hall; intros []; cbn; congruence.
 Qed.
 
 

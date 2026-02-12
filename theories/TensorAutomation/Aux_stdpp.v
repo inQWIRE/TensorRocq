@@ -1,11 +1,13 @@
 (* Extra bits for stdpp *)
+Require Combinators.
+Require Import SetoidList SetoidPermutation.
 From stdpp Require Import decidable.
 Require Import Aux.
 
 From stdpp Require Import prelude functions.
 
 
-From stdpp Require Import strings fin_maps pmap gmap hlist.
+From stdpp Require Import strings fin_maps gmultiset pmap gmap hlist.
 From stdpp Require Import pretty.
 
 Lemma exists_dsig {A} {P Q : A -> Prop} `{forall x, Decision (P x)} :
@@ -662,11 +664,12 @@ Proof.
 Qed.
 
 Lemma map_dom_img_lt_card_iff `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
+  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA}
     (m : M A) :
   size (map_img m :> SA) < size (dom m) <->
   exists i j a, m !! i = Some a /\ m !! j = Some a /\ i <> j.
 Proof.
+  assert (RelDecision (∈@{SA})) by apply elem_of_dec_slow.
   split.
   - induction m using map_first_key_ind;
     [now rewrite dom_empty, map_img_empty, 2 size_empty|].
@@ -702,7 +705,7 @@ Proof.
 Qed.
 
 Lemma map_dom_img_eq_card_iff_inj `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
+  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA}
     (m : M A) :
   size (dom m) = size (map_img m :> SA) <->
   forall i j a, m !! i = Some a -> m !! j = Some a -> i = j.
@@ -724,7 +727,7 @@ Proof.
 Qed.
 
 Lemma map_dom_img_eq_card_iff_NoDup `{FinMapDom K M SK}
-  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA} `{!RelDecision (∈@{SA})}
+  `{!Elements K SK} `{!FinSet K SK} `{FinSet A SA}
     (m : M A) :
   size (dom m) = size (map_img m :> SA) <->
   NoDup (map_to_list m).*2.
@@ -2360,9 +2363,10 @@ Proof.
   rewrite fmap_to_map_imap, map_imap_compose.
   reflexivity.
 Qed.
-Lemma elements_union `{FinSet A SA, !RelDecision (∈@{SA})} (X Y : SA) :
+Lemma elements_union `{FinSet A SA} (X Y : SA) :
   elements (X ∪ Y) ≡ₚ elements X ++ elements (Y ∖ X).
 Proof.
+  assert (RelDecision (∈@{SA})) by apply elem_of_dec_slow.
   rewrite <- elements_disj_union by set_solver.
   apply elements_proper.
   intros x.
@@ -2962,3 +2966,1396 @@ Qed.
 
 Notation vhd := Vector.hd.
 Notation vtl := Vector.tl.
+
+
+
+
+
+
+
+
+Lemma size_set_eq_exists_map `{FinMapDom K M SK,
+  !Elements K SK, !FinSet K SK, FinSet A SA}
+  (X : SK) (Y : SA) :
+  size X = size Y ->
+  exists (m : M A),
+    dom m ≡ X /\
+    map_img m ≡ Y /\
+    forall i j a,
+      m !! i = Some a -> m !! j = Some a -> i = j.
+Proof.
+  intros Hsize.
+  exists (list_to_map (zip (elements X) (elements Y))).
+  split_and!.
+  - rewrite dom_list_to_map, fst_zip by apply eq_reflexivity, Hsize.
+    apply list_to_set_elements.
+  - rewrite map_img_list_to_map by now
+      rewrite fst_zip by apply eq_reflexivity, Hsize;
+      apply NoDup_elements.
+    rewrite snd_zip by apply eq_reflexivity, symmetry, Hsize.
+    apply list_to_set_elements.
+  - intros i j a Hi Hj.
+    rewrite <- elem_of_list_to_map in Hi, Hj by now
+      rewrite fst_zip by apply eq_reflexivity, Hsize;
+      apply NoDup_elements.
+    rewrite elem_of_list_lookup in Hi, Hj.
+    destruct Hi as (ii & Hii).
+    destruct Hj as (ij & Hij).
+    rewrite lookup_zip_with in Hii, Hij.
+    destruct (elements X !! ii) as [Xii|] eqn:HXii; [|done].
+    destruct (elements X !! ij) as [Xij|] eqn:HXij; [|done].
+    destruct (elements Y !! ii) as [Yii|] eqn:HYii; [|done].
+    destruct (elements Y !! ij) as [Yij|] eqn:HYij; [|done].
+    cbn in *.
+    revert Hii Hij.
+    intros [= -> ->] [= -> ->].
+    enough (ii = ij) by congruence.
+    revert HYii HYij.
+    apply NoDup_lookup, NoDup_elements.
+Qed.
+
+Lemma list_to_set_bind `{SemiSet B SB} {A} (f : A -> list B) (l : list A) :
+  list_to_set (l ≫= f) ≡@{SB} ⋃ (list_to_set ∘ f <$> l).
+Proof.
+  intros x.
+  rewrite elem_of_list_to_set, elem_of_list_bind.
+  rewrite elem_of_union_list.
+  setoid_rewrite elem_of_list_fmap.
+  cbn.
+  split.
+  - intros (y & Hx & Hy).
+    eexists.
+    split; [exists y; split; [reflexivity|done]|].
+    now rewrite elem_of_list_to_set.
+  - intros (? & (? & -> & ?) & Hx%elem_of_list_to_set).
+    eauto.
+Qed.
+
+Lemma list_to_set_bind_L `{SemiSet B SB, !LeibnizEquiv SB} {A}
+  (f : A -> list B) (l : list A) :
+  list_to_set (l ≫= f) =@{SB} ⋃ (list_to_set ∘ f <$> l).
+Proof.
+  unfold_leibniz.
+  apply list_to_set_bind.
+Qed.
+
+Lemma map_relation_insert `{FinMap K M} {A B} P Q R
+  (m : M A) (m' : M B) k a b :
+  P k a b ->
+  map_relation P Q R m m' ->
+  map_relation P Q R (<[k := a]> m) (<[k := b]> m').
+Proof.
+  intros Hab Hrel i.
+  rewrite 2 lookup_insert_case.
+  case_decide; [now subst|].
+  apply Hrel.
+Qed.
+
+Lemma map_relation_empty `{FinMap K M} {A B} P Q R :
+  map_relation P Q R (∅ :> M A) (∅ :> M B).
+Proof.
+  intros i.
+  now rewrite 2 lookup_empty.
+Qed.
+
+Lemma map_relation_list_to_map `{FinMap K M} {A B} P Q R
+  (l : list (K * A)) (l' : list (K * B)) :
+  Forall2 (λ ka kb, ka.1 = kb.1 /\ P ka.1 ka.2 kb.2) l l' ->
+  map_relation P Q R (list_to_map l :> M A) (list_to_map l' :> M B).
+Proof.
+  intros Halls.
+  induction Halls as [|(k, a) (k', b) l l' [[= <-] Hab]]; [apply map_relation_empty|].
+  cbn.
+  now apply map_relation_insert.
+Qed.
+
+Lemma Forall_zip_with {A B C} (P : C -> Prop) (f : A -> B -> C)
+  (l : list A) (l' : list B) :
+  length l = length l' ->
+  Forall P (zip_with f l l') <->
+  Forall2 (λ a b, P (f a b)) l l'.
+Proof.
+  intros Hlen%Forall2_same_length.
+  induction Hlen; [easy|].
+  cbn.
+  rewrite Forall_cons, Forall2_cons, IHHlen.
+  done.
+Qed.
+
+Add Parametric Morphism `{SemiSet A SA, !LeibnizEquiv SA} :
+  (@union_list SA _ _) with signature
+  Permutation ==> eq as union_list_perm_L.
+Proof.
+  intros l l' Hperm.
+  apply set_eq; intros x.
+  rewrite 2 elem_of_union_list.
+  now setoid_rewrite Hperm.
+Qed.
+
+Lemma map_disjoint_union_inj `{FinMap K M} {A} (m m' : M A) :
+  m ##ₘ m' ->
+  (forall i j a, m !! i = Some a -> m !! j = Some a -> i = j) ->
+  (forall i j a, m' !! i = Some a -> m' !! j = Some a -> i = j) ->
+  (forall i j a, m !! i = Some a -> m' !! j = Some a -> False) ->
+  (forall i j a, (m ∪ m') !! i = Some a -> (m ∪ m') !! j = Some a -> i = j).
+Proof.
+  intros Hmm' Hm Hm' Himg.
+  intros i j a.
+  rewrite map_disjoint_alt in Hmm'.
+  specialize (Hmm' i) as Hi.
+  specialize (Hmm' j) as Hj.
+  rewrite 2 lookup_union.
+  destruct (m !! i) eqn:Hmi, (m' !! i) eqn:Hm'i; [now destruct Hi|..|easy];
+  destruct (m !! j) eqn:Hmj, (m' !! j) eqn:Hm'j; [now destruct Hj|..|easy];
+  cbn;
+  intros [= ->] [= ->];
+  solve [eauto|exfalso; eauto].
+Qed.
+
+
+Definition map_inj `{Lookup K A M} (m : M) :=
+  forall i j a, m !! i = Some a -> m !! j = Some a -> i = j.
+
+(* FIXME: Fix lemma in Aux_stdpp to not use dom (just use size m, not size (dom m)),
+  and then remove dom requirement here *)
+Lemma map_inj_iff_size_img `{FinMapDom K M SK, !Elements K SK, !FinSet K SK,
+  FinSet A SA} (m : M A) :
+  map_inj m <-> size (dom m) = size (map_img m :> SA).
+Proof.
+  symmetry.
+  pose proof @elem_of_dec_slow.
+  apply map_dom_img_eq_card_iff_inj.
+Qed.
+
+
+Lemma set_map_union_list `{FinSet A SA, SemiSet B SB} (f : A -> B)
+  (l : list SA) :
+  set_map f (⋃ l) ≡@{SB} ⋃ (set_map f <$> l).
+Proof.
+  induction l; [set_solver|].
+  cbn.
+  rewrite set_map_union.
+  now f_equiv.
+Qed.
+
+Lemma set_map_union_list_L `{FinSet A SA, SemiSet B SB, !LeibnizEquiv SB}
+  (f : A -> B) (l : list SA) :
+  set_map f (⋃ l) =@{SB} ⋃ (set_map f <$> l).
+Proof.
+  unfold_leibniz.
+  apply set_map_union_list.
+Qed.
+
+
+
+
+
+
+
+Lemma gmultiset_map_ext `{Countable A, Countable B} (m : gmultiset A)
+  (f g : A -> B) (Hfg : forall a, a ∈ m -> f a = g a) :
+  gmultiset_map f m = gmultiset_map g m.
+Proof.
+  rewrite 2 gmultiset_map_alt.
+  f_equal.
+  apply list_fmap_ext; intros _ a Ha%elem_of_list_lookup_2%gmultiset_elem_of_elements.
+  auto.
+Qed.
+
+Lemma gmultiset_map_id `{Countable A} (m : gmultiset A) :
+  gmultiset_map id m = m.
+Proof.
+  apply gmultiset_eq.
+  intros x.
+  change x with (id x) at 1.
+  now rewrite (multiplicity_gmultiset_map _ _ _ _).
+Qed.
+
+Lemma list_to_set_disj_elements `{Countable A} (m : gmultiset A) :
+  list_to_set_disj (elements m) = m.
+Proof.
+  rewrite <- (gmultiset_map_id m) at 2.
+  now rewrite gmultiset_map_alt, list_fmap_id.
+Qed.
+
+Lemma elements_list_to_set_disj `{Countable A} (l : list A) :
+  elements (list_to_set_disj l :> gmultiset A) ≡ₚ l.
+Proof.
+  induction l; [done|].
+  cbn -[disj_union].
+  rewrite gmultiset_elements_disj_union, IHl, gmultiset_elements_singleton.
+  done.
+Qed.
+
+Lemma gmultiset_map_compose `{Countable A, Countable B, Countable C}
+  (f : A -> B) (g : B -> C) (m : gmultiset A) :
+  gmultiset_map g (gmultiset_map f m) = gmultiset_map (g ∘ f) m.
+Proof.
+  rewrite 3 gmultiset_map_alt.
+  now rewrite elements_list_to_set_disj, list_fmap_compose.
+Qed.
+
+Lemma elements_gmultiset_map `{Countable A, Countable B} (m : gmultiset A)
+  (f : A -> B) : elements (gmultiset_map f m) ≡ₚ f <$> elements m.
+Proof.
+  rewrite gmultiset_map_alt.
+  apply elements_list_to_set_disj.
+Qed.
+
+Lemma gmultiset_size_alt `{Countable A} (m : gmultiset A) :
+  size m = list_sum (Pos.to_nat <$> (map_to_list m.(gmultiset_car)).*2).
+Proof.
+  destruct m as [m].
+  cbn.
+  induction m as [|a n m Hma Hfst IHm] using map_first_key_ind;
+    [rewrite map_to_list_empty; apply gmultiset_size_empty|].
+  unfold size, gmultiset_size.
+  cbn.
+  rewrite map_to_list_insert_first_key by done.
+  cbn.
+  rewrite length_app, length_replicate.
+  f_equal.
+  apply IHm.
+Qed.
+
+Lemma gmultiset_map_alt_car `{Countable A, Countable B} (f : A -> B)
+  (m : gmultiset A) :
+  gmultiset_map f m =
+  list_to_set_disj $
+    (prod_map f id <$> map_to_list m.(gmultiset_car)) ≫=
+    λ '(b, n), replicate (Pos.to_nat n) b.
+Proof.
+  rewrite gmultiset_map_alt.
+  rewrite list_fmap_bind.
+  unfold elements, gmultiset_elements.
+  destruct m as [m].
+  cbn.
+  rewrite list_bind_fmap.
+  f_equal.
+  apply list_bind_ext; [|done]; intros [a p].
+  cbn.
+  now rewrite fmap_replicate.
+Qed.
+
+
+Definition vsplitl {A n m} (v : vec A (n + m)) : vec A n :=
+  (Vector.splitat n v).1.
+Definition vsplitr {A n m} (v : vec A (n + m)) : vec A m :=
+  (Vector.splitat n v).2.
+Lemma app_vsplit {A n m} (v : vec A (n + m)) :
+  vsplitl v +++ vsplitr v = v.
+Proof.
+  apply symmetry, Vector.append_splitat, surjective_pairing.
+Qed.
+Lemma vsplit_eq {A n m} (v w : vec A (n + m)) :
+  v = w <-> vsplitl v = vsplitl w /\ vsplitr v = vsplitr w.
+Proof.
+  split; [now intros ->|].
+  intros [Hl Hr].
+  rewrite <- (app_vsplit v), <- (app_vsplit w).
+  congruence.
+Qed.
+Lemma vsplitl_app {A n m} (v : vec A n) (w : vec A m) :
+  vsplitl (v +++ w) = v.
+Proof.
+  unfold vsplitl.
+  now rewrite Vector.splitat_append.
+Qed.
+Lemma vsplitr_app {A n m} (v : vec A n) (w : vec A m) :
+  vsplitr (v +++ w) = w.
+Proof.
+  unfold vsplitr.
+  now rewrite Vector.splitat_append.
+Qed.
+Lemma vec_add_inv `(P : vec A (n + m) -> Prop)
+  (HP : forall v w, P (v +++ w)) : forall v, P v.
+Proof.
+  intros v.
+  rewrite <- app_vsplit.
+  apply HP.
+Qed.
+Fixpoint vec_cast_opt {A n} (v : vec A n) : forall (m : nat), option (vec A m) :=
+  match n, v with
+  | 0, _ => fun m => match m with
+    | 0 => Some [#]
+    | S _ => None
+    end
+  | S n, _ => fun m => match m with
+    | 0 => None
+    | S m => (vhd v :::.) <$> vec_cast_opt (vtl v) m
+    end
+  end.
+Lemma vec_cast_opt_spec {A n} (v : vec A n) m :
+  vec_cast_opt v m = (guard (n = m) ≫= λ H, Some (Vector.cast v H)).
+Proof.
+  revert m; induction v; intros [|m]; [done..|].
+  cbn.
+  rewrite IHv.
+  case_guard; case_guard; [|congruence..|done].
+  cbn.
+  do 3 f_equal; apply proof_irrel.
+Qed.
+Lemma vec_cast_opt_ne {A n} (v : vec A n) m :
+  n <> m -> vec_cast_opt v m = None.
+Proof.
+  intros Hne.
+  rewrite vec_cast_opt_spec.
+  case_guard; done.
+Qed.
+Lemma vec_cast_opt_refl {A n} (v : vec A n) :
+  vec_cast_opt v n = Some v.
+Proof.
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  now rewrite cast_id.
+Qed.
+Lemma vec_cast_opt_eq {A n} (v : vec A n) {m} (H : n = m) :
+  vec_cast_opt v m = Some (Vector.cast v H).
+Proof.
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  do 2 f_equal; apply proof_irrel.
+Qed.
+Lemma vec_cast_opt_Some {A n} (v : vec A n) m w : 
+  vec_cast_opt v m = Some w <->
+  exists H, w = Vector.cast v H.
+Proof.
+  split; [|now intros (Hw & ->); apply (vec_cast_opt_eq v Hw)].
+  rewrite vec_cast_opt_spec.
+  case_guard; [|done].
+  cbn.
+  intros [= <-].
+  eauto.
+Qed.
+Lemma vec_cast_opt_is_Some {A n} (v : vec A n) m :  
+  is_Some (vec_cast_opt v m) <-> n = m.
+Proof.
+  rewrite is_Some_alt.
+  rewrite vec_cast_opt_spec.
+  case_guard; cbn; naive_solver.
+Qed.
+
+Lemma vsplitl_map {A B n m} (f : A -> B) (v : vec A (n + m)) :
+  vsplitl (vmap f v) = vmap f (vsplitl v).
+Proof.
+  induction v using vec_add_inv.
+  rewrite Vector.map_append.
+  now rewrite 2 vsplitl_app.
+Qed.
+Lemma vsplitr_map {A B n m} (f : A -> B) (v : vec A (n + m)) :
+  vsplitr (vmap f v) = vmap f (vsplitr v).
+Proof.
+  induction v using vec_add_inv.
+  rewrite Vector.map_append.
+  now rewrite 2 vsplitr_app.
+Qed.
+
+Definition fun_to_map `{Insert A B M, Empty M, Elements A SA}
+  (f : A -> B) (X : SA) : M :=
+  set_to_map (fun a => (a, f a)) X.
+
+Lemma lookup_fun_to_map `{FinMap K M, FinSet K SK, !RelDecision (∈@{SK})} {A}
+  (f : K -> A) (X : SK) k :
+  (fun_to_map f X :> M A) !! k = if decide (k ∈ X) then Some (f k) else None.
+Proof.
+  unfold fun_to_map.
+  case_decide as Hk.
+  - rewrite lookup_set_to_map by done.
+    eauto.
+  - apply eq_None_not_Some.
+    intros (? & Heq).
+    rewrite lookup_set_to_map in Heq by done.
+    now destruct Heq as (_ & ? & [= -> <-]).
+Qed.
+
+
+Lemma lookup_fun_to_map_Some `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) (X : SK) k a :
+  (fun_to_map f X :> M A) !! k = Some a <->
+  k ∈ X /\ f k = a.
+Proof.
+  unfold fun_to_map.
+  rewrite lookup_set_to_map by done.
+  naive_solver.
+Qed.
+
+Lemma lookup_fun_to_map_None `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) (X : SK) k :
+  (fun_to_map f X :> M A) !! k = None <->
+  k ∉ X.
+Proof.
+  unfold fun_to_map.
+  rewrite eq_None_not_Some.
+  unfold is_Some.
+  setoid_rewrite lookup_set_to_map; [|done].
+  naive_solver.
+Qed.
+
+Lemma lookup_fun_to_map_Some_1 `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) (X : SK) k :
+  k ∈ X ->
+  (fun_to_map f X :> M A) !! k = Some (f k).
+Proof.
+  now rewrite lookup_fun_to_map_Some.
+Qed.
+
+Lemma lookup_fun_to_map_None_1 `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) (X : SK) k :
+  k ∉ X ->
+  (fun_to_map f X :> M A) !! k = None.
+Proof.
+  now rewrite lookup_fun_to_map_None.
+Qed.
+
+
+Lemma lookup_fun_to_map_is_Some `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) (X : SK) k :
+  is_Some ((fun_to_map f X :> M A) !! k) <-> k ∈ X.
+Proof.
+  unfold is_Some.
+  setoid_rewrite lookup_fun_to_map_Some.
+  naive_solver.
+Qed.
+
+Lemma dom_fun_to_map_gen `{FinMapDom K M SK, FinSet K SK'} {A}
+  (f : K -> A) (X : SK') :
+  dom (fun_to_map f X :> M A) ≡@{SK} set_map id X.
+Proof.
+  intros x.
+  rewrite elem_of_dom.
+  rewrite lookup_fun_to_map_is_Some.
+  set_solver.
+Qed.
+
+Lemma dom_fun_to_map_gen_L `{FinMapDom K M SK, FinSet K SK', !LeibnizEquiv SK} {A}
+  (f : K -> A) (X : SK') :
+  dom (fun_to_map f X :> M A) =@{SK} set_map id X.
+Proof.
+  unfold_leibniz; apply dom_fun_to_map_gen.
+Qed.
+
+Lemma dom_fun_to_map `{FinMapDom K M SK, !Elements K SK, !FinSet K SK} {A}
+  (f : K -> A) (X : SK) :
+  dom (fun_to_map f X :> M A) ≡@{SK} X.
+Proof.
+  now rewrite dom_fun_to_map_gen, set_map_id.
+Qed.
+
+Lemma dom_fun_to_map_L `{FinMapDom K M SK, !Elements K SK,
+  !FinSet K SK, !LeibnizEquiv SK} {A}
+  (f : K -> A) (X : SK) :
+  dom (fun_to_map f X :> M A) =@{SK} X.
+Proof.
+  unfold_leibniz; apply dom_fun_to_map.
+Qed.
+
+Lemma fun_to_map_union `{FinMap K M, FinSet K SK} {A} (f : K -> A)
+  (X Y : SK) :
+  fun_to_map f (X ∪ Y) =@{M A} fun_to_map f X ∪ fun_to_map f Y.
+Proof.
+  apply map_eq.
+  intros k.
+  apply option_eq; intros fk.
+  rewrite lookup_union, union_Some.
+  rewrite 3 lookup_fun_to_map_Some.
+  rewrite elem_of_union.
+  rewrite lookup_fun_to_map_None.
+  pose proof @elem_of_dec_slow.
+  destruct_decide (decide (k ∈ X)); tauto.
+Qed.
+
+Lemma fmap_fun_to_map `{FinMap K M, FinSet K SK} {A B} (f : K -> A) (g : A -> B)
+  (X : SK) :
+  g <$> fun_to_map f X =@{M B} fun_to_map (g ∘ f) X.
+Proof.
+  apply map_eq; intros k.
+  apply option_eq; intros fk.
+  rewrite lookup_fmap, fmap_Some.
+  setoid_rewrite lookup_fun_to_map_Some.
+  naive_solver.
+Qed.
+
+(* Lemma kmap_fun_to_map `{FinMap K1 M1, FinSet K1 SK1, FinMap K2 M2, FinSet K2 SK2}
+  {A} (f : K1 -> A) (g : K1 -> K2) (X : SK1) :
+  kmap g (fun_to_map f X :> M1 A) =@{M2 A}
+    set_to_map (fun a => (g a, f a)) X. *)
+Lemma fun_to_map_singleton
+  `{FinMap K M, FinSet K SK} {A} (f : K -> A)
+  (k : K) :
+  fun_to_map f ({[k]}:>SK) =@{M A} {[k := f k]}.
+Proof.
+  unfold fun_to_map, set_to_map.
+  rewrite elements_singleton.
+  done.
+Qed.
+
+Lemma fun_to_map_difference `{FinMap K M, FinSet K SK} {A} (f : K -> A)
+  (X Y : SK) :
+  fun_to_map f (X ∖ Y) =@{M A} fun_to_map f X ∖ fun_to_map f Y.
+Proof.
+  apply map_eq.
+  intros k.
+  apply option_eq; intros fk.
+  rewrite lookup_difference_Some.
+  rewrite 2 lookup_fun_to_map_Some, lookup_fun_to_map_None.
+  rewrite elem_of_difference.
+  tauto.
+Qed.
+
+Lemma fun_to_map_disjoint `{FinMap K M, FinSet K SK} {A} (f : K -> A)
+  (X Y : SK) : X ## Y -> fun_to_map f X ##ₘ (fun_to_map f Y :> M A).
+Proof.
+  intros HXY.
+  rewrite map_disjoint_alt.
+  intros k.
+  pose proof @elem_of_dec_slow.
+  rewrite 2 lookup_fun_to_map_None.
+  destruct_decide (decide (k ∈ X)).
+  - right.
+    now intros ?; apply (HXY k).
+  - left.
+    now intros ?; apply (HXY k).
+Qed.
+
+
+Lemma option_bind_comm {A B C} (f : A -> B -> option C)
+  (ma : option A) (mb : option B) :
+  (ma ≫= λ a, mb ≫= λ b, f a b) =
+  (mb ≫= λ b, ma ≫= λ a, f a b).
+Proof.
+  now destruct ma, mb.
+Qed.
+
+Lemma option_bind_fmap {A B C} (f : A -> option B) (g : B -> C)
+  (ma : option A) :
+  g <$> (ma ≫= f) = ma ≫= λ a, g <$> f a.
+Proof.
+  now destruct ma.
+Qed.
+
+Lemma option_fmap_bind {A B C} (f : A -> B) (g : B -> option C)
+  (ma : option A) :
+  ((f <$> ma) ≫= g) = ma ≫= g ∘ f.
+Proof.
+  now destruct ma.
+Qed.
+
+Lemma option_bind_assoc' {A B C} (f : A -> option B) (g : B -> option C)
+  (ma : option A) :
+  (ma ≫= f) ≫= g = ma ≫= λ a, f a ≫= g.
+Proof.
+  now destruct ma.
+Qed.
+
+Lemma join_list_fmap_mbind {A B} (f : A -> option B) (lm : list (option A)) :
+  join_list (mbind f <$> lm) =
+  l ← join_list lm;
+  join_list (f <$> l).
+Proof.
+  induction lm as [|ma lm IHlm]; [reflexivity|].
+  cbn.
+  rewrite IHlm.
+  destruct ma as [a|]; [|reflexivity].
+  cbn.
+  rewrite option_bind_assoc.
+  destruct (join_list lm) as [l|]; [|now case_match].
+  reflexivity.
+Qed.
+
+Add Parametric Morphism {A B} : (@mbind option _ A B) with signature
+  pointwise_relation A eq ==> eq ==> eq as option_bind_mor.
+Proof.
+  intros; now apply option_bind_ext.
+Qed.
+
+Lemma join_list_app {A} (ml ml' : list (option A)) :
+  join_list (ml ++ ml') =
+  l ← join_list ml;
+  (l ++.) <$> join_list ml'.
+Proof.
+  induction ml as [|ma ml IHml]; [cbn; now rewrite option_fmap_id|].
+  cbn.
+  rewrite IHml.
+  case_match; [|reflexivity].
+  cbn.
+  rewrite 2 option_bind_assoc.
+  unfold compose.
+  cbn.
+  setoid_rewrite option_fmap_bind.
+  reflexivity.
+Qed.
+
+Lemma join_list_app' {A} (ml ml' : list (option A)) :
+  join_list (ml ++ ml') =
+  l' ← join_list ml';
+  (.++ l') <$> join_list ml.
+Proof.
+  induction ml as [|ma ml IHml]; [cbn; now destruct (join_list ml')|].
+  cbn.
+  rewrite IHml.
+  destruct ma as [a|].
+  - rewrite option_bind_assoc.
+    unfold compose.
+    setoid_rewrite option_fmap_bind.
+    reflexivity.
+  - cbn.
+    now destruct (join_list ml').
+Qed.
+Lemma option_fmap_to_bind {A B} (f : A -> B) (ma : option A) :
+  f <$> ma = ma ≫= λ a, Some (f a).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma option_bind_None_r {A B} (ma : option A) :
+  (ma ≫= λ a, @None B) = None.
+Proof.
+  now destruct ma.
+Qed.
+
+
+
+
+
+
+
+
+
+Lemma join_list_Some_length {A} (ml : list (option A)) l :
+  join_list ml = Some l ->
+  length ml = length l.
+Proof.
+  intros Hlen%join_list_Some%(f_equal length).
+  now rewrite length_fmap in Hlen.
+Qed.
+
+
+
+Lemma option_Forall2_alt {A B} (P : A -> B -> Prop) ma mb :
+  option_Forall2 P ma mb <->
+  match ma, mb with
+  | Some a, Some b => P a b
+  | None, None => True
+  | _, _ => False
+  end.
+Proof.
+  split; [now intros []|].
+  destruct ma, mb; easy + now constructor.
+Qed.
+Lemma eqlistA_cons_iff `{eqA : relation A} {x x' : A} {l l' : list A} :
+  eqlistA eqA (x :: l) (x' :: l') <-> eqA x x' /\ eqlistA eqA l l'.
+Proof.
+  split; [|now intros []; apply eqlistA_cons].
+  intros Heq.
+  inversion Heq; now subst.
+Qed.
+Lemma PermutationA_iff_exists_Forall2_Permutation
+  `{RA : relation A} `{!Equivalence RA} l l' :
+  PermutationA RA l l' <-> exists l'', l ≡ₚ l'' /\ Forall2 RA l'' l'.
+Proof.
+  split.
+  - intros (l'' & Hl'' & Heq%eqlistA_altdef)%PermutationA_decompose; eauto.
+  - intros (l'' & Hperm & Heq%eqlistA_altdef).
+    etransitivity;
+    [now apply Permutation_PermutationA; eauto|].
+    now apply eqlistA_PermutationA.
+Qed.
+
+
+
+Lemma Forall2_iff_pred {A B} (P : A -> Prop) (Q : B -> Prop) (l : list A) l' :
+  Forall2 (λ a b, P a <-> Q b) l l' ->
+  Forall P l <-> Forall Q l'.
+Proof.
+  intros Hl.
+  induction Hl; rewrite ?Forall_cons, ?Forall_nil; tauto.
+Qed.
+
+
+Lemma list_omap_fmap {A B C} (f : A -> B) (g : B -> option C) (l : list A) :
+  omap g (f <$> l) = omap (g ∘ f) l.
+Proof.
+  induction l; [done|cbn]; case_match; f_equal; easy.
+Qed.
+
+Lemma join_list_Permutation {A} (ml ml' : list (option A)) :
+  ml ≡ₚ ml' -> option_Forall2 Permutation (join_list ml) (join_list ml').
+Proof.
+  intros Hperm.
+  pose proof (join_list_is_Some ml) as Hsome.
+  rewrite Hperm in Hsome at 2.
+  rewrite <- join_list_is_Some in Hsome.
+  rewrite 2 is_Some_alt in Hsome.
+  destruct (join_list ml) as [l|] eqn:Hl;
+  destruct (join_list ml') as [l'|] eqn:Hl'; [|tauto..|];
+  constructor.
+  apply join_list_Some in Hl, Hl'.
+  apply (f_equal (omap id)) in Hl, Hl'.
+  rewrite list_omap_fmap in Hl, Hl'.
+  unfold compose, id in Hl, Hl'.
+  rewrite <- list_fmap_alt, list_fmap_id in Hl, Hl'.
+  subst l l'.
+  apply omap_Permutation.
+  now rewrite Hperm.
+Qed.
+
+
+Lemma fmap_eqlistA `{RA : relation A, RB : relation B}
+  (f : A -> B) {Hf : Proper (RA ==> RB) f} (l l' : list A) :
+  eqlistA RA l l' -> eqlistA RB (f <$> l) (f <$> l').
+Proof.
+  intros Hl.
+  induction Hl; cbn; eauto using eqlistA.
+Qed.
+
+Lemma fmap_PermutationA `{RA : relation A, RB : relation B}
+  (f : A -> B) (Hf : Proper (RA ==> RB) f) (l l' : list A) :
+  PermutationA RA l l' -> PermutationA RB (f <$> l) (f <$> l').
+Proof.
+  intros Hl.
+  induction Hl; cbn; eauto using PermutationA.
+Qed.
+
+
+Lemma imap_to_imap_pair {A B} (f : nat -> A -> B) l :
+  imap f l = uncurry f <$> imap pair l.
+Proof.
+  rewrite fmap_imap.
+  reflexivity.
+Qed.
+
+Lemma zip_with_ext_strong {A B C} (f g : A -> B -> C)
+  (l1 l2 : list A) (k1 k2 : list B) :
+  (forall a b, a ∈ l1 -> b ∈ k1 -> f a b = g a b) ->
+  l1 = l2 -> k1 = k2 ->
+  zip_with f l1 k1 = zip_with g l2 k2.
+Proof.
+  intros Hfg <- <-.
+  revert k1 Hfg; induction l1; intros k1 Hfg; [done|].
+  destruct k1; [done|].
+  cbn.
+  f_equal; [|now apply IHl1; eauto using elem_of_list_further].
+  apply Hfg; constructor.
+Qed.
+
+
+Fixpoint infinite_injection_aux `{Infinite A} (n : nat) : A * list A :=
+  match n with
+  | 0 => (fresh [], [])
+  | S n' => let fn' := infinite_injection_aux n' in
+    (fresh (fn'.1 :: fn'.2), fn'.1 :: fn'.2)
+  end%nat.
+
+Lemma infinite_injection_aux_fresh `{Infinite A} (n : nat):
+  ((infinite_injection_aux n).1 :> A) ∉ (infinite_injection_aux n).2.
+Proof.
+  destruct n; apply infinite_is_fresh.
+Qed.
+
+Lemma infinite_injection_aux_contains `{Infinite A} (n m : nat) :
+  (n < m)%nat ->
+  uncurry cons (infinite_injection_aux n) ⊆@{list A} (infinite_injection_aux m).2.
+Proof.
+  intros Hlt.
+  induction Hlt.
+  - cbn.
+    now destruct (infinite_injection_aux _).
+  - cbn.
+    rewrite IHHlt.
+    now apply list_subseteq_cons.
+Qed.
+
+Definition infinite_injection `{Infinite A} (n : nat) : A :=
+  (infinite_injection_aux n).1.
+
+#[global] Instance infinite_injection_inj `{Infinite A} :
+  Inj (=) (@eq A) infinite_injection.
+Proof.
+  eenough (Hen : _) by
+  (intros n m; destruct (Nat.lt_trichotomy n m) as [Hnm | [-> | Hmn]];
+  [exact (Hen n m Hnm)|easy|exact (fun H => eq_sym (Hen m n Hmn (eq_sym H)))]).
+  intros n m Hnm.
+  unfold infinite_injection.
+  pose proof (infinite_injection_aux_fresh (A:=A) m) as Hfresh.
+  pose proof (infinite_injection_aux_contains (A:=A) n m Hnm) as Hcont.
+  rewrite (surjective_pairing (infinite_injection_aux n)) in Hcont.
+  cbn in Hcont.
+  intros Heq.
+  rewrite Heq in Hcont.
+  specialize (Hcont (infinite_injection_aux m).1 ltac:(constructor)).
+  easy.
+Qed.
+
+
+Fixpoint infinite_injection_avoiding_aux `{Infinite A} (l : list A) (n : nat) :
+  A * list A :=
+  match n with
+  | 0 => (fresh l, l)
+  | S n' => let fn' := infinite_injection_avoiding_aux l n' in
+    (fresh (fn'.1 :: fn'.2), fn'.1 :: fn'.2)
+  end%nat.
+
+Lemma infinite_injection_avoiding_aux_fresh `{Infinite A} (l : list A) (n : nat) :
+  (infinite_injection_avoiding_aux l n).1 ∉ (infinite_injection_avoiding_aux l n).2.
+Proof.
+  destruct n; apply infinite_is_fresh.
+Qed.
+
+Lemma infinite_injection_avoiding_aux_contains `{Infinite A}
+  (l : list A) (n m : nat) :
+  (n < m)%nat ->
+  uncurry cons (infinite_injection_avoiding_aux l n) ⊆
+    (infinite_injection_avoiding_aux l m).2.
+Proof.
+  intros Hlt.
+  induction Hlt.
+  - cbn.
+    now destruct (infinite_injection_avoiding_aux _).
+  - cbn.
+    rewrite IHHlt.
+    now apply list_subseteq_cons.
+Qed.
+
+
+Lemma infinite_injection_avoiding_aux_contains_avoid `{Infinite A}
+  (l : list A) (n : nat) :
+  l ⊆ (infinite_injection_avoiding_aux l n).2.
+Proof.
+  induction n; [reflexivity|].
+  cbn.
+  now apply list_subseteq_cons.
+Qed.
+
+Definition infinite_injection_avoiding `{Infinite A} (l : list A) (n : nat) : A :=
+  (infinite_injection_avoiding_aux l n).1.
+
+#[global] Instance infinite_injection_avoiding_inj `{Infinite A} l :
+  Inj (=) (@eq A) (infinite_injection_avoiding l).
+Proof.
+  eenough (Hen : _) by
+  (intros n m; destruct (Nat.lt_trichotomy n m) as [Hnm | [-> | Hmn]];
+  [exact (Hen n m Hnm)|easy|exact (fun H => eq_sym (Hen m n Hmn (eq_sym H)))]).
+  intros n m Hnm.
+  unfold infinite_injection_avoiding.
+  pose proof (infinite_injection_avoiding_aux_fresh l m) as Hfresh.
+  pose proof (infinite_injection_avoiding_aux_contains l n m Hnm) as Hcont.
+  rewrite (surjective_pairing (infinite_injection_avoiding_aux l n)) in Hcont.
+  cbn in Hcont.
+  intros Heq.
+  rewrite Heq in Hcont.
+  specialize (Hcont (infinite_injection_avoiding_aux l m).1 ltac:(constructor)).
+  easy.
+Qed.
+
+Lemma infinite_injection_avoiding_avoids `{Infinite A} (l : list A) (n : nat) :
+  infinite_injection_avoiding l n ∉ l.
+Proof.
+  pose proof (infinite_injection_avoiding_aux_fresh l n) as Hfresh.
+  now intros ?%(infinite_injection_avoiding_aux_contains_avoid l n).
+Qed.
+
+
+
+Lemma partial_injection_extension `{Countable A, Infinite B}
+  (l : list A) (f : A -> B) :
+    ForallPairs (λ i j, f i = f j → i = j) l ->
+    exists (g : A -> B), Inj (=) (=) g /\ Forall (fun a => g a = f a) l.
+Proof.
+  intros Hlinj.
+  set (g := infinite_injection_avoiding (f <$> l) ∘ Nat.pred ∘ Pos.to_nat).
+  exists (λ a, if decide (a ∈ l) then f a else g (encode a)).
+  split; [|now rewrite Forall_forall; intros a Ha; rewrite decide_True].
+  intros a b.
+  case_decide as Ha; case_decide as Hb.
+  - now apply Hlinj; apply elem_of_list_In.
+  - intros Heq%eq_sym.
+    exfalso.
+    apply (infinite_injection_avoiding_avoids (f <$> l) (Nat.pred $ Pos.to_nat (encode b))).
+    subst g.
+    cbn in Heq.
+    rewrite Heq.
+    now apply elem_of_list_fmap_1.
+  - intros Heq.
+    exfalso.
+    apply (infinite_injection_avoiding_avoids (f <$> l) (Nat.pred $ Pos.to_nat (encode a))).
+    subst g.
+    cbn in Heq.
+    rewrite Heq.
+    now apply elem_of_list_fmap_1.
+  - intros Heq.
+    apply (inj encode).
+    revert Heq.
+    apply inj.
+    unfold g.
+    change (?x ∘ ?y ∘ ?z) with (x ∘ (y ∘ z)).
+    apply (compose_inj _ eq), _.
+    hnf; cbn; lia.
+Qed.
+
+Lemma set_Forall2_elements `{FinSet A SA} (R : relation A) (X : SA) :
+  set_Forall2 R X <-> ForallPairs R (elements X).
+Proof.
+  rewrite <- (set_Forall2_list_to_set (C:=SA)).
+  now rewrite list_to_set_elements.
+Qed.
+
+Lemma partial_injection_extension' `{Countable A, Infinite B, FinSet A SA}
+  (X : SA) (f : A -> B) :
+  set_Forall2 (λ i j, f i = f j → i = j) X ->
+    exists (g : A -> B), Inj (=) (=) g /\ set_Forall (fun a => g a = f a) X.
+Proof.
+  rewrite set_Forall2_elements.
+  intros (g & Hg & Hgeq%set_Forall_elements)%partial_injection_extension.
+  eauto.
+Qed.
+
+
+Lemma kmap_ext `{FinMap K1 M1, FinMap K2 M2} {A}
+  (f g : K1 -> K2) (m : M1 A) :
+  (forall k a, m !! k = Some a -> f k = g k) ->
+  kmap f m =@{M2 A} kmap g m.
+Proof.
+  intros Hfg.
+  unfold kmap.
+  f_equal.
+  apply list_fmap_ext; intros _ (k, a) Hka%elem_of_list_lookup_2%elem_of_map_to_list.
+  cbn.
+  f_equal; eauto.
+Qed.
+
+Lemma set_union_eq_l `{SemiSet A C} (X Y : C) : Y ⊆ X ->
+  X ∪ Y ≡ X.
+Proof.
+  set_solver.
+Qed.
+
+
+
+Lemma map_inverses_empty `{FinMap A MA, FinMap B MB} :
+  map_inverses (∅ :> MA B) (∅ :> MB A).
+Proof.
+  intros ? ?.
+  rewrite 2 lookup_empty.
+  easy.
+Qed.
+
+Lemma map_inverses_comm `{Lookup A B MA, Lookup B A MB} (ma : MA) (mb : MB) :
+  map_inverses ma mb <-> map_inverses mb ma.
+Proof.
+  unfold map_inverses. firstorder.
+Qed.
+
+Lemma map_inverses_card_img `{FinMapDom A MA SA, !Elements A SA,
+  !FinSet A SA, FinMap B MB, FinSet B SB}
+  (ma : MA B) (mb : MB A) :
+  map_inverses ma mb ->
+  size (dom ma :> SA) = size (map_img ma :> SB).
+Proof.
+  intros Hinv.
+
+  rewrite map_dom_img_eq_card_iff_inj.
+  intros ? ? ? ?%Hinv ?%Hinv.
+  congruence.
+Qed.
+
+Lemma map_inverses_img `{FinMap A MA, FinMapDom B MB SB}
+  (ma : MA B) (mb : MB A) :
+    map_inverses ma mb ->
+    map_img ma ≡@{SB} dom mb.
+Proof.
+  intros Hab x.
+  rewrite elem_of_map_img, elem_of_dom.
+  setoid_rewrite (fun x => Hab x).
+  reflexivity.
+Qed.
+
+
+Lemma map_inverses_img_L `{FinMap A MA, FinMapDom B MB SB, !LeibnizEquiv SB}
+  (ma : MA B) (mb : MB A) :
+    map_inverses ma mb ->
+    map_img ma =@{SB} dom mb.
+Proof.
+  unfold_leibniz.
+  apply map_inverses_img.
+Qed.
+
+
+Lemma fold_right_map {A B C} (f : A -> B) (g : B -> C -> C) c l : 
+  fold_right g c (map f l) = fold_right (fun a c => g (f a) c) c l. 
+Proof.
+  induction l; cbn; congruence.
+Qed.
+Local Instance fold_right_mor `{R : relation A} f 
+  (HProp : Morphisms.Proper (R ==> R ==> R) f) : 
+  Morphisms.Proper (R ==> eqlistA R ==> R) (fold_right f).
+Proof.
+  intros a a' Ha l l' Hl.
+  revert a a' Ha.
+  induction Hl; intros a a' Ha.
+  - simpl.
+    auto.
+  - simpl.
+    apply HProp; auto.
+Qed.
+Lemma fold_right_concat `{R : relation A} `{!Equivalence R} (f : A -> A -> A) 
+  {HfR : Proper (R ==> R ==> R)%signature f} (d : A)
+  (Hd : forall a, R (f d a) a) 
+  (Hf : forall a b c, R (f (f a b) c) (f a (f b c))) ls : 
+  R (fold_right f d (concat ls))
+  (fold_right f d (map (fun l => fold_right f d l) ls)).
+Proof.
+  induction ls; [reflexivity|].
+  cbn.
+  rewrite fold_right_app.
+  rewrite IHls.
+  remember (fold_right f d (map (fold_right f d) ls)) as v eqn:Heqv.
+  clear Heqv.
+  induction a; [now cbn; auto|].
+  cbn.
+  rewrite IHa.
+  symmetry.
+  apply Hf.
+Qed.
+
+
+
+Lemma vmap_id' {A n} (f : A -> A) (v : vec A n) :
+  (forall a, a ∈ vec_to_list v -> f a = a) ->
+  vmap f v = v.
+Proof.
+  rewrite <- Forall_forall, vec_to_list_to_list, <- Vector.to_list_Forall.
+  intros Hall.
+  induction Hall; [done|].
+  cbn.
+  congruence.
+Qed.
+Lemma zip_with_to_fmap_l {A B C} (f : A -> C) (l : list A) (k : list B) :
+  length l = length k ->
+  zip_with (λ a _, f a) l k = f <$> l.
+Proof.
+  intros Hall%Forall2_same_length.
+  induction Hall; cbn; congruence.
+Qed.
+Lemma zip_with_to_fmap_r {A B C} (f : B -> C) (l : list A) (k : list B) :
+  length l = length k ->
+  zip_with (λ _ b, f b) l k = f <$> k.
+Proof.
+  intros Hall%Forall2_same_length.
+  induction Hall; cbn; congruence.
+Qed.
+
+
+Definition vec_to_list_ind {A} (P : list A -> Type)
+  (HP : forall n (v : vec A n), P v) : forall l, P l :=
+  fun l => eq_rect _ P (HP _ (list_to_vec l)) _ (vec_to_list_to_vec l).
+
+
+
+Lemma sumbool_same {P Q A} (HPQ : {P} + {Q}) (a : A) :
+  (if HPQ then a else a) = a.
+Proof.
+  now destruct HPQ.
+Qed.
+Lemma decide_same `{Decision P} `(a : A) :
+  (if decide P then a else a) = a.
+Proof.
+  apply sumbool_same.
+Qed.
+
+
+Lemma flat_map_to_list_bind `(f : A -> list B) (l : list A) :
+  flat_map f l = l ≫= f.
+Proof.
+  now rewrite list_bind_flat_map.
+Qed.
+
+
+Lemma list_inj_exists_partial_inverse `{EqDecision A, EqDecision B,
+  Inhabited (B -> A)}
+  (dom : list A) (f : A -> B) :
+  (forall a b, a ∈ dom -> b ∈ dom -> f a = f b -> a = b) ->
+  exists (g : B -> A), forall a, a ∈ dom -> g (f a) = a.
+Proof.
+  induction dom; [now exists inhabitant|].
+  intros Hf.
+  tspecialize IHdom by now intros ? ? ? ?; apply Hf; now constructor.
+  destruct IHdom as (g & Hg).
+  exists (<[f a := a]> g).
+  intros c [-> | Hc]%elem_of_cons.
+  - apply fn_lookup_insert.
+  - destruct_decide (decide (f c = f a)) as Hfc.
+    + rewrite Hfc.
+      rewrite fn_lookup_insert.
+      symmetry.
+      revert Hfc.
+      apply Hf; apply elem_of_cons; auto.
+    + rewrite fn_lookup_insert_ne by easy.
+      now apply Hg.
+Qed.
+
+
+Lemma list_find_app `(P : X -> Prop) `{forall x, Decision (P x)} (l l' : list X) :
+  list_find P (l ++ l') =
+  list_find P l ∪ (prod_map (Nat.add (length l)) id <$> list_find P l').
+Proof.
+  induction l.
+  - cbn.
+    rewrite option_union_left_id.
+    symmetry.
+    etransitivity; [|apply option_fmap_id].
+    apply option_fmap_ext; now intros [].
+  - cbn.
+    case_decide; [now rewrite union_Some_l|].
+    rewrite IHl.
+    destruct (list_find P l) as [[]|].
+    + cbn.
+      now rewrite 2 union_Some_l.
+    + cbn.
+      rewrite 2 option_union_left_id.
+      rewrite <- option_fmap_compose.
+      reflexivity.
+Qed.
+
+
+
+Definition make_vecs_map {A n m} (ins : vec positive n) (outs : vec positive m)
+  (insv : vec A n) (outsv : vec A m) : Pmap A :=
+  list_to_map (vzip ins insv) ∪ list_to_map (vzip outs outsv).
+
+Lemma dom_make_vecs_map {A n m} (ins : vec _ n) (outs : vec _ m)
+  (v w : vec A _) :
+  dom (make_vecs_map ins outs v w) =
+  list_to_set (ins ++ outs).
+Proof.
+  unfold_leibniz.
+  unfold make_vecs_map.
+  rewrite dom_union, 2 dom_list_to_map.
+  rewrite 2 vec_to_list_zip_with, list_to_set_app.
+  now rewrite 2 fst_zip by now rewrite 2 length_vec_to_list.
+Qed.
+
+
+
+
+Definition vremove {A n} (i : fin n) : vec A n -> vec A (pred n) :=
+  Fin.t_rect (fun n _ => vec A n -> vec A (pred n)) (fun _ => Vector.tl)
+  (fun n i => match i with
+    | 0%fin => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    | FS i' => fun IHi v => Vector.hd v ::: IHi (Vector.tl v)
+    end) n i.
+
+Lemma vec_to_list_vremove {A n} (i : fin n) (v : vec A n) :
+  vec_to_list (vremove i v) = delete (i:>nat) (v:>list A).
+Proof.
+  unfold vremove.
+  revert v; induction i.
+  - cbn.
+    now apply vec_S_inv.
+  - apply vec_S_inv.
+    intros x v.
+    cbn.
+    destruct i.
+    + cbn.
+      f_equal.
+      now destruct v using vec_S_inv.
+    + cbn.
+      f_equal.
+      apply IHi.
+Qed.
+
+
+
+Lemma list_fmap_subseteq {A B} (f : A -> B) (l1 l2 : list A) :
+  l1 ⊆ l2 -> f <$> l1 ⊆ f <$> l2.
+Proof.
+  intros Hl b (a & -> & ?%Hl)%elem_of_list_fmap.
+  now apply elem_of_list_fmap_1.
+Qed.
+
+Lemma list_subseteq_app {A} {l1 l1' l2 l2' : list A} :
+  l1 ⊆ l1' -> l2 ⊆ l2' -> l1 ++ l2 ⊆ l1' ++ l2'.
+Proof.
+  intros;
+  apply list_subseteq_app_iff_l, conj;
+    [apply list_subseteq_app_l|apply list_subseteq_app_r];
+  done.
+Qed.
+
+Lemma uncurry_alt {A B C} (f : A -> B -> C) p :
+  uncurry f p = f p.1 p.2.
+Proof.
+  now destruct p.
+Qed.
+
+
+
+Lemma NoDup_fmap_ind `(f : A -> B) (P : list A -> Prop)
+  (Pnil : P []) (Pcons : forall a l, f a ∉ f <$> l -> NoDup (f <$> l) ->
+    P l -> P (a :: l)) : forall l, NoDup (f <$> l) -> P l.
+Proof.
+  intros l.
+  induction l; [easy|].
+  cbn; rewrite NoDup_cons.
+  intros []; eauto.
+Qed.
+
+Lemma zip_with_irrel_l {A B C} (f : B -> C) (l l' : list A) (k : list B) :
+  length l = length l' ->
+  zip_with (λ _ b, f b) l k = zip_with (λ _ b, f b) l' k.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert k;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
+Lemma zip_with_irrel_r {A B C} (f : A -> C) (l : list A) (k k' : list B) :
+  length k = length k' ->
+  zip_with (λ a _, f a) l k = zip_with (λ a _, f a) l k'.
+Proof.
+  intros Hall%Forall2_same_length.
+  revert l;
+  induction Hall; intros []; cbn; congruence.
+Qed.
+
+Lemma map_to_list_disj_union `{FinMap K M} {A} (m1 m2 : M A) :
+  m1 ##ₘ m2 ->
+  map_to_list (m1 ∪ m2) ≡ₚ map_to_list m1 ++ map_to_list m2.
+Proof.
+  intros Hdisj.
+  pose proof Hdisj as Hdisj'.
+  rewrite map_disjoint_alt in Hdisj'.
+  apply NoDup_Permutation.
+  - apply NoDup_map_to_list.
+  - apply NoDup_app; split_and!; try apply NoDup_map_to_list.
+    intros (k, a) Hka%elem_of_map_to_list Hka'%elem_of_map_to_list.
+    destruct (Hdisj' k); congruence.
+  - intros (k, a).
+    rewrite elem_of_app, 3 elem_of_map_to_list.
+    rewrite lookup_union_Some by done.
+    done.
+Qed.
+Lemma map_to_list_kmap `{FinMap K1 M1, FinMap K2 M2} (f : K1 -> K2)
+  `{Hf : !Inj eq eq f} {A} (m : M1 A) :
+  map_to_list (kmap f m :> M2 A) ≡ₚ prod_map f id <$> map_to_list m.
+Proof.
+  unfold kmap.
+  apply map_to_list_to_map.
+  rewrite fsts_prod_map, (NoDup_fmap _).
+  apply NoDup_fst_map_to_list.
+Qed.
+Lemma map_disjoint_alt_neg `{FinMap K M} {A} (m1 m2 : M A) :
+  m1 ##ₘ m2 <-> forall k a b, m1 !! k = Some a -> m2 !! k = Some b -> False.
+Proof.
+  rewrite map_disjoint_alt.
+  apply forall_proper; intros k.
+  rewrite 2 eq_None_not_Some.
+  unfold is_Some.
+  destruct (m1 !! k), (m2 !! k); naive_solver.
+Qed.
+Lemma kmap_inj2_disjoint `{FinMap K1 M1, FinMap K2 M2} {I} `{R : relation I} {A}
+  (f : I -> K1 -> K2) `{Hf : !Inj2 R eq eq f} (m m' : M1 A) i j :
+  ~ R i j ->
+  (kmap (f i) m :> M2 A) ##ₘ kmap (f j) m'.
+Proof.
+  intros Hrij.
+  rewrite map_disjoint_alt_neg.
+  intros k a b (? & _ & Hfij)%lookup_kmap_Some_2
+    (? & _ & <-)%lookup_kmap_Some_2.
+  now apply Hf in Hfij.
+Qed.
+
+Lemma set_map_inj2_disjoint `{FinSet A SA, SemiSet B SB}
+  {I} `{R : relation I}
+  (f : I -> A -> B) `{Hf : !Inj2 R eq eq f} (X Y : SA) i j :
+  ~ R i j ->
+  (set_map (f i) X :> SB) ## set_map (f j) Y.
+Proof.
+  set_solver.
+Qed.
+
+
+#[export] Instance from_option_dec {A} (P : Prop) (Q : A -> Prop) (ma : option A) :
+  Decision P -> (forall a, Decision (Q a)) -> Decision (from_option Q P ma) :=
+  fun HP HQ =>
+  match ma with
+  | Some a => (HQ a)
+  | None => HP
+  end.
+
+Lemma filter_snd_imap_pair_compose {A B} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (f : nat -> B) (l : list A) :
+  filter (P ∘ snd) (imap (pair ∘ f) l) =
+  (prod_map f id) <$> filter (P ∘ snd) (imap pair l).
+Proof.
+  revert B f;
+  induction l; intros B f; [reflexivity|].
+  cbn.
+  case_decide as HPa.
+  - cbn.
+    f_equal.
+    rewrite Combinators.compose_assoc, 2 IHl.
+    rewrite <- list_fmap_compose.
+    reflexivity.
+  - rewrite Combinators.compose_assoc, 2 IHl.
+    rewrite <- list_fmap_compose.
+    reflexivity.
+Qed.
+
+Lemma from_option_fmap {A B C} (f : A -> B) (g : B -> C) (d : C) (ma : option A) :
+  from_option g d (f <$> ma) = from_option (g ∘ f) d ma.
+Proof.
+  now destruct ma.
+Qed.
+
+
+Lemma filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  filter (P ∘ snd) (imap pair l) =
+  imap (λ idx v, ((filter (λ i, from_option P False (l !! i)) (seq 0 (length l))) !!! idx, v))
+    (filter P l).
+Proof.
+  induction l; [reflexivity|].
+  cbn.
+  eenough (Hen : _).
+  - case_decide as HPa; [|exact Hen].
+    cbn.
+    f_equal.
+    apply Hen.
+  - rewrite (filter_snd_imap_pair_compose P S).
+    rewrite IHl.
+    rewrite fmap_imap.
+    apply imap_ext.
+    intros i x Hi.
+    cbn.
+    f_equal.
+    rewrite <- fmap_S_seq.
+    symmetry.
+    rewrite (list_filter_fmap S).
+    unfold compose; cbn.
+    apply list_lookup_total_fmap.
+    apply lookup_lt_Some in Hi as Hilt.
+    eapply Nat.lt_le_trans; [apply Hilt|].
+    apply eq_reflexivity.
+    clear.
+    induction l; [reflexivity|].
+    cbn.
+    eenough (Heq : _).
+    + case_decide as HPa; [|exact Heq].
+      cbn.
+      rewrite Heq.
+      reflexivity.
+    + rewrite <- fmap_S_seq, (list_filter_fmap S).
+      rewrite length_fmap.
+      apply IHl.
+Qed.
+
+
+Lemma length_filter_snd_imap_pair {A} (P : A -> Prop) `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  length (filter (P ∘ snd) (imap pair l)) =
+  length (filter P l).
+Proof.
+  now rewrite filter_snd_imap_pair, length_imap.
+Qed.
