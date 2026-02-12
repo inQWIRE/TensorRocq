@@ -2444,3 +2444,94 @@ Proof.
   rewrite pseq_to_seq.
   do 2 f_equal; lia.
 Qed.
+
+
+Fixpoint propogate_subst {n} (ps : vec (positive * positive) n) : vec (positive * positive) n :=
+match n, ps with
+| O, _ => [#]
+| (S k), _ =>
+  let (p, p') := Vector.hd ps in
+  let ps' := Vector.tl ps in
+    (p, p') ::: propogate_subst (vmap (prod_map {[p := p']} {[p := p']}) ps')
+end.
+
+Fixpoint subst_by_vec {n} (ps : vec (positive * positive) n) (p : positive) : positive :=
+  match ps with
+  | [#] => p
+  | (a, b) ::: ps' => subst_by_vec ps' ({[a := b]} p)
+  end.
+
+Lemma subst_by_vec_id {n} : forall v : vec positive n, forall p : positive,
+  subst_by_vec (propogate_subst (vzip_with pair v v)) p = p.
+Proof.
+  induction v.
+  - easy.
+  - intros.
+    simpl.
+    rewrite Vector.map_ext with (g:=(λ x : _, x)).
+    + rewrite Vector.map_id.
+      rewrite fn_lookup_singleton_case.
+      case_decide; subst; auto.
+    + intros.
+      destruct a.
+      simpl.
+      rewrite 2 fn_lookup_singleton_case.
+      case_decide; case_decide; subst; reflexivity.
+Qed.
+
+
+
+Lemma apply_fn_lookup_singleton `{EqDecision A, EqDecision B}
+  (f : A -> B) `{Hf : !Inj eq eq f} (a b c : A) :
+  f ({[a := b]} c) = {[f a := f b]} (f c).
+Proof.
+  rewrite fn_lookup_singleton_case.
+  case_decide as Hac.
+  - subst.
+    now rewrite fn_lookup_singleton.
+  - now rewrite fn_lookup_singleton_ne by now intros ?%(inj f).
+Qed.
+
+Lemma propogate_subst_vmap {n} (fl : positive -> positive)
+  `{Hfl : !Inj eq eq fl} (v : vec _ n) :
+  (* v.*1 ## v.*2 -> *)
+  propogate_subst (vmap (prod_map fl fl) v) =
+  vmap (prod_map fl fl) (propogate_subst v).
+Proof.
+  revert v; induction n as [|n IHn]; [refine (vec_0_inv _ _);done|
+    refine (vec_S_inv _ _)].
+  intros (p, q) v.
+  cbn.
+  (* intros Hdisj. *)
+  f_equal.
+  rewrite <- IHn.
+  f_equal.
+  apply vec_eq; intros i.
+  rewrite 2 Vector.map_map, 2 vlookup_map.
+  destruct (v !!! i) as (pi, qi).
+  cbn.
+  now rewrite 2 (apply_fn_lookup_singleton fl).
+Qed.
+
+Lemma susbt_by_vec_propogate_helper n i o
+  (insl outsl : vec positive n) (p' : positive) :
+  subst_by_vec (propogate_subst
+       (vzip_with pair (vmap {[o := i]} outsl) (vmap {[o := i]} insl))) p' =
+  subst_by_vec (propogate_subst
+      (vmap (prod_map {[o := i]} {[o := i]}) (vzip_with pair outsl insl))) p'.
+Proof.
+  revert i o insl outsl p'.
+  induction n; intros i o;
+  [do 2 refine (vec_0_inv _ _); done|].
+  refine (vec_S_inv _ _).
+  intros i' insl.
+  refine (vec_S_inv _ _).
+  intros o' outsl p.
+  cbn.
+  rewrite <- vzip_map.
+  rewrite IHn.
+  f_equal.
+  f_equal.
+  rewrite vzip_map.
+  done.
+Qed.

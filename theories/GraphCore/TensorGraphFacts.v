@@ -5,97 +5,13 @@ From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
 Require Import ZXCore.
 Require ZifyBool.
-Require TECospan.
-Import TECospan.
+Require Import TECospan TEPerm.
 
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 
 Open Scope nat_scope.
 
-Definition abstracts_indices {A} (abs : list (Idx * list A * list A)) : Pset :=
-  list_to_set ((fst ∘ fst) <$> abs).
-
-Lemma abstracts_indices_ntl2tl ntl :
-  abstracts_indices (ntl2tl ntl).(tl_abstracts) =
-  abstracts_indices ntl.(ntl_abstracts).
-Proof.
-  destruct ntl as [isums abs].
-  cbn.
-  rewrite <- list_fmap_compose.
-  f_equal.
-  apply list_fmap_ext; now intros _ [[]] _.
-Qed.
-
-Lemma abstracts_indices_relabel_abs `(f : A -> B) abs :
-  abstracts_indices (relabel_abs f <$> abs) = abstracts_indices abs.
-Proof.
-  unfold abstracts_indices.
-  rewrite <- list_fmap_compose.
-  f_equal.
-  now apply list_fmap_ext; intros _ [[]] _.
-Qed.
-
-Lemma abstracts_indices_ntl_aeq ntl ntl' :
-  ntl =ntl= ntl' ->
-  abstracts_indices ntl.(ntl_abstracts) =
-  abstracts_indices ntl'.(ntl_abstracts).
-Proof.
-  intros (f & _ & _ & Habs & Hdelt).
-  unfold abstracts_indices.
-  rewrite <- Habs.
-  symmetry.
-  apply abstracts_indices_relabel_abs.
-Qed.
-
-Lemma tl_total_semantics_aux_absidxs_ext
-  `{SR : SemiRing R rO rI radd rmul req, SA : Summable A, AEQ : EqDecision A}
-  mabs mabs' ml mr sums abs delt :
-  (forall i, i ∈ abstracts_indices abs -> mabs !! i = mabs' !! i) ->
-  req (tl_total_semantics_aux (SR:=SR) mabs ml mr sums abs delt)
-    (tl_total_semantics_aux mabs' ml mr sums abs delt).
-Proof.
-  intros Habs.
-  revert mr;
-  induction sums; intros mr;
-  [|cbn; apply sum_of_ext; intros ?; apply IHsums].
-  apply tl_total_semantics_aux_ext_base; apply Forall_Forall2_diag;
-  rewrite Forall_forall.
-  - intros [[f low] up] Hflu.
-    split; [|split; apply Forall_Forall2_diag;
-      rewrite Forall_forall; intros; reflexivity].
-    cbn.
-    apply Habs.
-    set_unfold.
-    now exists (f, low, up).
-  - easy.
-Qed.
-
-Lemma ntl_total_semantics_absidxs_ext
-  `{SR : SemiRing R rO rI radd rmul req, SA : Summable A, AEQ : EqDecision A}
-  mabs mabs' ml ntl :
-  (forall i, i ∈ abstracts_indices ntl.(ntl_abstracts) -> mabs !! i = mabs' !! i) ->
-  req (ntl_total_semantics (SR:=SR) mabs ml ntl)
-    (ntl_total_semantics mabs' ml ntl).
-Proof.
-  intros Habs.
-  apply tl_total_semantics_aux_absidxs_ext.
-  destruct ntl as [isums abs delt].
-  rewrite abstracts_indices_ntl2tl.
-  apply Habs.
-Qed.
-
-
-Lemma ntl_total_semantics_relabel_free
-  `{SR : SemiRing R rO rI radd rmul req, SA : Summable A, AEQ : EqDecision A}
-  f `{Hf : !Inj eq eq f} mabs ml ntl :
-  req (ntl_total_semantics (SR:=SR) mabs (kmap f ml) (ntl_relabel_free f ntl))
-    (ntl_total_semantics mabs ml ntl).
-Proof.
-  unfold ntl_total_semantics.
-  rewrite ntl2tl_ntl_relabel_free.
-  apply (relabel_tl_free_semantics_aux_kmap _).
-Qed.
 
 (* FIXME: Move *)
 Lemma forall_var (P : var -> Prop) :
@@ -883,19 +799,6 @@ Proof.
   apply graph_semantics_add_top_loop.
 Qed.
 
-
-Lemma abstracts_indices_relabel_absidx f ntl :
-  abstracts_indices (ntl_relabel_absidx f ntl).(ntl_abstracts) =
-  set_map f (abstracts_indices ntl.(ntl_abstracts)).
-Proof.
-  unfold abstracts_indices.
-  cbn.
-  rewrite <- list_fmap_compose.
-  unfold compose, prod_map; cbn.
-  rewrite set_map_list_to_set_L.
-  rewrite <- list_fmap_compose.
-  done.
-Qed.
 
 
 Lemma graph_namedtensorlist_semantics_offset_WF noff moff `(tg : TensorGraph n m) :
