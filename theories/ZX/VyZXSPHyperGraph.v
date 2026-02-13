@@ -125,7 +125,7 @@ Proof.
   zx_ocm_with 0.
 Qed.
 
-Fixpoint example_Z_stack_prf (n : nat) : S n = n + 1 :=
+(* Fixpoint example_Z_stack_prf (n : nat) : S n = n + 1 :=
   match n with
   | O => eq_refl
   | S n' => f_equal S (example_Z_stack_prf n')
@@ -151,4 +151,4 @@ Proof.
   intros n.
   assert (n = 5) by admit.
   subst.
-  Time zx_ocm.
+  Time zx_ocm. *)

@@ -1,7 +1,37 @@
 Require Import Tensor ZXCore.
 From QuantumLib Require Export Complex.
+Require Import Rmodeq. 
 Require Import TensorGraphSemantics.
 Open Scope nat_scope.
+
+(* FIXME: Move somewhere else *)
+Add Parametric Morphism : Cexp with signature
+  Rmodeq (2 * PI) ==> eq as Cexp_modeq_2PI.
+Proof.
+  unfold Cexp.
+  intros ? ? Heq.
+  f_equal;
+  now rewrite Heq.
+Qed.
+
+Add Parametric Morphism n m : (@zsp n m) with signature
+  Rmodeq (2 * PI) ==> equiv as zsp_modeq_2PI.
+Proof.
+  intros r r' Heq v w Hv Hw.
+  unfold zsp.
+  erewrite Cexp_modeq_2PI by apply Heq.
+  done.
+Qed.
+
+Add Parametric Morphism n m : (@xsp n m) with signature
+  Rmodeq (2 * PI) ==> equiv as xsp_modeq_2PI.
+Proof.
+  intros r r' Heq v w Hv Hw.
+  unfold xsp.
+  f_equal.
+  f_equal.
+  apply Cexp_modeq_2PI; case_match; now rewrite Heq.
+Qed.
 
 Notation "'ZXG'" := (CospanHyperGraph (bool * R)) (at level 0).
 
@@ -102,12 +132,37 @@ Proof.
   now rewrite andb_comm.
 Qed.
 
-Instance ZXCALC : TensorLike C bool (option (bool * R)) := {
-  interpretTensor (x : option (bool * R)) := match x with
+
+
+Definition ZXVERT := option (bool * R).
+
+#[export] Instance ZXVERT_equiv : Equiv ZXVERT :=
+  option_Forall2 (prod_relation eq (Rmodeq (2*PI))).
+
+
+#[export] Instance ZXVERT_equiv_equivalence : Equivalence (≡@{ZXVERT}).
+Proof. apply _. Qed.
+
+Definition ZXCALC_tensor (x : ZXVERT) : DimensionlessTensor bool :=
+  match x with
   | None => h_stack1'
   | Some (false, r)  => fun n m => @zsp n m r
   | Some (true, r) => fun n m => @xsp n m r
-  end
+  end.
+
+#[global] Arguments ZXCALC_tensor !_ /.
+
+#[export] Instance ZXCALC_tensor_proper : 
+  Proper ((≡) ==> (≡)) ZXCALC_tensor.
+Proof.
+  intros x x' Heq.
+  induction Heq as [[[] r] [_ r'] [[= <-] Heq]|]; [cbn; intros n m..|done];
+  cbn in Heq;
+  now rewrite Heq.
+Qed.
+
+#[export] Instance ZXCALC : TensorLike C bool ZXVERT := {
+  interpretTensor := ZXCALC_tensor;
 }.
 
 Lemma allb_forallb {n} b (v : vec bool n) :

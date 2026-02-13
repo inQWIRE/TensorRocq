@@ -22,12 +22,30 @@ Definition DimensionlessTensor {R} (A : Type) :=
   forall n m,
     Tensor (R:=R) n m A.
 
-Class TensorLike (R : Type) (A : Type) (T  : Type) := {
-  interpretTensor (x : T) : DimensionlessTensor (R:=R) A
+Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A} {n m} : relation (@Tensor R n m A) :=
+  fun t t' => forall v w, SummedElement v -> SummedElement w ->
+    req (t v w) (t' v w).
+
+#[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
+  `{Summable A} {n m} : Equiv (@Tensor R n m A) := tensoreq.
+
+Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A} : relation (@DimensionlessTensor R A) :=
+  fun t t' => forall n m, t n m ≡@{@Tensor R n m A} t' n m.
+
+#[global] Instance DimensionlessTensor_equiv `{SemiRing R rO rI radd rmul req}
+  `{Summable A} : Equiv (@DimensionlessTensor R A) := dimensionlesstensoreq.
+
+
+Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : Type) `{Equiv T}
+    `{Equivalence T equiv} := {
+  interpretTensor (x : T) : DimensionlessTensor (R:=R) A;
+  interpretTensorProper :: Proper (equiv ==> equiv) interpretTensor
 }.
 
-#[global] Hint Mode TensorLike - - + : typeclass_instances.
-
+#[global] Hint Mode TensorLike - - - - - - -   - - -   + - - : typeclass_instances.
 
 (* NB : We require a semiring (even though we use only equality)
   so typeclass inference is better-behaved *)
@@ -45,18 +63,6 @@ Definition strongly_permutative_tensor `{SemiRing R rO rI radd rmul req} {A}
       (vec_to_list v' ++ vec_to_list w') ->
     req (t n m v w) (t n' m' v' w').
 
-Class PermutativeTensorLike `{SemiRing R rO rI radd rmul req}
-  `(TensT : TensorLike R A T) := {
-  interpretTensorPermutative (x : T) n m :
-    permutative_tensor (interpretTensor x n m);
-}.
-
-Class StronglyPermutativeTensorLike `{SemiRing R rO rI radd rmul req}
-  `(TensT : TensorLike R A T) := {
-  interpretTensorStronglyPermutative (x : T) :
-    strongly_permutative_tensor (interpretTensor x);
-}.
-
 Lemma strongly_permutative_tensor_permutative_tensor
   `{SemiRing R rO rI radd rmul req} {A} (t : @DimensionlessTensor R A) :
   strongly_permutative_tensor t -> forall n m,
@@ -67,6 +73,18 @@ Proof.
   now apply Permutation_app.
 Qed.
 
+Class PermutativeTensorLike
+  `(TensT : TensorLike R rO rI radd rmul req A T) := {
+  interpretTensorPermutative (x : T) n m :
+    permutative_tensor (interpretTensor x n m);
+}.
+
+Class StronglyPermutativeTensorLike
+  `(TensT : TensorLike R rO rI radd rmul req A T) := {
+  interpretTensorStronglyPermutative (x : T) :
+    strongly_permutative_tensor (interpretTensor x);
+}.
+
 #[global] Instance StronglyPermutativeTensorLike_PermutativeTensorLike
   `{SR : SemiRing R rO rI radd rmul req} `(TensT : TensorLike R A T)
   (SP : StronglyPermutativeTensorLike TensT) : PermutativeTensorLike TensT.
@@ -75,20 +93,13 @@ Proof.
     interpretTensorStronglyPermutative.
 Qed.
 
-Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} {n m} : relation (@Tensor R n m A) :=
-  fun t t' => forall v w, SummedElement v -> SummedElement w ->
-    req (t v w) (t' v w).
-
-#[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
-  `{Summable A} {n m} : Equiv (@Tensor R n m A) := tensoreq.
-
-Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} : relation (@DimensionlessTensor R A) :=
-  fun t t' => forall n m, t n m ≡@{@Tensor R n m A} t' n m.
-
-#[global] Instance DimensionlessTensor_equiv `{SemiRing R rO rI radd rmul req}
-  `{Summable A} : Equiv (@DimensionlessTensor R A) := dimensionlesstensoreq.
+Class TensorLikeHom (R : Type) `{SR : SemiRing R rO rI radd rmul req} 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} `{Equiv T, Equiv T'} 
+  `{Equivalence T equiv, Equivalence T' equiv}
+  `{!TensorLike R A T, !TensorLike R A T'}
+  (f : T -> T') `{!Proper (equiv ==> equiv) f} := {
+  interpretTensor_hom t : interpretTensor (f t) ≡ interpretTensor t
+}.
 
 
 Section tensoreq.

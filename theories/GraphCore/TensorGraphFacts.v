@@ -29,9 +29,12 @@ Qed.
 
 Section TensorGraphFacts.
 
-Context `{TensT : TensorLike R A T}.
+Context `{SR : SemiRing R rO rI radd rmul req, 
+  SA : Summable A, EQA : EqDecision A} `{Equiv T} `{Equivalence T equiv}.
 
-Context `{SR : SemiRing R rO rI radd rmul req}.
+Context `{TensT : !TensorLike R A T}.
+
+
 
 (* Notation "0" := rO.
 Notation "1" := rI. *)
@@ -145,11 +148,6 @@ Proof.
     (split; [subst n; tauto|]);
     now apply elem_of_list_fmap_1.
 Qed. *)
-
-Context `{Summable A, EqDecision A}.
-
-
-#[global] Hint Mode TensorLike - - + : typeclass_instances.
 
 
 Lemma ntl_relabel_absidx_WF
@@ -905,7 +903,7 @@ Proof.
         setoid_rewrite elem_of_seq in Hi.
         cbn in Hi.
         rewrite length_vec_to_list.
-        firstorder lia.
+        destruct Hi as [[]|[]]; lia.
       * replace (i~0) with ((bcons false ∘ Pos.of_succ_nat) i) by now cbn; lia.
         rewrite (lookup_kmap_None (bcons true ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
@@ -1002,7 +1000,7 @@ Proof.
         setoid_rewrite elem_of_seq in Hi.
         cbn in Hi.
         rewrite length_vec_to_list.
-        firstorder lia.
+        destruct Hi as [[]|[]]; lia.
       * rewrite 4(lookup_kmap_None _ _ _).2 by now cbn; lia.
         done.
 Qed.
@@ -1096,7 +1094,7 @@ Proof.
         setoid_rewrite elem_of_seq in Hi.
         cbn in Hi.
         rewrite length_vec_to_list.
-        firstorder lia.
+        destruct Hi as [[]|[]]; lia.
       * replace (i~0) with ((bcons false ∘ Pos.of_succ_nat) i) by now cbn; lia.
         rewrite (lookup_kmap_None (bcons true ∘ _) _ _).2 by now cbn; lia.
         rewrite (lookup_kmap _).
@@ -1123,7 +1121,7 @@ Proof.
         setoid_rewrite elem_of_seq in Hi.
         cbn in Hi.
         rewrite length_vec_to_list.
-        firstorder lia.
+        destruct Hi as [[]|[]]; lia.
       * rewrite 4(lookup_kmap_None _ _ _).2 by now cbn; lia.
         done.
   - rewrite graph_namedtensorlist_semantics_offset_correct.
@@ -1646,7 +1644,7 @@ Lemma graph_semantics_swap_1_1 :
   graph_semantics (SR:=SR) (@swap_graph T 1 1) ≡ swap_tensor.
 Proof.
   intros v w Hv Hw.
-  cbn -[ntl_total_semantics].
+  cbn -[ntl_total_semantics make_vecs_map].
   unfold namedtensorlist_to_tensor.
   etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
     refine (graph_namedtensorlist_semantics_WT _ _ _)|
@@ -1681,8 +1679,7 @@ Lemma graph_semantics_cup_1_1 :
   graph_semantics (SR:=SR) (@cup_graph T 1) ≡ cup_tensor.
 Proof.
   intros v w Hv Hw.
-  cbn -[ntl_total_semantics].
-  unfold namedtensorlist_to_tensor.
+  cbn -[ntl_total_semantics make_vecs_map].
   etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
     refine (graph_namedtensorlist_semantics_WT _ _ _)|
     apply ntl_eq_of_ntl_delta_eq;
@@ -1711,8 +1708,7 @@ Lemma graph_semantics_cap_1_1 :
   graph_semantics (SR:=SR) (@cap_graph T 1) ≡ cap_tensor.
 Proof.
   intros v w Hv Hw.
-  cbn -[ntl_total_semantics].
-  unfold namedtensorlist_to_tensor.
+  cbn -[ntl_total_semantics make_vecs_map].
   etransitivity; [apply ntl_eq_correct; [now apply make_vecs_map_SummedElements|
     refine (graph_namedtensorlist_semantics_WT _ _ _)|
     apply ntl_eq_of_ntl_delta_eq;
@@ -1736,9 +1732,6 @@ Proof.
   apply eq_reflexivity, decide_ext.
   done.
 Qed.
-
-#[global] Hint Mode TensorLike ! - - : typeclass_instances.
-#[global] Hint Mode TensorLike - - ! : typeclass_instances.
 
 Lemma graph_semantics_graph_of_tensor t n m :
   graph_semantics (SR:=SR) (graph_of_tensor t n m) ≡ interpretTensor t n m.

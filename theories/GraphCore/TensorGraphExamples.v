@@ -40,8 +40,9 @@ Proof.
   cbn -[graph_semantics].
   unfold kron.
   cbn -[graph_semantics].
-  intros [] []; cbn -[graph_semantics]; (etransitivity;
-    [unfold example_graph', ZXCALC;
+  intros [] []; cbn -[graph_semantics]; 
+  (etransitivity;
+    [unfold example_graph', ZXCALC, ZXCALC_tensor; cbn;
 
       remember @zsp as zsp' eqn:Hzsp;
       vm_compute|Csimpl; reflexivity]);

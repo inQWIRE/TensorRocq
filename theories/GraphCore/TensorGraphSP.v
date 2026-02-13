@@ -277,7 +277,11 @@ Proof.
     now rewrite <- Hins, Houts.
 Qed.
 
-Lemma graph_mabs_hg_strongperm_eq `{TensorLike R A T}
+Section Correctness.
+
+Context `{TensT : TensorLike R rO rI radd rmul req A T}.
+
+Lemma graph_mabs_hg_strongperm_eq 
   {n m} (cohg cohg' : CospanHyperGraph T n m) :
   hg_strongperm_eq cohg cohg' ->
   graph_mabs cohg.(hedges) = graph_mabs cohg'.(hedges).
@@ -292,10 +296,7 @@ Proof.
   now rewrite Hperm.1.
 Qed.
 
-Lemma hg_strongperm_eq_correct `{TensT : TensorLike R A T,
-  SR : SemiRing R rO rI radd rmul req,
-  !StronglyPermutativeTensorLike TensT,
-  SA : Summable A, EQA : EqDecision A}
+Lemma hg_strongperm_eq_correct `{!StronglyPermutativeTensorLike TensT}
   {n m} (cohg cohg' : CospanHyperGraph T n m) :
   hg_strongperm_eq cohg cohg' ->
   graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
@@ -319,6 +320,7 @@ Proof.
     apply interpretTensorStronglyPermutative.
 Qed.
 
+End Correctness.
 
 Lemma mk_hg_strongperm_eq' {T n m} (cohg cohg' : CospanHyperGraph T n m) :
   cohg.(inputs) = cohg'.(inputs) ->

@@ -3408,6 +3408,10 @@ Definition namedtensorlist_to_tensor (mabs : abscontext)
   fun ins outs =>
     ntl_total_semantics mabs (make_vecs_map inputs outputs ins outs) ntl.
 
+#[global] Arguments tensorexpr_to_tensor _ {_ _} _ _ _ _ _ /.
+#[global] Arguments tensorlist_to_tensor _ {_ _} _ _ _ _ _ /.
+#[global] Arguments namedtensorlist_to_tensor _ {_ _} _ _ _ _ _ /.
+
 Definition tl_subst_free (l : Idx) (tl : tensorlist) :=
   tl_add_sums 1 (relabel_tl
     (var_elim (bound ∘ Pos.succ)
