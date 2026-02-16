@@ -1016,9 +1016,9 @@ Proof.
   symmetry; apply compose_to_swapped_stack.
 Qed.
 
-Lemma graph_semantics_compose_safe {n m o}
+Lemma graph_semantics_compose_graphs {n m o}
   (cohg : TensorGraph n m) (cohg' : TensorGraph m o) :
-  graph_semantics (SR:=SR) (compose_safe cohg cohg') ≡
+  graph_semantics (SR:=SR) (compose_graphs cohg cohg') ≡
   compose_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
   rewrite <- compose_graphs_alt_correct.

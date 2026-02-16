@@ -15,27 +15,27 @@ Section DPO.
 
   Context {T : Type}.
 
-
-  (* Reserved Notation "tgl ; tgr" (at level 50). *)
-  Definition compose_safe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
-    let connected_substs :=
-        propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
-     relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) ->
-      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) (list_to_set (vmap (bcons true) tgr.(inputs))) <- (vmap (bcons true) tgr.(outputs))).
-
-  Definition compose {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+  Definition compose_graphs_aux {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
     relabel_graph (subst_by_vec connected_substs)
       (tgl.(inputs) ->
         hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs))
           <- tgr.(outputs)).
 
-  Definition compose_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+  (* Reserved Notation "tgl ; tgr" (at level 50). *)
+  Definition compose_graphs {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+    let connected_substs :=
+        propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
+     relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) ->
+      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) (list_to_set (vmap (bcons true) tgr.(inputs))) <- (vmap (bcons true) tgr.(outputs))).
+
+
+  Definition compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs))) <- tgr.(outputs).
 
-Lemma compose_safe_to_compose {n m o}
+Lemma compose_graphs_to_compose_graphs_aux {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
-  compose_safe tgl tgr = compose
+  compose_graphs tgl tgr = compose_graphs_aux
     (reindex_graph (bcons false) (relabel_graph (bcons false) tgl))
     (reindex_graph (bcons true) (relabel_graph (bcons true) tgr)).
 Proof.
@@ -43,12 +43,12 @@ Proof.
 Qed.
 
 
-Lemma compose_to_compose_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
+Lemma compose_graphs_aux_to_compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
   tgl.(outputs) = tgr.(inputs) ->
-  compose tgl tgr = compose_unsafe tgl tgr.
+  compose_graphs_aux tgl tgr = compose_graphs_unsafe tgl tgr.
 Proof.
   intros.
-  unfold compose.
+  unfold compose_graphs_aux.
   rewrite H.
   unfold relabel_graph.
   rewrite Vector.map_ext with (g:=(λ x : _, x)).
@@ -228,7 +228,7 @@ Qed.
 Lemma compose_graphs_alt_aux_correct {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
   add_top_loops (swapped_stack_graphs_aux tgl tgr) =
-    compose tgl tgr.
+    compose_graphs_aux tgl tgr.
 Proof.
   rewrite add_top_loops_alt.
   cbn.
@@ -239,7 +239,7 @@ Qed.
 Lemma compose_graphs_alt_correct {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
   add_top_loops (swapped_stack_graphs tgl tgr) =
-    compose_safe tgl tgr.
+    compose_graphs tgl tgr.
 Proof.
   rewrite add_top_loops_alt.
   cbn.

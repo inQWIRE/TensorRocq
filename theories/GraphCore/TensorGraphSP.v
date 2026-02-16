@@ -4,8 +4,6 @@ Require Import TEPerm.
 Require Export TensorGraph
   TensorGraphExpr GraphRewriting TensorGraphSemantics TensorGraphFacts.
 
-Import GraphRewriting (compose).
-
 
 
 (* The (strong) permutation relation on graphs, and its correctness *)
@@ -152,13 +150,13 @@ Proof.
   now repeat f_equiv.
 Qed.
 
-Add Parametric Morphism {T n m o} : (@compose T n m o)
+Add Parametric Morphism {T n m o} : (@compose_graphs_aux T n m o)
   with signature hg_strongperm_eq ==> hg_strongperm_eq ==> hg_strongperm_eq
-    as compose_strongperm_mor.
+    as compose_graphs_aux_strongperm_mor.
 Proof.
   intros cohg1 cohg1' (Hins1 & Houts1 & Hverts1 & Hrel1)
     cohg2 cohg2' (Hins2 & Houts2 & Hverts2 & Hrel2).
-  unfold compose.
+  unfold compose_graphs_aux.
   rewrite <- Hins1, <- Hins2, <- Houts1, <- Houts2.
   f_equiv.
   split_and!; [try done..|now do 2 f_equal/=|].
@@ -166,26 +164,26 @@ Proof.
   now apply map_relation_union.
 Qed.
 
-Add Parametric Morphism {T n m o} : (@compose_unsafe T n m o)
+Add Parametric Morphism {T n m o} : (@compose_graphs_unsafe T n m o)
   with signature hg_strongperm_eq ==> hg_strongperm_eq ==> hg_strongperm_eq
-    as compose_unsafe_strongperm_mor.
+    as compose_graphs_unsafe_strongperm_mor.
 Proof.
   intros cohg1 cohg1' (Hins1 & Houts1 & Hverts1 & Hrel1)
     cohg2 cohg2' (Hins2 & Houts2 & Hverts2 & Hrel2).
-  unfold compose_unsafe.
+  unfold compose_graphs_unsafe.
   rewrite <- ?Hins1, <- ?Hins2, <- ?Houts1, <- ?Houts2.
   split_and!; [try done..|now do 2 f_equal/=|].
   cbn.
   now apply map_relation_union.
 Qed.
 
-Add Parametric Morphism {T n m o} : (@compose_safe T n m o)
+Add Parametric Morphism {T n m o} : (@compose_graphs T n m o)
   with signature hg_strongperm_eq ==> hg_strongperm_eq ==> hg_strongperm_eq
-    as compose_safe_strongperm_mor.
+    as compose_graphs_strongperm_mor.
 Proof.
   intros cohg1 cohg1' Heq1
     cohg2 cohg2' Heq2.
-  rewrite 2 compose_safe_to_compose.
+  rewrite 2 compose_graphs_to_compose_graphs_aux.
   (do 3 f_equiv); assumption.
 Qed.
 

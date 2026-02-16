@@ -16,7 +16,7 @@ Fixpoint ZX_graph_semantics {n m} (zx : ZX n m) :
   | X n m α => graph_of_tensor (Some (true, α)) n m
   | Z n m α => graph_of_tensor (Some (false, α)) n m
   | zx0 ↕ zx1 => stack_graphs (ZX_graph_semantics zx0) (ZX_graph_semantics zx1)
-  | zx0 ⟷ zx1 => compose_safe (ZX_graph_semantics zx0) (ZX_graph_semantics zx1)
+  | zx0 ⟷ zx1 => compose_graphs (ZX_graph_semantics zx0) (ZX_graph_semantics zx1)
   end.
 
 
@@ -41,7 +41,7 @@ Proof.
     rewrite graph_semantics_stack_graphs.
     now apply stack_tensor_mor.
   - cbn.
-    rewrite graph_semantics_compose_safe.
+    rewrite graph_semantics_compose_graphs.
     now apply compose_tensor_mor.
 Qed.
 

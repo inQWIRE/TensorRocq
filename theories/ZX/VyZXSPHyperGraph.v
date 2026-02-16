@@ -17,7 +17,7 @@ Fixpoint ZX_spgraph_semantics {n m} (zx : ZX n m) :
   | X n m α => spgraph_of_tensor (Some (true, α)) n m
   | Z n m α => spgraph_of_tensor (Some (false, α)) n m
   | zx0 ↕ zx1 => stack_spgraphs (ZX_spgraph_semantics zx0) (ZX_spgraph_semantics zx1)
-  | zx0 ⟷ zx1 => spcompose_safe (ZX_spgraph_semantics zx0) (ZX_spgraph_semantics zx1)
+  | zx0 ⟷ zx1 => spcompose_graphs (ZX_spgraph_semantics zx0) (ZX_spgraph_semantics zx1)
   end.
 
 
@@ -37,7 +37,7 @@ Proof.
   - cbn.
     now rewrite cosphg2cohg_stack_spgraphs, IHzx1, IHzx2.
   - cbn.
-    now rewrite cosphg2cohg_spcompose_safe, IHzx1, IHzx2.
+    now rewrite cosphg2cohg_spcompose_graphs, IHzx1, IHzx2.
 Qed.
 
 Lemma ZX_spgraph_semantics_correct {n m} (zx : ZX n m) :

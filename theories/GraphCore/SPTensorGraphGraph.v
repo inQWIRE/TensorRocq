@@ -166,35 +166,36 @@ Proof.
   done.
 Qed.
 
-Lemma cohg2cosphg_compose {T n m o}
+Lemma cohg2cosphg_compose_graphs_aux {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
-  cohg2cosphg (compose cohg cohg') =
-  spcompose (cohg2cosphg cohg) (cohg2cosphg cohg').
+  cohg2cosphg (compose_graphs_aux cohg cohg') =
+  spcompose_graphs_aux (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
-  unfold compose.
+  unfold compose_graphs_aux.
   rewrite cohg2cosphg_relabel_graph.
-  unfold spcompose.
+  unfold spcompose_graphs_aux.
   f_equal.
   apply cosphg_ext; [|done..].
   cbn.
   now rewrite map_fmap_union.
 Qed.
 
-Lemma cohg2cosphg_compose_safe {T n m o}
+Lemma cohg2cosphg_compose_graphs {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
-  cohg2cosphg (compose_safe cohg cohg') =
-  spcompose_safe (cohg2cosphg cohg) (cohg2cosphg cohg').
+  cohg2cosphg (compose_graphs cohg cohg') =
+  spcompose_graphs (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
-  rewrite compose_safe_to_compose, spcompose_safe_to_spcompose.
-  rewrite cohg2cosphg_compose, 2 cohg2cosphg_reindex_graph,
+  rewrite compose_graphs_to_compose_graphs_aux, 
+    spcompose_graphs_to_spcompose_graphs_aux.
+  rewrite cohg2cosphg_compose_graphs_aux, 2 cohg2cosphg_reindex_graph,
     2 cohg2cosphg_relabel_graph.
   reflexivity.
 Qed.
 
-Lemma cohg2cosphg_compose_unsafe {T n m o}
+Lemma cohg2cosphg_compose_graphs_unsafe {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
-  cohg2cosphg (compose_unsafe cohg cohg') =
-  spcompose_unsafe (cohg2cosphg cohg) (cohg2cosphg cohg').
+  cohg2cosphg (compose_graphs_unsafe cohg cohg') =
+  spcompose_graphs_unsafe (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
   apply cosphg_ext; [|done..].
   cbn.
@@ -254,7 +255,7 @@ Proof.
 Qed.
 
 Lemma spreferrenced_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
-  spreferrenced_vertices (cohg2cosphg cohg) = 
+  spreferrenced_vertices (cohg2cosphg cohg) =
   referrenced_vertices cohg.
 Proof.
   unfold referrenced_vertices, spreferrenced_vertices.
@@ -271,7 +272,7 @@ Proof.
 Qed.
 
 Lemma spisolated_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
-  spisolated_vertices (cohg2cosphg cohg) = 
+  spisolated_vertices (cohg2cosphg cohg) =
   isolated_vertices cohg.
 Proof.
   unfold isolated_vertices, spisolated_vertices.
@@ -280,7 +281,7 @@ Proof.
 Qed.
 
 Lemma cohg2cosphg_norm_spverts {T n m} (cohg : CospanHyperGraph T n m) :
-  cohg2cosphg (norm_verts cohg) = 
+  cohg2cosphg (norm_verts cohg) =
   norm_spverts (cohg2cosphg cohg).
 Proof.
   apply cosphg_ext; [|done..].
@@ -355,14 +356,14 @@ Proof.
   done.
 Qed.
 
-Lemma cosphg2cohg_spcompose {T n m o}
+Lemma cosphg2cohg_spcompose_graphs_aux {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  hg_strongperm_eq (cosphg2cohg (spcompose cosphg cosphg'))
-    (compose (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
+  hg_strongperm_eq (cosphg2cohg (spcompose_graphs_aux cosphg cosphg'))
+    (compose_graphs_aux (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
 Proof.
-  unfold spcompose.
+  unfold spcompose_graphs_aux.
   rewrite cosphg2cohg_relabel_spgraph.
-  unfold compose.
+  unfold compose_graphs_aux.
   apply relabel_graph_strongperm_mor.
   apply eq_reflexivity.
   apply cohg_ext; [|done..].
@@ -370,21 +371,21 @@ Proof.
   now rewrite map_fmap_union.
 Qed.
 
-Lemma cosphg2cohg_spcompose_safe {T n m o}
+Lemma cosphg2cohg_spcompose_graphs {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  hg_strongperm_eq (cosphg2cohg (spcompose_safe cosphg cosphg'))
-    (compose_safe (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
+  hg_strongperm_eq (cosphg2cohg (spcompose_graphs cosphg cosphg'))
+    (compose_graphs (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
 Proof.
-  rewrite compose_safe_to_compose, spcompose_safe_to_spcompose.
-  rewrite cosphg2cohg_spcompose, 2 cosphg2cohg_reindex_spgraph,
+  rewrite compose_graphs_to_compose_graphs_aux, spcompose_graphs_to_spcompose_graphs_aux.
+  rewrite cosphg2cohg_spcompose_graphs_aux, 2 cosphg2cohg_reindex_spgraph,
     2 cosphg2cohg_relabel_spgraph.
   reflexivity.
 Qed.
 
-Lemma cosphg2cohg_spcompose_unsafe {T n m o}
+Lemma cosphg2cohg_spcompose_graphs_unsafe {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  cosphg2cohg (spcompose_unsafe cosphg cosphg') =
-  compose_unsafe (cosphg2cohg cosphg) (cosphg2cohg cosphg').
+  cosphg2cohg (spcompose_graphs_unsafe cosphg cosphg') =
+  compose_graphs_unsafe (cosphg2cohg cosphg) (cosphg2cohg cosphg').
 Proof.
   apply cohg_ext; [|done..].
   cbn.
@@ -466,7 +467,7 @@ Proof.
 Qed.
 
 Lemma referrenced_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  referrenced_vertices (cosphg2cohg cosphg) = 
+  referrenced_vertices (cosphg2cohg cosphg) =
   spreferrenced_vertices cosphg.
 Proof.
   unfold referrenced_vertices, spreferrenced_vertices.
@@ -482,7 +483,7 @@ Proof.
 Qed.
 
 Lemma isolated_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  isolated_vertices (cosphg2cohg cosphg) = 
+  isolated_vertices (cosphg2cohg cosphg) =
   spisolated_vertices cosphg.
 Proof.
   unfold isolated_vertices, spisolated_vertices.
@@ -490,8 +491,8 @@ Proof.
 Qed.
 
 
-Lemma cosphg2cohg_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) : 
-  cosphg2cohg (norm_spverts cosphg) = 
+Lemma cosphg2cohg_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  cosphg2cohg (norm_spverts cosphg) =
   norm_verts (cosphg2cohg cosphg).
 Proof.
   apply cohg_ext; [|done..].

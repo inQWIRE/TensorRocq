@@ -16,25 +16,26 @@ Section DPO.
 
 
   (* Reserved Notation "tgl ; tgr" (at level 50). *)
-  Definition spcompose_safe {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
-    let connected_substs :=
-        propogate_subst (vzip (vmap (bcons false) tgl.(spoutputs)) (vmap (bcons true) tgr.(spinputs))) in
-     relabel_spgraph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(spinputs)) ->
-      sphg_add_vertices (tgl.(sphedges) ⊎ tgr.(sphedges)) (list_to_set (vmap (bcons true) tgr.(spinputs))) <- (vmap (bcons true) tgr.(spoutputs))).
-
-  Definition spcompose {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
+  Definition spcompose_graphs_aux {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
     let connected_substs := propogate_subst (vzip (tgl.(spoutputs)) (tgr.(spinputs))) in
     relabel_spgraph (subst_by_vec connected_substs)
       (tgl.(spinputs) ->
         sphg_add_vertices (tgl.(sphedges) ∪ tgr.(sphedges)) (list_to_set tgr.(spinputs))
           <- tgr.(spoutputs)).
 
-  Definition spcompose_unsafe {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
+  Definition spcompose_graphs {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
+    let connected_substs :=
+        propogate_subst (vzip (vmap (bcons false) tgl.(spoutputs)) (vmap (bcons true) tgr.(spinputs))) in
+     relabel_spgraph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(spinputs)) ->
+      sphg_add_vertices (tgl.(sphedges) ⊎ tgr.(sphedges)) (list_to_set (vmap (bcons true) tgr.(spinputs))) <- (vmap (bcons true) tgr.(spoutputs))).
+
+
+  Definition spcompose_graphs_unsafe {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) : CospanSPHyperGraph T n o :=
     tgl.(spinputs) ->  sphg_add_vertices (tgl.(sphedges) ∪ tgr.(sphedges)) (list_to_set (tgr.(spinputs))) <- tgr.(spoutputs).
 
-Lemma spcompose_safe_to_spcompose {n m o}
+Lemma spcompose_graphs_to_spcompose_graphs_aux {n m o}
   (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) :
-  spcompose_safe tgl tgr = spcompose
+  spcompose_graphs tgl tgr = spcompose_graphs_aux
     (reindex_spgraph (bcons false) (relabel_spgraph (bcons false) tgl))
     (reindex_spgraph (bcons true) (relabel_spgraph (bcons true) tgr)).
 Proof.
@@ -42,12 +43,12 @@ Proof.
 Qed.
 
 
-Lemma spcompose_to_spcompose_unsafe {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) :
+Lemma spcompose_graphs_aux_to_spcompose_graphs_unsafe {n m o} (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) :
   tgl.(spoutputs) = tgr.(spinputs) ->
-  spcompose tgl tgr = spcompose_unsafe tgl tgr.
+  spcompose_graphs_aux tgl tgr = spcompose_graphs_unsafe tgl tgr.
 Proof.
   intros.
-  unfold spcompose.
+  unfold spcompose_graphs_aux.
   rewrite H.
   unfold relabel_spgraph.
   rewrite Vector.map_ext with (g:=(λ x : _, x)).
@@ -224,10 +225,10 @@ Qed.
 
 
 
-Lemma spcompose_spgraphs_alt_aux_correct {n m o}
+Lemma spcompose_graphs_aux_spgraphs_alt_aux_correct {n m o}
   (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) :
   spadd_top_loops (swapped_stack_spgraphs_aux tgl tgr) =
-    spcompose tgl tgr.
+    spcompose_graphs_aux tgl tgr.
 Proof.
   rewrite spadd_top_loops_alt.
   cbn.
@@ -235,10 +236,10 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma spcompose_spgraphs_alt_correct {n m o}
+Lemma spcompose_graphs_aux_spgraphs_alt_correct {n m o}
   (tgl : CospanSPHyperGraph T n m) (tgr : CospanSPHyperGraph T m o) :
   spadd_top_loops (swapped_stack_spgraphs tgl tgr) =
-    spcompose_safe tgl tgr.
+    spcompose_graphs tgl tgr.
 Proof.
   rewrite spadd_top_loops_alt.
   cbn.
