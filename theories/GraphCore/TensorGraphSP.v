@@ -7,66 +7,6 @@ Require Export TensorGraph
 Import GraphRewriting (compose).
 
 
-Lemma map_relation_to_dom' `{FinMap K M} {A} P (m1 m2 : M A) :
-  map_relation P (λ _ _, False) (λ _ _, False) m1 m2 ->
-  (forall j, is_Some (m1 !! j) <-> is_Some (m2 !! j)).
-Proof.
-  intros Hrel j.
-  specialize (Hrel j).
-  rewrite 2 is_Some_alt.
-  do 2 case_match; done.
-Qed.
-
-Lemma map_relation_to_map_to_list `{FinMap K M} {A} P (m1 m2 : M A) :
-  map_relation P (λ _ _, False) (λ _ _, False) m1 m2 ->
-  Forall2 (λ ka kb, ka.1 = kb.1 /\ P ka.1 ka.2 kb.2)
-    (map_to_list m1) (map_to_list m2).
-Proof.
-  revert m2; induction m1 as [|i a m1 Hm1i H1fst IHm1] using map_first_key_ind; intros m2 Hrel.
-  - replace m2 with (∅ :> M A); [now rewrite map_to_list_empty|].
-    symmetry.
-    apply map_empty.
-    intros i.
-    pose proof ((map_relation_to_dom' _ _ _ Hrel i).2) as Hsome.
-    rewrite lookup_empty in Hsome.
-    rewrite 2 is_Some_alt in Hsome.
-    now destruct (m2 !! i).
-  - specialize (map_relation_to_dom' _ _ _ Hrel) as Hdom'.
-    rewrite map_to_list_insert_first_key by done.
-    assert (H2fst : map_first_key m2 i). 1:{
-      revert H1fst.
-      now refine (map_first_key_dom' _ _ _ _).1.
-    }
-    assert (Hm2i : is_Some (m2 !! i)) by now rewrite <- Hdom', lookup_insert.
-    destruct Hm2i as [m2i Hm2i].
-    rewrite <- (insert_delete _ _ _ Hm2i) in Hrel |- *.
-    rewrite map_to_list_insert_first_key by
-      first [apply lookup_delete|now rewrite insert_delete].
-    constructor.
-    + specialize (Hrel i).
-      now rewrite 2 lookup_insert in Hrel.
-    + apply IHm1.
-      intros j.
-      generalize (Hrel j).
-      rewrite 2 lookup_insert_case.
-      case_decide as Hij; [subst; now rewrite Hm1i, lookup_delete|].
-      done.
-Qed.
-
-
-Lemma map_relation_union `{FinMap K M} {A} P (m1 m1' m2 m2' : M A) :
-  map_relation P (λ _ _, False) (λ _ _, False) m1 m1' ->
-  map_relation P (λ _ _, False) (λ _ _, False) m2 m2' ->
-  map_relation P (λ _ _, False) (λ _ _, False) (m1 ∪ m2) (m1' ∪ m2').
-Proof.
-  intros Hm1 Hm2 i.
-  rewrite 2 lookup_union.
-  specialize (Hm1 i).
-  destruct (m1 !! i), (m1' !! i); [rewrite 2 union_Some_l|..]; [done..|].
-  rewrite 2 (left_id_L None _).
-  apply Hm2.
-Qed.
-
 
 (* The (strong) permutation relation on graphs, and its correctness *)
 

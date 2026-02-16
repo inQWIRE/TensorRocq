@@ -6,6 +6,41 @@ Require Export HyperGraph.
 Require Import TESyntax.
 
 (* FIXME: Move *)
+Lemma elem_of_relation {A} {RA : relation A} xy :
+  xy ∈ RA <-> RA xy.1 xy.2.
+Proof.
+  done.
+Qed.
+Lemma elem_of_relation_pair {A} {RA : relation A} x y :
+  (x, y) ∈ RA <-> RA x y.
+Proof.
+  done.
+Qed.
+Lemma relation_equiv_iff {A} {RA RA' : relation A} :
+  RA ≡ RA' <-> forall a a', RA a a' <-> RA' a a'.
+Proof.
+  split; [|intros Heq xy; apply Heq].
+  intros Heq a a'.
+  apply (Heq (a, a')).
+Qed.
+Lemma relation_subseteq_iff {A} {RA RA' : relation A} :
+  RA ⊆ RA' <-> subrelation RA RA'.
+Proof.
+  split; [|intros Heq xy; apply Heq].
+  intros Heq a a'.
+  apply (Heq (a, a')).
+Qed.
+Lemma rtc_prod_relation `{RA : relation A, RB : relation B} :
+  rtc (prod_relation RA RB) ⊆ prod_relation (rtc RA) (rtc RB).
+Proof.
+  apply relation_subseteq_iff.
+  intros [a b] [a' b'].
+  intros Heq.
+  induction Heq; [done|].
+  etransitivity; [|eassumption].
+  unfold prod_relation in *.
+  split; now apply rtc_once.
+Qed.
 
 (* Basic definitions and structural operations on TensorGraphs *)
 
@@ -760,7 +795,57 @@ Proof.
     now rewrite invfun_linv by first [intros ????;apply Hf|easy].
 Qed.
 
+Definition cohg_eq `{Equiv T} : relation CoHyGraph :=
+  fun cohg cohg' =>
+  cohg.(inputs) = cohg'.(inputs) /\
+  cohg.(outputs) = cohg'.(outputs) /\
+  cohg.(hedges) ≡ cohg'.(hedges).
+
+#[export] Instance cohg_eq_equivalence `{Equiv T, Equivalence T equiv} :
+  Equivalence cohg_eq.
+Proof.
+  apply rel_intersection_equiv, rel_intersection_equiv;
+  refine (rel_preimage_equiv _ _ _).
+Qed.
+
+Lemma mk_cohg_eq `{Equiv T} cohg cohg' :
+  cohg.(inputs) = cohg'.(inputs) ->
+  cohg.(outputs) = cohg'.(outputs) ->
+  cohg.(hedges) ≡ cohg'.(hedges) ->
+  cohg_eq cohg cohg'.
+Proof.
+  easy.
+Qed.
+
+(* Lemma relabel_graph_cohg_eq f tg tg' : cohg_eq tg tg' ->
+  cohg_eq (relabel_graph f ) *)
+
+
 End CospanHyperGraph.
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+  (@relabel_graph T n m f) with signature cohg_eq ==> cohg_eq as
+  relabel_graph_cohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & Hhedge).
+  apply mk_cohg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+  (@reindex_graph T n m f) with signature cohg_eq ==> cohg_eq as
+  reindex_graph_cohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & Hhedge).
+  apply mk_cohg_eq; [done..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+
+
 
 Add Parametric Relation {T n m} : (CospanHyperGraph T n m) isomorphic
   reflexivity proved by isomorphic_refl
@@ -796,8 +881,8 @@ Qed.
 (* TODO: Rewrite with a new Vector.remove function returning a [vec A (pred n)] *)
 Definition add_top_loop {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
   relabel_graph {[Vector.hd cohg.(outputs) := Vector.hd cohg.(inputs)]} (
-  Vector.tl cohg.(inputs) -> 
-    hg_add_vertices cohg.(hedges) {[Vector.hd cohg.(inputs)]} 
+  Vector.tl cohg.(inputs) ->
+    hg_add_vertices cohg.(hedges) {[Vector.hd cohg.(inputs)]}
       <- Vector.tl cohg.(outputs)).
 
 Fixpoint add_top_loops {T n m o} : forall (cohg : CospanHyperGraph T (n + m) (n + o)),
@@ -842,7 +927,7 @@ Definition id_graph {T} (n : nat) : CospanHyperGraph T n n :=
   vmap (Pos.of_succ_nat) (vseq 0 n) -> ∅ <- vmap (Pos.of_succ_nat) (vseq 0 n).
 
 Definition swap_graph {T} n m : CospanHyperGraph T (n + m) (m + n) :=
-  vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq n m) -> ∅ 
+  vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq n m) -> ∅
     <- vmap (Pos.of_succ_nat) (vseq n m +++ vseq 0 n).
 
 Definition cup_graph {T} n : CospanHyperGraph T 0 (n + n) :=
@@ -853,6 +938,144 @@ Definition cap_graph {T} n : CospanHyperGraph T (n + n) 0 :=
 
 Definition graph_of_tensor {T} (t : T) (n m : nat) : CospanHyperGraph T n m :=
   vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ->
-    {[xH := (t, (bcons false ∘ Pos.of_succ_nat) <$> (seq 0 n), 
-      (bcons true ∘ Pos.of_succ_nat) <$> (seq 0 m))]} <- 
+    {[xH := (t, (bcons false ∘ Pos.of_succ_nat) <$> (seq 0 n),
+      (bcons true ∘ Pos.of_succ_nat) <$> (seq 0 m))]} <-
   vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m).
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} :
+  (@hg_add_vertices T) with signature equiv ==> eq ==> equiv as
+  hg_add_vertices_equiv.
+Proof.
+  intros hg hg' (He & Hv) vs.
+  split; [|now cbn; f_equal].
+  apply He.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@stack_graphs_aux T n m n' m') with signature
+  cohg_eq ==> cohg_eq ==> cohg_eq as stack_graphs_aux_cohg_eq.
+Proof.
+  intros cohg1 cohg1' (Hins1 & Houts1 & He1)
+    cohg2 cohg2' (Hins2 & Houts2 & He2).
+  apply mk_cohg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@stack_graphs T n m n' m') with signature
+  cohg_eq ==> cohg_eq ==> cohg_eq as stack_graphs_cohg_eq.
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  unfold stack_graphs.
+  now do 3 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} :
+  (@add_top_loop T n m) with signature
+  cohg_eq ==> cohg_eq as add_top_loop_cohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & Hes).
+  apply mk_cohg_eq; [cbn; repeat first [assumption|f_equal]..|].
+  cbn.
+  rewrite <- Hins, <- Houts.
+  apply (relabel_hg_proper _ _ _).
+  f_equiv; done.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m o} :
+  (@add_top_loops T n m o) with signature
+  cohg_eq ==> cohg_eq as add_top_loops_cohg_eq.
+Proof.
+  induction n; [done|].
+  intros cohg cohg' Heq.
+  cbn.
+  apply IHn.
+  now f_equiv.
+Qed.
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@swapped_stack_graphs_aux T n m n' m') with signature
+  cohg_eq ==> cohg_eq ==> cohg_eq as swapped_stack_graphs_aux_cohg_eq.
+Proof.
+  intros cohg1 cohg1' (Hins1 & Houts1 & He1)
+    cohg2 cohg2' (Hins2 & Houts2 & He2).
+  apply mk_cohg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@swapped_stack_graphs T n m n' m') with signature
+  cohg_eq ==> cohg_eq ==> cohg_eq as swapped_stack_graphs_cohg_eq.
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  unfold swapped_stack_graphs.
+  now do 3 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m o} :
+  (@compose_graphs_alt T n m o) with signature
+  cohg_eq ==> cohg_eq ==> cohg_eq as compose_graphs_alt_cohg_eq.
+Proof.
+  unfold compose_graphs_alt.
+  intros; now do 2 f_equiv.
+Qed.
+
+
+#[export] Instance CospanHyperGraph_equiv `{Equiv T} {n m} :
+  Equiv (CospanHyperGraph T n m) :=
+  rtc (isomorphic ∪ cohg_eq).
+
+Lemma cohg_equiv_alt `{Equiv T, Equivalence T equiv} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ cohg' <-> exists cohg'', isomorphic cohg cohg'' /\ cohg_eq cohg'' cohg'.
+Proof.
+  split; cycle 1.
+  - intros (cohg'' & Hiso & Heq).
+    transitivity cohg'';
+    apply rtc_once; [now left|now right].
+  - intros Hrtc.
+    induction Hrtc as [cohg|cohg1 cohg2 cohg3 Heq12 Hrtc23 IH]; [now exists cohg|].
+    destruct IH as (cohg2' & Hiso2 & Heq2'3).
+    destruct Heq12 as [Hiso12|Heq12].
+    + exists cohg2'.
+      split; [etransitivity; eauto|].
+      done.
+    + induction Hiso2 as [cohg2 fe fv Hfe Hfv].
+      exists (relabel_graph fe (reindex_graph fv cohg1)).
+      split; [now constructor|].
+      now rewrite Heq12.
+Qed.
+
+Lemma proper_cohg_equiv_of_eq_iso_unary `{Equiv T1, Equiv T2, 
+  Equivalence T1 equiv} {n1 m1 n2 m2} 
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) : 
+  Proper (isomorphic ==> isomorphic) f ->
+  Proper (cohg_eq ==> cohg_eq) f ->
+  Proper (equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cohg cohg' (cohg'' & Hiso%Hfiso & Heq%Hfeq)%cohg_equiv_alt.
+  transitivity (f cohg'');
+  apply rtc_once; [now left|now right].
+Qed.
+
+Lemma proper_cohg_equiv_of_eq_iso_binary `{Equiv T1, Equiv T2, Equiv T3,
+  Equivalence T1 equiv, Equivalence T2 equiv} {n1 m1 n2 m2 n3 m3} 
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
+    CospanHyperGraph T3 n3 m3) : 
+  Proper (isomorphic ==> isomorphic ==> isomorphic) f ->
+  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) f ->
+  Proper (equiv ==> equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cohg1 cohg1' (cohg1'' & Hiso1 & Heq1)%cohg_equiv_alt.
+  intros cohg2 cohg2' (cohg2'' & Hiso2 & Heq2)%cohg_equiv_alt.
+  transitivity (f cohg1'' cohg2'');
+  apply rtc_once; [now left; apply Hfiso|now right; apply Hfeq].
+Qed.
+
+

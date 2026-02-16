@@ -29,7 +29,7 @@ Qed.
 
 Section TensorGraphFacts.
 
-Context `{SR : SemiRing R rO rI radd rmul req, 
+Context `{SR : SemiRing R rO rI radd rmul req,
   SA : Summable A, EQA : EqDecision A} `{Equiv T} `{Equivalence T equiv}.
 
 Context `{TensT : !TensorLike R A T}.
@@ -1733,7 +1733,7 @@ Proof.
   done.
 Qed.
 
-Lemma graph_semantics_graph_of_tensor t n m :
+Lemma graph_semantics_graph_of_tensor (t : T) n m :
   graph_semantics (SR:=SR) (graph_of_tensor t n m) ≡ interpretTensor t n m.
 Proof.
   intros v w Hv Hw.
@@ -1822,6 +1822,103 @@ Proof.
     rewrite Hvi.
     done.
 Qed.
+
+Lemma vertices_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
+  cohg_eq cohg cohg' ->
+  vertices cohg = vertices cohg'.
+Proof.
+  intros Heq.
+  unfold vertices.
+  f_equal; [now apply (vertices_hg_equiv _ _), Heq|].
+  now rewrite Heq.1, Heq.2.1.
+Qed.
+
+Lemma abstract_semantics_alt_ext_tens (mabs : Pmap (@DimensionlessTensor R A))
+   ml mr mabs'
+  idx idx' lower upper :
+  mabs !! idx ≡ mabs' !! idx' ->
+  map_Forall (λ _ a, SummedElement a) mr ->
+  map_Forall (λ _ a, SummedElement a) ml ->
+  abstract_semantics_alt (rO:=rO) mabs ml mr idx lower upper ==
+  abstract_semantics_alt (rO:=rO) mabs' ml mr idx' lower upper.
+Proof.
+  intros Hidx Hmr Hml.
+  unfold abstract_semantics_alt.
+  induction Hidx as [dt dt' Hdt|]; [|cbn; now rewrite !option_bind_None_r].
+  cbn.
+  destruct (join_list (_ <$> lower)) as [largs|] eqn:Hlargs; [cbn|done].
+  destruct (join_list (_ <$> upper)) as [uargs|] eqn:Huargs; [cbn|done].
+  apply Hdt; apply SummedElement_vec_iff_Forall;
+  rewrite vec_to_list_to_vec, Forall_forall;
+  intros a Ha.
+  - apply join_list_Some in Hlargs.
+    apply (elem_of_list_fmap_1 Some) in Ha.
+    rewrite <- Hlargs in Ha.
+    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
+    now destruct v as [r|l]; cbn in Hget;
+    [apply Hmr in Hget|apply Hml in Hget].
+  - apply join_list_Some in Huargs.
+    apply (elem_of_list_fmap_1 Some) in Ha.
+    rewrite <- Huargs in Ha.
+    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
+    now destruct v as [r|l]; cbn in Hget;
+    [apply Hmr in Hget|apply Hml in Hget].
+Qed.
+
+Lemma graph_semantics_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
+  cohg_eq cohg cohg' ->
+  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+Proof.
+  intros Heq.
+  intros v w Hv Hw.
+  cbn -[ntl_total_semantics].
+
+  rewrite 2 ntl_total_semantics_alt by apply graph_namedtensorlist_semantics_WF.
+  cbn -[abstracts_semantics_alt deltas_semantics_alt].
+  apply vertices_cohg_eq in Heq as Heqv.
+  rewrite <- Heqv.
+  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  rewrite <- Heq.1, <- Heq.2.1.
+  f_equiv.
+  pose proof Heq.2.2.1 as Hequ%map_to_list_equiv.
+  unfold tg_abstracts.
+  induction Hequ as [|k_tio k_tio' ? ? Hktio Heqls IHHequ]; [done|].
+  cbn -[abstracts_semantics_alt].
+  rewrite 2 abstracts_semantics_alt_cons.
+  f_equiv; [|apply IHHequ].
+  clear IHHequ.
+  cbn -[abstract_semantics_alt].
+  destruct Hktio as (Hk & [[Ht Hi] Ho]).
+  rewrite <- Hi, <- Ho.
+  apply abstract_semantics_alt_ext_tens.
+  - pose proof Heq.2.2.1 as Hequ.
+    unfold graph_mabs.
+    rewrite 2 lookup_fmap.
+    rewrite <- Hk.
+    specialize (Hequ k_tio.1).
+    induction Hequ as [t t' Htt'|]; [cbn|done].
+    constructor.
+    apply interpretTensorProper, Htt'.
+  - eapply map_Forall_impl; [apply Hmr.2|].
+    cbn.
+    intros ? ?; apply SummedElement_iff.
+  - now apply make_vecs_map_SummedElements.
+Qed.
+
+
+Lemma graph_semantics_equiv {n m} (cohg cohg' : TensorGraph n m) :
+  cohg ≡ cohg' ->
+  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+Proof.
+  intros Heq.
+  induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].
+  rewrite <- IH.
+  destruct Heq.
+  - now apply graph_semantics_isomorphic.
+  - now apply graph_semantics_cohg_eq.
+Qed.
+
+
 
 
 End TensorGraphFacts.

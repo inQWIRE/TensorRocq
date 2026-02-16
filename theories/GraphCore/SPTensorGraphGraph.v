@@ -2,13 +2,6 @@ Require Import SPTensorGraph SPIsomorphismTesting SPGraphRewriting.
 Require Import TEPerm TensorGraph TensorGraphSP GraphRewriting.
 
 (* FIXME: Move *)
-Lemma option_relation_Forall2 {A B} (P : A -> B -> Prop) ma mb :
-  option_relation P (λ _, False) (λ _, False) ma mb <->
-  option_Forall2 P ma mb.
-Proof.
-  rewrite option_Forall2_alt.
-  done.
-Qed.
 
 
 Definition abs2tv {A} `{Countable B} (abs : A * list B * list B) : A * gmultiset B :=

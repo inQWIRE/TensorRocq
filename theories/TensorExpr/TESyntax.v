@@ -5,6 +5,7 @@ From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.
 
 Require Import Aux_stdpp Aux_pos.
+Require Import Aux_relset.
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.
@@ -3738,58 +3739,7 @@ Definition ntl_delta_perm_eq : relation namedtensorlist :=
   ntl.(ntl_abstracts) = ntl'.(ntl_abstracts) /\
   PermutationA prod_swap_eq ntl.(ntl_deltas) ntl'.(ntl_deltas).
 
-#[export] Program Instance ntl_delta_perm_eq_setoid : Equivalence ntl_delta_perm_eq.
-Next Obligation.
-  easy.
-Qed.
-Next Obligation.
-  hnf.
-  intros * Heq; hnf; split_and!; symmetry; apply Heq.
-Qed.
-Next Obligation.
-  hnf.
-  unfold ntl_delta_perm_eq.
-  intros ??? (?&?&?) (?&?&?);
-  split_and!; etransitivity; eassumption.
-Qed.
-
-
-(* FIXME: Move *)
-#[export] Instance relation_elem_of {A B} : ElemOf (A * B) (A -> B -> Prop) :=
-  fun ab R => R ab.1 ab.2.
-#[export] Instance relation_empty {A B} : Empty (A -> B -> Prop) :=
-  fun a b => False.
-#[export] Instance relation_top {A B} : Top (A -> B -> Prop) :=
-  fun a b => True.
-#[export] Instance relation_singleton {A B} : Singleton (A * B) (A -> B -> Prop) :=
-  fun ab => fun a b => (a, b) = ab.
-#[export] Instance relation_union {A B} : Union (A -> B -> Prop) :=
-  fun R R' => fun a b => R a b \/ R' a b.
-#[export] Instance relation_intersection {A B} : Intersection (A -> B -> Prop) :=
-  fun R R' => fun a b => R a b /\ R' a b.
-#[export] Instance relation_difference {A B} : Difference (A -> B -> Prop) :=
-  fun R R' => fun a b => R a b /\ ~ R' a b.
-
-#[global] Arguments relation_elem_of {_ _} _ _ / : assert.
-#[global] Arguments relation_empty {_ _} _ _ / : assert.
-#[global] Arguments relation_top {_ _} _ _ / : assert.
-#[global] Arguments relation_singleton {_ _} _ _ _ / : assert.
-#[global] Arguments relation_union {_ _} _ _ _ _ / : assert.
-#[global] Arguments relation_intersection {_ _} _ _ _ _ / : assert.
-#[global] Arguments relation_difference {_ _} _ _ _ _ / : assert.
-
-
-
-
-#[export] Program Instance relation_semi_set {A B} : SemiSet (A * B) (A -> B -> Prop).
-Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
-
-#[export] Program Instance relation_set {A B} : Set_ (A * B) (A -> B -> Prop).
-Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
-
-#[export] Program Instance relation_top_set {A B} : TopSet (A * B) (A -> B -> Prop).
-Solve All Obligations with (repeat first [intros []|intro|cbv in *; tauto]).
-
+#[export] Instance ntl_delta_perm_eq_setoid : Equivalence ntl_delta_perm_eq := _.
 
 
 Definition ntl_delta_subst (lb : positive) (r : var) : relation namedtensorlist :=
@@ -5427,13 +5377,6 @@ Qed.
 Definition ntl_eq tl : relation namedtensorlist :=
   rtc (ntl_aeq ∪ ntl_delta_eq tl).
 
-#[export] Instance union_symmetric {A} {R R' : relation A} :
-  Symmetric R -> Symmetric R' -> Symmetric (R ∪ R').
-Proof.
-  unfold Symmetric.
-  unfold union, relation_union.
-  firstorder.
-Qed.
 
 #[export] Instance ntl_eq_setoid tl : Equivalence (ntl_eq tl).
 Proof.
