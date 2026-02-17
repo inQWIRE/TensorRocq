@@ -1895,5 +1895,22 @@ Proof.
   intros; apply Hcorr.
 Qed.
 
+Definition graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
+  match graph_isos cohg cohg' with
+  | [] => false
+  | _ :: _ => true
+  end.
+
+Lemma graph_iso_partial_test_correct {n m} (cohg cohg' : CospanHyperGraph T n m) : 
+  graph_iso_partial_test cohg cohg' = true -> 
+  norm_verts cohg ≡ norm_verts cohg'.
+Proof.
+  intros Heq.
+  apply graph_isos_test.
+  revert Heq.
+  unfold graph_iso_partial_test.
+  now case_match.
+Qed.
+
 End dec_equiv.
 (* TODO: Rewrite with [@RelDecision T equiv] *)

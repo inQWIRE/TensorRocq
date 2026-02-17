@@ -3376,6 +3376,39 @@ Proof.
   - apply ntl_delta_eq_correct; easy.
 Qed.
 
+
+Lemma abstract_semantics_alt_ext_tens (mabs : Pmap DimensionlessTensor)
+   ml mr mabs'
+  idx idx' lower upper :
+  mabs !! idx ≡ mabs' !! idx' ->
+  map_Forall (λ _ a, SummedElement a) mr ->
+  map_Forall (λ _ a, SummedElement a) ml ->
+  abstract_semantics_alt mabs ml mr idx lower upper ==
+  abstract_semantics_alt mabs' ml mr idx' lower upper.
+Proof.
+  intros Hidx Hmr Hml.
+  unfold abstract_semantics_alt.
+  induction Hidx as [dt dt' Hdt|]; [|cbn; now rewrite !option_bind_None_r].
+  cbn.
+  destruct (join_list (_ <$> lower)) as [largs|] eqn:Hlargs; [cbn|done].
+  destruct (join_list (_ <$> upper)) as [uargs|] eqn:Huargs; [cbn|done].
+  apply Hdt; apply SummedElement_vec_iff_Forall;
+  rewrite vec_to_list_to_vec, Forall_forall;
+  intros a Ha.
+  - apply join_list_Some in Hlargs.
+    apply (elem_of_list_fmap_1 Some) in Ha.
+    rewrite <- Hlargs in Ha.
+    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
+    now destruct v as [r|l]; cbn in Hget;
+    [apply Hmr in Hget|apply Hml in Hget].
+  - apply join_list_Some in Huargs.
+    apply (elem_of_list_fmap_1 Some) in Ha.
+    rewrite <- Huargs in Ha.
+    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
+    now destruct v as [r|l]; cbn in Hget;
+    [apply Hmr in Hget|apply Hml in Hget].
+Qed.
+
 (* Fixpoint join_vec {A n} (v : vec (option A) n) : option (vec A n) :=
   match v in vec _ n return option (vec A n) with
   | [#] => Some [#]

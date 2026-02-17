@@ -1029,6 +1029,13 @@ Qed.
   Equiv (CospanHyperGraph T n m) :=
   rtc (isomorphic ∪ cohg_eq).
 
+#[export] Instance CospanHyperGraph_equivalence `{Equiv T, Equivalence T equiv} {n m} :
+  Equivalence (≡@{CospanHyperGraph T n m}).
+Proof.
+  apply rtc_equivalence.
+  apply _.
+Qed.
+
 Lemma cohg_equiv_alt `{Equiv T, Equivalence T equiv} {n m}
   (cohg cohg' : CospanHyperGraph T n m) :
   cohg ≡ cohg' <-> exists cohg'', isomorphic cohg cohg'' /\ cohg_eq cohg'' cohg'.

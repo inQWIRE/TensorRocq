@@ -256,6 +256,11 @@ Proof.
 Qed.
 
 
+Lemma hyperedges_singleton {T} k abs :
+  hyperedges (T:=T) {[k := abs]} = {[k := abs]}.
+Proof.
+  done.
+Qed.
 
 (* Notation HyperGraph T := (Pmap (T * list positive * list positive)).
 

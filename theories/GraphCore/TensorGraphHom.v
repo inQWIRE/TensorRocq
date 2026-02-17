@@ -1,5 +1,22 @@
 Require Export TensorGraph GraphRewriting TensorGraphExpr
-  TensorGraphSemantics TensorGraphFacts.
+  TensorGraphSemantics.
+
+
+#[export] Instance cohg_eq_subrelation `{Equiv T} {n m} :
+  subrelation (@cohg_eq T n m _) equiv.
+Proof.
+  intros ? ? ?; now apply rtc_once; right.
+Qed.
+
+#[export] Instance isomorphic_subrelation `{Equiv T} {n m} :
+  subrelation (@isomorphic T n m) equiv.
+Proof.
+  intros ? ? ?; now apply rtc_once; left.
+Qed.
+
+
+
+
 
 Definition hypergraph_apply_hom {T T'} (f : T -> T')
  (hg : HyperGraph T) : HyperGraph T' :=
@@ -163,6 +180,27 @@ Proof.
   apply (inj _).
 Qed.
 
+Lemma hypergraph_apply_hom_equiv_inv `{Equiv T, Equiv T'}
+  `{!Inj equiv equiv f} hg hg' :
+  (hypergraph_apply_hom f hg) ≡ (hypergraph_apply_hom f hg') ->
+  hg ≡ hg'.
+Proof.
+  intros Heq.
+  split; [|apply Heq.2].
+  intros i.
+  specialize (Heq.1 i).
+  cbn.
+  rewrite 2 lookup_fmap.
+  unfold equiv, option_equiv.
+  rewrite <- 2 option_relation_Forall2.
+  destruct (hg.(hyperedges) !! i), (hg'.(hyperedges) !! i); [|done..].
+  cbn.
+  intros Htio.
+  split; [|apply Htio].
+  split; [|apply Htio].
+  apply (inj f _ _ Htio.1.1).
+Qed.
+
 
 End hypergraph_hom.
 
@@ -186,6 +224,14 @@ Proof.
   apply hypergraph_apply_hom_reindex.
 Qed.
 
+Lemma graph_apply_hom_add_top_loop {n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  graph_apply_hom f (add_top_loop cohg) =
+  add_top_loop (graph_apply_hom f cohg).
+Proof.
+  unfold add_top_loop.
+  rewrite graph_apply_hom_relabel_graph.
+  done.
+Qed.
 
 Context {n m : nat}.
 
@@ -231,6 +277,35 @@ Proof.
   done.
 Qed.
 
+Lemma graph_apply_hom_swapped_stack_graphs_aux {n' m'} cohg (cohg' : CospanHyperGraph T n' m') :
+  graph_apply_hom f (swapped_stack_graphs_aux cohg cohg') =
+  swapped_stack_graphs_aux (graph_apply_hom f cohg) (graph_apply_hom f cohg').
+Proof.
+  apply cohg_ext; [|done..].
+  apply hypergraph_apply_hom_union.
+Qed.
+
+Lemma graph_apply_hom_swapped_stack_graphs {n' m'} cohg (cohg' : CospanHyperGraph T n' m') :
+  graph_apply_hom f (swapped_stack_graphs cohg cohg') =
+  swapped_stack_graphs (graph_apply_hom f cohg) (graph_apply_hom f cohg').
+Proof.
+  unfold swapped_stack_graphs.
+  rewrite graph_apply_hom_swapped_stack_graphs_aux, 2 graph_apply_hom_relabel_graph,
+    2 graph_apply_hom_reindex_graph.
+  done.
+Qed.
+
+Lemma graph_apply_hom_add_top_loops {o}
+  (cohg : CospanHyperGraph T (o + n) (o + m)) :
+  graph_apply_hom f (add_top_loops cohg) =
+  add_top_loops (graph_apply_hom f cohg).
+Proof.
+  induction o as [|o IHo]; [done|].
+  cbn.
+  rewrite IHo, graph_apply_hom_add_top_loop.
+  done.
+Qed.
+
 Lemma graph_apply_hom_stack_graphs_aux {n' m'} cohg (cohg' : CospanHyperGraph T n' m') :
   graph_apply_hom f (stack_graphs_aux cohg cohg') =
   stack_graphs_aux (graph_apply_hom f cohg) (graph_apply_hom f cohg').
@@ -270,6 +345,17 @@ Proof.
   done.
 Qed.
 
+Lemma graph_apply_hom_compose_graphs_unsafe {o} cohg (cohg' : CospanHyperGraph T m o) :
+  graph_apply_hom f (compose_graphs_unsafe cohg cohg') =
+  compose_graphs_unsafe (graph_apply_hom f cohg) (graph_apply_hom f cohg').
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  rewrite hypergraph_apply_hom_add_vertices,
+    hypergraph_apply_hom_union.
+  done.
+Qed.
+
 Lemma graph_apply_hom_isomorphic cohg cohg' :
   isomorphic cohg cohg' ->
   isomorphic (graph_apply_hom f cohg) (graph_apply_hom f cohg').
@@ -289,7 +375,6 @@ Proof.
   apply (inj _).
 Qed.
 
-
 Lemma graph_apply_hom_isomorphic_inv `{!Inj eq eq f} cohg cohg' :
   isomorphic (graph_apply_hom f cohg) (graph_apply_hom f cohg') ->
   isomorphic cohg cohg'.
@@ -301,6 +386,61 @@ Proof.
   now constructor.
 Qed.
 
+Lemma graph_apply_hom_cohg_eq_inv `{Equiv T, Equiv T'}
+  `{!Inj equiv equiv f} cohg cohg' :
+  cohg_eq (graph_apply_hom f cohg) (graph_apply_hom f cohg') ->
+  cohg_eq cohg cohg'.
+Proof.
+  intros Heq.
+  apply mk_cohg_eq; [apply Heq..|].
+  apply (hypergraph_apply_hom_equiv_inv f), Heq.
+Qed.
+
+
+Lemma graph_apply_hom_equiv_inv `{Equiv T, Reflexive T equiv, Equiv T', 
+  Equivalence T' equiv}
+  `{!Inj equiv equiv f} cohg cohg' :
+  (graph_apply_hom f cohg) ≡ (graph_apply_hom f cohg') ->
+  cohg ≡ cohg'.
+Proof.
+  intros (cohg'' & (fe & fv & Hfe & Hfv & ->)%isomorphic_exists & Heq)%cohg_equiv_alt.
+  rewrite <- graph_apply_hom_reindex_graph, 
+    <- graph_apply_hom_relabel_graph in Heq.
+  apply graph_apply_hom_cohg_eq_inv in Heq.
+  etransitivity; [|apply cohg_eq_subrelation, Heq].
+  apply isomorphic_subrelation.
+  now constructor.
+Qed.
+
+
+Lemma referrenced_vertices_graph_apply_hom cohg :
+  referrenced_vertices (graph_apply_hom f cohg) =
+  referrenced_vertices cohg.
+Proof.
+  unfold referrenced_vertices.
+  f_equal.
+  cbn.
+  rewrite map_to_list_fmap, list_fmap_bind.
+  done.
+Qed.
+
+Lemma isolated_vertices_graph_apply_hom cohg :
+  isolated_vertices (graph_apply_hom f cohg) =
+  isolated_vertices cohg.
+Proof.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_graph_apply_hom.
+  done.
+Qed.
+
+Lemma graph_apply_hom_norm_verts cohg :
+  graph_apply_hom f (norm_verts cohg) = norm_verts (graph_apply_hom f cohg).
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  rewrite isolated_vertices_graph_apply_hom.
+  done.
+Qed.
 
 End graph_hom.
 

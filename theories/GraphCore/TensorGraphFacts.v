@@ -1469,11 +1469,6 @@ Proof.
       repeat first [lia|f_equal].
 Qed.
 
-Lemma hyperedges_singleton k abs :
-  hyperedges (T:=T) {[k := abs]} = {[k := abs]}.
-Proof.
-  done.
-Qed.
 
 Lemma vertices_graph_of_tensor (t : T) n m :
   vertices (graph_of_tensor t n m) =
@@ -1831,38 +1826,6 @@ Proof.
   unfold vertices.
   f_equal; [now apply (vertices_hg_equiv _ _), Heq|].
   now rewrite Heq.1, Heq.2.1.
-Qed.
-
-Lemma abstract_semantics_alt_ext_tens (mabs : Pmap (@DimensionlessTensor R A))
-   ml mr mabs'
-  idx idx' lower upper :
-  mabs !! idx ≡ mabs' !! idx' ->
-  map_Forall (λ _ a, SummedElement a) mr ->
-  map_Forall (λ _ a, SummedElement a) ml ->
-  abstract_semantics_alt (rO:=rO) mabs ml mr idx lower upper ==
-  abstract_semantics_alt (rO:=rO) mabs' ml mr idx' lower upper.
-Proof.
-  intros Hidx Hmr Hml.
-  unfold abstract_semantics_alt.
-  induction Hidx as [dt dt' Hdt|]; [|cbn; now rewrite !option_bind_None_r].
-  cbn.
-  destruct (join_list (_ <$> lower)) as [largs|] eqn:Hlargs; [cbn|done].
-  destruct (join_list (_ <$> upper)) as [uargs|] eqn:Huargs; [cbn|done].
-  apply Hdt; apply SummedElement_vec_iff_Forall;
-  rewrite vec_to_list_to_vec, Forall_forall;
-  intros a Ha.
-  - apply join_list_Some in Hlargs.
-    apply (elem_of_list_fmap_1 Some) in Ha.
-    rewrite <- Hlargs in Ha.
-    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
-    now destruct v as [r|l]; cbn in Hget;
-    [apply Hmr in Hget|apply Hml in Hget].
-  - apply join_list_Some in Huargs.
-    apply (elem_of_list_fmap_1 Some) in Ha.
-    rewrite <- Huargs in Ha.
-    apply elem_of_list_fmap in Ha as (v & Hget%eq_sym & Hv).
-    now destruct v as [r|l]; cbn in Hget;
-    [apply Hmr in Hget|apply Hml in Hget].
 Qed.
 
 Lemma graph_semantics_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
