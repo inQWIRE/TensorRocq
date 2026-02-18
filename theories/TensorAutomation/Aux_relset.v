@@ -129,3 +129,40 @@ Proof.
 Qed.
 
 End preimage.
+
+
+Lemma elem_of_relation {A} {RA : relation A} xy :
+  xy ∈ RA <-> RA xy.1 xy.2.
+Proof.
+  done.
+Qed.
+Lemma elem_of_relation_pair {A} {RA : relation A} x y :
+  (x, y) ∈ RA <-> RA x y.
+Proof.
+  done.
+Qed.
+Lemma relation_equiv_iff {A} {RA RA' : relation A} :
+  RA ≡ RA' <-> forall a a', RA a a' <-> RA' a a'.
+Proof.
+  split; [|intros Heq xy; apply Heq].
+  intros Heq a a'.
+  apply (Heq (a, a')).
+Qed.
+Lemma relation_subseteq_iff {A} {RA RA' : relation A} :
+  RA ⊆ RA' <-> subrelation RA RA'.
+Proof.
+  split; [|intros Heq xy; apply Heq].
+  intros Heq a a'.
+  apply (Heq (a, a')).
+Qed.
+Lemma rtc_prod_relation `{RA : relation A, RB : relation B} :
+  rtc (prod_relation RA RB) ⊆ prod_relation (rtc RA) (rtc RB).
+Proof.
+  apply relation_subseteq_iff.
+  intros [a b] [a' b'].
+  intros Heq.
+  induction Heq; [done|].
+  etransitivity; [|eassumption].
+  unfold prod_relation in *.
+  split; now apply rtc_once.
+Qed.

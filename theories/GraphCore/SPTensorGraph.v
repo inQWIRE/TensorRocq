@@ -75,9 +75,9 @@ Section CospanSPHyperGraph.
       tg.1)
   <- tg.(spoutputs). *)
 
-  Definition add_edge {T : Type} {o p} (n : positive) (t : T) (tg : CospanSPHyperGraph T o p) :
+  (* Definition add_edge {T : Type} {o p} (n : positive) (t : T) (tg : CospanSPHyperGraph T o p) :
   CospanSPHyperGraph T o p :=
-    tg.2.1 -> (<[ n := (t, ∅) ]> tg.1) <- tg.2.2.
+    tg.2.1 -> (<[ n := (t, ∅) ]> tg.1) <- tg.2.2. *)
 
   (* Instance insert_sphg {T: Type} : Insert positive T (SPHyperGraph T) := {
     insert := add_edge
@@ -87,11 +87,11 @@ Section CospanSPHyperGraph.
     empty := Vector.nil -> ∅ <- Vector.nil
   }.
 
-  Definition add_input {n m} (p : positive) (tg : CospanSPHyperGraph T n m) : CospanSPHyperGraph T (S n) m :=
+  (* Definition add_input {n m} (p : positive) (tg : CospanSPHyperGraph T n m) : CospanSPHyperGraph T (S n) m :=
   Vector.cons p tg.2.1 -> tg.1 <- tg.2.2.
 
   Definition add_output {n m} (p : positive) (tg : CospanSPHyperGraph T n m) : CospanSPHyperGraph T n (S m) :=
-  tg.2.1 -> tg.1 <- Vector.cons p tg.2.2.
+  tg.2.1 -> tg.1 <- Vector.cons p tg.2.2. *)
 
   (* Local Open Scope positive.
   Local Open Scope vector_scope.
@@ -114,7 +114,7 @@ Definition is_internal tm (e : edge) :=
 
 Definition not_internal tm (e : edge) :=
   ~ is_internal tm e. *)
-
+(* 
 Definition wrapover_r {n m} (tg : CospanSPHyperGraph T n m) :=
   match tg with
   | l -> sphg <- r => [#] -> sphg <- l +++ r
@@ -138,7 +138,7 @@ Definition wrapunder_l {n m} (tg : CospanSPHyperGraph T n m) :=
 Notation "⌊ csphg" := (wrapunder_r csphg) (at level 50).
 Notation "⌈ csphg" := (wrapover_r csphg) (at level 50).
 Notation "csphg ⌉" := (wrapover_l csphg) (at level 50).
-Notation "csphg ⌋" := (wrapunder_l csphg) (at level 50).
+Notation "csphg ⌋" := (wrapunder_l csphg) (at level 50). *)
 
 (* Definition internal_edges tg :=
   filter (is_internal tg.1) tg.2. *)
@@ -760,7 +760,50 @@ Proof.
     now rewrite invfun_linv by first [intros ????;apply Hf|easy].
 Qed.
 
+Definition cosphg_eq `{Equiv T} : relation CoHyGraph :=
+  fun cosphg cosphg' =>
+  cosphg.(spinputs) = cosphg'.(spinputs) /\
+  cosphg.(spoutputs) = cosphg'.(spoutputs) /\
+  cosphg.(sphedges) ≡ cosphg'.(sphedges).
+
+#[export] Instance cosphg_eq_equivalence `{Equiv T, Equivalence T equiv} :
+  Equivalence cosphg_eq.
+Proof.
+  apply rel_intersection_equiv, rel_intersection_equiv;
+  refine (rel_preimage_equiv _ _ _).
+Qed.
+
+Lemma mk_cosphg_eq `{Equiv T} cosphg cosphg' :
+  cosphg.(spinputs) = cosphg'.(spinputs) ->
+  cosphg.(spoutputs) = cosphg'.(spoutputs) ->
+  cosphg.(sphedges) ≡ cosphg'.(sphedges) ->
+  cosphg_eq cosphg cosphg'.
+Proof.
+  easy.
+Qed.
+
 End CospanSPHyperGraph.
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+  (@relabel_spgraph T n m f) with signature cosphg_eq ==> cosphg_eq as
+  relabel_spgraph_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & Hhedge).
+  apply mk_cosphg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+  (@reindex_spgraph T n m f) with signature cosphg_eq ==> cosphg_eq as
+  reindex_spgraph_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & Hhedge).
+  apply mk_cosphg_eq; [done..|].
+  cbn.
+  now f_equiv.
+Qed.
 
 Add Parametric Relation {T n m} : (CospanSPHyperGraph T n m) spisomorphic
   reflexivity proved by spisomorphic_refl
@@ -856,3 +899,209 @@ Definition spgraph_of_tensor {T} (t : T) (n m : nat) : CospanSPHyperGraph T n m 
     {[xH := (t, list_to_set_disj ((bcons false ∘ Pos.of_succ_nat <$> seq 0 n)
       ++ (bcons true ∘ Pos.of_succ_nat <$> seq 0 m)))]} <-
   vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m).
+
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} :
+  (@sphg_add_vertices T) with signature equiv ==> eq ==> equiv as
+  sphg_add_vertices_equiv.
+Proof.
+  intros sphg sphg' (He & Hv) vs.
+  split; [|now cbn; f_equal].
+  apply He.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@stack_spgraphs_aux T n m n' m') with signature
+  cosphg_eq ==> cosphg_eq ==> cosphg_eq as stack_spgraphs_aux_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' (Hins1 & Houts1 & He1)
+    cosphg2 cosphg2' (Hins2 & Houts2 & He2).
+  apply mk_cosphg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@stack_spgraphs T n m n' m') with signature
+  cosphg_eq ==> cosphg_eq ==> cosphg_eq as stack_spgraphs_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' Heq1 cosphg2 cosphg2' Heq2.
+  unfold stack_spgraphs.
+  now do 3 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} :
+  (@spadd_top_loop T n m) with signature
+  cosphg_eq ==> cosphg_eq as spadd_top_loop_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & Hes).
+  apply mk_cosphg_eq; [cbn; repeat first [assumption|f_equal]..|].
+  cbn.
+  rewrite <- Hins, <- Houts.
+  apply (relabel_sphg_proper _ _ _).
+  f_equiv; done.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m o} :
+  (@spadd_top_loops T n m o) with signature
+  cosphg_eq ==> cosphg_eq as spadd_top_loops_cosphg_eq.
+Proof.
+  induction n; [done|].
+  intros cosphg cosphg' Heq.
+  cbn.
+  apply IHn.
+  now f_equiv.
+Qed.
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@swapped_stack_spgraphs_aux T n m n' m') with signature
+  cosphg_eq ==> cosphg_eq ==> cosphg_eq as swapped_stack_spgraphs_aux_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' (Hins1 & Houts1 & He1)
+    cosphg2 cosphg2' (Hins2 & Houts2 & He2).
+  apply mk_cosphg_eq; [now cbn; f_equal..|].
+  cbn.
+  now f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m n' m'} :
+  (@swapped_stack_spgraphs T n m n' m') with signature
+  cosphg_eq ==> cosphg_eq ==> cosphg_eq as swapped_stack_spgraphs_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' Heq1 cosphg2 cosphg2' Heq2.
+  unfold swapped_stack_spgraphs.
+  now do 3 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m o} :
+  (@compose_spgraphs_alt T n m o) with signature
+  cosphg_eq ==> cosphg_eq ==> cosphg_eq as compose_spgraphs_alt_cosphg_eq.
+Proof.
+  unfold compose_spgraphs_alt.
+  intros; now do 2 f_equiv.
+Qed.
+
+
+#[export] Instance CospanSPHyperGraph_equiv `{Equiv T} {n m} :
+  Equiv (CospanSPHyperGraph T n m) :=
+  rtc (spisomorphic ∪ cosphg_eq).
+
+#[export] Instance CospanSPHyperGraph_equivalence `{Equiv T, Equivalence T equiv} {n m} :
+  Equivalence (≡@{CospanSPHyperGraph T n m}).
+Proof.
+  apply rtc_equivalence.
+  apply _.
+Qed.
+
+Lemma cosphg_equiv_alt `{Equiv T, Equivalence T equiv} {n m}
+  (cosphg cosphg' : CospanSPHyperGraph T n m) :
+  cosphg ≡ cosphg' <-> exists cosphg'', spisomorphic cosphg cosphg'' /\ cosphg_eq cosphg'' cosphg'.
+Proof.
+  split; cycle 1.
+  - intros (cosphg'' & Hiso & Heq).
+    transitivity cosphg'';
+    apply rtc_once; [now left|now right].
+  - intros Hrtc.
+    induction Hrtc as [cosphg|cosphg1 cosphg2 cosphg3 Heq12 Hrtc23 IH]; [now exists cosphg|].
+    destruct IH as (cosphg2' & Hiso2 & Heq2'3).
+    destruct Heq12 as [Hiso12|Heq12].
+    + exists cosphg2'.
+      split; [etransitivity; eauto|].
+      done.
+    + induction Hiso2 as [cosphg2 fv fe Hfe Hfv].
+      exists (relabel_spgraph fe (reindex_spgraph fv cosphg1)).
+      split; [now constructor|].
+      now rewrite Heq12.
+Qed.
+
+Lemma proper_cosphg_equiv_of_eq_iso_unary `{Equiv T1, Equiv T2, 
+  Equivalence T1 equiv} {n1 m1 n2 m2} 
+  (f : CospanSPHyperGraph T1 n1 m1 -> CospanSPHyperGraph T2 n2 m2) : 
+  Proper (spisomorphic ==> spisomorphic) f ->
+  Proper (cosphg_eq ==> cosphg_eq) f ->
+  Proper (equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cosphg cosphg' (cosphg'' & Hiso%Hfiso & Heq%Hfeq)%cosphg_equiv_alt.
+  transitivity (f cosphg'');
+  apply rtc_once; [now left|now right].
+Qed.
+
+Lemma proper_cosphg_equiv_of_eq_iso_binary `{Equiv T1, Equiv T2, Equiv T3,
+  Equivalence T1 equiv, Equivalence T2 equiv} {n1 m1 n2 m2 n3 m3} 
+  (f : CospanSPHyperGraph T1 n1 m1 -> CospanSPHyperGraph T2 n2 m2 ->
+    CospanSPHyperGraph T3 n3 m3) : 
+  Proper (spisomorphic ==> spisomorphic ==> spisomorphic) f ->
+  Proper (cosphg_eq ==> cosphg_eq ==> cosphg_eq) f ->
+  Proper (equiv ==> equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cosphg1 cosphg1' (cosphg1'' & Hiso1 & Heq1)%cosphg_equiv_alt.
+  intros cosphg2 cosphg2' (cosphg2'' & Hiso2 & Heq2)%cosphg_equiv_alt.
+  transitivity (f cosphg1'' cosphg2'');
+  apply rtc_once; [now left; apply Hfiso|now right; apply Hfeq].
+Qed.
+
+
+Definition spreferrenced_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  Pset :=
+  list_to_set (cosphg.(spinputs) ++ cosphg.(spoutputs))
+    ∪ list_to_set (map_to_list (cosphg.(sphedges).(sphyperedges)) ≫=
+    λ k_flu : (positive*(SPHyperEdge T)), (elements k_flu.2.2)).
+
+Definition spisolated_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  Pset :=
+  cosphg.(sphedges).(sphypervertices)
+    ∖ spreferrenced_vertices cosphg.
+
+
+Lemma vertices_decomp {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  vertices cosphg = spisolated_vertices cosphg ∪ spreferrenced_vertices cosphg.
+Proof.
+  unfold vertices, spisolated_vertices.
+  rewrite difference_union_L.
+  unfold vertices_sphg, spreferrenced_vertices.
+  apply set_eq.
+  intros ?.
+  rewrite 4 elem_of_union; tauto.
+Qed.
+
+Lemma spisolated_referrenced_disjoint {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spisolated_vertices cosphg ## spreferrenced_vertices cosphg.
+Proof.
+  unfold spisolated_vertices.
+  now apply disjoint_difference_l1.
+Qed.
+
+Definition set_spverts {T n m} (cosphg : CospanSPHyperGraph T n m)
+  (vs : Pset) : CospanSPHyperGraph T n m :=
+  mk_cosphg (mk_sphg cosphg.(sphedges).(sphyperedges) vs) cosphg.(spinputs) cosphg.(spoutputs).
+
+Definition norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  CospanSPHyperGraph T n m := set_spverts cosphg (spisolated_vertices cosphg).
+
+Lemma spreferrenced_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spreferrenced_vertices (norm_spverts cosphg) = spreferrenced_vertices cosphg.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma spisolated_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spisolated_vertices (norm_spverts cosphg) = spisolated_vertices cosphg.
+Proof.
+  unfold spisolated_vertices.
+  cbn.
+  unfold spisolated_vertices.
+  rewrite spreferrenced_vertices_norm_spverts.
+  apply difference_twice_L.
+Qed.
+
+
+Lemma vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  vertices (norm_spverts cosphg) = vertices cosphg.
+Proof.
+  now rewrite 2 vertices_decomp,
+    spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
+Qed.

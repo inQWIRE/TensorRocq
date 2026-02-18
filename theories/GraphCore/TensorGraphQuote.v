@@ -1,4 +1,5 @@
 Require Export TensorGraphHom.
+Require Export AbstractTensorQuote.
 
 (* TODO: Quote from CospanHyperGraph T to
   CospanHyperGraph positive, via CospanHyperGraph (option T).
@@ -114,13 +115,6 @@ Class CospanHyperGraphQuote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
 }.
 
 #[global] Hint Mode CospanHyperGraphQuote + + + - + - + + - + : typeclass_instances.
-
-Class AbstractTensorQuote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T') (ctx : Ctx)
-  (t : T) (t' : T') := {
-  abs_quote : f ctx t ≡ t'
-}.
-
-#[global] Hint Mode AbstractTensorQuote + + + - + + - + : typeclass_instances.
 
 
 Lemma cohg_quote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
@@ -359,21 +353,6 @@ Class CospanHyperGraphDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
 
 #[global] Hint Mode CospanHyperGraphDenote + + + - + - + + + - : typeclass_instances.
 
-Class AbstractTensorDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T') (ctx : Ctx)
-  (t : T) (t' : T') := {
-  abs_denote : f ctx t ≡ t'
-}.
-
-#[global] Hint Mode AbstractTensorDenote + + + - + + + - : typeclass_instances.
-
-#[export] Instance abstens_denote_default {Ctx T} `{Equiv T', Reflexive T' equiv}
-  (f : Ctx -> T -> T') (ctx : Ctx) (t : T) :
-  AbstractTensorDenote f ctx t (f ctx t) | 100.
-Proof.
-  constructor.
-  reflexivity.
-Qed.
-
 
 Lemma cohg_denote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
   Equiv T', Equivalence T' equiv}
@@ -402,12 +381,6 @@ Context {Ctx T} `{Equiv T'} `{Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx).
 
 Local Notation Denote := (@CospanHyperGraphDenote Ctx T T' _ f ctx _ _).
-
-#[export] Instance cohg_denote_graph_apply_hom {n m} (expr : CospanHyperGraph T n m) :
-  Denote expr (graph_apply_hom (f ctx) expr).
-Proof.
-  now constructor.
-Qed.
 
 #[export] Instance cohg_denote_id_graph {n} : Denote (id_graph n) (id_graph n).
 Proof.
@@ -630,8 +603,7 @@ Qed.
 
 
 
-Lemma graph_to_option_correct_equiv
-  `{TensorLike R rO rI radd rmul req A T}
+Lemma graph_to_option_correct_equiv `{Equiv T, Equivalence T equiv}
   {n m} (expr expr' : CospanHyperGraph T n m) val val' :
   CospanHyperGraphDenote (fun _ => Some) tt expr val ->
   CospanHyperGraphDenote (fun _ => Some) tt expr' val' ->
@@ -647,158 +619,39 @@ Qed.
 
 
 
-
-
-
-Inductive IsNth {A} : forall (a : A) (i : nat) (l : list A), Prop :=
-  | IsNth_here a l : IsNth a 0 (a :: l)
-  | IsNth_later a i a' l : IsNth a i l -> IsNth a (S i) (a' :: l).
-
-Lemma IsNth_iff_base {A} (a : A) i l :
-  IsNth a i l <-> (i < length l /\ forall d, nth i l d = a)%nat.
-Proof.
-  split.
-  - intros Hisn.
-    induction Hisn; (split; [cbn; lia|]).
-    + reflexivity.
-    + intros ?.
-      cbn.
-      easy.
-  - intros [Hil Hnth].
-    revert l Hil Hnth;
-    induction i; intros l Hil Hnth.
-    + destruct l; [easy|].
-      generalize (Hnth a).
-      cbn.
-      intros ->.
-      constructor.
-    + destruct l; [easy|].
-      cbn in Hil.
-      apply <- Nat.succ_lt_mono in Hil.
-      constructor.
-      auto.
-Qed.
-
-Lemma IsNth_iff {A} (a : A) i l :
-  IsNth a i l <-> l !! i = Some a.
-Proof.
-  split.
-  - intros Hisn.
-    induction Hisn; [done|].
-    cbn.
-    done.
-  - revert l;
-    induction i; intros l Hil.
-    + destruct l; [easy|].
-      cbn in Hil.
-      revert Hil.
-      intros [= ->].
-      constructor.
-    + destruct l; [easy|].
-      cbn in Hil.
-      constructor.
-      auto.
-Qed.
-
-
-
-(* On a goal [IsNth a ?i l], where [l] is [a0 :: a1 :: ... :: an :: ?l]
-  (i.e. ends in an evar), solves it with the smallest [i] such that
-  [a] and [ai] are convertible, or appends [a] to [l] if not (by
-  instantiating [?l := a :: ?l']). Assumes that [a] and all the [ai]
-  are ground terms (i.e. are not evars), and that [l] ends in an evar as
-  described above (if [a] is in [l], the latter condition is not necessary). *)
-Ltac get_nth :=
-  lazymatch goal with
-  | |- @IsNth ?A ?a ?i_evar ?l =>
-    tryif is_evar l then
-      idtac "evar" l;
-      let l' := fresh "l" in
-      evar (l' : list A);
-      let l' := eval unfold l' in l' in
-      refine (IsNth_here a l');
-      shelve
-    else
-      lazymatch l with
-      | ?a0 :: ?lrest =>
-        idtac "trying" a0;
-        tryif unify a a0 then
-          idtac "succeeded";
-          refine (IsNth_here a lrest);
-          shelve
-        else
-          idtac "failed";
-          refine (IsNth_later a _ a0 lrest _);
-          shelve_unifiable;
-          get_nth
-      | _ => fail "get_nth: list" l "is not an evar or a cons"
-      end
-  | |- ?G => fail "get_nth: goal is not of the form 'IsNth a ?i l' (goal:" G ")"
-  end.
-
-
-(* Splits a goal [Forall2 P l l'] according to the structure of [l].
-  In particular, if [l] is concrete and [l'] is an evar, [l'] will be
-  filled with evars to match the length of [l] *)
-Ltac split_forall2 := match goal with
-  | |- Forall2 _ (cons _ _) _ => apply List.Forall2_cons; [|split_forall2]
-  | |- Forall2 _ nil _ => apply List.Forall2_nil
-  | _ => idtac
-  end.
-
-(* To make the [IsNth] condition work, we use the following hint *)
-#[export] Hint Extern 0 (IsNth _ _ _) => get_nth : typeclass_instances.
-
-
-
-
-#[local] Instance positive_equiv : Equiv positive := eq.
-
-Definition interp_discrete_hg {T} (l : list T) (p : positive) :
-  option T :=
-  l !! (pos_to_nat_pred p).
-
-#[local] Instance interp_discrete_hg_proper `{Equiv T, Reflexive T equiv} ctx :
-  Proper (equiv ==> equiv) (@interp_discrete_hg T ctx).
-Proof.
-  intros ? ? [].
-  now apply option_Forall2_refl.
-Qed.
-
-#[export] Instance abstens_quote_discrete `{Equiv T, Reflexive T equiv}
-  (ctx : list T) (n : nat) (t : T) : IsNth t n ctx ->
-  AbstractTensorQuote interp_discrete_hg ctx (Pos.of_succ_nat n) (Some t).
-Proof.
-  intros Hn%IsNth_iff.
-  constructor.
-  unfold interp_discrete_hg.
-  rewrite pos_to_nat_pred_of_nat.
-  rewrite Hn.
-  now apply option_Forall2_refl.
-Qed.
+Local Existing Instance positive_equiv.
 
 
 Lemma graph_equiv_of_positive `{Equiv T, Equivalence T equiv}
-  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) val val' :
-  CospanHyperGraphQuote interp_discrete_hg ctx expr val ->
-  CospanHyperGraphQuote interp_discrete_hg ctx expr' val' ->
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) 
+  val val' oval oval' :
+  CospanHyperGraphDenote (λ _, Some) tt val oval ->
+  CospanHyperGraphDenote (λ _, Some) tt val' oval' ->
+  CospanHyperGraphQuote interp_discrete_hg ctx expr oval ->
+  CospanHyperGraphQuote interp_discrete_hg ctx expr' oval' ->
   expr ≡ expr' ->
   val ≡ val'.
 Proof.
-  intros Hval Hval'.
-  now apply (cohg_quote_correct_equiv interp_discrete_hg ctx), _.
+  intros Hoval Hoval' Hval Hval'.
+  intros Heq.
+  apply (cohg_quote_correct_equiv interp_discrete_hg ctx _ _ oval oval') in Heq.
+  revert Heq.
+  apply graph_to_option_correct_equiv; apply _.
 Qed.
 
 Lemma graph_test_isomorphism_quote `{Equiv T, Equivalence T equiv}
-  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) val val' :
-  CospanHyperGraphQuote interp_discrete_hg ctx expr val ->
-  CospanHyperGraphQuote interp_discrete_hg ctx expr' val' ->
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) val val' oval oval' :
+  CospanHyperGraphDenote (λ _, Some) tt val oval ->
+  CospanHyperGraphDenote (λ _, Some) tt val' oval' ->
+  CospanHyperGraphQuote interp_discrete_hg ctx expr oval ->
+  CospanHyperGraphQuote interp_discrete_hg ctx expr' oval' ->
   graph_iso_partial_test expr expr' = true ->
   norm_verts val ≡ norm_verts val'.
 Proof.
-  intros Hval Hval' Heq%graph_iso_partial_test_correct.
+  intros Hoval Hoval' Hval Hval' Heq%graph_iso_partial_test_correct.
   revert Heq.
-  apply graph_equiv_of_positive with ctx; apply _.
+  apply graph_equiv_of_positive with ctx (norm_verts oval) (norm_verts oval');
+    apply _.
 Qed.
 
 

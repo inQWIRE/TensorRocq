@@ -5,43 +5,6 @@ Require Export Aux_stdpp Aux_pos.
 Require Export HyperGraph.
 Require Import TESyntax.
 
-(* FIXME: Move *)
-Lemma elem_of_relation {A} {RA : relation A} xy :
-  xy ∈ RA <-> RA xy.1 xy.2.
-Proof.
-  done.
-Qed.
-Lemma elem_of_relation_pair {A} {RA : relation A} x y :
-  (x, y) ∈ RA <-> RA x y.
-Proof.
-  done.
-Qed.
-Lemma relation_equiv_iff {A} {RA RA' : relation A} :
-  RA ≡ RA' <-> forall a a', RA a a' <-> RA' a a'.
-Proof.
-  split; [|intros Heq xy; apply Heq].
-  intros Heq a a'.
-  apply (Heq (a, a')).
-Qed.
-Lemma relation_subseteq_iff {A} {RA RA' : relation A} :
-  RA ⊆ RA' <-> subrelation RA RA'.
-Proof.
-  split; [|intros Heq xy; apply Heq].
-  intros Heq a a'.
-  apply (Heq (a, a')).
-Qed.
-Lemma rtc_prod_relation `{RA : relation A, RB : relation B} :
-  rtc (prod_relation RA RB) ⊆ prod_relation (rtc RA) (rtc RB).
-Proof.
-  apply relation_subseteq_iff.
-  intros [a b] [a' b'].
-  intros Heq.
-  induction Heq; [done|].
-  etransitivity; [|eassumption].
-  unfold prod_relation in *.
-  split; now apply rtc_once.
-Qed.
-
 (* Basic definitions and structural operations on TensorGraphs *)
 
 
@@ -55,7 +18,6 @@ Record CospanHyperGraph {T : Type} {n m : nat} := mk_cohg {
 }.
 #[global] Arguments CospanHyperGraph T : clear implicits.
 #[global] Arguments mk_cohg {_} {_ _} (_ _ _) : assert.
-
 
 Declare Scope cohg_scope.
 Delimit Scope cohg_scope with cohg.
@@ -1086,3 +1048,67 @@ Proof.
 Qed.
 
 
+
+Definition abs_vertices {T} (hg : (HyperEdge T)) : Pset :=
+  list_to_set (hg.1.2 ++ hg.2).
+
+Definition referrenced_vertices {T n m} (cohg : CospanHyperGraph T n m) :
+  Pset :=
+  list_to_set (cohg.(inputs) ++ cohg.(outputs))
+    ∪ list_to_set (map_to_list cohg.(hedges).(hyperedges)
+     ≫= λ k_flu, k_flu.2.1.2 ++ k_flu.2.2).
+
+Definition isolated_vertices {T n m} (cohg : CospanHyperGraph T n m) :
+  Pset :=
+  cohg.(hedges).(hypervertices)
+    ∖ referrenced_vertices cohg.
+
+
+Lemma vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
+  vertices cohg = isolated_vertices cohg ∪ referrenced_vertices cohg.
+Proof.
+  unfold vertices, isolated_vertices.
+  rewrite difference_union_L.
+  unfold vertices_hg, referrenced_vertices.
+  apply set_eq.
+  intros ?.
+  rewrite 4 elem_of_union; tauto.
+Qed.
+
+Lemma isolated_referrenced_disjoint {T n m} (cohg : CospanHyperGraph T n m) :
+  isolated_vertices cohg ## referrenced_vertices cohg.
+Proof.
+  unfold isolated_vertices.
+  now apply disjoint_difference_l1.
+Qed.
+
+Definition set_verts {T n m} (cohg : CospanHyperGraph T n m)
+  (vs : Pset) : CospanHyperGraph T n m :=
+  mk_cohg (mk_hg cohg.(hedges).(hyperedges) vs) cohg.(inputs) cohg.(outputs).
+
+Definition norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
+  CospanHyperGraph T n m := set_verts cohg (isolated_vertices cohg).
+
+Lemma referrenced_vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
+  referrenced_vertices (norm_verts cohg) = referrenced_vertices cohg.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma isolated_vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
+  isolated_vertices (norm_verts cohg) = isolated_vertices cohg.
+Proof.
+  unfold isolated_vertices.
+  cbn.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_norm_verts.
+  apply difference_twice_L.
+Qed.
+
+
+Lemma vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
+  vertices (norm_verts cohg) = vertices cohg.
+Proof.
+  now rewrite 2 vertices_decomp,
+    isolated_vertices_norm_verts, referrenced_vertices_norm_verts.
+Qed.

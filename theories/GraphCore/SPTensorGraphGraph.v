@@ -169,11 +169,11 @@ Qed.
 Lemma cohg2cosphg_compose_graphs_aux {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
   cohg2cosphg (compose_graphs_aux cohg cohg') =
-  spcompose_graphs_aux (cohg2cosphg cohg) (cohg2cosphg cohg').
+  compose_spgraphs_aux (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
   unfold compose_graphs_aux.
   rewrite cohg2cosphg_relabel_graph.
-  unfold spcompose_graphs_aux.
+  unfold compose_spgraphs_aux.
   f_equal.
   apply cosphg_ext; [|done..].
   cbn.
@@ -183,10 +183,10 @@ Qed.
 Lemma cohg2cosphg_compose_graphs {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
   cohg2cosphg (compose_graphs cohg cohg') =
-  spcompose_graphs (cohg2cosphg cohg) (cohg2cosphg cohg').
+  compose_spgraphs (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
-  rewrite compose_graphs_to_compose_graphs_aux, 
-    spcompose_graphs_to_spcompose_graphs_aux.
+  rewrite compose_graphs_to_compose_graphs_aux,
+    compose_spgraphs_to_compose_spgraphs_aux.
   rewrite cohg2cosphg_compose_graphs_aux, 2 cohg2cosphg_reindex_graph,
     2 cohg2cosphg_relabel_graph.
   reflexivity.
@@ -195,7 +195,7 @@ Qed.
 Lemma cohg2cosphg_compose_graphs_unsafe {T n m o}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
   cohg2cosphg (compose_graphs_unsafe cohg cohg') =
-  spcompose_graphs_unsafe (cohg2cosphg cohg) (cohg2cosphg cohg').
+  compose_spgraphs_unsafe (cohg2cosphg cohg) (cohg2cosphg cohg').
 Proof.
   apply cosphg_ext; [|done..].
   cbn.
@@ -290,6 +290,44 @@ Proof.
   now rewrite spisolated_vertices_cohg2cosphg.
 Qed.
 
+Lemma abs2tv_equiv `{Equiv T} (hg hg' : HyperEdge T) :
+  hg ≡ hg' -> abs2tv hg ≡ abs2tv hg'.
+Proof.
+  intros [[Ht Hi] Ho].
+  split; [apply Ht|].
+  unfold abs2tv; cbn.
+  now rewrite <- Hi, <- Ho.
+Qed.
+
+Lemma cohg2cosphg_cohg_eq `{Equiv T} {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  cohg_eq cohg cohg' ->
+  cosphg_eq (cohg2cosphg cohg) (cohg2cosphg cohg').
+Proof.
+  intros (Hins & Houts & Hhes).
+  apply mk_cosphg_eq; [done..|].
+  cbn.
+  split; [|apply Hhes.2].
+  intros i.
+  cbn.
+  rewrite 2 lookup_fmap.
+  apply option_fmap_proper, Hhes.
+  hnf; intros *; apply abs2tv_equiv.
+Qed.
+
+Lemma cohg2cosphg_equiv `{Equiv T} {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ cohg' ->
+  cohg2cosphg cohg ≡ cohg2cosphg cohg'.
+Proof.
+  intros Heq.
+  induction Heq as [|cohg cohg' cohg'' Heq _ IHHeq]; [done|].
+  rewrite <- IHHeq.
+  apply rtc_once.
+  destruct Heq as [Heq|Heq]; [left|right].
+  - now apply cohg2cosphg_isomorphic.
+  - now apply cohg2cosphg_cohg_eq.
+Qed.
+
+
 
 
 
@@ -356,12 +394,12 @@ Proof.
   done.
 Qed.
 
-Lemma cosphg2cohg_spcompose_graphs_aux {T n m o}
+Lemma cosphg2cohg_compose_spgraphs_aux {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  hg_strongperm_eq (cosphg2cohg (spcompose_graphs_aux cosphg cosphg'))
+  hg_strongperm_eq (cosphg2cohg (compose_spgraphs_aux cosphg cosphg'))
     (compose_graphs_aux (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
 Proof.
-  unfold spcompose_graphs_aux.
+  unfold compose_spgraphs_aux.
   rewrite cosphg2cohg_relabel_spgraph.
   unfold compose_graphs_aux.
   apply relabel_graph_strongperm_mor.
@@ -371,20 +409,20 @@ Proof.
   now rewrite map_fmap_union.
 Qed.
 
-Lemma cosphg2cohg_spcompose_graphs {T n m o}
+Lemma cosphg2cohg_compose_spgraphs {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  hg_strongperm_eq (cosphg2cohg (spcompose_graphs cosphg cosphg'))
+  hg_strongperm_eq (cosphg2cohg (compose_spgraphs cosphg cosphg'))
     (compose_graphs (cosphg2cohg cosphg) (cosphg2cohg cosphg')).
 Proof.
-  rewrite compose_graphs_to_compose_graphs_aux, spcompose_graphs_to_spcompose_graphs_aux.
-  rewrite cosphg2cohg_spcompose_graphs_aux, 2 cosphg2cohg_reindex_spgraph,
+  rewrite compose_graphs_to_compose_graphs_aux, compose_spgraphs_to_compose_spgraphs_aux.
+  rewrite cosphg2cohg_compose_spgraphs_aux, 2 cosphg2cohg_reindex_spgraph,
     2 cosphg2cohg_relabel_spgraph.
   reflexivity.
 Qed.
 
-Lemma cosphg2cohg_spcompose_graphs_unsafe {T n m o}
+Lemma cosphg2cohg_compose_spgraphs_unsafe {T n m o}
   (cosphg : CospanSPHyperGraph T n m) (cosphg' : CospanSPHyperGraph T m o) :
-  cosphg2cohg (spcompose_graphs_unsafe cosphg cosphg') =
+  cosphg2cohg (compose_spgraphs_unsafe cosphg cosphg') =
   compose_graphs_unsafe (cosphg2cohg cosphg) (cosphg2cohg cosphg').
 Proof.
   apply cohg_ext; [|done..].
@@ -499,4 +537,43 @@ Proof.
   apply hg_ext; [done|].
   cbn.
   now rewrite isolated_vertices_cosphg2cohg.
+Qed.
+
+Lemma tv2abs_equiv `{Equiv T} (hg hg' : SPHyperEdge T) :
+  hg ≡ hg' -> tv2abs hg ≡ tv2abs hg'.
+Proof.
+  intros [Ht Hv].
+  split; [split; [apply Ht|]|]; unfold tv2abs; cbn; now f_equal.
+Qed.
+
+Lemma cosphg2cohg_cosphg_eq `{Equiv T} {n m} (cosphg cosphg' : CospanSPHyperGraph T n m) :
+  cosphg_eq cosphg cosphg' ->
+  cohg_eq (cosphg2cohg cosphg) (cosphg2cohg cosphg').
+Proof.
+  intros (Hins & Houts & Hhes).
+  apply mk_cohg_eq; [done..|].
+  cbn.
+  split; [|apply Hhes.2].
+  intros i.
+  cbn.
+  rewrite 2 lookup_fmap.
+  apply option_fmap_proper, Hhes.
+  hnf; intros *; apply tv2abs_equiv.
+Qed.
+
+Lemma cosphg2cohg_equiv_gen `{Equiv T, Equivalence T equiv}
+  {n m} (cosphg cosphg' : CospanSPHyperGraph T n m) :
+  cosphg ≡ cosphg' ->
+  exists cohg,
+  hg_strongperm_eq cohg (cosphg2cohg cosphg) /\
+  cosphg2cohg cosphg' ≡ cohg.
+Proof.
+  intros (cosphg'' & (cosphg''' &
+    Hperm & Hiso)%spisomorphic_symm%cosphg2cohg_spisomorphic_gen & Hequiv)%cosphg_equiv_alt.
+  exists cosphg'''.
+  split; [easy|].
+  etransitivity; [| apply rtc_once; left; apply Hiso].
+  symmetry.
+  apply rtc_once; right.
+  now apply cosphg2cohg_cosphg_eq.
 Qed.
