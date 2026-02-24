@@ -1,5 +1,80 @@
 Require Export SPTensorGraph IsomorphismTestingAux.
 
+(* FIXME: Move *)
+Definition rel_compose {A B C} (R1 : A -> B -> Prop) (R2 : B -> C -> Prop) :
+  A -> C -> Prop :=
+  fun a c => exists b, R1 a b /\ R2 b c.
+
+Add Parametric Morphism {A B C} : (@rel_compose A B C) with signature
+  equiv ==> equiv ==> equiv as rel_compose_equiv.
+Proof.
+  intros R1 R1' HR1 R2 R2' HR2.
+  intros (a, c).
+  unfold elem_of, relation_elem_of.
+  cbn.
+  apply exists_iff; intros b.
+  f_equiv.
+  - apply (HR1 (_, _)).
+  - apply (HR2 (_, _)).
+Qed.
+
+Add Parametric Morphism {A B C} : (@rel_compose A B C) with signature
+  subseteq ==> subseteq ==> subseteq as rel_compose_subseteq.
+Proof.
+  intros R1 R1' HR1 R2 R2' HR2.
+  intros (a, c).
+  unfold elem_of, relation_elem_of.
+  cbn.
+  intros [b []].
+  exists b.
+  split; [now apply (HR1 (_, _))|now apply (HR2 (_, _))].
+Qed.
+
+#[export] Instance subrelation_rel_compose_l {A} (R1 R2 : relation A) :
+  Reflexive R2 -> subrelation R1 (rel_compose R1 R2).
+Proof.
+  intros HR2 a b Hab.
+  now exists b.
+Qed.
+
+#[export] Instance subrelation_rel_compose_r {A} (R1 R2 : relation A) :
+  Reflexive R1 -> subrelation R2 (rel_compose R1 R2).
+Proof.
+  intros HR2 a b Hab.
+  now exists a.
+Qed.
+
+
+Lemma Transitive_iff_subseteq {A} (R : relation A) :
+  Transitive R <-> rel_compose R R ⊆ R.
+Proof.
+  setoid_rewrite relation_subseteq_iff.
+  firstorder.
+Qed.
+
+Lemma rel_compose_assoc {A B C D} R1 R2 R3 :
+  @rel_compose A C D (@rel_compose A B C R1 R2) R3 ≡
+  rel_compose R1 (rel_compose R2 R3).
+Proof.
+  firstorder.
+Qed.
+
+Lemma rel_compose_trans {A} (R1 R2 : relation A) :
+  Transitive R1 -> Transitive R2 ->
+  rel_compose R2 R1 ⊆ rel_compose R1 R2 ->
+  Transitive (rel_compose R1 R2).
+Proof.
+  intros HR1%((Transitive_iff_subseteq _).1) HR2%((Transitive_iff_subseteq _).1) Hsubs.
+  rewrite Transitive_iff_subseteq.
+  rewrite rel_compose_assoc, <- (rel_compose_assoc R2).
+  rewrite Hsubs.
+  rewrite rel_compose_assoc.
+  rewrite HR2.
+  rewrite <- rel_compose_assoc.
+  rewrite HR1.
+  done.
+Qed.
+
 Definition sphyperedge_map_eq_reqs {T} (hg hg' : Pmap (SPHyperEdge T)) :
   option (list (T * T)) :=
   (* if decide (map_relation (λ _ tio tio' =>
@@ -263,6 +338,7 @@ Proof.
   - rewrite 2 gmultiset_size_alt.
     apply (fmap_Permutation snd) in Hperm.
     rewrite 2 snds_prod_map, 2 list_fmap_id in Hperm.
+    apply Permutation_list_sum.
     now rewrite Hperm.
   - done.
   - rewrite Hdom.
@@ -270,7 +346,7 @@ Proof.
     apply leibniz_equiv_iff.
     replace hg with (GMultiSet hg.(gmultiset_car)) at 2 by now destruct hg.
     unfold dom, gmultiset_dom.
-    rewrite dom_alt.
+    rewrite ((leibniz_equiv_iff _ _).1 (dom_alt _)).
     rewrite set_map_list_to_set, list_fmap_id.
     done.
   - rewrite Himg.
@@ -278,7 +354,7 @@ Proof.
     apply leibniz_equiv_iff.
     replace hg' with (GMultiSet hg'.(gmultiset_car)) at 2 by now destruct hg'.
     unfold dom, gmultiset_dom.
-    rewrite dom_alt.
+    rewrite ((leibniz_equiv_iff _ _).1 (dom_alt _)).
     rewrite set_map_list_to_set, list_fmap_id.
     done.
   - rewrite 2 gmultiset_map_alt_car.
@@ -909,8 +985,8 @@ Fixpoint gmultiset_pre_isos_extending_aux_alt
     | None =>
       list_select (λ k_n, k_n.2 = n) hg' ≫=
         λ '(k_n, hg'rest),
-          default [] 
-          (gmultiset_pre_isos_extending_aux_alt hg hg'rest <$> 
+          default []
+          (gmultiset_pre_isos_extending_aux_alt hg hg'rest <$>
             pupdate k k_n.1 m)
     end
   end.
@@ -956,11 +1032,11 @@ Definition spgraph_pre_isos_alt {T n m} (cosphg cosphg' : CospanSPHyperGraph T n
   else
     [].
 
-Lemma gmultiset_pre_isos_extending_aux_alt_correct hg hg' m : 
+Lemma gmultiset_pre_isos_extending_aux_alt_correct hg hg' m :
   Piso_map <$> gmultiset_pre_isos_extending_aux_alt hg hg' m ⊆
   gmultiset_pre_isos_extending_aux hg hg' (Piso_map m).
 Proof.
-  revert hg' m; induction hg as [|[k n] hg IHhg]; 
+  revert hg' m; induction hg as [|[k n] hg IHhg];
     intros hg' m; [destruct hg'; done|].
   cbn.
   destruct (m.(Piso_map) !! k) as [mk|] eqn:Hmk.
@@ -978,7 +1054,7 @@ Proof.
     now apply pupdate_correct_insert in Hm' as ->.
 Qed.
 
-Lemma gmultiset_pre_isos_extending_alt_correct hg hg' m : 
+Lemma gmultiset_pre_isos_extending_alt_correct hg hg' m :
   Piso_map <$> gmultiset_pre_isos_extending_alt hg hg' m ⊆
   gmultiset_pre_isos_extending hg hg' (Piso_map m).
 Proof.
@@ -1008,7 +1084,7 @@ Proof.
   unfold prod_map at 5 6.
   cbn.
   rewrite list_bind_fmap.
-  rewrite <- (list_bind_mono_l _ _ _ 
+  rewrite <- (list_bind_mono_l _ _ _
     (gmultiset_pre_isos_extending_alt_correct _ _ _)).
   rewrite list_fmap_bind.
   apply list_bind_mono_r.
@@ -1109,8 +1185,8 @@ Proof.
   destruct (pupdate k k_n'.1 ts_mhe_mv.1.2) as [mhe'|] eqn:Hmhe';
     [|now apply list_subseteq_nil].
   cbn.
-  rewrite (list_bind_mono_r _ _ _ 
-    (fun mv' _ => IHhg hg'rest ((t, k_n'.2.1) :: ts_mhe_mv.1.1, mhe', mv') 
+  rewrite (list_bind_mono_r _ _ _
+    (fun mv' _ => IHhg hg'rest ((t, k_n'.2.1) :: ts_mhe_mv.1.1, mhe', mv')
     (List.Forall_cons (uncurry equiv) (_,_) _ Htt' Hts))).
   rewrite list_filter_bind, list_bind_fmap.
   done.
@@ -1183,8 +1259,8 @@ Definition spgraph_iso_partial_test {n m} (cohg cohg' : CospanSPHyperGraph T n m
   | _ :: _ => true
   end.
 
-Lemma spgraph_iso_partial_test_correct {n m} (cohg cohg' : CospanSPHyperGraph T n m) : 
-  spgraph_iso_partial_test cohg cohg' = true -> 
+Lemma spgraph_iso_partial_test_correct {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test cohg cohg' = true ->
   norm_spverts cohg ≡ norm_spverts cohg'.
 Proof.
   intros Heq.
@@ -1192,6 +1268,1442 @@ Proof.
   revert Heq.
   unfold spgraph_iso_partial_test.
   now case_match.
+Qed.
+
+
+
+
+
+Fixpoint gmultiset_pre_isos_extending_aux_alt'
+  (hg hg' : list (positive * positive) (* lists of element and multiplicity *))
+  (m : WPiso) : list WPiso :=
+  match hg with
+  | [] => match hg' with | [] => [m] | _::_ => [] end
+  | (k, n) :: hg =>
+    match m.(WPiso_map) !! k with
+    | Some mk =>
+      list_select (λ k_n, k_n = (mk, n)) hg' ≫=
+        λ '(_, hg'rest),
+          gmultiset_pre_isos_extending_aux_alt' hg hg'rest m
+    | None =>
+      list_select (λ k_n, k_n.2 = n) hg' ≫=
+        λ '(k_n, hg'rest),
+          default []
+          (gmultiset_pre_isos_extending_aux_alt' hg hg'rest <$>
+            wpupdate k k_n.1 m)
+    end
+  end.
+
+Fixpoint sphyperedge_map_isos_extending_aux'
+  (hg hg' : list (positive * (T * list (positive * positive))))
+  (mhe_mv : WPiso * WPiso) :
+  list (WPiso * WPiso) :=
+  match hg with
+  | [] => match hg' with | [] => [mhe_mv] | _::_ => [] end
+  | (k, (t, v)) :: hg =>
+    list_select (λ k_tv, t ≡ k_tv.2.1 /\
+      sum_list_with Pos.to_nat (k_tv.2.2).*2 =
+      sum_list_with Pos.to_nat v.*2) hg'
+      ≫= λ '(k_tv, hg'rest),
+      match wpupdate k k_tv.1 mhe_mv.1 with
+      | None => []
+      | Some mhe' =>
+        mv' ← gmultiset_pre_isos_extending_aux_alt' v k_tv.2.2 mhe_mv.2;
+        sphyperedge_map_isos_extending_aux' hg hg'rest
+         (mhe', mv')
+      end
+  end.
+
+Definition sphyperedge_map_isos_extending'
+  (hg hg' : Pmap (SPHyperEdge T)) (mhe_mv : WPiso * WPiso) :
+  list (WPiso * WPiso) :=
+  sphyperedge_map_isos_extending_aux'
+    (prod_map id (prod_map id (map_to_list (M:=gmap positive positive) ∘ gmultiset_car)) <$>
+      (map_to_list hg :> list (positive * (T * gmultiset positive))))
+    (prod_map id (prod_map id (map_to_list (M:=gmap positive positive) ∘ gmultiset_car)) <$>
+      (map_to_list hg' :> list (positive * (T * gmultiset positive))))
+    mhe_mv.
+
+Definition spgraph_isos' {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  list (WPiso * WPiso) :=
+  if decide (size (spisolated_vertices cohg) = size (spisolated_vertices cohg')) then
+    default []
+      (mv ← wpupdates (zip (cohg.(spinputs) ++ cohg.(spoutputs))
+        (cohg'.(spinputs) ++ cohg'.(spoutputs))) ∅;
+      Some
+      (sphyperedge_map_isos_extending' cohg.(sphedges).(sphyperedges)
+        cohg'.(sphedges).(sphyperedges) (∅, mv)))
+  else
+    [].
+
+
+Definition spgraph_iso_partial_test' {n m}
+  (cohg cohg' : CospanSPHyperGraph T n m) : bool :=
+  match spgraph_isos' cohg cohg' with
+  | [] => false
+  | _ :: _ => true
+  end.
+
+
+Lemma gmultiset_pre_isos_extending_aux_alt'_correct hg hg' m :
+  gmultiset_pre_isos_extending_aux_alt' hg hg' (Piso_to_weak m) =
+  Piso_to_weak <$> gmultiset_pre_isos_extending_aux_alt hg hg' m.
+Proof.
+  revert hg' m; induction hg as [|(k, n) hg IHhg]; intros hg' m;
+  [now destruct hg'|].
+  cbn.
+  case_match eqn:Hmk.
+  cbn.
+  - rewrite list_bind_fmap.
+    apply list_bind_ext; [|done].
+    intros (kn', hg'rest).
+    now rewrite IHhg.
+  - rewrite list_bind_fmap.
+    apply list_bind_ext; [|done].
+    intros (kn', hg'rest).
+    rewrite wpupdate_correct.
+    destruct (pupdate k kn'.1 m) as [m'|]; [|done].
+    cbn.
+    apply IHhg.
+Qed.
+
+
+
+Lemma list_decomps_aux_fmap {A B} (f : A -> B) (l l' : list A) :
+  list_decomps_aux (f <$> l') (f <$> l) =
+    prod_map (prod_map (fmap (M:=list) f) f) (fmap (M:=list) f) <$>
+      list_decomps_aux l' l.
+Proof.
+  revert l';
+  induction l; [done|intros l'].
+  cbn.
+  f_equal.
+  rewrite <- IHl.
+  now rewrite fmap_app.
+Qed.
+
+Lemma list_decomps_fmap {A B} (f : A -> B) (l : list A) :
+  list_decomps (f <$> l) =
+    prod_map (prod_map (fmap (M:=list) f) f) (fmap (M:=list) f) <$>
+      list_decomps l.
+Proof.
+  apply (list_decomps_aux_fmap _ _ []).
+Qed.
+
+Lemma list_removals_fmap {A B} (f : A -> B) (l : list A) :
+  list_removals (f <$> l) = prod_map f (fmap (M:=list) f) <$> list_removals l.
+Proof.
+  unfold list_removals.
+  rewrite list_decomps_fmap.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext; intros _ [[]] _; cbn; now rewrite fmap_app.
+Qed.
+
+Lemma list_select_fmap {A B} (P : B -> Prop) `{HP : forall b, Decision (P b)}
+  (f : A -> B) (l : list A) :
+  list_select P (f <$> l) = prod_map f (fmap (M:=list) f) <$> list_select (P ∘ f) l.
+Proof.
+  unfold list_select.
+  rewrite list_removals_fmap.
+  now rewrite list_filter_fmap.
+Qed.
+
+Lemma gmultiset_size_alt' `{Countable A} (m : gmultiset A) :
+  size m = sum_list_with Pos.to_nat (map_to_list (gmultiset_car m)).*2.
+Proof.
+  rewrite gmultiset_size_alt.
+  remember (_.*2) as l eqn:Hl.
+  clear Hl.
+  unfold list_sum.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma list_select_iff {A} (P Q : A -> Prop)
+  `{HP : forall a, Decision (P a), HQ : forall a, Decision (Q a)} l :
+  (forall a, a ∈ l -> P a <-> Q a) ->
+  list_select P l = list_select Q l.
+Proof.
+  intros HPQ.
+  unfold list_select.
+  apply list_filter_iff_strong.
+  intros (a & l') (hd & tl & -> & <-)%elem_of_list_removals.
+  apply HPQ.
+  cbn.
+  set_solver +.
+Qed.
+
+
+
+Lemma sphyperedge_map_isos_extending_aux'_correct ktio ktio' mhe_mv :
+  sphyperedge_map_isos_extending_aux'
+    (prod_map id (prod_map id (map_to_list ∘ gmultiset_car)) <$> ktio)
+    (prod_map id (prod_map id (map_to_list ∘ gmultiset_car)) <$> ktio')
+    (prod_map Piso_to_weak Piso_to_weak mhe_mv) =
+  prod_map Piso_to_weak Piso_to_weak <$>
+    sphyperedge_map_isos_extending_aux ktio ktio' mhe_mv.
+Proof.
+  revert ktio' mhe_mv; induction ktio as [|[k [t v]] ktio IHktio];
+    intros ktios' mhe_mv; [now destruct ktios'|].
+  cbn.
+  rewrite list_select_fmap.
+  unfold compose at 4.
+  simpl.
+  rewrite list_fmap_bind, list_bind_fmap.
+  apply list_bind_ext; [|
+    apply list_select_iff; intros; now rewrite <- 2 gmultiset_size_alt'].
+  intros (ktio' & ktios'rest).
+  cbn.
+  simpl.
+  rewrite wpupdate_correct.
+  destruct (pupdate k ktio'.1 mhe_mv.1) as [mhe'|] eqn:Hmhe'; [|done].
+  cbn.
+  rewrite gmultiset_pre_isos_extending_aux_alt'_correct.
+  rewrite list_fmap_bind, list_bind_fmap.
+  apply list_bind_ext; [|done].
+  intros mv'.
+  cbn.
+  rewrite <- IHktio.
+  done.
+Qed.
+
+
+Lemma sphyperedge_map_isos_extending'_correct ktio ktio' mhe_mv :
+  sphyperedge_map_isos_extending' ktio ktio' (prod_map Piso_to_weak Piso_to_weak mhe_mv) =
+  prod_map Piso_to_weak Piso_to_weak <$> sphyperedge_map_isos_extending ktio ktio' mhe_mv.
+Proof.
+  unfold sphyperedge_map_isos_extending'.
+  rewrite sphyperedge_map_isos_extending_aux'_correct.
+  done.
+Qed.
+
+Lemma spgraph_isos'_correct {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_isos' cohg cohg' =
+  prod_map Piso_to_weak Piso_to_weak <$>
+  spgraph_isos cohg cohg'.
+Proof.
+  unfold spgraph_isos', spgraph_isos.
+  case_decide; [|done].
+  rewrite WPiso_empty_correct, wpupdates_correct.
+  destruct (pupdates _ _); [cbn|done].
+  apply (sphyperedge_map_isos_extending'_correct _ _ (_, _)).
+Qed.
+
+Lemma spgraph_iso_partial_test'_eq {n m}
+  (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test' cohg cohg' = spgraph_iso_partial_test cohg cohg'.
+Proof.
+  unfold spgraph_iso_partial_test, spgraph_iso_partial_test'.
+  rewrite spgraph_isos'_correct.
+  now destruct (spgraph_isos _ _).
+Qed.
+
+Lemma spgraph_iso_partial_test'_correct {n m}
+  (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test' cohg cohg' = true ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  rewrite spgraph_iso_partial_test'_eq.
+  apply spgraph_iso_partial_test_correct.
+Qed.
+
+
+
+Fixpoint vertex_map_of_sections
+  (vs : list (list (positive * positive) * list (positive * positive)))
+  (m : Piso) : option Piso :=
+  match vs with
+  | [] => Some m
+  | (vin, vout) :: vs =>
+    list_first_omap (vertex_map_of_sections vs)
+      $ gmultiset_pre_isos_extending_aux_alt vin vout m
+  end.
+
+Definition vertex_sections_of_alignment
+  (ms : list (gmultiset positive * gmultiset positive)) :
+    list (list (positive * positive) * list (positive * positive)) :=
+  ((λ '((i1, o1), (i2, o2)),
+    (map_to_list (gmultiset_car (i1 ∩ i2)),
+    map_to_list (gmultiset_car (o1 ∩ o2)))) <$> list_ordpairs ms) ++
+  ((λ '(i, o),  (map_to_list (gmultiset_car i),
+    map_to_list (gmultiset_car o))) <$> ms).
+
+Definition vertex_map_of_alignment
+  (m : Piso) (ktios : list ((positive * (T * gmultiset positive)) *
+    (positive * (T * gmultiset positive)))) : option Piso :=
+  vertex_map_of_sections (vertex_sections_of_alignment
+    ((λ ktio_ktio', (ktio_ktio'.1.2.2, ktio_ktio'.2.2.2)) <$> ktios)) m.
+
+
+
+
+
+Definition maybe_vertex_map (m : Piso)
+  (ktios ktios' : list (positive * (T * gmultiset positive))) :
+  option Piso :=
+  list_first_omap (vertex_map_of_alignment m)
+    (partial_permutations (λ ktio ktio', ktio.2.1 ≡ ktio'.2.1 /\
+      size ktio.2.2 = size ktio'.2.2) ktios ktios').
+
+
+Definition spgraph_isos_fast {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  option Piso :=
+  if decide (size (spisolated_vertices cohg) = size (spisolated_vertices cohg')) then
+    mv ← pupdates (zip (cohg.(spinputs) ++ cohg.(spoutputs))
+        (cohg'.(spinputs) ++ cohg'.(spoutputs))) ∅;
+    maybe_vertex_map mv (map_to_list cohg.(sphedges).(sphyperedges))
+        (map_to_list cohg'.(sphedges).(sphyperedges))
+  else
+    None.
+
+
+Definition spgraph_iso_partial_test_fast
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) : bool :=
+  match spgraph_isos_fast cohg cohg' with
+  | None => false
+  | Some _ => true
+  end.
+
+
+
+Lemma vertex_map_of_sections_correct vs m m' :
+  vertex_map_of_sections vs m = Some m' ->
+  m.(Piso_map) ⊆ m'.(Piso_map) /\
+  Forall (λ '(vin, vout),
+    prod_map (m'.(Piso_map) !!.) id <$> vin
+      ≡ₚ prod_map Some id <$> vout) vs.
+Proof.
+  revert m m'; induction vs as [|(vin, vout) vs IHvs]; intros m m';
+  [intros [= <-]; done|].
+  cbn.
+  intros (m'' & Hm'' & Hvmap%IHvs)%list_first_omap_Some.
+  apply (elem_of_list_fmap_1 Piso_map),
+    gmultiset_pre_isos_extending_aux_alt_correct in Hm'' as Hm''_alt.
+  pose proof (gmultiset_pre_isos_extending_aux_correct vin vout m) as Hall.
+  rewrite Forall_forall in Hall.
+  apply Hall in Hm''_alt.
+  split.
+  - rewrite <- Hvmap.1.
+    apply Hm''_alt.
+  - constructor; [|apply Hvmap].
+    rewrite <- Hm''_alt.2.2.2.2.
+    apply eq_reflexivity, list_fmap_ext.
+    intros i (k, n) Hi.
+    cbn.
+    f_equal.
+    apply elem_of_list_lookup_2 in Hi as Hi'.
+    apply (elem_of_list_fmap_1 (prod_map (m''.(Piso_map) !!.) id)) in Hi'.
+    rewrite Hm''_alt.2.2.2.2 in Hi'.
+    cbn in Hi'.
+    rewrite elem_of_list_fmap in Hi'.
+    destruct Hi' as ((k', n') & [= Hm''k <-] & _).
+    rewrite Hm''k.
+    specialize Hvmap.1.
+    now apply lookup_weaken.
+Qed.
+
+Lemma vertex_map_of_alignment_correct ktios m m' :
+  vertex_map_of_alignment m ktios = Some m' ->
+  m.(Piso_map) ⊆ m'.(Piso_map) /\
+  Forall (λ '(ktv, ktv'),
+    gmultiset_map (m'.(Piso_map) !!.) ktv.2.2
+      = gmultiset_map Some (ktv').2.2) ktios.
+Proof.
+  unfold vertex_map_of_alignment.
+  intros Heq%vertex_map_of_sections_correct.
+  split; [apply Heq.1|].
+  specialize Heq.2 as Hall.
+  unfold vertex_sections_of_alignment in Hall.
+  apply Forall_app in Hall as [_ Hall].
+  rewrite 2 Forall_fmap in Hall.
+  apply (Forall_impl _ _ _ Hall).
+  intros (ktv, ktv').
+  cbn.
+  intros Hmap.
+  rewrite 2 gmultiset_map_alt_car.
+  rewrite Hmap.
+  done.
+Qed.
+
+Import SetoidList SetoidPermutation list.
+
+Lemma PermutationA_flip `(R : relation A) l l' :
+  PermutationA (flip R) l l' <-> PermutationA R l' l.
+Proof.
+  split.
+  - intros Heq.
+    induction Heq; eauto using PermutationA.
+  - intros Heq.
+    induction Heq; eauto using PermutationA.
+Qed.
+
+Add Parametric Morphism {A} : (@PermutationA A) with signature
+  subseteq ==> subseteq as PermutationA_subseteq.
+Proof.
+  intros R R' HR%relation_subseteq_iff.
+  apply relation_subseteq_iff.
+  intros l l' Hl.
+  induction Hl; eauto using PermutationA.
+Qed.
+
+Add Parametric Morphism {A} : (@PermutationA A) with signature
+  equiv ==> equiv as PermutationA_equiv.
+Proof.
+  intros R R' HR.
+  apply set_subseteq_antisymm; apply PermutationA_subseteq; firstorder.
+Qed.
+
+Lemma PermutationA_length `(R : relation A) l l' :
+  PermutationA R l l' -> length l = length l'.
+Proof.
+  intros Heq.
+  induction Heq; cbn; congruence.
+Qed.
+
+Lemma PermutationA_nil `(R : relation A) l :
+  PermutationA R [] l -> l = [].
+Proof.
+  intros Heq%PermutationA_length.
+  now destruct l.
+Qed.
+
+(* Lemma compose_PermutationA {A} (R1 R2 : relation A)
+  `{HR1 : !Transitive R1, HR2 : !Transitive R2} :
+  rel_compose (PermutationA R1) (PermutationA R2) ⊆
+  PermutationA (rel_compose R1 R2).
+Proof.
+  apply relation_subseteq_iff.
+  intros l l'' (l' & Hll' & Hl'l'').
+  induction Hll'.
+  - apply PermutationA_nil in Hl'l'' as ->.
+    constructor.
+  -
+
+
+
+Lemma PermutationA_commute {A} (R1 R2 : relation A) :
+  rel_compose R1 R2 ⊆ rel_compose R2 R1 ->
+  rel_compose (PermutationA R2) (PermutationA R1)
+  ⊆ rel_compose (PermutationA R1) (PermutationA R2).
+Proof.
+  intros HR12.
+  apply relation_subseteq_iff.
+  intros l l'' (l' & Hll' & Hl'l'').
+
+
+
+Lemma PermutationA_compose {A} (R1 R2 : relation A)
+  `{HR1 : !Transitive R1, HR2 : !Transitive R2} l l' :
+  PermutationA (rel_compose R1 R2) l l' ->
+  rel_compose (PermutationA R1) (PermutationA R2) l l'.
+Proof.
+  intros Hl.
+  induction Hl; [unfold rel_compose; eauto using PermutationA|
+  |unfold rel_compose; eauto using PermutationA|].
+  - firstorder idtac.
+    unfold rel_compose.
+    eauto using PermutationA.
+  - eapply rel_compose_trans; eauto using PermutationA.
+
+    constructor.
+
+
+  unfold rel_compose in *; firstorder (eauto using PermutationA)].
+  firstorder idtac.
+  unfold rel_compose; eauto using PermutationA.
+  unfold rel_compose in *. *)
+
+
+
+Lemma map_relation_kmap `{FinMap K1 M1, FinMap K2 M2}
+  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B)
+  (f : K1 -> K2) `{Hf : !Inj eq eq f} :
+  map_relation (λ _, R) (λ _, P) (λ _, Q) (kmap f m1 :> M2 A) (kmap f m2) <->
+  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
+Proof.
+  split.
+  - intros Hfeq.
+    intros i.
+    specialize (Hfeq (f i)).
+    now rewrite 2 (lookup_kmap f _) in Hfeq.
+  - intros Heq.
+    intros i.
+    destruct (kmap f m1 !! i) as [fm1i|] eqn:Hfm1i;
+    [|destruct (kmap f m2 !! i) as [fm2i|] eqn:Hfm2i].
+    + apply (lookup_kmap_Some _) in Hfm1i as Hj.
+      destruct Hj as (j & -> & Hm1j).
+      rewrite (lookup_kmap _).
+      rewrite <- Hm1j.
+      apply Heq.
+    + apply (lookup_kmap_Some _) in Hfm2i as Hj.
+      destruct Hj as (j & -> & Hm2j).
+      rewrite <- Hfm1i, <- Hm2j.
+      rewrite (lookup_kmap _).
+      apply Heq.
+    + done.
+Qed.
+
+
+Lemma exists_kmap_map_relation_iff `{FinMap K1 M1, FinMap K2 M2}
+  `{!Countable K1, Infinite K2}
+  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B) :
+  (exists (f : K1 -> K2), Inj eq eq f /\
+  map_relation (λ _, R) (λ _, P) (λ _, Q)
+    (kmap f m1 :> M2 A) (kmap f m2)) <->
+  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
+Proof.
+  split.
+  - now intros (? & ? & ?%map_relation_kmap).
+  - intros Hrel.
+    destruct (partial_injection_extension []
+      ((infinite_injection ∘ Pos.to_nat ∘ encode) :> K1 -> K2))
+    as (f & Hf & _); [easy|].
+    exists f.
+    split; [done|].
+    now apply map_relation_kmap.
+Qed.
+
+Lemma map_inj_list_to_map `{FinMap K M} {A} (l : list (K * A)) :
+  NoDup l.*1 -> NoDup l.*2 ->
+  map_inj (list_to_map l :> M A).
+Proof.
+  intros Hks Hvs.
+  intros k k' v.
+  rewrite <- 2 elem_of_list_to_map by done.
+  intros (i & Hi)%elem_of_list_lookup (j & Hj)%elem_of_list_lookup.
+  specialize (NoDup_lookup _ i j v Hvs) as Hij.
+  rewrite 2 list_lookup_fmap, Hi, Hj in Hij.
+  destruct Hij as []; [done..|congruence].
+Qed.
+
+
+
+Lemma spisomorphic_of_map_to_list_perm {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanSPHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!!.) cohg.(sphedges).(sphypervertices) = cohg'.(sphedges).(sphypervertices) ->
+  PermutationA (rel_preimage snd eq)
+  (prod_map id (prod_map id (gmultiset_map (mv !!!.))) <$>
+    map_to_list cohg.(sphedges).(sphyperedges))
+    (map_to_list cohg'.(sphedges).(sphyperedges)) ->
+  vmap (mv !!!.) cohg.(spinputs) = cohg'.(spinputs) ->
+  vmap (mv !!!.) cohg.(spoutputs) = cohg'.(spoutputs) ->
+  spisomorphic cohg cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+
+  apply (PermutationA_decompose _) in Hes as Hes'.
+  destruct Hes' as (es' & Hes'perm & Hes'eq).
+
+  set (mhe := (list_to_map (zip es'.*1
+    (map_to_list cohg'.(sphedges).(sphyperedges)).*1) :> Pmap positive)).
+
+  apply eqlistA_length in Hes'eq as Hlen.
+
+  assert (Hdome : dom mhe = dom cohg.(sphedges).(sphyperedges)). 1:{
+    unfold mhe.
+    apply leibniz_equiv_iff.
+    rewrite dom_list_to_map.
+    rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+    rewrite <- Hes'perm.
+    rewrite fsts_prod_map, list_fmap_id.
+    symmetry.
+    apply dom_alt.
+  }
+
+  assert (Hinje : map_inj mhe). 1:{
+    apply map_inj_list_to_map.
+    - rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    - rewrite snd_zip by now rewrite 2 length_fmap, Hlen.
+      apply NoDup_fst_map_to_list.
+  }
+
+  eapply (spisomorphic_of_partial_inj_dom' _ _
+    (mv !!!.) (mhe !!!.)).
+  - intros i j [mvi Hmvi]%Hdom%elem_of_dom [mvj Hmvj]%Hdom%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinj; eauto.
+  - rewrite <- Hdome.
+    intros i j [mvi Hmvi]%elem_of_dom [mvj Hmvj]%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinje; eauto.
+  - symmetry.
+    apply cosphg_ext; [|done..].
+    cbn.
+    apply sphg_ext; [|done].
+    cbn.
+    unfold kmap.
+    rewrite <- list_to_map_fmap.
+    etransitivity; [|apply list_to_map_to_list].
+    symmetry.
+    apply list_to_map_proper; [apply NoDup_fst_map_to_list|].
+    symmetry.
+    transitivity (prod_map (mhe !!!.) id <$>
+      (prod_map id (prod_map id (gmultiset_map (mv !!!.))) <$>
+      map_to_list cohg.(sphedges).(sphyperedges))).
+    1:{
+      rewrite <- 2 list_fmap_compose.
+      done.
+    }
+    rewrite Hes'perm.
+    apply eq_reflexivity.
+    apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite length_fmap|].
+    intros i [k tv] [k' tv'] Hi.
+    rewrite list_lookup_fmap.
+
+    apply eqlistA_altdef in Hes'eq.
+    rewrite Forall2_lookup in Hes'eq.
+    destruct (es' !! i) as [es'i|] eqn:Hes'i; [cbn|done].
+    destruct (map_to_list _ !! i) as [mi|] eqn:Hmi; [cbn|done].
+    intros [= <- <-] [= Hmieq].
+    specialize (Hes'eq i).
+    rewrite Hes'i, Hmi in Hes'eq.
+    rewrite <- option_relation_Forall2 in Hes'eq.
+    cbn in Hes'eq.
+    hnf in Hes'eq.
+    rewrite Hes'eq, Hmieq.
+    f_equal.
+    apply lookup_total_correct.
+    apply elem_of_list_to_map.
+    1:{
+      rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    }
+    apply elem_of_list_lookup.
+    exists i.
+    rewrite lookup_zip_Some.
+    rewrite 2 list_lookup_fmap, Hes'i, Hmi, Hmieq.
+    done.
+Qed.
+
+Lemma spequiv_of_map_to_list_perm_equiv `{Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanSPHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!!.) cohg.(sphedges).(sphypervertices) = cohg'.(sphedges).(sphypervertices) ->
+  PermutationA (rel_preimage snd equiv)
+  (prod_map id (prod_map id (gmultiset_map (mv !!!.))) <$>
+    map_to_list cohg.(sphedges).(sphyperedges))
+    (map_to_list cohg'.(sphedges).(sphyperedges)) ->
+  vmap (mv !!!.) cohg.(spinputs) = cohg'.(spinputs) ->
+  vmap (mv !!!.) cohg.(spoutputs) = cohg'.(spoutputs) ->
+  cohg ≡ cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+
+  apply (PermutationA_decompose _) in Hes as Hes'.
+  destruct Hes' as (es' & Hes'perm & Hes'eq).
+
+  set (mhe := (list_to_map (zip es'.*1
+    (map_to_list cohg'.(sphedges).(sphyperedges)).*1) :> Pmap positive)).
+
+  apply eqlistA_length in Hes'eq as Hlen.
+
+  assert (Hdome : dom mhe = dom cohg.(sphedges).(sphyperedges)). 1:{
+    unfold mhe.
+    apply leibniz_equiv_iff.
+    rewrite dom_list_to_map.
+    rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+    rewrite <- Hes'perm.
+    rewrite fsts_prod_map, list_fmap_id.
+    symmetry.
+    apply dom_alt.
+  }
+
+  assert (Hinje : map_inj mhe). 1:{
+    apply map_inj_list_to_map.
+    - rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    - rewrite snd_zip by now rewrite 2 length_fmap, Hlen.
+      apply NoDup_fst_map_to_list.
+  }
+  transitivity (mk_cosphg (mk_sphg (list_to_map $ zip_with (λ e mc,
+    (mc.1, (e.2.1, mc.2.2))) es' (map_to_list cohg'.(sphedges).(sphyperedges)))
+    cohg'.(sphedges).(sphypervertices)) cohg'.(spinputs) cohg'.(spoutputs)).
+  2:{
+    apply cosphg_eq_subrelation.
+    apply mk_cosphg_eq; [done..|].
+    cbn.
+    split; [|done].
+    cbn.
+    rewrite <- (list_to_map_to_list (sphyperedges _)) at 2.
+    apply map_equiv_map_relation.
+    apply map_relation_list_to_map.
+    apply Forall2_lookup.
+    intros i.
+    rewrite eqlistA_altdef, Forall2_lookup in Hes'eq.
+    rewrite lookup_zip_with.
+    induction (Hes'eq i) as [x y Hxy|]; [|done].
+    cbn.
+    constructor.
+    cbn.
+    split; [done|].
+    split; [|done].
+    apply Hxy.
+  }
+  apply spisomorphic_subrelation.
+  eapply (spisomorphic_of_partial_inj_dom' _ _
+    (mv !!!.) (mhe !!!.)).
+  - intros i j [mvi Hmvi]%Hdom%elem_of_dom [mvj Hmvj]%Hdom%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinj; eauto.
+  - rewrite <- Hdome.
+    intros i j [mvi Hmvi]%elem_of_dom [mvj Hmvj]%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinje; eauto.
+  - symmetry.
+    apply cosphg_ext; [|done..].
+    cbn.
+    apply sphg_ext; [|done].
+    cbn.
+    unfold kmap.
+    rewrite <- list_to_map_fmap.
+    etransitivity; [|apply list_to_map_to_list].
+    symmetry.
+    apply list_to_map_proper; [apply NoDup_fst_map_to_list|].
+    symmetry.
+    transitivity (prod_map (mhe !!!.) id <$>
+      (prod_map id (prod_map id (gmultiset_map (mv !!!.))) <$>
+      map_to_list cohg.(sphedges).(sphyperedges))).
+    1:{
+      rewrite <- 2 list_fmap_compose.
+      done.
+    }
+    rewrite map_to_list_to_map. 2:{
+      rewrite fmap_zip_with.
+      cbn.
+      rewrite zip_with_to_fmap_r by done.
+      apply NoDup_fst_map_to_list.
+    }
+    rewrite Hes'perm.
+    apply eq_reflexivity.
+    apply (fun H => list_eq_same_length _ _ _ H eq_refl);
+    [now rewrite length_fmap, length_zip_with; lia|].
+    rewrite length_fmap.
+    intros i [k tv] [k' tv'] Hi.
+    rewrite list_lookup_fmap.
+
+    apply eqlistA_altdef in Hes'eq.
+    rewrite Forall2_lookup in Hes'eq.
+    rewrite lookup_zip_with.
+    destruct (es' !! i) as [es'i|] eqn:Hes'i; [cbn|done].
+    destruct (map_to_list _ !! i) as [mi|] eqn:Hmi; [cbn|done].
+    intros [= <- <-] [= Hmi1 Htv'].
+    specialize (Hes'eq i).
+    rewrite Hes'i, Hmi in Hes'eq.
+    rewrite <- option_relation_Forall2 in Hes'eq.
+    cbn in Hes'eq.
+    hnf in Hes'eq.
+    f_equal.
+    + apply lookup_total_correct.
+      apply elem_of_list_to_map.
+      1:{
+        rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+        rewrite <- Hes'perm.
+        rewrite fsts_prod_map, list_fmap_id.
+        apply NoDup_fst_map_to_list.
+      }
+      apply elem_of_list_lookup.
+      exists i.
+      rewrite lookup_zip_Some.
+      rewrite 2 list_lookup_fmap, Hes'i, Hmi.
+      cbn.
+      rewrite Hmi1.
+      done.
+    + rewrite (surjective_pairing es'i.2).
+      rewrite <- Htv'.
+      f_equal.
+      apply Hes'eq.2.
+Qed.
+
+
+Lemma spequiv_of_map_to_list_perm_equiv' `{Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanSPHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!.) cohg.(sphedges).(sphypervertices) =@{gset _}
+    set_map Some cohg'.(sphedges).(sphypervertices) ->
+  PermutationA (rel_preimage snd (prod_relation equiv eq))
+  (prod_map id (prod_map id (gmultiset_map (mv !!.))) <$>
+    map_to_list cohg.(sphedges).(sphyperedges))
+  (prod_map id (prod_map id (gmultiset_map Some)) <$>
+    map_to_list cohg'.(sphedges).(sphyperedges)) ->
+  vmap (mv !!.) cohg.(spinputs) = vmap Some cohg'.(spinputs) ->
+  vmap (mv !!.) cohg.(spoutputs) = vmap Some cohg'.(spoutputs) ->
+  cohg ≡ cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+  apply (spequiv_of_map_to_list_perm_equiv mv).
+  - done.
+  - done.
+  - apply (f_equal (set_map (D:=Pset) (default inhabitant))) in Hvs.
+    rewrite 2 set_map_compose_L in Hvs.
+    rewrite set_map_id_L in Hvs.
+    apply Hvs.
+  - eapply (fmap_PermutationA (RB:=rel_preimage snd equiv)
+      (prod_map id (prod_map id (gmultiset_map (default inhabitant))))) in Hes.
+    2:{
+      unfold rel_preimage.
+      intros x y Hxy.
+      simpl.
+      split; [apply Hxy.1|].
+      simpl.
+      f_equal.
+      apply Hxy.2.
+    }
+    rewrite <- 2 list_fmap_compose in Hes.
+    unfold compose in Hes.
+    simpl in Hes.
+    erewrite list_fmap_ext in Hes by now intros; rewrite gmultiset_map_compose.
+    etransitivity; [apply Hes|].
+
+    erewrite (list_fmap_ext _ _
+      (map_to_list cohg'.(sphedges).(sphyperedges))) by
+      now intros; rewrite gmultiset_map_compose, gmultiset_map_id.
+    now rewrite list_fmap_id' by now intros (? & ? & ?).
+  - specialize (f_equal (vmap (default inhabitant)) Hins).
+    rewrite 2 Vector.map_map, Vector.map_id.
+    now intros <-.
+  - specialize (f_equal (vmap (default inhabitant)) Houts).
+    rewrite 2 Vector.map_map, Vector.map_id.
+    now intros <-.
+Qed.
+
+Lemma map_inj_subseteq `{FinMap K M} {A} (m m' : M A) :
+  m ⊆ m' -> map_inj m' -> map_inj m.
+Proof.
+  intros Hm Hm' i j v Hmi Hmj.
+  apply (fun H => lookup_weaken _ _ _ _ H Hm) in Hmi, Hmj.
+  revert Hmi Hmj.
+  apply Hm'.
+Qed.
+
+Lemma map_inverses_map_inj_l `{FinMap K1 M1, FinMap K2 M2}
+  (m1 : M1 K2) (m2 : M2 K1) : map_inverses m1 m2 -> map_inj m1.
+Proof.
+  intros Hinj i j v.
+  rewrite (Hinj i), (Hinj j).
+  congruence.
+Qed.
+
+Lemma map_inverses_map_inj_r `{FinMap K1 M1, FinMap K2 M2}
+  (m1 : M1 K2) (m2 : M2 K1) : map_inverses m1 m2 -> map_inj m2.
+Proof.
+  intros Hinj i j v.
+  rewrite <- 2 (Hinj v).
+  congruence.
+Qed.
+
+Lemma Piso_map_inj (m : Piso) : map_inj m.(Piso_map).
+Proof.
+  apply (map_inverses_map_inj_l _ _ (Piso_inverses m)).
+Qed.
+
+Lemma spreferrenced_vertices_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
+  vs : spreferrenced_vertices (set_spverts cohg vs) = spreferrenced_vertices cohg.
+Proof.
+  done.
+Qed.
+
+Lemma spreferrenced_vertices_relabel_spgraph f {n m} (cohg : CospanSPHyperGraph T n m) :
+  spreferrenced_vertices (relabel_spgraph f cohg) = set_map f (spreferrenced_vertices cohg).
+Proof.
+  unfold spreferrenced_vertices; cbn.
+  rewrite set_map_union_L, set_map_list_to_set_L.
+  f_equal; [now rewrite 2 vec_to_list_map, fmap_app|].
+  rewrite set_map_list_to_set_L.
+  rewrite map_to_list_fmap.
+  rewrite list_fmap_bind, list_bind_fmap.
+  apply set_eq.
+  intros k.
+  rewrite 2 elem_of_list_to_set, 2 elem_of_list_bind.
+  apply exists_iff.
+  intros ktio.
+  simpl.
+  rewrite elements_gmultiset_map.
+  done.
+Qed.
+
+Lemma spreferrenced_vertices_reindex_spgraph f `{Hf : !Inj eq eq f} {n m} (cohg : CospanSPHyperGraph T n m) :
+  spreferrenced_vertices (reindex_spgraph f cohg) = spreferrenced_vertices cohg.
+Proof.
+  unfold spreferrenced_vertices; cbn.
+  f_equal.
+  rewrite (map_to_list_kmap _).
+  rewrite list_fmap_bind.
+  done.
+Qed.
+
+Lemma spisomorphic_of_set_spverts_empty_isomorphic `{Equivalence T equiv} {n m}
+  (cohg cohg' : CospanSPHyperGraph T n m) :
+  size (spisolated_vertices cohg) = size (spisolated_vertices cohg') ->
+  spisomorphic (set_spverts cohg ∅) (set_spverts cohg' ∅) ->
+  spisomorphic (norm_spverts cohg) (norm_spverts cohg').
+Proof.
+  intros Hverts.
+  intros (fv & fe & Hfv & Hfe & Heq)%spisomorphic_exists.
+  apply (size_set_eq_exists_map (M:=Pmap)) in Hverts as Hmv'.
+  destruct Hmv' as (mv' & Hdommv' & Himgmv' & Hinj).
+
+  assert (Himgfv : forall v, v ∈ spreferrenced_vertices cohg ->
+    fv v ∈ spreferrenced_vertices cohg'). 1:{
+    intros v Hv.
+    apply (f_equal spreferrenced_vertices) in Heq.
+    rewrite spreferrenced_vertices_set_spverts in Heq.
+    rewrite Heq.
+    rewrite spreferrenced_vertices_relabel_spgraph,
+      (spreferrenced_vertices_reindex_spgraph _).
+    rewrite spreferrenced_vertices_set_spverts.
+    now apply elem_of_map_2.
+  }
+
+  eapply (spisomorphic_of_partial_inj_dom' _ _
+    (λ i, default (fv i) (mv' !! i)) fe).
+  - intros i j.
+    rewrite vertices_decomp, 2 elem_of_union.
+    rewrite spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
+    intros [Hii|Hir];
+    [apply Hdommv' in Hii as Hmi;
+    apply elem_of_dom in Hmi as [mi Hmi];
+    rewrite Hmi; cbn; apply (elem_of_map_img_2 (SA:=Pset)) in Hmi as Hmii;
+    rewrite Himgmv' in Hmii
+    |replace (mv' !! i) with (@None positive) by
+      (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
+      intros ?%spisolated_referrenced_disjoint);
+     cbn;
+     specialize (Himgfv i Hir) as Hfir];
+    (intros [Hji|Hjr];
+    [apply Hdommv' in Hji as Hmj;
+    apply elem_of_dom in Hmj as [mj Hmj];
+    rewrite Hmj; cbn; apply (elem_of_map_img_2 (SA:=Pset)) in Hmj as Hmji;
+    rewrite Himgmv' in Hmji
+    |replace (mv' !! j) with (@None positive) by
+      (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
+      intros ?%spisolated_referrenced_disjoint);
+     cbn;
+     specialize (Himgfv j Hjr) as Hfjr]).
+    + intros <-.
+      revert Hmi Hmj.
+      apply Hinj.
+    + intros ->.
+      now apply spisolated_referrenced_disjoint in Hmii.
+    + intros <-.
+      now apply spisolated_referrenced_disjoint in Hmji.
+    + apply Hfv.
+  - intros ? ? ? ?; apply Hfe.
+  - apply cosphg_ext; [apply sphg_ext|..].
+    + cbn.
+      etransitivity; [apply (f_equal (sphyperedges ∘ sphedges) Heq)|].
+      cbn.
+      apply map_fmap_ext.
+      intros _ tv (i & -> & Hitv)%(lookup_kmap_Some _).
+      apply pair_eq, conj; [done|].
+      apply gmultiset_map_ext.
+      intros v Hv.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
+      apply elem_of_map_to_list in Hitv.
+      unfold spreferrenced_vertices.
+      apply elem_of_union_r.
+      apply elem_of_list_to_set.
+      apply elem_of_list_bind.
+      exists (i, tv).
+      rewrite gmultiset_elem_of_elements.
+      done.
+    + cbn.
+      apply leibniz_equiv_iff in Hdommv', Himgmv'.
+      rewrite <- Hdommv', <- Himgmv'.
+      apply set_eq.
+      intros k.
+      clear.
+      set_unfold.
+      rewrite elem_of_map_img.
+      setoid_rewrite elem_of_dom.
+      apply exists_iff.
+      intros i.
+      split; [now intros ->|].
+      now intros [-> [? ->]].
+    + cbn.
+      etransitivity; [apply (f_equal spinputs Heq)|].
+      cbn.
+      apply vec_to_list_inj2.
+      rewrite 2 vec_to_list_map.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
+      unfold spreferrenced_vertices.
+      apply elem_of_union_l.
+      apply elem_of_list_to_set.
+      now apply elem_of_app; left.
+    + cbn.
+      etransitivity; [apply (f_equal spoutputs Heq)|].
+      cbn.
+      apply vec_to_list_inj2.
+      rewrite 2 vec_to_list_map.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
+      unfold spreferrenced_vertices.
+      apply elem_of_union_l.
+      apply elem_of_list_to_set.
+      now apply elem_of_app; right.
+Qed.
+
+(* FIXME: Remove, once moved from top of SPTensorGraphQuote to SPTensorGraph *)
+
+Add Parametric Morphism {n m} : (@spreferrenced_vertices T n m)
+  with signature cosphg_eq ==> eq as spreferrenced_vertices_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]).
+  unfold spreferrenced_vertices.
+  rewrite <- Hins, Houts.
+  f_equal.
+  apply map_to_list_equiv in Heq.
+  induction Heq as [|? ? ? ? Hhd]; [done|].
+  cbn.
+  rewrite 2 (list_to_set_app_L).
+  f_equal; [|done].
+  do 2 f_equal; apply Hhd.
+Qed.
+
+Add Parametric Morphism {n m} : (@spisolated_vertices T n m)
+  with signature cosphg_eq ==> eq as spisolated_vertices_cosphg_eq.
+Proof.
+  intros cosphg cosphg' Heq.
+  unfold spisolated_vertices.
+  f_equal; [|now rewrite Heq].
+  apply Heq.2.2.2.
+Qed.
+
+Add Parametric Morphism {n m} : (@set_spverts T n m)
+  with signature cosphg_eq ==> eq ==> cosphg_eq as set_spverts_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]) vs.
+  apply mk_cosphg_eq; [done..|].
+  split; [done|].
+  done.
+Qed.
+
+
+Add Parametric Morphism {n m} : (@norm_spverts T n m)
+  with signature cosphg_eq ==> cosphg_eq as norm_spverts_cosphg_eq.
+Proof.
+  intros cosphg cosphg' Heq.
+  unfold norm_spverts.
+  now apply set_spverts_cosphg_eq, spisolated_vertices_cosphg_eq_Proper.
+Qed.
+
+Lemma set_spverts_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
+  vs vs' : set_spverts (set_spverts cohg vs) vs' = set_spverts cohg vs'.
+Proof.
+  done.
+Qed.
+
+Lemma spisolated_vertices_set_spverts_spisolated_vertices
+  {n m} (cohg : CospanSPHyperGraph T n m) :
+  spisolated_vertices (set_spverts cohg (spisolated_vertices cohg)) =
+  spisolated_vertices cohg.
+Proof.
+  unfold spisolated_vertices at 1 2.
+  cbn.
+  rewrite spreferrenced_vertices_set_spverts.
+  unfold spisolated_vertices.
+  now rewrite difference_twice_L.
+Qed.
+
+Lemma spequiv_of_set_spverts_empty_equiv `{Equivalence T equiv} {n m}
+  (cohg cohg' : CospanSPHyperGraph T n m) :
+  size (spisolated_vertices cohg) = size (spisolated_vertices cohg') ->
+  set_spverts cohg ∅ ≡ set_spverts cohg' ∅ ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  intros Hverts.
+  intros (cohg'' & Hiso & Hequiv)%cosphg_equiv_alt.
+
+  transitivity (norm_spverts (
+      set_spverts cohg'' (spisolated_vertices cohg'))).
+  - replace cohg'' with (set_spverts
+    (set_spverts cohg'' (spisolated_vertices cohg')) ∅) in Hiso. 2:{
+      apply cosphg_ext; [|done..].
+      apply sphg_ext; [done|].
+      cbn.
+      symmetry.
+      now rewrite Hequiv.2.2.2.
+    }
+    apply spisomorphic_of_set_spverts_empty_isomorphic in Hiso. 2:{
+      rewrite Hequiv, set_spverts_set_spverts.
+      rewrite Hverts.
+      now rewrite spisolated_vertices_set_spverts_spisolated_vertices.
+    }
+    now rewrite Hiso.
+  - rewrite Hequiv.
+    apply eq_reflexivity.
+    rewrite set_spverts_set_spverts.
+    unfold norm_spverts.
+    rewrite set_spverts_set_spverts.
+    now rewrite spisolated_vertices_set_spverts_spisolated_vertices.
+Qed.
+
+
+
+Lemma norm_spverts_equiv_of_map_to_list_perm_equiv `{Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanSPHyperGraph T n m) :
+  spreferrenced_vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  size (spisolated_vertices cohg) = size (spisolated_vertices cohg') ->
+  PermutationA (rel_preimage snd (prod_relation equiv eq))
+  (prod_map id (prod_map id (gmultiset_map (mv !!.))) <$>
+    map_to_list cohg.(sphedges).(sphyperedges))
+  (prod_map id (prod_map id (gmultiset_map Some)) <$>
+    map_to_list cohg'.(sphedges).(sphyperedges)) ->
+  vmap (mv !!.) cohg.(spinputs) = vmap Some cohg'.(spinputs) ->
+  vmap (mv !!.) cohg.(spoutputs) = vmap Some cohg'.(spoutputs) ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  intros Hdom Hinj Hverts Hperm Hins Houts.
+  apply spequiv_of_set_spverts_empty_equiv; [done|].
+  apply (spequiv_of_map_to_list_perm_equiv' mv); [|done..].
+  rewrite vertices_decomp.
+  rewrite spreferrenced_vertices_set_spverts.
+  unfold spisolated_vertices.
+  rewrite spreferrenced_vertices_set_spverts.
+  cbn -[difference].
+  rewrite <- Hdom.
+  generalize (spreferrenced_vertices cohg).
+  set_solver +.
+Qed.
+
+
+
+Lemma maybe_vertex_map_correct m ktios ktios' m' :
+  maybe_vertex_map m ktios ktios' = Some m' ->
+  m.(Piso_map) ⊆ m' /\
+  exists ktios'',
+  Forall2 (λ ktv ktv',
+    ktv.2.1 ≡ ktv'.2.1 /\
+    gmultiset_map (m'.(Piso_map)!!.) ktv.2.2 =
+    gmultiset_map Some ktv'.2.2) ktios ktios'' /\
+    ktios'' ≡ₚ ktios'.
+Proof.
+  unfold maybe_vertex_map.
+  intros (ktioss & Hktios%elem_of_partial_permutations &
+    Hm'%vertex_map_of_alignment_correct)%list_first_omap_Some.
+  split; [apply Hm'.1|].
+  rewrite <- Hktios.2.1.
+  exists ktioss.*2.
+  split; [|apply Hktios.2.2].
+  apply Forall2_fmap, Forall_Forall2_diag.
+  eapply Forall_impl; [eapply Forall_and, conj, Hm'.2; apply Hktios.1|].
+  intros (ktv, ktv').
+  cbn.
+  easy.
+Qed.
+
+
+Lemma spgraph_isos_fast_correct {n m} `{Equivalence T equiv}
+  (cohg cohg' : CospanSPHyperGraph T n m)
+  mv : spgraph_isos_fast cohg cohg' = Some mv ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  unfold spgraph_isos_fast.
+  case_decide as Hsize; [|done].
+  intros (mv' & Hmv' & Hmaybe)%bind_Some.
+  apply maybe_vertex_map_correct in Hmaybe as Hmaybe'.
+  destruct Hmaybe' as (Hsubs & (sphe & Hall2 & Hsphe)).
+  apply pupdates_correct in Hmv' as Hmv'_alt.
+  rewrite zip_with_app, Forall_app in Hmv'_alt by now rewrite 2 length_vec_to_list.
+  destruct Hmv'_alt as [Hins Houts].
+  apply (norm_spverts_equiv_of_map_to_list_perm_equiv mv).
+  - apply subseteq_dom in Hsubs as Hdoms.
+    unfold spreferrenced_vertices.
+    rewrite union_subseteq.
+    split.
+    + apply pupdates_correct in Hmv' as Hmv'_alt.
+      rewrite Forall_lookup in Hmv'_alt.
+      intros v [i Hi]%elem_of_list_to_set%elem_of_list_lookup.
+      apply lookup_lt_Some in Hi as Hilt.
+      rewrite length_app, 2 length_vec_to_list in Hilt.
+      assert (is_Some ((spinputs cohg' ++ spoutputs cohg') !! i)) as
+        [v' Hv'] by now rewrite lookup_lt_is_Some, length_app, 2 length_vec_to_list.
+      apply elem_of_dom.
+      exists v'.
+      revert Hsubs.
+      apply lookup_weaken.
+      apply (Hmv'_alt i (v, v')).
+      rewrite lookup_zip_with.
+      cbn in Hi.
+      rewrite Hi, Hv'.
+      done.
+    + intros v ([k tvs] & Hv & [i Hktvs]%elem_of_list_lookup
+        )%elem_of_list_to_set%elem_of_list_bind.
+      rewrite Forall2_lookup in Hall2.
+      specialize (Hall2 i).
+      cbn in Hktvs.
+      rewrite <- option_relation_Forall2, Hktvs in Hall2.
+      cbn in Hall2, Hv.
+      destruct (sphe !! i) as [tvs'|]; [|done].
+      destruct Hall2 as [_ Hall2].
+      apply (f_equal elements), (eq_reflexivity (RA:=Permutation)) in Hall2.
+      rewrite 2 elements_gmultiset_map in Hall2.
+      apply (elem_of_list_fmap_1 (mv.(Piso_map) !!.)) in Hv.
+      rewrite Hall2, elem_of_list_fmap in Hv.
+      apply elem_of_dom.
+      destruct Hv as (y & Hy & _).
+      now exists y.
+  - apply Piso_map_inj.
+  - done.
+  - symmetry.
+    apply PermutationA_iff_exists_Forall2_Permutation.
+    eexists.
+    split; [rewrite <- Hsphe; reflexivity|].
+    symmetry.
+    apply Forall2_fmap.
+    apply Hall2.
+  - apply vec_eq; intros i.
+    rewrite 2 vlookup_map.
+    rewrite Forall_lookup in Hins.
+    revert Hsubs.
+    apply lookup_weaken.
+    apply (Hins i (_, _)).
+    rewrite lookup_zip_with.
+    rewrite 2 lookup_vec_to_list_fin.
+    done.
+  - apply vec_eq; intros i.
+    rewrite 2 vlookup_map.
+    rewrite Forall_lookup in Houts.
+    revert Hsubs.
+    apply lookup_weaken.
+    apply (Houts i (_, _)).
+    rewrite lookup_zip_with.
+    rewrite 2 lookup_vec_to_list_fin.
+    done.
+Qed.
+
+
+Lemma spgraph_iso_partial_test_fast_correct {n m} `{Equivalence T equiv}
+  (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test_fast cohg cohg' = true ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  unfold spgraph_iso_partial_test_fast.
+  case_match; [|done].
+  intros _.
+  eapply spgraph_isos_fast_correct; eauto.
+Qed.
+
+
+
+
+
+Definition maybe_vertex_map' (m : Piso)
+  (ktios ktios' : list (positive * (T * gmultiset positive))) :
+  option Piso :=
+  first_omap_partial_permutations (λ ktio ktio', ktio.2.1 ≡ ktio'.2.1 /\
+      size ktio.2.2 = size ktio'.2.2)
+      (vertex_map_of_alignment m) ktios ktios'.
+
+
+Definition spgraph_isos_fast' {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  option Piso :=
+  if decide (size (spisolated_vertices cohg) = size (spisolated_vertices cohg')) then
+    mv ← pupdates (zip (cohg.(spinputs) ++ cohg.(spoutputs))
+        (cohg'.(spinputs) ++ cohg'.(spoutputs))) ∅;
+    maybe_vertex_map' mv (map_to_list cohg.(sphedges).(sphyperedges))
+        (map_to_list cohg'.(sphedges).(sphyperedges))
+  else
+    None.
+
+
+Definition spgraph_iso_partial_test_fast' {n m} (cohg cohg' : CospanSPHyperGraph T n m) : bool :=
+  match spgraph_isos_fast' cohg cohg' with
+  | None => false
+  | Some _ => true
+  end.
+
+Lemma maybe_vertex_map'_correct m ktios ktios' :
+  maybe_vertex_map' m ktios ktios' = maybe_vertex_map m ktios ktios'.
+Proof.
+  unfold maybe_vertex_map'.
+  rewrite first_omap_partial_permutations_correct.
+  done.
+Qed.
+
+Lemma spgraph_isos_fast'_correct {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_isos_fast' cohg cohg' = spgraph_isos_fast cohg cohg'.
+Proof.
+  unfold spgraph_isos_fast'.
+  unfold spgraph_isos_fast.
+  case_decide; [|done].
+  apply option_bind_ext; [|done].
+  intros mv.
+  now rewrite maybe_vertex_map'_correct.
+Qed.
+
+
+Lemma spgraph_iso_partial_test_fast'_correct
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test_fast' cohg cohg' = spgraph_iso_partial_test_fast cohg cohg'.
+Proof.
+  unfold spgraph_iso_partial_test_fast'.
+  now rewrite spgraph_isos_fast'_correct.
+Qed.
+
+
+Fixpoint vertex_map_of_sections''
+  (vs : list (list (positive * positive) * list (positive * positive)))
+  (m : WPiso) : option WPiso :=
+  match vs with
+  | [] => Some m
+  | (vin, vout) :: vs =>
+    list_first_omap (vertex_map_of_sections'' vs)
+      $ gmultiset_pre_isos_extending_aux_alt' vin vout m
+  end.
+
+
+Definition vertex_map_of_alignment''
+  {T} (m : WPiso) (ktios : list ((positive * (T * gmultiset positive)) *
+    (positive * (T * gmultiset positive)))) : option WPiso :=
+  vertex_map_of_sections'' (vertex_sections_of_alignment
+    ((λ ktio_ktio', (ktio_ktio'.1.2.2, ktio_ktio'.2.2.2)) <$> ktios)) m.
+
+Definition maybe_vertex_map'' `{Equiv T, RelDecision T T equiv}
+  (m : WPiso)
+  (ktios ktios' : list (positive * (T * gmultiset positive))) :
+  option WPiso :=
+  first_omap_partial_permutations (λ ktio ktio', ktio.2.1 ≡ ktio'.2.1 /\
+      size ktio.2.2 = size ktio'.2.2)
+      (vertex_map_of_alignment'' m) ktios ktios'.
+
+
+Definition spgraph_isos_fast'' `{Equiv T, RelDecision T T equiv}
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  option WPiso :=
+  if decide (size (spisolated_vertices cohg) = size (spisolated_vertices cohg')) then
+    mv ← wpupdates (zip (cohg.(spinputs) ++ cohg.(spoutputs))
+        (cohg'.(spinputs) ++ cohg'.(spoutputs))) ∅;
+    maybe_vertex_map'' mv (map_to_list cohg.(sphedges).(sphyperedges))
+        (map_to_list cohg'.(sphedges).(sphyperedges))
+  else
+    None.
+
+
+Definition spgraph_iso_partial_test_fast'' `{Equiv T, RelDecision T T equiv}
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) : bool :=
+  match spgraph_isos_fast'' cohg cohg' with
+  | None => false
+  | Some _ => true
+  end.
+
+Lemma fmap_list_first_omap {A B C} (f : A -> option B) (g : B -> C) l :
+  g <$> list_first_omap f l = list_first_omap (fmap g ∘ f) l.
+Proof.
+  induction l; [done|].
+  cbn.
+  case_match; cbn; done.
+Qed.
+
+Lemma list_first_omap_ext {A B} (f g : A -> option B) (l : list A) :
+  (forall a, a ∈ l -> f a = g a) ->
+  list_first_omap f l = list_first_omap g l.
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; [done|].
+  cbn.
+  do 2 case_match; congruence.
+Qed.
+
+Lemma vertex_map_of_sections''_correct vs m :
+  vertex_map_of_sections'' vs (Piso_to_weak m) =
+    Piso_to_weak <$> vertex_map_of_sections vs m.
+Proof.
+  revert m; induction vs as [|(k, v) vs IHvs]; [done|intros m].
+  cbn.
+  rewrite gmultiset_pre_isos_extending_aux_alt'_correct.
+  rewrite list_first_omap_fmap, fmap_list_first_omap.
+  apply list_first_omap_ext.
+  intros mv _.
+  cbn.
+  done.
+Qed.
+
+Lemma vertex_map_of_alignment''_correct vs m :
+  vertex_map_of_alignment'' (Piso_to_weak m) vs =
+    Piso_to_weak <$> vertex_map_of_alignment m vs.
+Proof.
+  unfold vertex_map_of_alignment''.
+  now rewrite vertex_map_of_sections''_correct.
+Qed.
+
+Lemma maybe_vertex_map''_correct m ktios ktios' :
+  maybe_vertex_map'' (Piso_to_weak m) ktios ktios' =
+  Piso_to_weak <$> maybe_vertex_map m ktios ktios'.
+Proof.
+  rewrite <- maybe_vertex_map'_correct.
+  unfold maybe_vertex_map'', maybe_vertex_map'.
+  rewrite 2 first_omap_partial_permutations_correct.
+  rewrite fmap_list_first_omap.
+  apply list_first_omap_ext.
+  intros; apply vertex_map_of_alignment''_correct.
+Qed.
+
+Lemma spgraph_isos_fast''_correct {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_isos_fast'' cohg cohg' = Piso_to_weak <$> spgraph_isos_fast cohg cohg'.
+Proof.
+  unfold spgraph_isos_fast''.
+  unfold spgraph_isos_fast.
+  case_decide; [|done].
+  rewrite WPiso_empty_correct.
+  rewrite wpupdates_correct, option_fmap_bind, option_bind_fmap.
+  apply option_bind_ext; [|done].
+  intros mv.
+  cbn.
+  now rewrite maybe_vertex_map''_correct.
+Qed.
+
+
+Lemma spgraph_iso_partial_test_fast''_correct_aux
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test_fast'' cohg cohg' = spgraph_iso_partial_test_fast cohg cohg'.
+Proof.
+  rewrite <- spgraph_iso_partial_test_fast'_correct.
+  unfold spgraph_iso_partial_test_fast''.
+  rewrite spgraph_isos_fast''_correct.
+  symmetry.
+  unfold spgraph_iso_partial_test_fast'.
+  rewrite spgraph_isos_fast'_correct.
+  now case_match.
+Qed.
+
+Lemma spgraph_iso_partial_test_fast''_correct `{Equivalence T equiv}
+  {n m} (cohg cohg' : CospanSPHyperGraph T n m) :
+  spgraph_iso_partial_test_fast'' cohg cohg' = true ->
+  norm_spverts cohg ≡ norm_spverts cohg'.
+Proof.
+  rewrite spgraph_iso_partial_test_fast''_correct_aux.
+  apply spgraph_iso_partial_test_fast_correct.
 Qed.
 
 End dec_equiv.

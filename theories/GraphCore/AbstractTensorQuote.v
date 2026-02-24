@@ -1,21 +1,21 @@
 Require Import PeanoNat Lia.
 From stdpp Require Import base list.
 
-Class AbstractTensorQuote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T') (ctx : Ctx)
+Class AbstractTensorQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T') (ctx : Ctx)
   (t : T) (t' : T') := {
   abs_quote : f ctx t ≡ t'
 }.
 
-#[global] Hint Mode AbstractTensorQuote + + + - + - - + : typeclass_instances.
+#[global] Hint Mode AbstractTensorQuote + + + - - + - - + : typeclass_instances.
 
-Class AbstractTensorDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T') (ctx : Ctx)
+Class AbstractTensorDenote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T') (ctx : Ctx)
   (t : T) (t' : T') := {
   abs_denote : f ctx t ≡ t'
 }.
 
-#[global] Hint Mode AbstractTensorDenote + + + - + - + - : typeclass_instances.
+#[global] Hint Mode AbstractTensorDenote + + + - - + - + - : typeclass_instances.
 
-#[export] Instance abstens_denote_default {Ctx T} `{Equiv T', Reflexive T' equiv}
+#[export] Instance abstens_denote_default {Ctx T} `{Equiv T', Equivalence T' equiv}
   (f : Ctx -> T -> T') (ctx : Ctx) (t : T) :
   AbstractTensorDenote f ctx t (f ctx t) | 100.
 Proof.
@@ -143,7 +143,7 @@ Proof.
   now apply option_Forall2_refl.
 Qed.
 
-#[global] Instance abstens_quote_discrete `{Equiv T, Reflexive T equiv}
+#[global] Instance abstens_quote_discrete `{Equiv T, Equivalence T equiv}
   (ctx : list T) (n : nat) (t : T) : IsNth t n ctx ->
   AbstractTensorQuote interp_discrete_hg ctx (Pos.of_succ_nat n) (Some t).
 Proof.
@@ -153,4 +153,30 @@ Proof.
   rewrite pos_to_nat_pred_of_nat.
   rewrite Hn.
   now apply option_Forall2_refl.
+Qed.
+
+
+Definition interp_discrete_hg_inhab `{Inhabited T} (l : list T) (p : positive) :
+  T :=
+  l !!! (pos_to_nat_pred p).
+
+#[global] Instance interp_discrete_hg_inhab_proper `{Inhabited T} 
+  `{Equiv T, Reflexive T equiv} ctx :
+  Proper (equiv ==> equiv) (@interp_discrete_hg_inhab T _ ctx).
+Proof.
+  intros ? ? [].
+  reflexivity.
+Qed.
+
+#[global] Instance abstens_quote_discrete_inhab `{Inhabited T, Equiv T, Equivalence T equiv}
+  (ctx : list T) (n : nat) (t : T) : IsNth t n ctx ->
+  AbstractTensorQuote interp_discrete_hg_inhab ctx (Pos.of_succ_nat n) t.
+Proof.
+  intros Hn%IsNth_iff.
+  constructor.
+  unfold interp_discrete_hg_inhab.
+  rewrite list_lookup_total_alt.
+  rewrite pos_to_nat_pred_of_nat.
+  rewrite Hn.
+  done.
 Qed.

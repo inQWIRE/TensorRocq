@@ -61,26 +61,6 @@ Proof.
 Qed.
 
 
-Lemma lookup_vec_to_list {A n} (v : vec A n) i :
-  vec_to_list v !! i =
-  guard (i < n) ≫= fun H => Some (v !!! nat_to_fin H).
-Proof.
-  apply option_eq; intros a.
-  rewrite <- vlookup_lookup'.
-  rewrite bind_Some.
-  cbn.
-  split; [|naive_solver].
-  intros (Hlt & <-).
-  exists Hlt.
-  split; [case_guard; [f_equal; apply proof_irrel|done]|done].
-Qed.
-
-Lemma lookup_vec_to_list_fin {A n} (v : vec A n) (i : fin n) :
-  vec_to_list v !! (i:>nat) =
-  Some (v !!! i).
-Proof.
-  now apply vlookup_lookup.
-Qed.
 
 
 

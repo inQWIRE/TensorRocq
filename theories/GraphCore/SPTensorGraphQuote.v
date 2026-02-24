@@ -62,47 +62,6 @@ Proof.
   now apply sphypergraph_union_proper.
 Qed.
 
-Add Parametric Morphism `{Equiv T} {n m} : (@spreferrenced_vertices T n m)
-  with signature cosphg_eq ==> eq as spreferrenced_vertices_cosphg_eq.
-Proof.
-  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]).
-  unfold spreferrenced_vertices.
-  rewrite <- Hins, Houts.
-  f_equal.
-  apply map_to_list_equiv in Heq.
-  induction Heq as [|? ? ? ? Hhd]; [done|].
-  cbn.
-  rewrite 2 (list_to_set_app_L).
-  f_equal; [|done].
-  do 2 f_equal; apply Hhd.
-Qed.
-
-Add Parametric Morphism `{Equiv T} {n m} : (@spisolated_vertices T n m)
-  with signature cosphg_eq ==> eq as spisolated_vertices_cosphg_eq.
-Proof.
-  intros cosphg cosphg' Heq.
-  unfold spisolated_vertices.
-  f_equal; [|now rewrite Heq].
-  apply Heq.2.2.2.
-Qed.
-
-Add Parametric Morphism `{Equiv T} {n m} : (@set_spverts T n m)
-  with signature cosphg_eq ==> eq ==> cosphg_eq as set_spverts_cosphg_eq.
-Proof.
-  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]) vs.
-  apply mk_cosphg_eq; [done..|].
-  split; [done|].
-  done.
-Qed.
-
-
-Add Parametric Morphism `{Equiv T} {n m} : (@norm_spverts T n m)
-  with signature cosphg_eq ==> cosphg_eq as norm_spverts_cosphg_eq.
-Proof.
-  intros cosphg cosphg' Heq.
-  unfold norm_spverts.
-  now apply set_spverts_cosphg_eq, spisolated_vertices_cosphg_eq_Proper.
-Qed.
 
 
 
@@ -110,13 +69,12 @@ Qed.
 
 
 
-
-Class CospanSPHyperGraphQuote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
+Class CospanSPHyperGraphQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanSPHyperGraph T n m) (val : CospanSPHyperGraph T' n m) := {
   cosphg_quote : cosphg_eq (spgraph_apply_hom (f ctx) expr) val;
 }.
 
-#[global] Hint Mode CospanSPHyperGraphQuote + + + - + - + + - + : typeclass_instances.
+#[global] Hint Mode CospanSPHyperGraphQuote + + + - - + - + + - + : typeclass_instances.
 
 
 Lemma cosphg_quote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
@@ -146,7 +104,7 @@ Section instances.
 Context {Ctx T} `{Equiv T'} `{Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx).
 
-Local Notation Quote := (@CospanSPHyperGraphQuote Ctx T T' _ f ctx _ _).
+Local Notation Quote := (@CospanSPHyperGraphQuote Ctx T T' _ _ f ctx _ _).
 
 #[export] Instance cosphg_quote_spgraph_apply_hom {n m} (expr : CospanSPHyperGraph T n m) :
   Quote expr (spgraph_apply_hom (f ctx) expr).
@@ -348,28 +306,12 @@ End instances.
 
 
 
-Class CospanSPHyperGraphDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
+Class CospanSPHyperGraphDenote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanSPHyperGraph T n m) (val : CospanSPHyperGraph T' n m) := {
   cosphg_denote : cosphg_eq (spgraph_apply_hom (f ctx) expr) val;
 }.
 
-#[global] Hint Mode CospanSPHyperGraphDenote + + + - + - + + + - : typeclass_instances.
-
-Class AbstractTensorDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T') (ctx : Ctx)
-  (t : T) (t' : T') := {
-  abs_denote : f ctx t ≡ t'
-}.
-
-#[global] Hint Mode AbstractTensorDenote + + + - + + + - : typeclass_instances.
-
-#[export] Instance abstens_denote_default {Ctx T} `{Equiv T', Reflexive T' equiv}
-  (f : Ctx -> T -> T') (ctx : Ctx) (t : T) :
-  AbstractTensorDenote f ctx t (f ctx t) | 100.
-Proof.
-  constructor.
-  reflexivity.
-Qed.
-
+#[global] Hint Mode CospanSPHyperGraphDenote + + + - - + - + + + - : typeclass_instances.
 
 Lemma cosphg_denote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
   Equiv T', Equivalence T' equiv}
@@ -397,7 +339,7 @@ Section instances.
 Context {Ctx T} `{Equiv T'} `{Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx).
 
-Local Notation Denote := (@CospanSPHyperGraphDenote Ctx T T' _ f ctx _ _).
+Local Notation Denote := (@CospanSPHyperGraphDenote Ctx T T' _ _ f ctx _ _).
 
 #[export] Instance cosphg_denote_id_spgraph {n} : Denote (id_spgraph n) (id_spgraph n).
 Proof.

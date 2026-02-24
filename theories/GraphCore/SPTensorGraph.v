@@ -1105,3 +1105,61 @@ Proof.
   now rewrite 2 vertices_decomp,
     spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
 Qed.
+
+
+
+#[export] Instance cosphg_eq_subrelation `{Equiv T} {n m} :
+  subrelation (@cosphg_eq T n m _) equiv.
+Proof.
+  intros ? ? ?; now apply rtc_once; right.
+Qed.
+
+#[export] Instance spisomorphic_subrelation `{Equiv T} {n m} :
+  subrelation (@spisomorphic T n m) equiv.
+Proof.
+  intros ? ? ?; now apply rtc_once; left.
+Qed.
+
+
+
+Add Parametric Morphism `{Equiv T} {n m} : (@spreferrenced_vertices T n m)
+  with signature cosphg_eq ==> eq as spreferrenced_vertices_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]).
+  unfold spreferrenced_vertices.
+  rewrite <- Hins, Houts.
+  f_equal.
+  apply map_to_list_equiv in Heq.
+  induction Heq as [|? ? ? ? Hhd]; [done|].
+  cbn.
+  rewrite 2 (list_to_set_app_L).
+  f_equal; [|done].
+  do 2 f_equal; apply Hhd.
+Qed.
+
+Add Parametric Morphism `{Equiv T} {n m} : (@spisolated_vertices T n m)
+  with signature cosphg_eq ==> eq as spisolated_vertices_cosphg_eq.
+Proof.
+  intros cosphg cosphg' Heq.
+  unfold spisolated_vertices.
+  f_equal; [|now rewrite Heq].
+  apply Heq.2.2.2.
+Qed.
+
+Add Parametric Morphism `{Equiv T} {n m} : (@set_spverts T n m)
+  with signature cosphg_eq ==> eq ==> cosphg_eq as set_spverts_cosphg_eq.
+Proof.
+  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]) vs.
+  apply mk_cosphg_eq; [done..|].
+  split; [done|].
+  done.
+Qed.
+
+
+Add Parametric Morphism `{Equiv T} {n m} : (@norm_spverts T n m)
+  with signature cosphg_eq ==> cosphg_eq as norm_spverts_cosphg_eq.
+Proof.
+  intros cosphg cosphg' Heq.
+  unfold norm_spverts.
+  now apply set_spverts_cosphg_eq, spisolated_vertices_cosphg_eq_Proper.
+Qed.

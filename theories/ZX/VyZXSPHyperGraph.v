@@ -194,7 +194,7 @@ Proof.
 
     (* apply spgraph_test_isomorphism_quote. *)
   unshelve (notypeclasses refine (spgraph_test_isomorphism_quote _ _ _ _ _ _ _ _
-    _ _ _ _); [apply _..|]); [apply nil|].
+    _ _ _ _); [apply _..|]); [apply _|apply nil|].
   vm_compute.
   done.
 Qed.
@@ -213,7 +213,7 @@ Proof.
 
     (* apply spgraph_test_isomorphism_quote. *)
   unshelve (notypeclasses refine (spgraph_test_isomorphism_quote _ _ _ _ _ _ _ _
-    _ _ _ _); [cbn; apply _..|]); [apply nil|];
+    _ _ _ _); [cbn; apply _..|]); [apply _|apply nil|].
   vm_compute.
   done.
 Qed.

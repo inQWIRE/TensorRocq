@@ -109,12 +109,12 @@ Qed.
 
 
 
-Class CospanHyperGraphQuote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
+Class CospanHyperGraphQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanHyperGraph T n m) (val : CospanHyperGraph T' n m) := {
   cohg_quote : cohg_eq (graph_apply_hom (f ctx) expr) val;
 }.
 
-#[global] Hint Mode CospanHyperGraphQuote + + + - + - + + - + : typeclass_instances.
+#[global] Hint Mode CospanHyperGraphQuote + + + - - + - + + - + : typeclass_instances.
 
 
 Lemma cohg_quote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
@@ -144,7 +144,7 @@ Section instances.
 Context {Ctx T} `{Equiv T'} `{Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx).
 
-Local Notation Quote := (@CospanHyperGraphQuote Ctx T T' _ f ctx _ _).
+Local Notation Quote := (@CospanHyperGraphQuote Ctx T T' _ _ f ctx _ _).
 
 #[export] Instance cohg_quote_graph_apply_hom {n m} (expr : CospanHyperGraph T n m) :
   Quote expr (graph_apply_hom (f ctx) expr).
@@ -346,12 +346,12 @@ End instances.
 
 
 
-Class CospanHyperGraphDenote {Ctx T} `{Equiv T'} (f : Ctx -> T -> T')
+Class CospanHyperGraphDenote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanHyperGraph T n m) (val : CospanHyperGraph T' n m) := {
   cohg_denote : cohg_eq (graph_apply_hom (f ctx) expr) val;
 }.
 
-#[global] Hint Mode CospanHyperGraphDenote + + + - + - + + + - : typeclass_instances.
+#[global] Hint Mode CospanHyperGraphDenote + + + - - + - + + + - : typeclass_instances.
 
 
 Lemma cohg_denote_correct_equiv {Ctx} `{Equiv T, Equivalence T equiv,
@@ -380,7 +380,7 @@ Section instances.
 Context {Ctx T} `{Equiv T'} `{Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx).
 
-Local Notation Denote := (@CospanHyperGraphDenote Ctx T T' _ f ctx _ _).
+Local Notation Denote := (@CospanHyperGraphDenote Ctx T T' _ _ f ctx _ _).
 
 #[export] Instance cohg_denote_id_graph {n} : Denote (id_graph n) (id_graph n).
 Proof.

@@ -1,18 +1,6 @@
 Require Export SPTensorGraph SPGraphRewriting.
 
 
-#[export] Instance cosphg_eq_subrelation `{Equiv T} {n m} :
-  subrelation (@cosphg_eq T n m _) equiv.
-Proof.
-  intros ? ? ?; now apply rtc_once; right.
-Qed.
-
-#[export] Instance spisomorphic_subrelation `{Equiv T} {n m} :
-  subrelation (@spisomorphic T n m) equiv.
-Proof.
-  intros ? ? ?; now apply rtc_once; left.
-Qed.
-
 
 
 

@@ -1,4 +1,4 @@
-From stdpp Require Export pmap. 
+From stdpp Require Export pmap.
 Require Export Aux_pos Aux_relset.
 
 
@@ -420,7 +420,7 @@ Proof.
   trivial.
 Qed.
 
-Lemma pupdate_correct_insert k v m m' : 
+Lemma pupdate_correct_insert k v m m' :
   pupdate k v m = Some m' -> m'.(Piso_map) = <[k := v]> m.(Piso_map).
 Proof.
   unfold pupdate.
@@ -859,4 +859,337 @@ Proof.
   setoid_rewrite mayzip_Some.
   rewrite zip_fmap_r.
   naive_solver.
+Qed.
+
+
+Record WPiso := mk_WPiso {
+  WPiso_map : Pmap positive;
+  WPiso_invmap : Pmap positive;
+}.
+
+#[export] Instance WPiso_empty : Empty WPiso := mk_WPiso ∅ ∅.
+
+Definition wpinsert (k v : positive) (m : WPiso) : option WPiso :=
+  match m.(WPiso_map) !! k with
+  | Some _ => None
+  | None =>
+    match m.(WPiso_invmap) !! v with
+    | Some _ => None
+    | None =>
+      Some (mk_WPiso (insert k v m.(WPiso_map))
+        (insert v k m.(WPiso_invmap)))
+    end
+  end.
+
+Definition wpupdate (k v : positive) (m : WPiso) : option WPiso :=
+  match m.(WPiso_map) !! k with
+  | Some v' => if decide (v = v') then Some m else None
+  | None =>
+    match m.(WPiso_invmap) !! v with
+    | Some _ => None
+    | None =>
+      Some (mk_WPiso (insert k v m.(WPiso_map))
+        (insert v k m.(WPiso_invmap)))
+    end
+  end.
+
+Fixpoint wpupdates (kvs : list (positive * positive)) (m : WPiso) : option WPiso :=
+  match kvs with
+  | [] => Some m
+  | (k, v) :: kvs =>
+    wpupdate k v m ≫= wpupdates kvs
+  end.
+
+Definition Piso_to_weak (m : Piso) : WPiso := mk_WPiso m.(Piso_map) m.(Piso_invmap).
+
+Lemma WPiso_empty_correct : ∅ = Piso_to_weak ∅.
+Proof.
+  done.
+Qed.
+
+Lemma wpinsert_correct k v (m : Piso) :
+  wpinsert k v (Piso_to_weak m) = Piso_to_weak <$> pinsert k v m.
+Proof.
+  unfold wpinsert, pinsert.
+  generalize (map_inverses_insert_fresh m.(Piso_map) m.(Piso_invmap) k v (Piso_inverses m)).
+  intros Heq.
+  cbn.
+  case_match; [done|].
+  case_match; done.
+Qed.
+
+Lemma wpupdate_alt k v m :
+  wpupdate k v m =
+  match m.(WPiso_map) !! k with
+  | Some v' => if decide (v = v') then Some m else None
+  | None => wpinsert k v m
+  end.
+Proof.
+  unfold wpupdate.
+  case_match eqn:Hmk; [done|].
+  unfold wpinsert.
+  rewrite Hmk.
+  done.
+Qed.
+
+Lemma wpupdate_correct k v (m : Piso) :
+  wpupdate k v (Piso_to_weak m) = Piso_to_weak <$> pupdate k v m.
+Proof.
+  rewrite wpupdate_alt.
+  unfold pupdate.
+  cbn.
+  case_match; [now case_decide|].
+  apply wpinsert_correct.
+Qed.
+
+#[export] Instance pupdates_perm_Proper : 
+  Proper ((≡ₚ) ==> eq ==> eq) pupdates.
+Proof.
+  intros kvs kvs' Hkvs m _ <-.
+  apply option_eq; intros m'.
+  split; now apply pupdates_perm.
+Qed.
+
+Lemma pupdates_cons_alt k v kvs m : 
+  pupdates ((k, v) :: kvs) m = 
+  pupdate k v m ≫= pupdates kvs.
+Proof.
+  rewrite (ltac:(solve_Permutation) : (k, v) :: kvs ≡ₚ kvs ++ [(k, v)]).
+  rewrite pupdates_app.
+  done.
+Qed.
+
+Lemma wpupdates_correct kvs (m : Piso) :
+  wpupdates kvs (Piso_to_weak m) = Piso_to_weak <$> pupdates kvs m.
+Proof.
+  revert m; induction kvs as [|(k, v) kvs IHkvs]; intros m; [done|].
+  rewrite pupdates_cons_alt.
+  cbn.
+  rewrite wpupdate_correct.
+  rewrite option_bind_fmap, option_fmap_bind.
+  apply option_bind_ext; [|done].
+  intros m'.
+  apply IHkvs.
+Qed.
+
+
+
+Fixpoint partial_permutations {A B} (R : A -> B -> Prop) `{HR : forall a b, Decision (R a b)}
+  (l : list A) (l' : list B) : list (list (A * B)) :=
+  match l with
+  | [] => match l' with
+    | [] => [[]]
+    | _ :: _ => []
+    end
+  | a :: l => list_select (R a) l' ≫=
+    λ '(b, l'), ((a, b) ::.) <$> partial_permutations R l l'
+  end.
+
+Lemma elem_of_partial_permutations {A B} (R : A -> B -> Prop) `{HR : forall a b, Decision (R a b)}
+  (l : list A) (l' : list B) ll' :
+  ll' ∈ partial_permutations R l l' <->
+    Forall (uncurry R) ll' /\ ll'.*1 = l /\ ll'.*2 ≡ₚ l'.
+Proof.
+  revert l' ll'; induction l as [|a l IHl]; intros l' ll'.
+  - destruct l'; [|split; cbn; [easy|
+    intros (_ & ?%(f_equal length) & ?%(Permutation_length)); cbn in *;
+    rewrite ?length_fmap in *; lia]].
+    cbn.
+    rewrite elem_of_list_singleton.
+    split; [now intros ->|].
+    now intros (_ & ->%fmap_nil_inv & _).
+  - cbn.
+    rewrite elem_of_list_bind, exists_pair.
+    split.
+    + intros (b & l'rest & (ll'' & -> & (Hll'' & Hfst & Hsnd)%IHl)%elem_of_list_fmap
+      & [HRab Hl']%elem_of_list_select_perm_Prop).
+      rewrite Forall_cons.
+      cbn.
+      split_and!; [done..| now f_equal|now rewrite Hl', Hsnd].
+    + destruct ll' as [|(a', b) ll']; [easy|].
+      rewrite Forall_cons; cbn.
+      intros ((HRab & Hll') & [= -> Hfst] & (l'1 & l'2 & -> & Hsnd)%Permutation_cons_inv_l).
+      exists b, (l'1 ++ l'2).
+      split.
+      * rewrite (elem_of_list_fmap_inj _).
+        rewrite IHl.
+        done.
+      * rewrite elem_of_list_select.
+        eauto.
+Qed.
+
+Local Open Scope nat_scope.
+
+Fixpoint list_ordpairs {A} (l : list A) : list (A * A) :=
+  match l with
+  | [] => []
+  | a :: l => ((a,.) <$> l) ++ list_ordpairs l
+  end.
+
+
+
+Lemma triangle_number_pred (n : nat) :
+  (n + n * (n - 1) / 2 = (n + 1) * n / 2)%nat.
+Proof.
+  destruct n; [done|].
+  cbn -[Nat.div Nat.mul].
+  rewrite Nat.sub_0_r.
+  rewrite 2 Nat.mul_succ_l, Nat.mul_add_distr_r, <- Nat.add_assoc.
+  replace (1 * _ + _)%nat with (S n * 2)%nat by lia.
+  rewrite Nat.div_add by lia.
+  rewrite Nat.mul_succ_r.
+  lia.
+Qed.
+
+
+Lemma length_list_ordpairs {A} (l : list A) :
+  length (list_ordpairs l) = (length l * (length l - 1)) / 2.
+Proof.
+  induction l; [done|].
+  cbn -[Nat.div Nat.mul].
+  rewrite length_app, length_fmap, IHl.
+  rewrite triangle_number_pred.
+  f_equal; lia.
+Qed.
+
+Lemma elem_of_list_ordpairs {A} (l : list A) ab :
+  ab ∈ list_ordpairs l <-> exists i j, i < j /\
+    l !! i = Some ab.1 /\ l !! j = Some ab.2.
+Proof.
+  split.
+  - revert ab; induction l; [easy|intros ab].
+    cbn.
+    rewrite elem_of_app, elem_of_list_fmap.
+    intros [(b & -> & (i & Hi)%elem_of_list_lookup)|(i & j & Hij & Hli & Hlj)%IHl].
+    + exists 0, (S i).
+      split; [lia|easy].
+    + exists (S i), (S j).
+      split; [lia|easy].
+  - intros (i & j & Hij & Hli & Hlj).
+    revert l Hli j Hij Hlj;
+    induction i as [|i IHi];
+    intros l Hli j Hij Hlj.
+    + destruct l as [|a l]; [easy|].
+      cbn.
+      rewrite elem_of_app.
+      left.
+      apply elem_of_list_fmap.
+      exists ab.2.
+      split; [now destruct ab; cbn in *; congruence|].
+      destruct j; [lia|].
+      cbn in Hlj.
+      now apply elem_of_list_lookup_2 in Hlj.
+    + destruct j; [lia|].
+      destruct l as [|a l]; [easy|].
+      cbn in *.
+      apply elem_of_app; right.
+      apply (IHi l Hli j); [lia|done].
+Qed.
+
+
+Fixpoint ofoldl {A B} (f : A -> B -> option A) (a : option A) (l : list B) : option A :=
+  match a with
+  | None => None
+  | Some a =>
+    match l with
+    | [] => Some a
+    | b :: l =>
+      ofoldl f (f a b) l
+    end
+  end.
+
+
+(* FIXME: Move *)
+Definition list_first_omap {A B} (f : A -> option B) : list A -> option B :=
+  fix list_first_omap l :=
+  match l with
+  | [] => None
+  | a :: l =>
+    match f a with
+    | Some b => Some b
+    | None => list_first_omap l
+    end
+  end.
+
+Lemma list_first_omap_eq_head_bind {A B} (f : A -> option B) l :
+  list_first_omap f l =
+  head (x ← l; from_option (λ x, [x]) [] (f x)).
+Proof.
+  induction l; [done|].
+  cbn.
+  rewrite IHl.
+  destruct (f a); reflexivity.
+Qed.
+
+Lemma list_first_omap_Some {A B} (f : A -> option B) l b :
+  list_first_omap f l = Some b ->
+  exists a, a ∈ l /\ f a = Some b.
+Proof.
+  rewrite list_first_omap_eq_head_bind.
+  intros (a & Hb & Ha)%head_Some_elem_of%elem_of_list_bind.
+  exists a; split; [easy|].
+  destruct (f a); [|easy].
+  cbn in Hb.
+  rewrite elem_of_list_singleton in Hb.
+  now subst.
+Qed.
+
+Lemma list_first_omap_bind {A B C} (f : A -> list B) (g : B -> option C)
+  (l : list A) :
+  list_first_omap g (l ≫= f) =
+  list_first_omap (list_first_omap g ∘ f) l.
+Proof.
+  rewrite 2 list_first_omap_eq_head_bind.
+  induction l; [done|].
+  cbn.
+  rewrite bind_app.
+  rewrite 2 head_app, IHl.
+  rewrite list_first_omap_eq_head_bind.
+  case_match; done.
+Qed.
+
+Lemma list_first_omap_fmap {A B C} (f : A -> B) (g : B -> option C)
+  (l : list A) :
+  list_first_omap g (f <$> l) =
+  list_first_omap (g ∘ f) l.
+Proof.
+  rewrite 2 list_first_omap_eq_head_bind.
+  now rewrite list_fmap_bind.
+Qed.
+
+
+Fixpoint first_omap_partial_permutations
+  {A B C} (R : A -> B -> Prop) `{HR : forall a b, Decision (R a b)}
+  (f : list (A * B) -> option C)
+  (l : list A) (l' : list B) : option C :=
+  match l with
+  | [] => match l' with
+    | [] => f nil
+    | _ :: _ => None
+    end
+  | a :: l => list_first_omap
+      (λ '(b, l'), first_omap_partial_permutations R (λ ll', f ((a, b) :: ll'))
+        l l') (list_select (R a) l')
+  end.
+
+Lemma first_omap_partial_permutations_correct
+  {A B C} (R : A -> B -> Prop) `{HR : forall a b, Decision (R a b)}
+  (f : list (A * B) -> option C) (l : list A) (l' : list B) :
+  first_omap_partial_permutations R f l l' =
+  list_first_omap f (partial_permutations R l l').
+Proof.
+  revert f l'; induction l; intros f l'.
+  - destruct l'; [|done].
+    cbn.
+    now case_match.
+  - cbn.
+    rewrite list_first_omap_bind.
+    rewrite 2 list_first_omap_eq_head_bind.
+    f_equal.
+    apply list_bind_ext; [|done].
+    intros [b l'rest].
+    cbn.
+    rewrite IHl.
+    rewrite list_first_omap_fmap.
+    done.
 Qed.
