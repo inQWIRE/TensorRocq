@@ -1112,3 +1112,62 @@ Proof.
   now rewrite 2 vertices_decomp,
     isolated_vertices_norm_verts, referrenced_vertices_norm_verts.
 Qed.
+
+
+Lemma graph_of_tensor_cohg_eq `{Equiv T} (t t' : T) n m : t ≡ t' ->
+  cohg_eq (graph_of_tensor t n m) (graph_of_tensor t' n m).
+Proof.
+  intros Ht.
+  apply mk_cohg_eq; [done..|].
+  cbn.
+  split; [|done].
+  rewrite 2 hyperedges_singleton.
+  rewrite <- insert_empty.
+  apply insert_proper; [|apply map_empty_equiv_eq; done].
+  split; [split;[|done]|done].
+  apply Ht.
+Qed.
+
+
+
+Add Parametric Morphism `{Equiv T} {n m} : (@referrenced_vertices T n m)
+  with signature cohg_eq ==> eq as referrenced_vertices_cohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & [Heq Hverts]).
+  unfold referrenced_vertices.
+  rewrite <- Hins, Houts.
+  f_equal.
+  apply map_to_list_equiv in Heq.
+  induction Heq as [|? ? ? ? Hhd]; [done|].
+  cbn.
+  rewrite 2 (list_to_set_app_L (_++_)).
+  f_equal; [|done].
+  do 2 f_equal; apply Hhd.
+Qed.
+
+Add Parametric Morphism `{Equiv T} {n m} : (@isolated_vertices T n m)
+  with signature cohg_eq ==> eq as isolated_vertices_cohg_eq.
+Proof.
+  intros cohg cohg' Heq.
+  unfold isolated_vertices.
+  f_equal; [|now rewrite Heq].
+  apply Heq.2.2.2.
+Qed.
+
+Add Parametric Morphism `{Equiv T} {n m} : (@set_verts T n m)
+  with signature cohg_eq ==> eq ==> cohg_eq as set_verts_cohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & [Heq Hverts]) vs.
+  apply mk_cohg_eq; [done..|].
+  split; [done|].
+  done.
+Qed.
+
+
+Add Parametric Morphism `{Equiv T} {n m} : (@norm_verts T n m)
+  with signature cohg_eq ==> cohg_eq as norm_verts_cohg_eq.
+Proof.
+  intros cohg cohg' Heq.
+  unfold norm_verts.
+  now apply set_verts_cohg_eq, isolated_vertices_cohg_eq_Proper.
+Qed.

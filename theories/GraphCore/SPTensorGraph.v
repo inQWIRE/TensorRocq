@@ -2,8 +2,6 @@ Require Export Tensor.
 Require Export SPHyperGraph.
 Require Import TESyntax.
 
-(* FIXME: Move *)
-
 
 (* Basic definitions and structural operations on TensorGraphs *)
 
@@ -1162,4 +1160,19 @@ Proof.
   intros cosphg cosphg' Heq.
   unfold norm_spverts.
   now apply set_spverts_cosphg_eq, spisolated_vertices_cosphg_eq_Proper.
+Qed.
+
+
+Lemma spgraph_of_tensor_cosphg_eq `{Equiv T} (t t' : T) n m : t ≡ t' ->
+  cosphg_eq (spgraph_of_tensor t n m) (spgraph_of_tensor t' n m).
+Proof.
+  intros Ht.
+  apply mk_cosphg_eq; [done..|].
+  cbn.
+  split; [|done].
+  rewrite 2 sphyperedges_singleton.
+  rewrite <- insert_empty.
+  apply insert_proper; [|apply map_empty_equiv_eq; done].
+  split;[|done].
+  apply Ht.
 Qed.

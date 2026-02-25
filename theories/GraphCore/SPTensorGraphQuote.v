@@ -4,63 +4,6 @@ Require Export SPTensorGraphHom AbstractTensorQuote SPIsomorphismTesting.
   CospanSPHyperGraph positive, via CospanSPHyperGraph (option T).
   Prove can test for isomorphism in quoted. *)
 
-(* FIXME: Move *)
-Lemma spgraph_of_tensor_cosphg_eq `{Equiv T} (t t' : T) n m : t ≡ t' ->
-  cosphg_eq (spgraph_of_tensor t n m) (spgraph_of_tensor t' n m).
-Proof.
-  intros Ht.
-  apply mk_cosphg_eq; [done..|].
-  cbn.
-  split; [|done].
-  rewrite 2 sphyperedges_singleton.
-  rewrite <- insert_empty.
-  apply insert_proper; [|apply map_empty_equiv_eq; done].
-  split;[|done].
-  apply Ht.
-Qed.
-
-Add Parametric Morphism `{Equiv T, Equivalence T equiv}
-  {n m o} : (@compose_spgraphs_aux T n m o)
-  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
-  as compose_spgraphs_aux_cosphg_eq.
-Proof.
-  intros cosphg1 cosphg1' (Hin1 & Hout1 & He1)
-    cosphg2 cosphg2' (Hin2 & Hout2 & He2).
-  unfold compose_spgraphs_aux.
-  rewrite <- Hin1, <- Hout1, <- Hin2, <- Hout2.
-  apply relabel_spgraph_cosphg_eq_Proper.
-  apply mk_cosphg_eq; [done..|].
-  cbn.
-  f_equiv.
-  now apply sphypergraph_union_proper.
-Qed.
-
-Add Parametric Morphism `{Equiv T, Equivalence T equiv}
-  {n m o} : (@compose_spgraphs T n m o)
-  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
-  as compose_spgraphs_cosphg_eq.
-Proof.
-  intros cosphg1 cosphg1' Heq1
-    cosphg2 cosphg2' Heq2.
-  rewrite 2 compose_spgraphs_to_compose_spgraphs_aux.
-  now f_equiv; apply reindex_spgraph_cosphg_eq_Proper, 
-    relabel_spgraph_cosphg_eq_Proper.
-Qed.
-
-Add Parametric Morphism `{Equiv T, Equivalence T equiv}
-  {n m o} : (@compose_spgraphs_unsafe T n m o)
-  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
-  as compose_spgraphs_unsafe_cosphg_eq.
-Proof.
-  intros cosphg1 cosphg1' (Hin1 & Hout1 & He1)
-    cosphg2 cosphg2' (Hin2 & Hout2 & He2).
-  unfold compose_spgraphs_unsafe.
-  rewrite <- Hin1, <- Hin2, <- Hout2.
-  apply mk_cosphg_eq; [done..|].
-  cbn.
-  f_equiv.
-  now apply sphypergraph_union_proper.
-Qed.
 
 
 

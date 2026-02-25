@@ -366,3 +366,43 @@ Proof.
   intros; now apply stack_graphs_isomorphic.
 Qed.
   
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_graphs_aux T n m o)
+  with signature cohg_eq ==> cohg_eq ==> cohg_eq
+  as compose_graphs_aux_cohg_eq.
+Proof.
+  intros cohg1 cohg1' (Hin1 & Hout1 & He1)
+    cohg2 cohg2' (Hin2 & Hout2 & He2).
+  unfold compose_graphs_aux.
+  rewrite <- Hin1, <- Hout1, <- Hin2, <- Hout2.
+  f_equiv.
+  apply mk_cohg_eq; [done..|].
+  cbn.
+  now do 2 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_graphs T n m o)
+  with signature cohg_eq ==> cohg_eq ==> cohg_eq
+  as compose_graphs_cohg_eq.
+Proof.
+  intros cohg1 cohg1' Heq1
+    cohg2 cohg2' Heq2.
+  rewrite 2 compose_graphs_to_compose_graphs_aux.
+  now do 3 f_equiv.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_graphs_unsafe T n m o)
+  with signature cohg_eq ==> cohg_eq ==> cohg_eq
+  as compose_graphs_unsafe_cohg_eq.
+Proof.
+  intros cohg1 cohg1' (Hin1 & Hout1 & He1)
+    cohg2 cohg2' (Hin2 & Hout2 & He2).
+  unfold compose_graphs_unsafe.
+  rewrite <- Hin1, <- Hin2, <- Hout2.
+  apply mk_cohg_eq; [done..|].
+  cbn.
+  now do 2 f_equiv.
+Qed.

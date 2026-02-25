@@ -319,4 +319,47 @@ Add Parametric Morphism {T n m n' m'} : (@stack_spgraphs T n m n' m') with signa
 Proof.
   intros; now apply stack_spgraphs_spisomorphic.
 Qed.
-  
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_spgraphs_aux T n m o)
+  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
+  as compose_spgraphs_aux_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' (Hin1 & Hout1 & He1)
+    cosphg2 cosphg2' (Hin2 & Hout2 & He2).
+  unfold compose_spgraphs_aux.
+  rewrite <- Hin1, <- Hout1, <- Hin2, <- Hout2.
+  apply relabel_spgraph_cosphg_eq_Proper.
+  apply mk_cosphg_eq; [done..|].
+  cbn.
+  f_equiv.
+  now apply sphypergraph_union_proper.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_spgraphs T n m o)
+  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
+  as compose_spgraphs_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' Heq1
+    cosphg2 cosphg2' Heq2.
+  rewrite 2 compose_spgraphs_to_compose_spgraphs_aux.
+  now f_equiv; apply reindex_spgraph_cosphg_eq_Proper, 
+    relabel_spgraph_cosphg_eq_Proper.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_spgraphs_unsafe T n m o)
+  with signature cosphg_eq ==> cosphg_eq ==> cosphg_eq
+  as compose_spgraphs_unsafe_cosphg_eq.
+Proof.
+  intros cosphg1 cosphg1' (Hin1 & Hout1 & He1)
+    cosphg2 cosphg2' (Hin2 & Hout2 & He2).
+  unfold compose_spgraphs_unsafe.
+  rewrite <- Hin1, <- Hin2, <- Hout2.
+  apply mk_cosphg_eq; [done..|].
+  cbn.
+  f_equiv.
+  now apply sphypergraph_union_proper.
+Qed.

@@ -1482,7 +1482,7 @@ Proof.
   intros m Hm%elem_of_Vmap_elements_1.
   f_equiv.
   - apply Rlist_prod_ext.
-    rewrite Forall2_fmap_l, 2 Forall2_fmap_r, (unfold @compose).
+    rewrite Forall2_fmap_l, 2 Forall2_fmap_r; unfold compose.
     apply Forall_Forall2_diag.
     apply Forall_forall.
     intros ((fidx, low), up) _.
@@ -1493,7 +1493,7 @@ Proof.
     cbn;
     now rewrite (lookup_kmap _).
   - apply Rlist_prod_ext.
-    rewrite Forall2_fmap_l, 2 Forall2_fmap_r, (unfold @compose).
+    rewrite Forall2_fmap_l, 2 Forall2_fmap_r; unfold compose.
     apply Forall_Forall2_diag.
     apply Forall_forall.
     intros (l, u) _.

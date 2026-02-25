@@ -1,79 +1,5 @@
 Require Export SPTensorGraph IsomorphismTestingAux.
 
-(* FIXME: Move *)
-Definition rel_compose {A B C} (R1 : A -> B -> Prop) (R2 : B -> C -> Prop) :
-  A -> C -> Prop :=
-  fun a c => exists b, R1 a b /\ R2 b c.
-
-Add Parametric Morphism {A B C} : (@rel_compose A B C) with signature
-  equiv ==> equiv ==> equiv as rel_compose_equiv.
-Proof.
-  intros R1 R1' HR1 R2 R2' HR2.
-  intros (a, c).
-  unfold elem_of, relation_elem_of.
-  cbn.
-  apply exists_iff; intros b.
-  f_equiv.
-  - apply (HR1 (_, _)).
-  - apply (HR2 (_, _)).
-Qed.
-
-Add Parametric Morphism {A B C} : (@rel_compose A B C) with signature
-  subseteq ==> subseteq ==> subseteq as rel_compose_subseteq.
-Proof.
-  intros R1 R1' HR1 R2 R2' HR2.
-  intros (a, c).
-  unfold elem_of, relation_elem_of.
-  cbn.
-  intros [b []].
-  exists b.
-  split; [now apply (HR1 (_, _))|now apply (HR2 (_, _))].
-Qed.
-
-#[export] Instance subrelation_rel_compose_l {A} (R1 R2 : relation A) :
-  Reflexive R2 -> subrelation R1 (rel_compose R1 R2).
-Proof.
-  intros HR2 a b Hab.
-  now exists b.
-Qed.
-
-#[export] Instance subrelation_rel_compose_r {A} (R1 R2 : relation A) :
-  Reflexive R1 -> subrelation R2 (rel_compose R1 R2).
-Proof.
-  intros HR2 a b Hab.
-  now exists a.
-Qed.
-
-
-Lemma Transitive_iff_subseteq {A} (R : relation A) :
-  Transitive R <-> rel_compose R R ⊆ R.
-Proof.
-  setoid_rewrite relation_subseteq_iff.
-  firstorder.
-Qed.
-
-Lemma rel_compose_assoc {A B C D} R1 R2 R3 :
-  @rel_compose A C D (@rel_compose A B C R1 R2) R3 ≡
-  rel_compose R1 (rel_compose R2 R3).
-Proof.
-  firstorder.
-Qed.
-
-Lemma rel_compose_trans {A} (R1 R2 : relation A) :
-  Transitive R1 -> Transitive R2 ->
-  rel_compose R2 R1 ⊆ rel_compose R1 R2 ->
-  Transitive (rel_compose R1 R2).
-Proof.
-  intros HR1%((Transitive_iff_subseteq _).1) HR2%((Transitive_iff_subseteq _).1) Hsubs.
-  rewrite Transitive_iff_subseteq.
-  rewrite rel_compose_assoc, <- (rel_compose_assoc R2).
-  rewrite Hsubs.
-  rewrite rel_compose_assoc.
-  rewrite HR2.
-  rewrite <- rel_compose_assoc.
-  rewrite HR1.
-  done.
-Qed.
 
 Definition sphyperedge_map_eq_reqs {T} (hg hg' : Pmap (SPHyperEdge T)) :
   option (list (T * T)) :=
@@ -2271,49 +2197,6 @@ Proof.
       now apply elem_of_app; right.
 Qed.
 
-(* FIXME: Remove, once moved from top of SPTensorGraphQuote to SPTensorGraph *)
-
-Add Parametric Morphism {n m} : (@spreferrenced_vertices T n m)
-  with signature cosphg_eq ==> eq as spreferrenced_vertices_cosphg_eq.
-Proof.
-  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]).
-  unfold spreferrenced_vertices.
-  rewrite <- Hins, Houts.
-  f_equal.
-  apply map_to_list_equiv in Heq.
-  induction Heq as [|? ? ? ? Hhd]; [done|].
-  cbn.
-  rewrite 2 (list_to_set_app_L).
-  f_equal; [|done].
-  do 2 f_equal; apply Hhd.
-Qed.
-
-Add Parametric Morphism {n m} : (@spisolated_vertices T n m)
-  with signature cosphg_eq ==> eq as spisolated_vertices_cosphg_eq.
-Proof.
-  intros cosphg cosphg' Heq.
-  unfold spisolated_vertices.
-  f_equal; [|now rewrite Heq].
-  apply Heq.2.2.2.
-Qed.
-
-Add Parametric Morphism {n m} : (@set_spverts T n m)
-  with signature cosphg_eq ==> eq ==> cosphg_eq as set_spverts_cosphg_eq.
-Proof.
-  intros cosphg cosphg' (Hins & Houts & [Heq Hverts]) vs.
-  apply mk_cosphg_eq; [done..|].
-  split; [done|].
-  done.
-Qed.
-
-
-Add Parametric Morphism {n m} : (@norm_spverts T n m)
-  with signature cosphg_eq ==> cosphg_eq as norm_spverts_cosphg_eq.
-Proof.
-  intros cosphg cosphg' Heq.
-  unfold norm_spverts.
-  now apply set_spverts_cosphg_eq, spisolated_vertices_cosphg_eq_Proper.
-Qed.
 
 Lemma set_spverts_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
   vs vs' : set_spverts (set_spverts cohg vs) vs' = set_spverts cohg vs'.

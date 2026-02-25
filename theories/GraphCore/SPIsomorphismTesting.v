@@ -263,6 +263,7 @@ Proof.
   - rewrite 2 gmultiset_size_alt.
     apply (fmap_Permutation snd) in Hperm.
     rewrite 2 snds_prod_map, 2 list_fmap_id in Hperm.
+    apply Permutation_list_sum.
     now rewrite Hperm.
   - done.
   - rewrite Hdom.
@@ -270,7 +271,7 @@ Proof.
     apply leibniz_equiv_iff.
     replace hg with (GMultiSet hg.(gmultiset_car)) at 2 by now destruct hg.
     unfold dom, gmultiset_dom.
-    rewrite dom_alt.
+    rewrite ((leibniz_equiv_iff _ _).1 (dom_alt _)).
     rewrite set_map_list_to_set, list_fmap_id.
     done.
   - rewrite Himg.
@@ -278,7 +279,7 @@ Proof.
     apply leibniz_equiv_iff.
     replace hg' with (GMultiSet hg'.(gmultiset_car)) at 2 by now destruct hg'.
     unfold dom, gmultiset_dom.
-    rewrite dom_alt.
+    rewrite ((leibniz_equiv_iff _ _).1 (dom_alt _)).
     rewrite set_map_list_to_set, list_fmap_id.
     done.
   - rewrite 2 gmultiset_map_alt_car.
