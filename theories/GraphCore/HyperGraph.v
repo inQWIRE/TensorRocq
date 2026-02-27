@@ -60,6 +60,17 @@ Definition vertices_hg {T} (hg : HyperGraph T) : Pset :=
     mk_hg (hg.(hyperedges) ∪ hg'.(hyperedges))
       (hg.(hypervertices) ∪ hg'.(hypervertices)).
 
+  Lemma hg_empty_union {T} (H : HyperGraph T) : 
+    ∅ ∪ H = H.
+  Proof.
+    unfold union.
+    apply hg_ext.
+    - simpl;
+      rewrite (map_empty_union (H.(hyperedges))).
+      reflexivity.
+    - simpl; apply union_empty_l_L.
+  Qed.
+
 #[export] Instance hypergraph_disjunion {T} : DisjUnion (HyperGraph T) :=
   fun hg hg' =>
   reindex_hg (bcons false) (relabel_hg (bcons false) hg) ∪

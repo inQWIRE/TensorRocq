@@ -5,21 +5,22 @@ Require Import TESyntax.
 Require Import Aux_pos.
 
 
-
-(* An implementation of double pushout (DPO) rewriting *)
-
-
 Local Open Scope nat_scope.
 
 Section DPO.
 
   Context {T : Type}.
 
+  Definition all_vertices (H : HyperGraph T) : Pset := 
+    map_fold (fun k h s => (list_to_set h.1.2 ∪ list_to_set h.2) ∪ s) 
+    (H.(hypervertices)) (H.(hyperedges)).
+  
+
   Definition compose_graphs_aux {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
     relabel_graph (subst_by_vec connected_substs)
       (tgl.(inputs) ->
-        hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs))
+        hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs) ∖ (all_vertices tgl ∪ all_vertices tgr))
           <- tgr.(outputs)).
 
   (* Reserved Notation "tgl ; tgr" (at level 50). *)
@@ -27,11 +28,15 @@ Section DPO.
     let connected_substs :=
         propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
      relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) ->
-      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) (list_to_set (vmap (bcons true) tgr.(inputs))) <- (vmap (bcons true) tgr.(outputs))).
+      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) 
+        ((list_to_set (vmap (bcons true) tgr.(inputs)) ∖ 
+          (all_vertices (reindex_graph (bcons false) (relabel_graph (bcons false) tgl)) ∪
+           all_vertices (reindex_graph (bcons true) (relabel_graph (bcons true) tgr))))) 
+           <- (vmap (bcons true) tgr.(outputs))).
 
 
   Definition compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
-    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs))) <- tgr.(outputs).
+    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs)) ∖ (all_vertices tgl ∪ all_vertices tgr)) <- tgr.(outputs).
 
 Lemma compose_graphs_to_compose_graphs_aux {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
@@ -41,7 +46,6 @@ Lemma compose_graphs_to_compose_graphs_aux {n m o}
 Proof.
   reflexivity.
 Qed.
-
 
 Lemma compose_graphs_aux_to_compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
   tgl.(outputs) = tgr.(inputs) ->
@@ -95,7 +99,6 @@ Proof.
   cbn [add_top_loops].
   rewrite IHn.
   destruct tg as [hg ins outs].
-  (* cbn in ins, outs. *)
   induction ins as [insl insr] using vec_add_inv.
   induction outs as [outsl outsr] using vec_add_inv.
   induction insl as [i insl] using vec_S_inv.
@@ -233,8 +236,18 @@ Proof.
   rewrite add_top_loops_alt.
   cbn.
   rewrite 2 vsplitl_app, 2 vsplitr_app.
-  reflexivity.
-Qed.
+  unfold compose_graphs_aux.
+  apply cohg_ext.
+  - simpl.
+    f_equal.
+    
+    admit.
+  - f_equal.
+  - f_equal.
+  (* reflexivity. *)
+Admitted.
+  (* reflexivity. *)
+(* Qed. *)
 
 Lemma compose_graphs_alt_correct {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
@@ -245,9 +258,9 @@ Proof.
   cbn.
   rewrite 2 vsplitl_app, 2 vsplitr_app.
   rewrite <- 2 reindex_relabel_hg.
-  done.
-Qed.
-
+  (* done.
+Qed. *)
+Admitted.
 
 Lemma relabel_stack_graphs_aux {n m n' m'} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T n' m') f :
@@ -307,48 +320,198 @@ Proof.
   apply (iso_relabel_reindex _ _ _).
 Qed.
 
+  Section Paths.
+
+    Context (H : HyperGraph T).
+
+    Definition successor (h h' : HyperEdge T) :=
+      Exists (fun p => p ∈ (h'.2)) (h.1.2).
+
+    Definition predecessor (h h' : HyperEdge T) :=
+      Exists (fun p => p ∈ (h.2)) (h'.1.2).
+
+    Instance successor_decide (h h' : HyperEdge T) : Decision (successor h h') := _.
+    Instance predecessor_decide (h h' : HyperEdge T) : Decision (predecessor h h') := _.
+
+    Definition successors (h : HyperEdge T) : Pmap (HyperEdge T) :=
+      map_filter (fun ka => successor ka.2 h) _ H.(hyperedges).
+
+    Definition predecessors (h : HyperEdge T) : Pmap (HyperEdge T) :=
+      map_filter (fun ka => predecessor ka.2 h) _ H.(hyperedges).
+
+    Definition all_successors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter 
+      (fun kh' => Exists (fun kh => successor kh'.2 kh.2) (map_to_list G)) 
+      _ H.(hyperedges).
+    
+    Definition all_predecessors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter 
+      (fun kh' => Exists (fun kh => predecessor kh'.2 kh.2) (map_to_list G)) 
+      _ H.(hyperedges).
+
+    Fixpoint all_paths_aux
+      (G : Pmap (HyperEdge T)) (n : nat) : Pmap (HyperEdge T) :=
+    match n with
+    | 0     => ∅
+    | (S k) => let step := all_predecessors G in
+      step ∖ G ∪ all_paths_aux step k
+    end.
+
+    Definition all_paths (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) :=
+      all_paths_aux G (length (map_to_list H.(hyperedges))).
+
+    Definition all_paths_idx (pdx : list positive) : Pmap (HyperEdge T) :=
+      all_paths (map_filter (fun ka => ka.1 ∈ pdx) _ (H.(hyperedges))).
+
+    Fixpoint all_predpaths
+      (G : Pmap (HyperEdge T)) (n : nat) : Pmap (HyperEdge T) :=
+    match n with
+    | 0     => ∅
+    | (S k) => let step := all_successors G in
+      step ∖ G ∪ all_predpaths step k
+    end.
+
+    Definition successor_idx (p p' : positive)
+      (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p')) :=
+      successor (is_Some_proj Sp) (is_Some_proj Sp').
+
+    Definition predecessor_idx (p p' : positive)
+      (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p')) :=
+      predecessor (is_Some_proj Sp) (is_Some_proj Sp').
+
+    Instance successor_idx_decide (p p' : positive) (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p'))
+      : Decision (successor_idx p p' Sp Sp') := _.
+    
+    Instance predecessor_idx_decide (p p' : positive) (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p'))
+      : Decision (predecessor_idx p p' Sp Sp') := _.
+
+    Lemma succ_pred_symm (h h' : HyperEdge T) :
+      successor h h' <-> predecessor h' h.
+  Proof. auto. Qed.
+
+    Definition path (h h' : HyperEdge T) : Prop :=
+      (tc successor) h h'.
+
+    Definition pred_path (h h' : HyperEdge T) :=
+      (tc predecessor) h h'.
 
 
-Section Paths.
+    Definition predecessors_idx (p : positive) : Pmap (HyperEdge T) :=
+      match H.(hyperedges) !! p with
+      | Some h => predecessors h
+      | None => ∅
+      end.  
 
-  Context (H : HyperGraph T).
+    Definition path_pred_path_symm (h h' : HyperEdge T) :
+      path h h' <-> pred_path h' h.
+    Proof.
+      split; intros.
+      - induction H0.
+        + apply tc_once.
+          now rewrite succ_pred_symm in H0.
+        + rewrite succ_pred_symm in H0.
+          apply tc_transitive with (y:=y).
+          * auto.
+          * now apply tc_once.
+      - induction H0.
+        + apply tc_once.
+          now rewrite <- succ_pred_symm in H0.
+        + rewrite <- succ_pred_symm in H0.
+          apply tc_transitive with (y:=y).
+          * auto.
+          * now apply tc_once.
+    Qed.
 
-  Definition successor (h h' : HyperEdge T) :=
-    exists p, In p (h.1.2) /\ In p (h'.2).
+    Definition v_pred (v : positive) (h : HyperEdge T) := 
+      v ∈ h.1.2.
+    Definition v_succ (v : positive) (h : HyperEdge T) :=
+      v ∈ h.2.
+    Definition v_incident (v : positive) (h : HyperEdge T) :=
+      v_pred v h /\ v_succ v h.
 
-  Definition predecessor (h h' : HyperEdge T) :=
-    exists p, In p (h'.1.2) /\ In p (h.2).
+    Definition v_pred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h).
+    Proof.
+      unfold v_pred.
+      destruct h as [[]].
+      simpl.
+      induction l.
+      - right. intros X.
+        inversion X.
+      - specialize (decide (v = a)) as [].
+        + subst; left; left.
+        + destruct IHl.
+          * left; now right.
+          * right. intros C.
+            inversion C; auto. 
+    Defined.
 
-  Lemma succ_pred_symm (h h' : HyperEdge T) :
-    successor h h' <-> predecessor h' h.
-  Proof.
-    split;
-      intros [x []];
-      exists x;
-      auto.
-  Qed.
+    Definition v_succ_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h).
+    Proof.
+      unfold v_succ.
+      destruct h as [[]].
+      simpl.
+      induction l0.
+      - right. intros X.
+        inversion X.
+      - specialize (decide (v = a)) as [].
+        + subst; left; left.
+        + destruct IHl0.
+          * left; now right.
+          * right. intros C.
+            inversion C; auto. 
+    Defined.
 
-  Definition path (h h' : HyperEdge T) : Prop :=
-    (tc successor) h h'.
+      Instance vpred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h) := {
+        decide := v_pred_decide v h
+      }.
+      Instance vsucc_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h) := {
+        decide := v_succ_decide v h
+      }.
 
-  Definition pred_path (h h' : HyperEdge T) :=
-    (tc predecessor) h h'.
-
-  (* Definition path_pred_path_symm (h h' : HyperEdge T) :
-    path h h' <-> pred_path h' h.
-  Proof.
-    split.
-    intros.
-    - induction H0.
-      + apply tc_once.
-        now rewrite succ_pred_symm in H0.
-      +
-        rewrite IHtc.
-    - intros [x y | x y].
-      +  *)
+    (* Definition all_incident_vertices :=
+      (map_to_set (fun k v => list_to_set v.2) H.(hyperedges)). *)
+  (* (fun pe => (pe.1, pe.2.1.2 ++ pe.2.2)) <$>  *)
 
 
-End Paths.
+  (* Need to produce : list (positive * (list positive * list positive)) *)
+  (* Representing the Vertex Idx and the edge indices it is incident to *)
+    Definition vertex_map : Pmap (list positive * list positive) := 
+      list_to_map(map_to_list H.(hyperedges) ≫= (fun pe =>
+      let label := pe.1 in 
+      (* Edge Idx *)
+      let lefts := pe.2.1.2 in 
+      (* All the vertices where this edge is right-incident *)
+      let rights := pe.2.2 in 
+      (* All the vertices where this edge is left-incident *)
+      ((fun x => (x, (@nil positive, [label]))) <$> lefts) ++
+      ((fun x => (x, ([label], @nil positive))) <$> rights))).
+
+    Instance elemof_hyperedge : ElemOf positive (HyperEdge T) :=
+      (fun p he => p ∈ he.2 \/ p ∈ he.1.2).
+
+    Instance elemof_pair : ElemOf positive (list positive * list positive) :=
+      (fun p pr => p ∈ pr.1 \/ p ∈ pr.2).
+
+    Instance elemof_option `{ElemOf A B} : ElemOf A (option B) :=
+      fun a opb =>
+        match opb with
+        | Some x => a ∈ x
+        | None => False
+        end.
+
+    Open Scope positive.
+
+    Definition PredMap : Pmap (list positive) :=
+      let hedges := H.(hyperedges) in
+        (fun x => x.1.2) <$> hedges.
+
+    Definition SuccMap : Pmap (list positive) :=
+      let hedges := H.(hyperedges) in
+        (fun x => x.2) <$> hedges.
+
+    Definition vPredMap : Pmap (list positive) :=
+      let predmap := PredMap in
+      predmap.
+
+  End Paths.
 
 Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) : CospanHyperGraph T n m :=
   G.(inputs) -> {|
@@ -356,9 +519,164 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     hypervertices := ∅
   |} <- G.(outputs).
 
+  Definition subgraph_index_aux (H : HyperGraph T) (L : list positive) : Pmap (HyperEdge T) :=
+    map_filter (fun ka => (ka.1 ∈ L)) _ H.(hyperedges).
+
+  Definition subgraph_index (H : HyperGraph T) (L : list positive) : HyperGraph T :=
+  {| hyperedges := subgraph_index_aux H L; 
+     hypervertices := ∅ |}.
+
+  Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
+  let C1 := all_paths_idx H L in
+  let L1 := subgraph_index H L in
+  let C2 := H.(hedges).(hyperedges) ∖ (C1 ∪ L1) in
+  let C1' := all_vertices {| hyperedges := C1; hypervertices := ∅ |} in
+  let L1' := all_vertices L1 in
+  let C2' := all_vertices {| hyperedges := C2; hypervertices := H.(hypervertices) |} in
+  let i := list_to_vec(elements(L1' ∩ C1')) in
+  let j := list_to_vec(elements(L1' ∩ C2')) in
+  let k := list_to_vec(elements(C1' ∩ C2')) in
+  compose_graphs_unsafe (
+  H.(inputs) -> {| hyperedges := C1; hypervertices := ∅ |}  <- (k +++ i)
+  ) (compose_graphs_unsafe
+  ( stack_graphs_aux (k -> ∅ <- k)
+                 (i -> {| hyperedges := L1; hypervertices := ∅ |} <- j)
+  ) (
+  k +++ j -> {| hyperedges := C2; hypervertices := H.(hypervertices) |} <- H.(outputs)
+  )).
+
+  Lemma all_paths_subset (H L : HyperGraph T) :
+    all_paths H L ⊆ H.
+  Proof.
+    generalize dependent L.
+    unfold all_paths.
+    induction (length (map_to_list H.(hyperedges))); intros.
+    - apply map_empty_subseteq.
+    - simpl.
+      apply map_union_least.
+      + apply map_subseteq_difference_l.
+        apply map_filter_subseteq.
+      + apply (IHn (mk_hg (all_predecessors H L) ∅)).
+  Qed.
+
+  Lemma all_paths_idx_subset {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
+  Proof.
+    unfold all_paths_idx.
+    remember ((map_filter (λ ka : positive * HyperEdge T, ka.1 ∈ L) (λ x : positive * HyperEdge T, decide_rel elem_of x.1 L) H.(hyperedges))) as L'.
+    apply (all_paths_subset H (mk_hg L' ∅)).
+  Qed.
+
+  Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
+  Proof.
+    induction l.
+    - reflexivity.
+    - simpl.
+      rewrite IHl; auto.
+  Qed.  
+
+  Lemma list_to_vec_app {A B} {SA : Singleton A B} {UB : Union B} {EB : Empty B} {EAB : ElemOf A B} {LEQ : LeibnizEquiv B} {SSAB : SemiSet A B} (v u : list A) : 
+    @list_to_set A B SA EB UB (list_to_vec v +++ list_to_vec u) = 
+    @list_to_set A B SA EB UB (list_to_vec v) ∪ list_to_set (list_to_vec u).
+  Proof.
+    induction v.
+    - simpl.
+      rewrite (union_empty_l_L ).
+      reflexivity.
+    - simpl.
+      rewrite IHv.
+      rewrite union_assoc_L.
+      reflexivity.
+  Qed.
+
+  Check hg_ext.
+
+  Lemma decompose_is_graph {n m} (H : CospanHyperGraph T n m) (L : list positive) :
+  H = decompose H L.
+  Proof.
+    apply cohg_ext; try reflexivity.
+    apply hg_ext.
+    - simpl.
+      rewrite map_empty_union.
+      rewrite map_union_assoc.
+      rewrite map_difference_union; [reflexivity|].
+      apply map_union_least.
+      + apply all_paths_idx_subset.
+      + apply map_filter_subseteq.
+    - unfold decompose.
+      remember (all_paths_idx H L) as C1.
+      remember (subgraph_index H L) as L1.
+      remember (H.(hedges).(hyperedges) ∖ (C1 ∪ L1)) as C2.
+      simpl.
+      (* We rebuild the let expressions used in the decompose function.
+         This helps alleviate the pain. *)
+      remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
+      remember ({| hyperedges := L1; hypervertices := ∅ |}) as L1'.
+      remember ({| hyperedges := C2; hypervertices := hypervertices H |}) as C2'.
+      remember (all_vertices L1) as Lv.
+      (* remember (all_vertices L1') as Lv'. *)
+      remember (all_vertices C1') as C1v.
+      remember (all_vertices C2') as C2v.
+      repeat rewrite union_empty_l_L.
+      repeat rewrite hg_empty_union.
+      repeat rewrite list_to_vec_app.
+      repeat rewrite list_to_set_list_to_vec.
+      repeat rewrite list_to_set_elements_L.
+      remember (all_vertices L1') as Lv'.
+      rewrite (subseteq_empty_difference_L _ (Lv' ∪ C2v)),
+              (subseteq_empty_difference_L _ (C1v ∪ _)).
+      + repeat rewrite union_empty_l_L.
+        done.
+      + rewrite hg_add_vertices_empty.
+        apply union_subseteq_l'.
+        apply union_least.
+        * apply intersection_subseteq_l.
+        * apply intersection_subseteq_r.
+      + apply union_least.
+        * apply union_subseteq_r'.
+          apply intersection_subseteq_r.
+        * apply union_subseteq_r'.
+          apply intersection_subseteq_r. 
+  Qed.
 
 End DPO.
 
+  Open Scope positive.
+
+  Print HyperEdge.
+
+  Definition example : HyperGraph positive.
+  Proof.
+    constructor.
+    - exact {[ 1 := (1, [], [2]) ; 2 := (2, [2], [4]) ; 3 := (3, [], [3]) ; 4 := (4, [3; 4], []) ]}.
+    - exact ∅.
+  Defined.
+
+  Definition ex_1 : HyperGraph positive := 
+    {| hyperedges := {[ 1 := (1, [2; 1], [3]) ]}; hypervertices := ∅ |}.
+  
+  Definition ex_2 : HyperGraph positive :=
+    {| hyperedges := {[ 2 := (2, [1; 2; 3], []) ]}; hypervertices := ∅ |}.
+
+  Definition ex_1cohg := [#1] -> ex_1 <- [#1; 2].
+
+  Definition ex_2cohg := [#1;2] -> ex_2 <- [#3].
+
+  Compute (compose_graphs_unsafe ex_1cohg ex_2cohg).
+
+  Definition example' : HyperGraph positive.
+  Proof.
+    constructor.
+    - exact {[ 4 := (5, [3; 4], []) ]}.
+    - exact ∅.
+  Defined.
+
+  Check all_paths.
+
+  Compute all_paths example ({[ 3 := (4, [], [3]) ; 4 := (5, [3; 4], []) ]}).
+  Compute all_paths_idx example [4].
+
+  Compute (predecessors example (5, [3; 4], [])).
+  Compute (elements (dom (predecessors_idx example 4))).
 
 Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signature 
   isomorphic ==> isomorphic ==> isomorphic as stack_graphs_isomorphic_mor.
