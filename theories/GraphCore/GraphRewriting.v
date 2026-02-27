@@ -20,7 +20,7 @@ Section DPO.
     let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
     relabel_graph (subst_by_vec connected_substs)
       (tgl.(inputs) ->
-        hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs) ∖ (all_vertices tgl ∪ all_vertices tgr))
+        hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs) ∖ (vertices_hg tgl ∪ vertices_hg tgr))
           <- tgr.(outputs)).
 
   (* Reserved Notation "tgl ; tgr" (at level 50). *)
@@ -30,13 +30,13 @@ Section DPO.
      relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) ->
       hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) 
         ((list_to_set (vmap (bcons true) tgr.(inputs)) ∖ 
-          (all_vertices (reindex_graph (bcons false) (relabel_graph (bcons false) tgl)) ∪
-           all_vertices (reindex_graph (bcons true) (relabel_graph (bcons true) tgr))))) 
+          (vertices_hg (reindex_graph (bcons false) (relabel_graph (bcons false) tgl)) ∪
+           vertices_hg (reindex_graph (bcons true) (relabel_graph (bcons true) tgr))))) 
            <- (vmap (bcons true) tgr.(outputs))).
 
 
   Definition compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
-    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs)) ∖ (all_vertices tgl ∪ all_vertices tgr)) <- tgr.(outputs).
+    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs)) ∖ (vertices_hg tgl ∪ vertices_hg tgr)) <- tgr.(outputs).
 
 Lemma compose_graphs_to_compose_graphs_aux {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
@@ -530,9 +530,9 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   let C1 := all_paths_idx H L in
   let L1 := subgraph_index H L in
   let C2 := H.(hedges).(hyperedges) ∖ (C1 ∪ L1) in
-  let C1' := all_vertices {| hyperedges := C1; hypervertices := ∅ |} in
-  let L1' := all_vertices L1 in
-  let C2' := all_vertices {| hyperedges := C2; hypervertices := H.(hypervertices) |} in
+  let C1' := vertices_hg {| hyperedges := C1; hypervertices := ∅ |} in
+  let L1' := vertices_hg L1 in
+  let C2' := vertices_hg {| hyperedges := C2; hypervertices := H.(hypervertices) |} in
   let i := list_to_vec(elements(L1' ∩ C1')) in
   let j := list_to_vec(elements(L1' ∩ C2')) in
   let k := list_to_vec(elements(C1' ∩ C2')) in
@@ -612,16 +612,16 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
       remember ({| hyperedges := L1; hypervertices := ∅ |}) as L1'.
       remember ({| hyperedges := C2; hypervertices := hypervertices H |}) as C2'.
-      remember (all_vertices L1) as Lv.
+      remember (vertices_hg L1) as Lv.
       (* remember (all_vertices L1') as Lv'. *)
-      remember (all_vertices C1') as C1v.
-      remember (all_vertices C2') as C2v.
+      remember (vertices_hg C1') as C1v.
+      remember (vertices_hg C2') as C2v.
       repeat rewrite union_empty_l_L.
       repeat rewrite hg_empty_union.
       repeat rewrite list_to_vec_app.
       repeat rewrite list_to_set_list_to_vec.
       repeat rewrite list_to_set_elements_L.
-      remember (all_vertices L1') as Lv'.
+      remember (vertices_hg L1') as Lv'.
       rewrite (subseteq_empty_difference_L _ (Lv' ∪ C2v)),
               (subseteq_empty_difference_L _ (C1v ∪ _)).
       + repeat rewrite union_empty_l_L.
@@ -698,7 +698,8 @@ Proof.
   f_equiv.
   apply mk_cohg_eq; [done..|].
   cbn.
-  now do 2 f_equiv.
+  do 2 f_equiv; [done..|].
+  now rewrite He1, He2.
 Qed.
 
 Add Parametric Morphism `{Equiv T, Equivalence T equiv}
@@ -723,5 +724,6 @@ Proof.
   rewrite <- Hin1, <- Hin2, <- Hout2.
   apply mk_cohg_eq; [done..|].
   cbn.
-  now do 2 f_equiv.
+  do 2 f_equiv; [done..|].
+  now rewrite He1, He2.
 Qed.
