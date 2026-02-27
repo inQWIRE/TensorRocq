@@ -4381,3 +4381,44 @@ Lemma lookup_vec_to_list_fin {A n} (v : vec A n) (i : fin n) :
 Proof.
   now apply vlookup_lookup.
 Qed.
+
+
+Lemma set_map_difference `{FinSet A SA, Set_ B SB}
+  (f : A -> B) `{Hf : !Inj eq eq f} (X Y : SA) :
+  set_map f (X ∖ Y) ≡@{SB} set_map f X ∖ set_map f Y.
+Proof.
+  set_solver.
+Qed.
+
+Lemma set_map_difference_L `{FinSet A SA, Set_ B SB, !LeibnizEquiv SB}
+  (f : A -> B) `{Hf : !Inj eq eq f} (X Y : SA) :
+  set_map f (X ∖ Y) =@{SB} set_map f X ∖ set_map f Y.
+Proof.
+  unfold_leibniz.
+  now apply set_map_difference.
+Qed.
+
+Lemma set_map_dom_map_img `{FinMapDom K M SK, !Elements K SK, !FinSet K SK,
+  SemiSet A SA, Inhabited A} (m : M A) :
+  set_map (m !!!.) (dom m :> SK) ≡@{SA} map_img m.
+Proof.
+  intros i.
+  split.
+  - intros (j & -> & [mj Hmj]%elem_of_dom)%elem_of_map.
+    rewrite lookup_total_alt, Hmj.
+    eapply elem_of_map_img_2; eauto.
+  - intros (j & Hij)%elem_of_map_img.
+    apply elem_of_map.
+    exists j.
+    rewrite lookup_total_alt, Hij.
+    split; [done|].
+    now apply elem_of_dom_2 in Hij.
+Qed.
+
+Lemma set_map_dom_map_img_L `{FinMapDom K M SK, !Elements K SK, !FinSet K SK,
+  SemiSet A SA, Inhabited A, !LeibnizEquiv SA} (m : M A) :
+  set_map (m !!!.) (dom m :> SK) =@{SA} map_img m.
+Proof.
+  unfold_leibniz.
+  apply set_map_dom_map_img.
+Qed.

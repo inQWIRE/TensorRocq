@@ -1550,47 +1550,6 @@ Proof.
   done.
 Qed.
 
-Import SetoidList SetoidPermutation list.
-
-Lemma PermutationA_flip `(R : relation A) l l' :
-  PermutationA (flip R) l l' <-> PermutationA R l' l.
-Proof.
-  split.
-  - intros Heq.
-    induction Heq; eauto using PermutationA.
-  - intros Heq.
-    induction Heq; eauto using PermutationA.
-Qed.
-
-Add Parametric Morphism {A} : (@PermutationA A) with signature
-  subseteq ==> subseteq as PermutationA_subseteq.
-Proof.
-  intros R R' HR%relation_subseteq_iff.
-  apply relation_subseteq_iff.
-  intros l l' Hl.
-  induction Hl; eauto using PermutationA.
-Qed.
-
-Add Parametric Morphism {A} : (@PermutationA A) with signature
-  equiv ==> equiv as PermutationA_equiv.
-Proof.
-  intros R R' HR.
-  apply set_subseteq_antisymm; apply PermutationA_subseteq; firstorder.
-Qed.
-
-Lemma PermutationA_length `(R : relation A) l l' :
-  PermutationA R l l' -> length l = length l'.
-Proof.
-  intros Heq.
-  induction Heq; cbn; congruence.
-Qed.
-
-Lemma PermutationA_nil `(R : relation A) l :
-  PermutationA R [] l -> l = [].
-Proof.
-  intros Heq%PermutationA_length.
-  now destruct l.
-Qed.
 
 (* Lemma compose_PermutationA {A} (R1 R2 : relation A)
   `{HR1 : !Transitive R1, HR2 : !Transitive R2} :
@@ -1639,67 +1598,6 @@ Proof.
   unfold rel_compose in *. *)
 
 
-
-Lemma map_relation_kmap `{FinMap K1 M1, FinMap K2 M2}
-  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B)
-  (f : K1 -> K2) `{Hf : !Inj eq eq f} :
-  map_relation (λ _, R) (λ _, P) (λ _, Q) (kmap f m1 :> M2 A) (kmap f m2) <->
-  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
-Proof.
-  split.
-  - intros Hfeq.
-    intros i.
-    specialize (Hfeq (f i)).
-    now rewrite 2 (lookup_kmap f _) in Hfeq.
-  - intros Heq.
-    intros i.
-    destruct (kmap f m1 !! i) as [fm1i|] eqn:Hfm1i;
-    [|destruct (kmap f m2 !! i) as [fm2i|] eqn:Hfm2i].
-    + apply (lookup_kmap_Some _) in Hfm1i as Hj.
-      destruct Hj as (j & -> & Hm1j).
-      rewrite (lookup_kmap _).
-      rewrite <- Hm1j.
-      apply Heq.
-    + apply (lookup_kmap_Some _) in Hfm2i as Hj.
-      destruct Hj as (j & -> & Hm2j).
-      rewrite <- Hfm1i, <- Hm2j.
-      rewrite (lookup_kmap _).
-      apply Heq.
-    + done.
-Qed.
-
-
-Lemma exists_kmap_map_relation_iff `{FinMap K1 M1, FinMap K2 M2}
-  `{!Countable K1, Infinite K2}
-  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B) :
-  (exists (f : K1 -> K2), Inj eq eq f /\
-  map_relation (λ _, R) (λ _, P) (λ _, Q)
-    (kmap f m1 :> M2 A) (kmap f m2)) <->
-  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
-Proof.
-  split.
-  - now intros (? & ? & ?%map_relation_kmap).
-  - intros Hrel.
-    destruct (partial_injection_extension []
-      ((infinite_injection ∘ Pos.to_nat ∘ encode) :> K1 -> K2))
-    as (f & Hf & _); [easy|].
-    exists f.
-    split; [done|].
-    now apply map_relation_kmap.
-Qed.
-
-Lemma map_inj_list_to_map `{FinMap K M} {A} (l : list (K * A)) :
-  NoDup l.*1 -> NoDup l.*2 ->
-  map_inj (list_to_map l :> M A).
-Proof.
-  intros Hks Hvs.
-  intros k k' v.
-  rewrite <- 2 elem_of_list_to_map by done.
-  intros (i & Hi)%elem_of_list_lookup (j & Hj)%elem_of_list_lookup.
-  specialize (NoDup_lookup _ i j v Hvs) as Hij.
-  rewrite 2 list_lookup_fmap, Hi, Hj in Hij.
-  destruct Hij as []; [done..|congruence].
-Qed.
 
 
 
@@ -2011,35 +1909,6 @@ Proof.
     now intros <-.
 Qed.
 
-Lemma map_inj_subseteq `{FinMap K M} {A} (m m' : M A) :
-  m ⊆ m' -> map_inj m' -> map_inj m.
-Proof.
-  intros Hm Hm' i j v Hmi Hmj.
-  apply (fun H => lookup_weaken _ _ _ _ H Hm) in Hmi, Hmj.
-  revert Hmi Hmj.
-  apply Hm'.
-Qed.
-
-Lemma map_inverses_map_inj_l `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) : map_inverses m1 m2 -> map_inj m1.
-Proof.
-  intros Hinj i j v.
-  rewrite (Hinj i), (Hinj j).
-  congruence.
-Qed.
-
-Lemma map_inverses_map_inj_r `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) : map_inverses m1 m2 -> map_inj m2.
-Proof.
-  intros Hinj i j v.
-  rewrite <- 2 (Hinj v).
-  congruence.
-Qed.
-
-Lemma Piso_map_inj (m : Piso) : map_inj m.(Piso_map).
-Proof.
-  apply (map_inverses_map_inj_l _ _ (Piso_inverses m)).
-Qed.
 
 Lemma spreferrenced_vertices_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
   vs : spreferrenced_vertices (set_spverts cohg vs) = spreferrenced_vertices cohg.

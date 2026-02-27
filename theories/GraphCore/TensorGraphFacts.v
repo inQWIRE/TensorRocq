@@ -2263,15 +2263,6 @@ Proof.
     done.
 Qed.
 
-Lemma vertices_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
-  cohg_eq cohg cohg' ->
-  vertices cohg = vertices cohg'.
-Proof.
-  intros Heq.
-  unfold vertices.
-  f_equal; [now apply (vertices_hg_equiv _ _), Heq|].
-  now rewrite Heq.1, Heq.2.1.
-Qed.
 
 Lemma graph_semantics_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
   cohg_eq cohg cohg' ->
@@ -2322,11 +2313,59 @@ Proof.
   induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].
   rewrite <- IH.
   destruct Heq.
-  - now apply graph_semantics_isomorphic.
   - now apply graph_semantics_cohg_eq.
+  - now apply cohg_vert_eq_semantic_eq.
 Qed.
 
+Lemma graph_semantics_syntactic_eq {n m} (cohg cohg' : TensorGraph n m) :
+  cohg ≡ₛ cohg' ->
+  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+Proof.
+  intros Heq%(relation_equiv_iff.1 cohg_syntactic_eq_alt).
+  induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].
+  rewrite <- IH.
+  destruct Heq as [[Hheq | Hiso] | Hveq].
+  - now apply graph_semantics_cohg_eq.
+  - now apply graph_semantics_isomorphic.
+  - now apply cohg_vert_eq_semantic_eq.
+Qed.
 
+#[export] Instance cohg_syntactic_eq_semantic_eq {n m} : 
+  subrelation (@cohg_syntactic_eq T _ n m) cohg_semantic_eq.
+Proof.
+  refine graph_semantics_syntactic_eq.
+Qed.
 
+#[export] Instance cohg_eq_semantic_eq {n m} : 
+  subrelation (@cohg_eq T n m _) cohg_semantic_eq.
+Proof.
+  rewrite <- cohg_syntactic_eq_semantic_eq.
+  apply _.
+Qed.
+
+#[export] Instance isomorphic_semantic_eq {n m} : 
+  subrelation (@isomorphic T n m) cohg_semantic_eq.
+Proof.
+  rewrite <- cohg_syntactic_eq_semantic_eq.
+  apply _.
+Qed.
+
+(* FIXME: Move *)
+#[export] Instance struct_isomorphic_syntactic_eq {n m} : 
+  subrelation (@struct_isomorphic T n m) cohg_syntactic_eq.
+Proof.
+  intros x y Heq.
+  hnf in Heq.
+  rewrite <- (norm_verts_vert_eq x), Heq.
+  apply (subrel (norm_verts_vert_eq y)).
+Qed.
+
+#[export] Instance struct_isomorphic_semantic_eq {n m} : 
+  subrelation (@struct_isomorphic T n m) cohg_semantic_eq.
+Proof.
+  rewrite <- cohg_syntactic_eq_semantic_eq.
+  apply _.
+Qed.
 
 End TensorGraphFacts.
+

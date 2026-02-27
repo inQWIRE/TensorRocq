@@ -70,6 +70,17 @@ Proof.
   firstorder.
 Qed.
 
+Add Parametric Relation {A} : (relation A) equiv
+  reflexivity proved by ltac:(hnf; firstorder)
+  symmetry proved by ltac:(hnf; firstorder)
+  transitivity proved by ltac:(hnf; firstorder)
+  as relation_equivalence.
+
+Add Parametric Relation {A} : (relation A) subseteq
+  reflexivity proved by ltac:(hnf; firstorder)
+  transitivity proved by ltac:(hnf; firstorder)
+  as relation_subseteq_equiv.
+
 
 #[export] Instance rel_union_refl {A} {R R' : relation A} :
   TCOr (Reflexive R) (Reflexive R') -> Reflexive (R ∪ R').
@@ -157,7 +168,7 @@ Qed.
 End preimage.
 
 
-Lemma relation_subseteq_antisymm {A} (R1 R2 : relation A) : 
+Lemma relation_subseteq_antisymm {A} (R1 R2 : relation A) :
   R1 ⊆ R2 -> R2 ⊆ R1 -> R1 ≡ R2.
 Proof.
   firstorder.
@@ -199,13 +210,13 @@ Proof.
   split; now apply rtc_once.
 Qed.
 
-Lemma rel_union_subseteq_l {A} (R1 R2 : relation A) : 
+Lemma rel_union_subseteq_l {A} (R1 R2 : relation A) :
   R1 ⊆ R1 ∪ R2.
 Proof.
   firstorder.
 Qed.
 
-Lemma rel_union_subseteq_r {A} (R1 R2 : relation A) : 
+Lemma rel_union_subseteq_r {A} (R1 R2 : relation A) :
   R2 ⊆ R1 ∪ R2.
 Proof.
   firstorder.
@@ -495,3 +506,253 @@ Proof.
   apply elem_of_relation_pair.
   eauto.
 Qed.
+
+
+#[export] Instance rtc_once_subrelation {A} (R : relation A) :
+  subrelation R (rtc R).
+Proof.
+  refine rtc_once.
+Qed.
+#[export] Instance rel_union_subrelation_l {A} (R1 R1' R2 : relation A) :
+  subrelation R1 R1' -> subrelation R1 (R1' ∪ R2) | 10.
+Proof.
+  firstorder.
+Qed.
+#[export] Instance rel_union_subrelation_r {A} (R1 R2 R2' : relation A) :
+  subrelation R2 R2' -> subrelation R2 (R1 ∪ R2') | 10.
+Proof.
+  firstorder.
+Qed.
+#[export] Instance rel_union_subrelation_l' {A} (R1 R2 : relation A) :
+  subrelation R1 (R1 ∪ R2).
+Proof.
+  firstorder.
+Qed.
+#[export] Instance rel_union_subrelation_r' {A} (R1 R2 : relation A) :
+  subrelation R2 (R1 ∪ R2).
+Proof.
+  firstorder.
+Qed.
+#[export] Instance rtc_once_subrelation' {A} (R1 R2 : relation A) :
+  subrelation R1 R2 ->
+  subrelation R1 (rtc R2).
+Proof.
+  intros ->.
+  apply _.
+Qed.
+Lemma subrel {A} {R1 R2 : relation A} `{H12 : !subrelation R1 R2} {x y} :
+  R1 x y -> R2 x y.
+Proof.
+  firstorder.
+Qed.
+Lemma Reflexive_iff_subseteq {A} (R : relation A) :
+  Reflexive R <-> eq ⊆@{relation A} R.
+Proof.
+  rewrite relation_subseteq_iff.
+  split; [intros; now apply eq_subrelation|].
+  firstorder.
+Qed.
+Lemma Symmetric_iff_subseteq {A} (R : relation A) :
+  Symmetric R <-> R ⊆ flip R.
+Proof.
+  rewrite relation_subseteq_iff.
+  unfold Symmetric.
+  firstorder.
+Qed.
+Lemma Equivalence_iff_substeqs {A} (R : relation A) :
+  Equivalence R <->
+  eq ⊆@{relation A} R /\
+  R ⊆ flip R /\
+  rel_compose R R ⊆ R.
+Proof.
+  rewrite <- Reflexive_iff_subseteq, <- Symmetric_iff_subseteq,
+    <- Transitive_iff_subseteq.
+  split; [now intros []|].
+  now constructor.
+Qed.
+Lemma Equivalence_equiv_proper {A} (R1 R2 : relation A) :
+  R1 ≡ R2 -> Equivalence R1 <-> Equivalence R2.
+Proof.
+  intros Heq.
+  assert (HR12 : R1 ⊆ R2) by now rewrite Heq.
+  assert (HR21 : R2 ⊆ R1) by now rewrite Heq.
+  clear Heq.
+  rewrite relation_subseteq_iff in HR12.
+  rewrite relation_subseteq_iff in HR21.
+  intros; split; intros []; constructor;
+  firstorder eauto.
+Qed.
+
+Lemma rtc_union_weaken {A} (R1 R2 : relation A) :
+  rel_compose (rtc R1) (rtc R2) ⊆ rtc (R1 ∪ R2).
+Proof.
+  rewrite rtc_union.
+  f_equiv.
+  apply rtc_subseteq.
+  apply relation_subseteq_iff.
+  hnf; eauto using rtc.
+Qed.
+
+Lemma rel_union_subseteq {A} (R1 R2 R3 : relation A) : 
+  R1 ∪ R2 ⊆ R3 <-> R1 ⊆ R3 /\ R2 ⊆ R3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma rtc_union_commute {A} (R1 R2 : relation A) :
+  rel_compose R2 R1 ⊆ rel_compose R1 R2 ->
+  rtc (R1 ∪ R2) ≡ rel_compose (rtc R1) (rtc R2).
+Proof.
+  intros Hcomm.
+  apply relation_subseteq_antisymm; [|apply rtc_union_weaken].
+  rewrite <- (rtc_id (rel_compose _ _)); [|hnf; eauto using rtc|
+  apply rel_compose_trans; [apply _..|]; 
+  now apply rtc_commute_subseteq_l, rtc_commute_subseteq_r].
+  apply rtc_subseteq.
+  apply rel_union_subseteq; split; 
+  apply relation_subseteq_iff; intros ? ? ?; eauto using rtc.
+Qed.
+
+
+Lemma rtc_proper {A B} (RA : relation A) (RB : relation B)
+  (f : A -> B) : Proper (RA ==> RB) f -> Proper (rtc RA ==> rtc RB) f.
+Proof.
+  intros Hf.
+  intros a b Hab.
+  induction Hab; eauto using rtc.
+Qed.
+(* Lemma rtc_respectful {A B} (RA : relation A) (RB : relation B) :
+  rtc (RA ==> RB)%signature ⊆ (rtc RA ==> rtc RB)%signature.
+Proof.
+  apply relation_subseteq_iff.
+  intros f g. *)
+Lemma rtc_proper2 {A B C} (RA : relation A) `{HRA : !Reflexive RA}
+  (RB : relation B) `{HRB : !Reflexive RB} (RC : relation C)
+  (f : A -> B -> C) : Proper (RA ==> RB ==> RC) f ->
+    Proper (rtc RA ==> rtc RB ==> rtc RC) f.
+Proof.
+  intros Hf.
+  intros a a' Ha b b' Hb.
+  revert b b' Hb; induction Ha; intros b b' Hb;
+    induction Hb; [reflexivity|..].
+  - rewrite <- IHHb.
+    apply rtc_once.
+    apply Hf; done.
+  - rewrite <- IHHa by reflexivity.
+    apply rtc_once.
+    apply Hf; done.
+  - rewrite <- IHHb by done.
+    apply rtc_once.
+    apply Hf; done.
+Qed.
+Lemma rtc_proper2' {A B C} (RA : relation A)
+  (RB : relation B) (RC : relation C)
+  (f : A -> B -> C) : Proper (RA ==> eq ==> RC) f ->
+    Proper (eq ==> RB ==> RC) f ->
+    Proper (rtc RA ==> rtc RB ==> rtc RC) f.
+Proof.
+  intros HfA HfB.
+  intros a a' Ha b b' Hb.
+  revert b b' Hb; induction Ha; intros b b' Hb;
+    induction Hb; [reflexivity|..].
+  - rewrite <- IHHb.
+    apply rtc_once.
+    apply HfB; done.
+  - rewrite <- IHHa by reflexivity.
+    apply rtc_once.
+    apply HfA; done.
+  - rewrite <- IHHb by done.
+    apply rtc_once.
+    apply HfB; done.
+Qed.
+Lemma rtc_subrelation {A} (R1 R2 : relation A) :
+  subrelation R1 R2 -> subrelation (rtc R1) (rtc R2).
+Proof.
+  rewrite <- 2 relation_subseteq_iff.
+  apply rtc_subseteq.
+Qed.
+#[export] Instance rel_preimage_proper {A B} (f : A -> B) :
+  Proper (equiv ==> equiv) (rel_preimage f).
+Proof.
+  hnf.
+  intros RB RB'.
+  rewrite relation_equiv_iff.
+  firstorder.
+Qed.
+Lemma rel_compose_subseteq_trans {A} (R1 R2 R3 : relation A)
+  `{HR3 : !Transitive R3} :
+  R1 ⊆ R3 -> R2 ⊆ R3 -> rel_compose R1 R2 ⊆@{relation A} R3.
+Proof.
+  rewrite 3 relation_subseteq_iff.
+  firstorder eauto.
+Qed.
+#[export] Instance respectful_equiv {A B} :
+  Proper (equiv ==> equiv ==> equiv) (@respectful A B).
+Proof.
+  intros RA RA' HRA RB RB' HRB.
+  rewrite @relation_equiv_iff in *.
+  intros f g.
+  unfold respectful.
+  setoid_rewrite HRA.
+  setoid_rewrite HRB.
+  done.
+Qed.
+Lemma Proper_equiv_proper {A} : Proper (equiv ==> eq ==> iff) (@Proper A).
+Proof.
+  intros RA RA' HRA f _ <-.
+  rewrite relation_equiv_iff in HRA.
+  apply HRA.
+Qed.
+Lemma rel_union_proper_l {A B} (RA1 RA2 : relation A) (RB : relation B) f :
+  Proper (RA1 ==> RB) f ->
+  Proper (RA2 ==> RB) f ->
+  Proper (RA1 ∪ RA2 ==> RB) f.
+Proof.
+  firstorder.
+Qed.
+Lemma rel_union_proper {A B} (RA1 RA2 : relation A) (RB1 RB2 : relation B) f :
+  Proper (RA1 ==> RB1) f ->
+  Proper (RA2 ==> RB2) f ->
+  Proper (RA1 ∪ RA2 ==> RB1 ∪ RB2) f.
+Proof.
+  firstorder.
+Qed.
+
+
+
+Lemma rtc_rel_preimage_subseteq {A B} (f : A -> B) (R : relation B) :
+  rtc (rel_preimage f R) ⊆ rel_preimage f (rtc R).
+Proof.
+  apply relation_subseteq_iff.
+  intros x y Hxy.
+  unfold rel_preimage.
+  induction Hxy; eauto using rtc.
+Qed.
+
+Lemma rel_preimage_rtc {A B} (f : A -> B) `{Hf : !Inj eq eq f} (R : relation B) :
+  (forall a b, R (f a) b -> exists a', f a' = b) ->
+  rel_preimage f (rtc R) ≡ rtc (rel_preimage f R).
+Proof.
+  intros HRf.
+  apply relation_subseteq_antisymm; [apply relation_subseteq_iff|apply rtc_rel_preimage_subseteq].
+  intros x y.
+  unfold rel_preimage at 1.
+  intros Heq.
+  remember (f x) as fx eqn:Hfx.
+  remember (f y) as fy eqn:Hfy.
+  revert x Hfx y Hfy.
+  induction Heq as [|x y z Hxy Hyz IH].
+  - intros a -> b ->%Hf.
+    done.
+  - intros a -> c ->.
+    apply HRf in Hxy as Hb.
+    destruct Hb as (b & <-).
+    eauto using rtc.
+Qed.
+
+Lemma rel_preimage_union {A B} (f : A -> B) (R1 R2 : relation B) : 
+  rel_preimage f (R1 ∪ R2) = rel_preimage f R1 ∪ rel_preimage f R2.
+Proof.
+  reflexivity.
+Qed.
+

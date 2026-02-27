@@ -365,7 +365,8 @@ Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signatu
 Proof.
   intros; now apply stack_graphs_isomorphic.
 Qed.
-  
+
+
 
 Add Parametric Morphism `{Equiv T, Equivalence T equiv}
   {n m o} : (@compose_graphs_aux T n m o)

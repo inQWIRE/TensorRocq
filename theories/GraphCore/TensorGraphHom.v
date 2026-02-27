@@ -2,17 +2,6 @@ Require Export TensorGraph GraphRewriting TensorGraphExpr
   TensorGraphSemantics.
 
 
-#[export] Instance cohg_eq_subrelation `{Equiv T} {n m} :
-  subrelation (@cohg_eq T n m _) equiv.
-Proof.
-  intros ? ? ?; now apply rtc_once; right.
-Qed.
-
-#[export] Instance isomorphic_subrelation `{Equiv T} {n m} :
-  subrelation (@isomorphic T n m) equiv.
-Proof.
-  intros ? ? ?; now apply rtc_once; left.
-Qed.
 
 
 
@@ -397,22 +386,6 @@ Proof.
 Qed.
 
 
-Lemma graph_apply_hom_equiv_inv `{Equiv T, Reflexive T equiv, Equiv T', 
-  Equivalence T' equiv}
-  `{!Inj equiv equiv f} cohg cohg' :
-  (graph_apply_hom f cohg) ≡ (graph_apply_hom f cohg') ->
-  cohg ≡ cohg'.
-Proof.
-  intros (cohg'' & (fe & fv & Hfe & Hfv & ->)%isomorphic_exists & Heq)%cohg_equiv_alt.
-  rewrite <- graph_apply_hom_reindex_graph, 
-    <- graph_apply_hom_relabel_graph in Heq.
-  apply graph_apply_hom_cohg_eq_inv in Heq.
-  etransitivity; [|apply cohg_eq_subrelation, Heq].
-  apply isomorphic_subrelation.
-  now constructor.
-Qed.
-
-
 Lemma referrenced_vertices_graph_apply_hom cohg :
   referrenced_vertices (graph_apply_hom f cohg) =
   referrenced_vertices cohg.
@@ -442,6 +415,108 @@ Proof.
   done.
 Qed.
 
+Lemma graph_apply_hom_cohg_vert_eq cohg cohg' :
+  cohg ≡ᵥ cohg' ->
+  graph_apply_hom f cohg ≡ᵥ graph_apply_hom f cohg'.
+Proof.
+  intros Hnorm.
+  unfold cohg_vert_eq.
+  now rewrite <- graph_apply_hom_norm_verts, Hnorm, graph_apply_hom_norm_verts.
+Qed.
+
+Lemma graph_apply_hom_cohg_vert_eq_inv `{Hf : !Inj eq eq f} cohg cohg' :
+  graph_apply_hom f cohg ≡ᵥ graph_apply_hom f cohg' ->
+  cohg ≡ᵥ cohg'.
+Proof.
+  unfold cohg_vert_eq.
+  intros Heq.
+  rewrite <- 2 graph_apply_hom_norm_verts in Heq.
+  revert Heq.
+  apply graph_apply_hom_inj.
+Qed.
+
+
+Lemma graph_apply_hom_equiv_inv `{Equiv T, Equiv T',
+  Equivalence T equiv, Equivalence T' equiv}
+  `{!Inj equiv equiv f} cohg cohg' :
+  (graph_apply_hom f cohg) ≡ (graph_apply_hom f cohg') ->
+  cohg ≡ cohg'.
+Proof.
+  rewrite 2 (relation_equiv_iff.1 cohg_equiv_alt').
+  unfold rel_preimage.
+  rewrite <- 2 graph_apply_hom_norm_verts.
+  apply graph_apply_hom_cohg_eq_inv.
+Qed.
+
+Lemma graph_apply_hom_struct_isomorphic cohg cohg' :
+  cohg ≡ᵢ cohg' ->
+  graph_apply_hom f cohg ≡ᵢ graph_apply_hom f cohg'.
+Proof.
+  unfold struct_isomorphic.
+  rewrite <- 2 graph_apply_hom_norm_verts.
+  apply graph_apply_hom_isomorphic.
+Qed.
+
+
+Lemma graph_apply_hom_struct_isomorphic_inv `{!Inj eq eq f} cohg cohg' :
+  (graph_apply_hom f cohg) ≡ᵢ (graph_apply_hom f cohg') ->
+  cohg ≡ᵢ cohg'.
+Proof.
+  unfold struct_isomorphic.
+  rewrite <- 2 graph_apply_hom_norm_verts.
+  apply graph_apply_hom_isomorphic_inv.
+Qed.
+
+Lemma graph_apply_hom_syntactic_eq `{Equiv T, Equiv T'}
+  `{Hf : !Proper (equiv ==> equiv) f}
+  cohg cohg' :
+  cohg ≡ₛ cohg' ->
+  graph_apply_hom f cohg ≡ₛ graph_apply_hom f cohg'.
+Proof.
+  intros Heq.
+  induction Heq as [cohg cohg' fv fe Hfv Hfe Heq].
+  rewrite graph_apply_hom_relabel_graph, graph_apply_hom_reindex_graph.
+  constructor; [done..|].
+  rewrite <- 2 graph_apply_hom_norm_verts.
+  now apply graph_apply_hom_cohg_eq_Proper.
+Qed.
+
+Lemma graph_apply_hom_equiv `{Equiv T, Equiv T'}
+  `{Hf : !Proper (equiv ==> equiv) f}
+  cohg cohg' :
+  cohg ≡ cohg' ->
+  graph_apply_hom f cohg ≡ graph_apply_hom f cohg'.
+Proof.
+  refine ((relation_subseteq_iff (RA':=rel_preimage (graph_apply_hom _) _)).1 _ _ _).
+  unfold equiv, CospanHyperGraph_equiv.
+  rewrite <- rtc_rel_preimage_subseteq.
+  apply rtc_subseteq.
+  rewrite rel_preimage_union.
+  apply rel_union_subseteq, conj.
+  - rewrite <- rel_union_subseteq_l.
+    apply relation_subseteq_iff.
+    refine (graph_apply_hom_cohg_eq_Proper _ _).
+  - rewrite <- rel_union_subseteq_r.
+    apply relation_subseteq_iff.
+    refine graph_apply_hom_cohg_vert_eq.
+Qed.
+
+(*
+Lemma graph_apply_hom_syntactic_eq_inv `{Equiv T, Equiv T',
+  Equivalence T equiv, Equivalence T' equiv}
+  `{Hf : !Inj equiv equiv f, Hfeq : !Inj eq eq f}
+  (Hfsurj : forall a b, f a ≡ b -> exists a', f a' = b) cohg cohg' :
+  graph_apply_hom f cohg ≡ₛ graph_apply_hom f cohg' ->
+  cohg ≡ₛ cohg'.
+Proof.
+  rewrite 2 (relation_equiv_iff.1 cohg_syntactic_eq_alt).
+  refine ((relation_subseteq_iff (RA:=rel_preimage (graph_apply_hom _) _)).1 _ _ _).
+  rewrite rel_preimage_rtc.
+  
+  intros (cohg'' & fv & fe & Hfv & Hfe & Hveq & Happl)%cohg_syntactic_eq_exists.
+
+   *)
+
 End graph_hom.
 
 Add Parametric Morphism {T T'} (f : T -> T') {n m} :
@@ -451,14 +526,39 @@ Proof.
   apply graph_apply_hom_isomorphic.
 Qed.
 
+Add Parametric Morphism {T T'} (f : T -> T') {n m} :
+  (graph_apply_hom f) with signature (@struct_isomorphic T n m) ==> struct_isomorphic
+  as graph_apply_hom_struct_isomorphic_mor.
+Proof.
+  apply graph_apply_hom_struct_isomorphic.
+Qed.
 
-Add Parametric Morphism `{Equiv T, Equivalence T equiv, Equiv T'}
+Add Parametric Morphism {T T'} (f : T -> T') {n m} :
+  (graph_apply_hom f) with signature (@cohg_vert_eq T n m) ==> cohg_vert_eq
+  as graph_apply_hom_cohg_vert_eq_mor.
+Proof.
+  apply graph_apply_hom_cohg_vert_eq.
+Qed.
+
+
+Add Parametric Morphism `{Equiv T, Equiv T'}
   (f : T -> T') (Hf : Proper (equiv ==> equiv) f) {n m} :
   (graph_apply_hom f) with signature (≡@{CospanHyperGraph T n m}) ==> equiv
   as graph_apply_hom_proper.
 Proof.
-  refine (proper_cohg_equiv_of_eq_iso_unary (graph_apply_hom f) _ _).
+  now apply graph_apply_hom_equiv.
 Qed.
+
+Add Parametric Morphism `{Equiv T, Equiv T'}
+  (f : T -> T') (Hf : Proper (equiv ==> equiv) f) {n m} :
+  (graph_apply_hom f) with signature (@cohg_syntactic_eq T _ n m) ==> cohg_syntactic_eq
+  as graph_apply_hom_cohg_syntactic_eq_mor.
+Proof.
+  now apply graph_apply_hom_syntactic_eq.
+Qed.
+
+
+
 
 Section correctness.
 

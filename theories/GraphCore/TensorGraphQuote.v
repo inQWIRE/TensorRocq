@@ -31,9 +31,26 @@ Proof.
   destruct Hval as [Hval].
   destruct Hval' as [Hval'].
   rewrite <- Hval.
-  etransitivity; [|apply cohg_eq_subrelation, Hval'].
-  refine (graph_apply_hom_proper_Proper _ _ _ _ _).
-  done.
+  etransitivity; [|apply (subrel Hval')].
+  now f_equiv.
+Qed.
+
+
+Lemma cohg_quote_correct_syntactic_eq {Ctx} `{Equiv T, Equivalence T equiv,
+  Equiv T', Equivalence T' equiv}
+  (f : Ctx -> T -> T')
+  (ctx : Ctx) {n m} (expr expr' : CospanHyperGraph T n m)
+    (val val' : CospanHyperGraph T' n m)
+    {Hval : CospanHyperGraphQuote f ctx expr val}
+    {Hval' : CospanHyperGraphQuote f ctx expr' val'}
+    {Hf : Proper (equiv ==> equiv) (f ctx)} :
+  expr ≡ₛ expr' -> val ≡ₛ val'.
+Proof.
+  intros Heq.
+  destruct Hval as [Hval].
+  destruct Hval' as [Hval'].
+  rewrite <- Hval, <- (subrel (R2:=cohg_syntactic_eq) Hval').
+  now f_equiv.
 Qed.
 
 
@@ -268,9 +285,26 @@ Proof.
   destruct Hval as [Hval].
   destruct Hval' as [Hval'].
   rewrite <- Hval.
-  etransitivity; [|apply cohg_eq_subrelation, Hval'].
-  refine (graph_apply_hom_proper_Proper _ _ _ _ _).
-  done.
+  etransitivity; [|apply (subrel Hval')].
+  now f_equiv.
+Qed.
+
+Lemma cohg_denote_correct_syntactic_eq {Ctx} `{Equiv T, Equivalence T equiv,
+  Equiv T', Equivalence T' equiv}
+  (f : Ctx -> T -> T')
+  (ctx : Ctx) {n m} (expr expr' : CospanHyperGraph T n m)
+    (val val' : CospanHyperGraph T' n m)
+    {Hval : CospanHyperGraphDenote f ctx expr val}
+    {Hval' : CospanHyperGraphDenote f ctx expr' val'}
+    {Hf : Proper (equiv ==> equiv) (f ctx)} :
+  expr ≡ₛ expr' -> val ≡ₛ val'.
+Proof.
+  intros Heq.
+  destruct Hval as [Hval].
+  destruct Hval' as [Hval'].
+  rewrite <- Hval.
+  etransitivity; [|apply (subrel Hval')].
+  now f_equiv.
 Qed.
 
 Section instances.
@@ -515,13 +549,25 @@ Proof.
   now apply (graph_apply_hom_equiv_inv Some).
 Qed.
 
+(* Lemma graph_to_option_correct_syntactic_eq `{Equiv T, Equivalence T equiv}
+  {n m} (expr expr' : CospanHyperGraph T n m) val val' :
+  CospanHyperGraphDenote (fun _ => Some) tt expr val ->
+  CospanHyperGraphDenote (fun _ => Some) tt expr' val' ->
+  val ≡ₛ val' ->
+  expr ≡ₛ expr'.
+Proof.
+  intros [Hval] [Hval'] Heq.
+  rewrite <- Hval, <- Hval' in Heq.
+  now apply (graph_apply_hom_syntactic_eq_inv Some).
+Qed. *)
+
 
 
 
 
 Local Existing Instance positive_equiv.
 
-
+(* 
 Lemma graph_equiv_of_positive `{Equiv T, Equivalence T equiv}
   (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) 
   val val' oval oval' :
@@ -529,12 +575,12 @@ Lemma graph_equiv_of_positive `{Equiv T, Equivalence T equiv}
   CospanHyperGraphDenote (λ _, Some) tt val' oval' ->
   CospanHyperGraphQuote interp_discrete_hg ctx expr oval ->
   CospanHyperGraphQuote interp_discrete_hg ctx expr' oval' ->
-  expr ≡ expr' ->
-  val ≡ val'.
+  expr ≡ₛ expr' ->
+  val ≡ₛ val'.
 Proof.
   intros Hoval Hoval' Hval Hval'.
   intros Heq.
-  apply (cohg_quote_correct_equiv interp_discrete_hg ctx _ _ oval oval') in Heq.
+  apply (cohg_quote_correct_syntactic_eq interp_discrete_hg ctx _ _ oval oval') in Heq.
   revert Heq.
   apply graph_to_option_correct_equiv; apply _.
 Qed.
@@ -546,13 +592,43 @@ Lemma graph_test_isomorphism_quote `{Equiv T, Equivalence T equiv}
   CospanHyperGraphQuote interp_discrete_hg ctx expr oval ->
   CospanHyperGraphQuote interp_discrete_hg ctx expr' oval' ->
   graph_iso_partial_test expr expr' = true ->
-  norm_verts val ≡ norm_verts val'.
+  norm_verts val ≡ₛ norm_verts val'.
 Proof.
   intros Hoval Hoval' Hval Hval' Heq%graph_iso_partial_test_correct.
   revert Heq.
   apply graph_equiv_of_positive with ctx (norm_verts oval) (norm_verts oval');
     apply _.
 Qed.
+ *)
+
+
+Lemma graph_syntactic_equiv_of_positive_inhab `{Equiv T, Equivalence T equiv, Inhabited T}
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) 
+  val val' :
+  CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr val ->
+  CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr' val' ->
+  expr ≡ₛ expr' ->
+  val ≡ₛ val'.
+Proof.
+  intros Hval Hval'.
+  intros Heq.
+  apply (cohg_quote_correct_syntactic_eq interp_discrete_hg_inhab ctx _ _ val val') in Heq.
+  revert Heq.
+  done.
+Qed.
+
+Lemma graph_test_isomorphism_quote_inhab `{Equiv T, Equivalence T equiv, Inhabited T}
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) val val' :
+  CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr val ->
+  CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr' val' ->
+  graph_iso_partial_test expr expr' = true ->
+  val ≡ₛ val'.
+Proof.
+  intros Hval Hval' Heq%graph_iso_partial_test_correct.
+  revert Heq.
+  now apply graph_syntactic_equiv_of_positive_inhab with ctx.
+Qed.
+
 
 
 

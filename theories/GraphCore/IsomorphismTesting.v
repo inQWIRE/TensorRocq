@@ -1,5 +1,520 @@
 Require Export TensorGraph IsomorphismTestingAux.
 
+
+Lemma isomorphic_of_map_to_list_perm {T} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!!.) cohg.(hedges).(hypervertices) = cohg'.(hedges).(hypervertices) ->
+  PermutationA (rel_preimage snd eq)
+  (prod_map id (relabel_abs (mv !!!.)) <$>
+    map_to_list cohg.(hedges).(hyperedges))
+    (map_to_list cohg'.(hedges).(hyperedges)) ->
+  vmap (mv !!!.) cohg.(inputs) = cohg'.(inputs) ->
+  vmap (mv !!!.) cohg.(outputs) = cohg'.(outputs) ->
+  isomorphic cohg cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+
+  apply (PermutationA_decompose _) in Hes as Hes'.
+  destruct Hes' as (es' & Hes'perm & Hes'eq).
+
+  set (mhe := (list_to_map (zip es'.*1
+    (map_to_list cohg'.(hedges).(hyperedges)).*1) :> Pmap positive)).
+
+  apply eqlistA_length in Hes'eq as Hlen.
+
+  assert (Hdome : dom mhe = dom cohg.(hedges).(hyperedges)). 1:{
+    unfold mhe.
+    apply leibniz_equiv_iff.
+    rewrite dom_list_to_map.
+    rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+    rewrite <- Hes'perm.
+    rewrite fsts_prod_map, list_fmap_id.
+    symmetry.
+    apply dom_alt.
+  }
+
+  assert (Hinje : map_inj mhe). 1:{
+    apply map_inj_list_to_map.
+    - rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    - rewrite snd_zip by now rewrite 2 length_fmap, Hlen.
+      apply NoDup_fst_map_to_list.
+  }
+
+  eapply (isomorphic_of_partial_inj_dom' _ _
+    (mv !!!.) (mhe !!!.)).
+  - intros i j [mvi Hmvi]%Hdom%elem_of_dom [mvj Hmvj]%Hdom%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinj; eauto.
+  - rewrite <- Hdome.
+    intros i j [mvi Hmvi]%elem_of_dom [mvj Hmvj]%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinje; eauto.
+  - symmetry.
+    apply cohg_ext; [|done..].
+    cbn.
+    apply hg_ext; [|done].
+    cbn.
+    unfold kmap.
+    rewrite <- list_to_map_fmap.
+    etransitivity; [|apply list_to_map_to_list].
+    symmetry.
+    apply list_to_map_proper; [apply NoDup_fst_map_to_list|].
+    symmetry.
+    transitivity (prod_map (mhe !!!.) id <$>
+      (prod_map id (relabel_abs (mv !!!.)) <$>
+      map_to_list cohg.(hedges).(hyperedges))).
+    1:{
+      rewrite <- 2 list_fmap_compose.
+      done.
+    }
+    rewrite Hes'perm.
+    apply eq_reflexivity.
+    apply (list_eq_same_length _ _ _ eq_refl);
+    [now rewrite length_fmap|].
+    intros i [k tv] [k' tv'] Hi.
+    rewrite list_lookup_fmap.
+
+    apply eqlistA_altdef in Hes'eq.
+    rewrite Forall2_lookup in Hes'eq.
+    destruct (es' !! i) as [es'i|] eqn:Hes'i; [cbn|done].
+    destruct (map_to_list _ !! i) as [mi|] eqn:Hmi; [cbn|done].
+    intros [= <- <-] [= Hmieq].
+    specialize (Hes'eq i).
+    rewrite Hes'i, Hmi in Hes'eq.
+    rewrite <- option_relation_Forall2 in Hes'eq.
+    cbn in Hes'eq.
+    hnf in Hes'eq.
+    rewrite Hes'eq, Hmieq.
+    f_equal.
+    apply lookup_total_correct.
+    apply elem_of_list_to_map.
+    1:{
+      rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    }
+    apply elem_of_list_lookup.
+    exists i.
+    rewrite lookup_zip_Some.
+    rewrite 2 list_lookup_fmap, Hes'i, Hmi, Hmieq.
+    done.
+Qed.
+
+(* FIXME: Move *)
+Definition subrel' := @subrel.
+#[global] Arguments subrel' {_} _ {_ _} {_ _} _ : assert.
+
+Lemma equiv_of_map_to_list_perm_equiv `{Equiv T, Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!!.) cohg.(hedges).(hypervertices) =
+    cohg'.(hedges).(hypervertices) ->
+  PermutationA (rel_preimage snd equiv)
+  (prod_map id (relabel_abs (mv !!!.)) <$>
+    map_to_list cohg.(hedges).(hyperedges))
+    (map_to_list cohg'.(hedges).(hyperedges)) ->
+  vmap (mv !!!.) cohg.(inputs) = cohg'.(inputs) ->
+  vmap (mv !!!.) cohg.(outputs) = cohg'.(outputs) ->
+  cohg ≡ₛ cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+
+  apply (PermutationA_decompose _) in Hes as Hes'.
+  destruct Hes' as (es' & Hes'perm & Hes'eq).
+
+  set (mhe := (list_to_map (zip es'.*1
+    (map_to_list cohg'.(hedges).(hyperedges)).*1) :> Pmap positive)).
+
+  apply eqlistA_length in Hes'eq as Hlen.
+
+  assert (Hdome : dom mhe = dom cohg.(hedges).(hyperedges)). 1:{
+    unfold mhe.
+    apply leibniz_equiv_iff.
+    rewrite dom_list_to_map.
+    rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+    rewrite <- Hes'perm.
+    rewrite fsts_prod_map, list_fmap_id.
+    symmetry.
+    apply dom_alt.
+  }
+
+  assert (Hinje : map_inj mhe). 1:{
+    apply map_inj_list_to_map.
+    - rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+      rewrite <- Hes'perm.
+      rewrite fsts_prod_map, list_fmap_id.
+      apply NoDup_fst_map_to_list.
+    - rewrite snd_zip by now rewrite 2 length_fmap, Hlen.
+      apply NoDup_fst_map_to_list.
+  }
+  transitivity (mk_cohg (mk_hg (list_to_map $ zip_with (λ e mc,
+    (mc.1, (e.2.1, mc.2.2))) es' (map_to_list cohg'.(hedges).(hyperedges)))
+    cohg'.(hedges).(hypervertices)) cohg'.(inputs) cohg'.(outputs)).
+  2:{
+    apply (subrel' cohg_eq).
+    apply mk_cohg_eq; [done..|].
+    cbn.
+    split; [|done].
+    cbn.
+    rewrite <- (list_to_map_to_list (hyperedges _)) at 2.
+    apply map_equiv_map_relation.
+    apply map_relation_list_to_map.
+    apply Forall2_lookup.
+    intros i.
+    rewrite eqlistA_altdef, Forall2_lookup in Hes'eq.
+    rewrite lookup_zip_with.
+    induction (Hes'eq i) as [x y Hxy|]; [|done].
+    cbn.
+    constructor.
+    cbn.
+    split; [done|].
+    split; [|done].
+    apply Hxy.
+  }
+  apply (subrel' isomorphic).
+  eapply (isomorphic_of_partial_inj_dom' _ _
+    (mv !!!.) (mhe !!!.)).
+  - intros i j [mvi Hmvi]%Hdom%elem_of_dom [mvj Hmvj]%Hdom%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinj; eauto.
+  - rewrite <- Hdome.
+    intros i j [mvi Hmvi]%elem_of_dom [mvj Hmvj]%elem_of_dom.
+    rewrite 2 lookup_total_alt, Hmvi, Hmvj.
+    cbn.
+    intros <-.
+    eapply Hinje; eauto.
+  - symmetry.
+    apply cohg_ext; [|done..].
+    cbn.
+    apply hg_ext; [|done].
+    cbn.
+    unfold kmap.
+    rewrite <- list_to_map_fmap.
+    etransitivity; [|apply list_to_map_to_list].
+    symmetry.
+    apply list_to_map_proper; [apply NoDup_fst_map_to_list|].
+    symmetry.
+    transitivity (prod_map (mhe !!!.) id <$>
+      (prod_map id (relabel_abs (mv !!!.)) <$>
+      map_to_list cohg.(hedges).(hyperedges))).
+    1:{
+      rewrite <- 2 list_fmap_compose.
+      done.
+    }
+    rewrite map_to_list_to_map. 2:{
+      rewrite fmap_zip_with.
+      cbn.
+      rewrite zip_with_to_fmap_r by done.
+      apply NoDup_fst_map_to_list.
+    }
+    rewrite Hes'perm.
+    apply eq_reflexivity.
+    apply (fun H => list_eq_same_length _ _ _ H eq_refl);
+    [now rewrite length_fmap, length_zip_with; lia|].
+    rewrite length_fmap.
+    intros i [k tv] [k' tv'] Hi.
+    rewrite list_lookup_fmap.
+
+    apply eqlistA_altdef in Hes'eq.
+    rewrite Forall2_lookup in Hes'eq.
+    rewrite lookup_zip_with.
+    destruct (es' !! i) as [es'i|] eqn:Hes'i; [cbn|done].
+    destruct (map_to_list _ !! i) as [mi|] eqn:Hmi; [cbn|done].
+    intros [= <- <-] [= Hmi1 Htv'].
+    specialize (Hes'eq i).
+    rewrite Hes'i, Hmi in Hes'eq.
+    rewrite <- option_relation_Forall2 in Hes'eq.
+    cbn in Hes'eq.
+    hnf in Hes'eq.
+    f_equal.
+    + apply lookup_total_correct.
+      apply elem_of_list_to_map.
+      1:{
+        rewrite fst_zip by now rewrite 2 length_fmap, Hlen.
+        rewrite <- Hes'perm.
+        rewrite fsts_prod_map, list_fmap_id.
+        apply NoDup_fst_map_to_list.
+      }
+      apply elem_of_list_lookup.
+      exists i.
+      rewrite lookup_zip_Some.
+      rewrite 2 list_lookup_fmap, Hes'i, Hmi.
+      cbn.
+      rewrite Hmi1.
+      done.
+    + rewrite (surjective_pairing es'i.2).
+      rewrite <- Htv'.
+      f_equal.
+      apply Hes'eq.2.
+Qed.
+
+
+Lemma equiv_of_map_to_list_perm_equiv' `{Equiv T, Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  set_map (mv !!.) cohg.(hedges).(hypervertices) =@{gset _}
+    set_map Some cohg'.(hedges).(hypervertices) ->
+  PermutationA (rel_preimage snd (prod_relation (prod_relation equiv eq) eq))
+  (prod_map id (relabel_abs (mv !!.)) <$>
+    map_to_list cohg.(hedges).(hyperedges))
+  (prod_map id (relabel_abs Some) <$>
+    map_to_list cohg'.(hedges).(hyperedges)) ->
+  vmap (mv !!.) cohg.(inputs) = vmap Some cohg'.(inputs) ->
+  vmap (mv !!.) cohg.(outputs) = vmap Some cohg'.(outputs) ->
+  cohg ≡ₛ cohg'.
+Proof.
+  intros Hdom Hinj Hvs Hes Hins Houts.
+  apply (equiv_of_map_to_list_perm_equiv mv).
+  - done.
+  - done.
+  - apply (f_equal (set_map (D:=Pset) (default inhabitant))) in Hvs.
+    rewrite 2 set_map_compose_L in Hvs.
+    rewrite set_map_id_L in Hvs.
+    apply Hvs.
+  - eapply (fmap_PermutationA (RB:=rel_preimage snd equiv)
+      (prod_map id (relabel_abs (default inhabitant)))) in Hes.
+    2:{
+      unfold rel_preimage.
+      intros x y Hxy.
+      simpl.
+      destruct x as [k [[t i] o]], y as [k' [[t' i'] o']].
+      cbn in *.
+      split; [|cbn; f_equal; apply Hxy].
+      split; [|cbn; f_equal; apply Hxy].
+      apply Hxy.1.1.
+    }
+    rewrite <- 2 list_fmap_compose in Hes.
+    unfold compose in Hes.
+    simpl in Hes.
+    erewrite list_fmap_ext in Hes by now intros; rewrite relabel_abs_compose.
+    etransitivity; [apply Hes|].
+
+    erewrite (list_fmap_ext _ _
+      (map_to_list cohg'.(hedges).(hyperedges))) by
+      now intros; rewrite relabel_abs_compose, relabel_abs_id.
+    now rewrite list_fmap_id' by now intros (? & ? & ?).
+  - specialize (f_equal (vmap (default inhabitant)) Hins).
+    rewrite 2 Vector.map_map, Vector.map_id.
+    now intros <-.
+  - specialize (f_equal (vmap (default inhabitant)) Houts).
+    rewrite 2 Vector.map_map, Vector.map_id.
+    now intros <-.
+Qed.
+
+Lemma norm_verts_isomorphic_of_set_verts_empty_isomorphic {T} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  size (isolated_vertices cohg) = size (isolated_vertices cohg') ->
+  isomorphic (set_verts cohg ∅) (set_verts cohg' ∅) ->
+  isomorphic (norm_verts cohg) (norm_verts cohg').
+Proof.
+  intros Hverts.
+  intros (fv & fe & Hfv & Hfe & Heq)%isomorphic_exists.
+  apply (size_set_eq_exists_map (M:=Pmap)) in Hverts as Hmv'.
+  destruct Hmv' as (mv' & Hdommv' & Himgmv' & Hinj).
+
+  assert (Himgfv : forall v, v ∈ referrenced_vertices cohg ->
+    fv v ∈ referrenced_vertices cohg'). 1:{
+    intros v Hv.
+    apply (f_equal referrenced_vertices) in Heq.
+    rewrite referrenced_vertices_set_verts in Heq.
+    rewrite Heq.
+    rewrite referrenced_vertices_relabel_graph,
+      (referrenced_vertices_reindex_graph _).
+    rewrite referrenced_vertices_set_verts.
+    now apply elem_of_map_2.
+  }
+
+  eapply (isomorphic_of_partial_inj_dom' _ _
+    (λ i, default (fv i) (mv' !! i)) fe).
+  - intros i j.
+    rewrite vertices_decomp, 2 elem_of_union.
+    rewrite isolated_vertices_norm_verts, referrenced_vertices_norm_verts.
+    intros [Hii|Hir];
+    [apply Hdommv' in Hii as Hmi;
+    apply elem_of_dom in Hmi as [mi Hmi];
+    rewrite Hmi; cbn; apply (elem_of_map_img_2 (SA:=Pset)) in Hmi as Hmii;
+    rewrite Himgmv' in Hmii
+    |replace (mv' !! i) with (@None positive) by
+      (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
+      intros ?%isolated_referrenced_disjoint);
+     cbn;
+     specialize (Himgfv i Hir) as Hfir];
+    (intros [Hji|Hjr];
+    [apply Hdommv' in Hji as Hmj;
+    apply elem_of_dom in Hmj as [mj Hmj];
+    rewrite Hmj; cbn; apply (elem_of_map_img_2 (SA:=Pset)) in Hmj as Hmji;
+    rewrite Himgmv' in Hmji
+    |replace (mv' !! j) with (@None positive) by
+      (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
+      intros ?%isolated_referrenced_disjoint);
+     cbn;
+     specialize (Himgfv j Hjr) as Hfjr]).
+    + intros <-.
+      revert Hmi Hmj.
+      apply Hinj.
+    + intros ->.
+      now apply isolated_referrenced_disjoint in Hmii.
+    + intros <-.
+      now apply isolated_referrenced_disjoint in Hmji.
+    + apply Hfv.
+  - intros ? ? ? ?; apply Hfe.
+  - apply cohg_ext; [apply hg_ext|..].
+    + cbn.
+      etransitivity; [apply (f_equal (hyperedges ∘ hedges) Heq)|].
+      cbn.
+      apply map_fmap_ext.
+      intros _ tv (i & -> & Hitv)%(lookup_kmap_Some _).
+      apply relabel_abs_ext_strong.
+      intros v Hv.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
+      apply elem_of_map_to_list in Hitv.
+      unfold referrenced_vertices.
+      apply elem_of_union_r.
+      apply elem_of_list_to_set.
+      apply elem_of_list_bind.
+      exists (i, tv).
+      eauto.
+    + cbn.
+      apply leibniz_equiv_iff in Hdommv', Himgmv'.
+      rewrite <- Hdommv', <- Himgmv'.
+      apply set_eq.
+      intros k.
+      clear.
+      set_unfold.
+      rewrite elem_of_map_img.
+      setoid_rewrite elem_of_dom.
+      apply exists_iff.
+      intros i.
+      split; [now intros ->|].
+      now intros [-> [? ->]].
+    + cbn.
+      etransitivity; [apply (f_equal inputs Heq)|].
+      cbn.
+      apply vec_to_list_inj2.
+      rewrite 2 vec_to_list_map.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
+      unfold referrenced_vertices.
+      apply elem_of_union_l.
+      apply elem_of_list_to_set.
+      now apply elem_of_app; left.
+    + cbn.
+      etransitivity; [apply (f_equal outputs Heq)|].
+      cbn.
+      apply vec_to_list_inj2.
+      rewrite 2 vec_to_list_map.
+      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
+      enough (mv' !! v = None) as -> by done.
+      apply not_elem_of_dom.
+      rewrite Hdommv'.
+      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
+      unfold referrenced_vertices.
+      apply elem_of_union_l.
+      apply elem_of_list_to_set.
+      now apply elem_of_app; right.
+Qed.
+
+
+Lemma set_verts_set_verts {T} {n m} (cohg : CospanHyperGraph T n m)
+  vs vs' : set_verts (set_verts cohg vs) vs' = set_verts cohg vs'.
+Proof.
+  done.
+Qed.
+
+Lemma isolated_vertices_set_verts_isolated_vertices
+  {T} {n m} (cohg : CospanHyperGraph T n m) :
+  isolated_vertices (set_verts cohg (isolated_vertices cohg)) =
+  isolated_vertices cohg.
+Proof.
+  unfold isolated_vertices at 1 2.
+  cbn.
+  rewrite referrenced_vertices_set_verts.
+  unfold isolated_vertices.
+  now rewrite difference_twice_L.
+Qed.
+
+(* Lemma equiv_of_set_verts_empty_equiv `{Equiv T, Equivalence T equiv} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  size (isolated_vertices cohg) = size (isolated_vertices cohg') ->
+  set_verts cohg ∅ ≡ₛ set_verts cohg' ∅ ->
+  norm_verts cohg ≡ₛ norm_verts cohg'.
+Proof.
+  intros Hverts.
+  intros (cohg'' & Hiso & Hequiv)%cohg_equiv_alt.
+
+  transitivity (norm_verts (
+      set_verts cohg'' (isolated_vertices cohg'))).
+  - replace cohg'' with (set_verts
+    (set_verts cohg'' (isolated_vertices cohg')) ∅) in Hiso. 2:{
+      apply cohg_ext; [|done..].
+      apply hg_ext; [done|].
+      cbn.
+      symmetry.
+      now rewrite Hequiv.2.2.2.
+    }
+    apply isomorphic_of_set_verts_empty_isomorphic in Hiso. 2:{
+      rewrite Hequiv, set_verts_set_verts.
+      rewrite Hverts.
+      now rewrite isolated_vertices_set_verts_isolated_vertices.
+    }
+    now rewrite Hiso.
+  - rewrite Hequiv.
+    apply eq_reflexivity.
+    rewrite set_verts_set_verts.
+    unfold norm_verts.
+    rewrite set_verts_set_verts.
+    now rewrite isolated_vertices_set_verts_isolated_vertices.
+Qed.
+
+
+
+Lemma norm_verts_equiv_of_map_to_list_perm_equiv `{Equivalence T equiv} {n m}
+  (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
+  referrenced_vertices cohg ⊆ dom mv ->
+  map_inj mv ->
+  size (isolated_vertices cohg) = size (isolated_vertices cohg') ->
+  PermutationA (rel_preimage snd (prod_relation equiv eq))
+  (prod_map id (prod_map id (gmultiset_map (mv !!.))) <$>
+    map_to_list cohg.(hedges).(hyperedges))
+  (prod_map id (prod_map id (gmultiset_map Some)) <$>
+    map_to_list cohg'.(hedges).(hyperedges)) ->
+  vmap (mv !!.) cohg.(inputs) = vmap Some cohg'.(inputs) ->
+  vmap (mv !!.) cohg.(outputs) = vmap Some cohg'.(outputs) ->
+  norm_verts cohg ≡ norm_verts cohg'.
+Proof.
+  intros Hdom Hinj Hverts Hperm Hins Houts.
+  apply spequiv_of_set_verts_empty_equiv; [done|].
+  apply (spequiv_of_map_to_list_perm_equiv' mv); [|done..].
+  rewrite vertices_decomp.
+  rewrite referrenced_vertices_set_verts.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_set_verts.
+  cbn -[difference].
+  rewrite <- Hdom.
+  generalize (referrenced_vertices cohg).
+  set_solver +.
+Qed. *)
+
 Definition hyperedge_map_eq_reqs {T} (hg hg' : Pmap (HyperEdge T)) :
   option (list (T * T)) :=
   (* if decide (map_relation (λ _ tio tio' =>
@@ -564,11 +1079,13 @@ Proof.
 Qed.
 
 
-Lemma graph_pre_isos_correct' `{Equiv T} {n m} (cohg cohg' : CospanHyperGraph T n m) :
+
+Lemma graph_pre_isos_correct' `{Equiv T, Equivalence T equiv}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
   Forall (λ '(ts, mhe, mv),
     Forall (uncurry equiv) ts ->
     size (dom mv :> Pset) = size (map_img mv :> Pset) ->
-    norm_verts cohg ≡ norm_verts cohg')
+    cohg ≡ₛ cohg')
     (graph_pre_isos cohg cohg').
 Proof.
   eapply Forall_impl; [apply graph_pre_isos_correct_aux|].
@@ -586,16 +1103,9 @@ Proof.
     rewrite Hdom_misol, Hdom_mv.
     apply isolated_referrenced_disjoint.
   }
-  etransitivity; [
-  eapply rtc_once, or_introl, (isomorphic_of_partial_inj_dom' _ _
-    (Pmap_map (misol ∪ mv)) (Pmap_map mhe)), eq_refl|].
-  - apply Pmap_map_inj_on.
-    1:{
-      rewrite dom_union.
-      rewrite Hdom_misol, Hdom_mv.
-      now rewrite vertices_norm_verts, vertices_decomp.
-    }
-    apply map_disjoint_union_inj.
+
+  assert (Hinjun : map_inj (misol ∪ mv)). 1:{
+    refine (map_disjoint_union_inj _ _ _ _ _ _).
     * done.
     * apply Hmisol_inj.
     * apply Hinj.
@@ -606,9 +1116,25 @@ Proof.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
       apply isolated_referrenced_disjoint.
-  - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
-    apply Hmhe_inj.
-  - apply rtc_once, or_intror.
+  }
+
+  apply cohg_syntactic_eq_trans with (relabel_graph (Pmap_injmap (misol ∪ mv))
+    (reindex_graph (Pmap_injmap mhe) cohg)); [
+  eapply (subrel' isomorphic);
+    refine (isomorphic_of_partial_inj_dom' _ _
+    (Pmap_injmap (misol ∪ mv)) (Pmap_injmap mhe) _ _ eq_refl)|].
+  - intros i j Hi Hj. 
+    apply (inj _).
+  - intros ? ? ? ?.
+    apply (inj _).
+  - eapply cohg_syntactic_eq_trans. 1:{
+      apply (subrel' cohg_vert_eq).
+      rewrite <- norm_verts_vert_eq.
+      rewrite (norm_verts_relabel_graph _), (norm_verts_reindex_graph _).
+      reflexivity.
+    }
+    rewrite <- (norm_verts_vert_eq cohg').
+    apply (subrel' cohg_eq).
     apply mk_cohg_eq; cbn.
     + apply vec_to_list_inj2.
       apply (list_eq_same_length _ _ _ eq_refl);
@@ -626,7 +1152,7 @@ Proof.
       intros [= Hmv_ii].
       unfold Pmap_map.
       eapply lookup_union_Some_r in Hmv_ii as Hun_ii; [|eauto].
-      now rewrite Hun_ii.
+      now apply Pmap_injmap_correct in Hun_ii.
     + apply vec_to_list_inj2.
       apply (list_eq_same_length _ _ _ eq_refl);
       [now rewrite 2 length_vec_to_list|].
@@ -643,14 +1169,14 @@ Proof.
       intros [= Hmv_ii].
       unfold Pmap_map.
       eapply lookup_union_Some_r in Hmv_ii as Hun_ii; [|eauto].
-      now rewrite Hun_ii.
+      now apply Pmap_injmap_correct in Hun_ii.
     + split. 2:{
         cbn.
         rewrite <- Himg_misol.
         apply set_eq.
         intros k.
         rewrite elem_of_map, elem_of_map_img.
-        unfold Pmap_map.
+        unfold Pmap_injmap.
         split.
         - intros (i & -> & Hi).
           exists i.
@@ -666,25 +1192,40 @@ Proof.
           now apply elem_of_dom_2 in Hi.
       }
       cbn.
-      replace (_ <$> _) with ((relabel_abs (Pmap_map mv) <$>
-          kmap (Pmap_map mhe) (hedges cohg).(hyperedges)) :> Pmap _).
+      assert (Hkmap : kmap (Pmap_injmap mhe) (hedges cohg).(hyperedges) =@{Pmap _}
+        kmap (Pmap_map mhe) (hedges cohg).(hyperedges)). 1:{
+        apply kmap_ext.
+        intros k _ Hk%elem_of_dom_2.
+        apply Pmap_injmap_correct_dom.
+        now rewrite Hdom_mhe.
+      }
+      replace (_ <$> _) with ((relabel_abs (Pmap_injmap mv) <$>
+          kmap (Pmap_injmap mhe) (hedges cohg).(hyperedges)) :> Pmap _).
       2: {
         symmetry.
         apply map_fmap_ext; intros fi tio (i & Hi & <-)%lookup_kmap_Some_2.
         apply relabel_abs_ext_strong.
         intros k Hk.
-        unfold Pmap_map.
+        unfold Pmap_injmap.
         rewrite lookup_union.
-        enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
-        apply not_elem_of_dom.
-        rewrite Hdom_misol.
-        intros Href%isolated_referrenced_disjoint; apply Href.
-        unfold referrenced_vertices.
-        apply elem_of_union; right.
-        rewrite elem_of_list_to_set, elem_of_list_bind.
-        exists (i, tio).
-        split; [apply Hk|].
-        now apply elem_of_map_to_list.
+        enough (misol !! k = None /\ k ∈ dom mv) as [-> [? ->]%elem_of_dom]
+           by now rewrite (left_id_L None _).
+        split.
+        - apply not_elem_of_dom.
+          rewrite Hdom_misol.
+          intros Href%isolated_referrenced_disjoint; apply Href.
+          unfold referrenced_vertices.
+          apply elem_of_union; right.
+          rewrite elem_of_list_to_set, elem_of_list_bind.
+          exists (i, tio).
+          split; [apply Hk|].
+          now apply elem_of_map_to_list.
+        - rewrite Hdom_mv.
+          unfold referrenced_vertices.
+          apply elem_of_union_r, elem_of_list_to_set.
+          apply elem_of_list_bind.
+          apply elem_of_map_to_list in Hi.
+          set_solver +Hi Hk.
       }
       intros i.
       specialize (Heq i).
@@ -692,7 +1233,8 @@ Proof.
       rewrite 2 lookup_fmap in Heq.
       rewrite lookup_fmap.
       apply option_relation_Forall2.
-      destruct (_ !! _) as [tio'|], (_ !! _) as [tio|];
+      rewrite <- Hkmap in Heq.
+      destruct (kmap _ _ !! i) as [tio'|], (_ !! i) as [tio|];
         cbn in Heq; [|easy..].
       destruct tio' as [[t' ins'] outs'],
         tio as [[t ins] outs].
@@ -715,7 +1257,7 @@ Proof.
         intros [= <-] [= <-].
         cbn in Hins'.
         revert Hins'.
-        unfold Pmap_map.
+        unfold Pmap_injmap.
         now intros [= ->].
       * apply (list_eq_same_length _ _ _ eq_refl);
         [rewrite length_fmap; now apply (f_equal length) in Houts';
@@ -730,7 +1272,7 @@ Proof.
         intros [= <-] [= <-].
         cbn in Houts'.
         revert Houts'.
-        unfold Pmap_map.
+        unfold Pmap_injmap.
         now intros [= ->].
 Qed.
 
@@ -974,10 +1516,10 @@ Proof.
 Qed.
 
 
-Lemma graph_isos_correct_aux_2 {n m}
+Lemma graph_isos_correct_aux_2 `{Equivalence T equiv} {n m}
   (cohg cohg' : CospanHyperGraph T n m) :
   Forall (λ '(mhe, mv),
-    (norm_verts cohg) ≡ (norm_verts cohg'))
+    cohg ≡ₛ cohg')
     (graph_isos cohg cohg').
 Proof.
   rewrite Forall_forall.
@@ -994,11 +1536,12 @@ Proof.
   now specialize (Hcorr (map_inverses_card_img _ _ (Piso_inverses mv))).
 Qed.
 
-Lemma graph_isos_test {n m} (cohg cohg' : CospanHyperGraph T n m) :
+Lemma graph_isos_test `{Equivalence T equiv} 
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
   match graph_isos cohg cohg' with
   | [] => False
   | _ :: _ => True
-  end -> norm_verts cohg ≡ norm_verts cohg'.
+  end -> cohg ≡ₛ cohg'.
 Proof.
   pose proof (graph_isos_correct_aux_2 cohg cohg') as Hcorr.
   destruct (graph_isos _ _); [done|].
@@ -1013,9 +1556,10 @@ Definition graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : 
   | _ :: _ => true
   end.
 
-Lemma graph_iso_partial_test_correct {n m} (cohg cohg' : CospanHyperGraph T n m) : 
-  graph_iso_partial_test cohg cohg' = true -> 
-  norm_verts cohg ≡ norm_verts cohg'.
+Lemma graph_iso_partial_test_correct `{Equivalence T equiv} 
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  graph_iso_partial_test cohg cohg' = true ->
+  cohg ≡ₛ cohg'.
 Proof.
   intros Heq.
   apply graph_isos_test.

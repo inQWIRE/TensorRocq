@@ -640,4 +640,24 @@ Proof.
 Qed.
 
 
+Lemma graph_namedtensorlist_semantics_struct_isomorphic {n m} (tg tg' : TensorGraph n m) :
+  tg ≡ᵢ tg' ->
+  exists fv, Inj eq eq fv /\
+  ntl_relabel_absidx fv (graph_namedtensorlist_semantics tg) =ntl=
+  graph_namedtensorlist_semantics tg'.
+Proof.
+  intros (fv & Hfv & Heq)%graph_namedtensorlist_semantics_isomorphic.
+  exists fv.
+  now rewrite 2 graph_namedtensorlist_semantics_norm_verts in Heq.
+Qed.
+
+Lemma graph_namedtensorlist_semantics_vert_eq {n m} (tg tg' : TensorGraph n m) :
+  tg ≡ᵥ tg' -> graph_namedtensorlist_semantics tg = graph_namedtensorlist_semantics tg'.
+Proof.
+  intros Heq.
+  now rewrite <- graph_namedtensorlist_semantics_norm_verts, Heq, 
+    graph_namedtensorlist_semantics_norm_verts.
+Qed.
+
 End TensorGraphExpr.
+

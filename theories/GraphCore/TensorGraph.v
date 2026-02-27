@@ -5,6 +5,10 @@ Require Export Aux_stdpp Aux_pos.
 Require Export HyperGraph.
 Require Import TESyntax.
 
+
+
+
+
 (* Basic definitions and structural operations on TensorGraphs *)
 
 
@@ -32,8 +36,7 @@ Definition CospanHyperGraph2triple {T} {n m : nat} (tg : CospanHyperGraph T n m)
 
 #[global] Coercion CospanHyperGraph2triple : CospanHyperGraph >-> prod.
 
-Definition CospanHyperGraph2HyperGraph {T} {n m} (tg : CospanHyperGraph T n m) := tg.(hedges).
-#[global] Coercion CospanHyperGraph2HyperGraph : CospanHyperGraph >-> HyperGraph.
+#[global] Coercion hedges : CospanHyperGraph >-> HyperGraph.
 
 Lemma cohg_ext {T} {n m} (tg tg' : CospanHyperGraph T n m) :
   tg.(hedges) = tg'.(hedges) ->
@@ -786,7 +789,7 @@ Qed.
 End CospanHyperGraph.
 
 
-Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+Add Parametric Morphism `{Equiv T} {n m} f :
   (@relabel_graph T n m f) with signature cohg_eq ==> cohg_eq as
   relabel_graph_cohg_eq.
 Proof.
@@ -796,7 +799,7 @@ Proof.
   now f_equiv.
 Qed.
 
-Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} f :
+Add Parametric Morphism `{Equiv T} {n m} f :
   (@reindex_graph T n m f) with signature cohg_eq ==> cohg_eq as
   reindex_graph_cohg_eq.
 Proof.
@@ -987,67 +990,6 @@ Proof.
 Qed.
 
 
-#[export] Instance CospanHyperGraph_equiv `{Equiv T} {n m} :
-  Equiv (CospanHyperGraph T n m) :=
-  rtc (isomorphic ∪ cohg_eq).
-
-#[export] Instance CospanHyperGraph_equivalence `{Equiv T, Equivalence T equiv} {n m} :
-  Equivalence (≡@{CospanHyperGraph T n m}).
-Proof.
-  apply rtc_equivalence.
-  apply _.
-Qed.
-
-Lemma cohg_equiv_alt `{Equiv T, Equivalence T equiv} {n m}
-  (cohg cohg' : CospanHyperGraph T n m) :
-  cohg ≡ cohg' <-> exists cohg'', isomorphic cohg cohg'' /\ cohg_eq cohg'' cohg'.
-Proof.
-  split; cycle 1.
-  - intros (cohg'' & Hiso & Heq).
-    transitivity cohg'';
-    apply rtc_once; [now left|now right].
-  - intros Hrtc.
-    induction Hrtc as [cohg|cohg1 cohg2 cohg3 Heq12 Hrtc23 IH]; [now exists cohg|].
-    destruct IH as (cohg2' & Hiso2 & Heq2'3).
-    destruct Heq12 as [Hiso12|Heq12].
-    + exists cohg2'.
-      split; [etransitivity; eauto|].
-      done.
-    + induction Hiso2 as [cohg2 fe fv Hfe Hfv].
-      exists (relabel_graph fe (reindex_graph fv cohg1)).
-      split; [now constructor|].
-      now rewrite Heq12.
-Qed.
-
-Lemma proper_cohg_equiv_of_eq_iso_unary `{Equiv T1, Equiv T2, 
-  Equivalence T1 equiv} {n1 m1 n2 m2} 
-  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) : 
-  Proper (isomorphic ==> isomorphic) f ->
-  Proper (cohg_eq ==> cohg_eq) f ->
-  Proper (equiv ==> equiv) f.
-Proof.
-  intros Hfiso Hfeq.
-  intros cohg cohg' (cohg'' & Hiso%Hfiso & Heq%Hfeq)%cohg_equiv_alt.
-  transitivity (f cohg'');
-  apply rtc_once; [now left|now right].
-Qed.
-
-Lemma proper_cohg_equiv_of_eq_iso_binary `{Equiv T1, Equiv T2, Equiv T3,
-  Equivalence T1 equiv, Equivalence T2 equiv} {n1 m1 n2 m2 n3 m3} 
-  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
-    CospanHyperGraph T3 n3 m3) : 
-  Proper (isomorphic ==> isomorphic ==> isomorphic) f ->
-  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) f ->
-  Proper (equiv ==> equiv ==> equiv) f.
-Proof.
-  intros Hfiso Hfeq.
-  intros cohg1 cohg1' (cohg1'' & Hiso1 & Heq1)%cohg_equiv_alt.
-  intros cohg2 cohg2' (cohg2'' & Hiso2 & Heq2)%cohg_equiv_alt.
-  transitivity (f cohg1'' cohg2'');
-  apply rtc_once; [now left; apply Hfiso|now right; apply Hfeq].
-Qed.
-
-
 
 Definition abs_vertices {T} (hg : (HyperEdge T)) : Pset :=
   list_to_set (hg.1.2 ++ hg.2).
@@ -1129,6 +1071,16 @@ Proof.
 Qed.
 
 
+Add Parametric Morphism `{Equiv T} {n m} : (@vertices T n m)
+  with signature cohg_eq ==> eq as vertices_cohg_eq.
+Proof.
+  intros cohg cohg'.
+  intros Heq.
+  unfold vertices.
+  f_equal; [now apply (vertices_hg_equiv _ _), Heq|].
+  now rewrite Heq.1, Heq.2.1.
+Qed.
+
 
 Add Parametric Morphism `{Equiv T} {n m} : (@referrenced_vertices T n m)
   with signature cohg_eq ==> eq as referrenced_vertices_cohg_eq.
@@ -1170,4 +1122,868 @@ Proof.
   intros cohg cohg' Heq.
   unfold norm_verts.
   now apply set_verts_cohg_eq, isolated_vertices_cohg_eq_Proper.
+Qed.
+
+Lemma norm_verts_idemp {T n m} (cohg : CospanHyperGraph T n m) :
+  norm_verts (norm_verts cohg) = norm_verts cohg.
+Proof.
+  unfold norm_verts at 1 3.
+  now rewrite isolated_vertices_norm_verts.
+Qed.
+
+
+Definition cohg_vert_eq {T} {n m} (cohg cohg' : CospanHyperGraph T n m) :=
+  norm_verts cohg = norm_verts cohg'.
+
+#[export] Instance cohg_vert_equiv {T n m} : Equivalence (@cohg_vert_eq T n m) :=
+  rel_preimage_equiv norm_verts _ _.
+
+Notation "cohg '≡ᵥ' cohg'" := (cohg_vert_eq cohg%cohg cohg'%cohg)
+  (at level 70) : cohg_scope.
+
+Notation "cohg '≡ₕ' cohg'" := (cohg_eq cohg%cohg cohg'%cohg)
+  (at level 70) : cohg_scope.
+
+
+
+Lemma norm_verts_vert_eq {T n m} (cohg : CospanHyperGraph T n m) :
+  norm_verts cohg ≡ᵥ cohg.
+Proof.
+  apply norm_verts_idemp.
+Qed.
+
+Lemma cohg_vert_eq_alt {T n m} (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ᵥ cohg' <->
+  inputs cohg = inputs cohg' /\
+  outputs cohg = outputs cohg' /\
+  hyperedges cohg = cohg' /\
+  isolated_vertices cohg = isolated_vertices cohg'.
+Proof.
+  destruct cohg, cohg'; cbn.
+  unfold cohg_vert_eq.
+  unfold norm_verts, set_verts.
+  cbn.
+  naive_solver congruence.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma cohg_eq_trans `{Equiv T, Transitive T equiv} {n m} :
+  Transitive (@cohg_eq T n m _).
+Proof.
+  apply rel_intersection_trans, rel_intersection_trans;
+  refine (rel_preimage_trans _ _ _).
+  apply rel_intersection_trans;
+  refine (rel_preimage_trans _ _ _).
+  intros m1 m2 m3 H12 H23 i.
+  specialize (H12 i).
+  specialize (H23 i).
+  hnf in H12, H23 |- *.
+  etransitivity; eauto.
+Qed.
+Lemma cohg_eq_symm `{Equiv T, Symmetric T equiv} {n m} :
+  Symmetric (@cohg_eq T n m _).
+Proof.
+  apply rel_intersection_symm, rel_intersection_symm;
+  refine (rel_preimage_symm _ _ _).
+  apply rel_intersection_symm;
+  refine (rel_preimage_symm _ _ _).
+  intros m1 m2 H12 i.
+  specialize (H12 i).
+  hnf in H12 |- *.
+  now symmetry.
+Qed.
+Lemma cohg_eq_refl `{Equiv T, Reflexive T equiv} {n m} :
+  Reflexive (@cohg_eq T n m _).
+Proof.
+  apply rel_intersection_refl, rel_intersection_refl;
+  refine (rel_preimage_refl _ _ _).
+  apply rel_intersection_refl;
+  refine (rel_preimage_refl _ _ _).
+  intros m1 i.
+  hnf.
+  reflexivity.
+Qed.
+
+
+#[export] Instance CospanHyperGraph_equiv `{Equiv T} {n m} :
+  Equiv (CospanHyperGraph T n m) :=
+  rtc (cohg_eq ∪ cohg_vert_eq).
+
+#[export] Instance CospanHyperGraph_equivalence `{Equiv T, Symmetric T equiv} {n m} :
+  Equivalence (≡@{CospanHyperGraph T n m}).
+Proof.
+  apply rtc_equivalence.
+  apply rel_union_symm, _.
+  now apply cohg_eq_symm.
+Qed.
+
+#[export] Instance CospanHyperGraph_refl `{Equiv T} {n m} :
+  Reflexive (≡@{CospanHyperGraph T n m}).
+Proof.
+  apply _.
+Qed.
+
+#[export] Instance CospanHyperGraph_trans `{Equiv T} {n m} :
+  Transitive (≡@{CospanHyperGraph T n m}).
+Proof.
+  apply _.
+Qed.
+
+#[export] Instance cohg_eq_subrelation_equiv `{Equiv T} {n m} :
+  subrelation (@cohg_eq T n m _) equiv.
+Proof.
+  apply _.
+Qed.
+
+#[export] Instance cohg_vert_eq_subrelation_equiv `{Equiv T} {n m} :
+  subrelation (@cohg_vert_eq T n m) equiv.
+Proof.
+  apply _.
+Qed.
+
+#[export] Typeclasses Opaque CospanHyperGraph_equiv.
+
+(* Definition cohg_equiv_alt_defn `{Equiv T} {n m} (cohg cohg' : CospanHyperGraph T n m) :=
+  cohg_eq (norm_verts cohg) (norm_verts cohg').
+
+#[export] Instance cohg_equiv_alt_defn_equiv `{Equiv T, Equivalence T equiv} {n m} :
+  Equivalence (@cohg_equiv_alt_defn T _ n m) :=
+  rel_preimage_equiv norm_verts _ _. *)
+
+Lemma set_verts_id {T n m} (cohg : CospanHyperGraph T n m) :
+  set_verts cohg (hypervertices cohg) = cohg.
+Proof.
+  now destruct cohg as [[]].
+Qed.
+
+Lemma referrenced_vertices_set_verts {T n m} (cohg : CospanHyperGraph T n m) vs :
+  referrenced_vertices (set_verts cohg vs) = referrenced_vertices cohg.
+Proof.
+  done.
+Qed.
+
+Lemma cohg_vert_eq_cohg_eq_commute `{Equiv T} {n m} :
+  rel_compose cohg_vert_eq (@cohg_eq T n m _) ⊆
+  rel_compose cohg_eq cohg_vert_eq.
+Proof.
+  apply relation_subseteq_iff.
+  intros cohg cohg'' (cohg' & Hveq & Heq).
+  apply cohg_vert_eq_alt in Hveq.
+  exists (set_verts cohg'' (hypervertices cohg)). (* (mk_cohg (mk_hg (cohg'') (hypervertices cohg))
+    (inputs cohg'') (outputs cohg'')). *)
+  split.
+  - apply mk_cohg_eq; cbn.
+    + rewrite Hveq.1.
+      apply Heq.
+    + rewrite Hveq.2.1.
+      apply Heq.
+    + split; [cbn; rewrite Hveq.2.2.1; apply Heq|].
+      done.
+  - apply cohg_vert_eq_alt.
+    split_and!; [done..|].
+    cbn.
+    unfold isolated_vertices; cbn.
+    symmetry.
+    rewrite <- Heq.2.2.2.
+    rewrite referrenced_vertices_set_verts.
+    erewrite <- referrenced_vertices_cohg_eq by apply Heq.
+    symmetry.
+    unfold referrenced_vertices.
+    etransitivity; [|apply Hveq.2.2.2].
+    rewrite <- Hveq.1, <- Hveq.2.1, <- Hveq.2.2.1.
+    done.
+Qed.
+
+
+Definition struct_isomorphic {T n m} (cohg cohg' : CospanHyperGraph T n m) :=
+  isomorphic (norm_verts cohg) (norm_verts cohg').
+
+Lemma referrenced_vertices_relabel_graph {T n m} f (cohg : CospanHyperGraph T n m) :
+  referrenced_vertices (relabel_graph f cohg) =
+  set_map f (referrenced_vertices cohg).
+Proof.
+  unfold referrenced_vertices.
+  cbn.
+  rewrite 2 vec_to_list_map, <- fmap_app.
+  rewrite set_map_union_L, 2 set_map_list_to_set_L.
+  f_equal.
+  rewrite map_to_list_fmap.
+  rewrite list_fmap_bind, list_bind_fmap.
+  f_equal.
+  apply list_bind_ext; [|done].
+  intros [? [[]]]; now rewrite fmap_app.
+Qed.
+
+
+Lemma isolated_vertices_relabel_graph {T n m} f `{Hf : !Inj eq eq f}
+  (cohg : CospanHyperGraph T n m) :
+  isolated_vertices (relabel_graph f cohg) =
+  set_map f (isolated_vertices cohg).
+Proof.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_relabel_graph.
+  cbn.
+  now rewrite (set_map_difference_L _).
+Qed.
+
+Lemma norm_verts_relabel_graph {T n m} f `{Hf : !Inj eq eq f}
+  (cohg : CospanHyperGraph T n m) :
+  norm_verts (relabel_graph f cohg) = relabel_graph f (norm_verts cohg).
+Proof.
+  unfold norm_verts.
+  rewrite (isolated_vertices_relabel_graph _).
+  done.
+Qed.
+
+Lemma referrenced_vertices_reindex_graph {T n m}
+  f `{Hf : !Inj eq eq f} (cohg : CospanHyperGraph T n m) :
+  referrenced_vertices (reindex_graph f cohg) =
+  referrenced_vertices cohg.
+Proof.
+  unfold referrenced_vertices.
+  cbn.
+  f_equal.
+  rewrite (map_to_list_kmap _).
+  rewrite list_fmap_bind.
+  done.
+Qed.
+
+
+Lemma isolated_vertices_reindex_graph {T n m} f `{Hf : !Inj eq eq f}
+  (cohg : CospanHyperGraph T n m) :
+  isolated_vertices (reindex_graph f cohg) =
+  isolated_vertices cohg.
+Proof.
+  unfold isolated_vertices.
+  rewrite (referrenced_vertices_reindex_graph _).
+  done.
+Qed.
+
+Lemma norm_verts_reindex_graph {T n m} f `{Hf : !Inj eq eq f}
+  (cohg : CospanHyperGraph T n m) :
+  norm_verts (reindex_graph f cohg) = reindex_graph f (norm_verts cohg).
+Proof.
+  unfold norm_verts.
+  rewrite (isolated_vertices_reindex_graph _).
+  done.
+Qed.
+
+
+
+
+Lemma norm_verts_isomorphic {T n m} (cohg cohg' : CospanHyperGraph T n m) :
+  isomorphic cohg cohg' -> isomorphic (norm_verts cohg) (norm_verts cohg').
+Proof.
+  intros (fv & fe & Hfv & Hfe & ->)%isomorphic_exists.
+  rewrite (norm_verts_relabel_graph _),
+    (norm_verts_reindex_graph _).
+  now constructor.
+Qed.
+
+#[export] Instance struct_isomorphic_equivalence {T n m} :
+  Equivalence (@struct_isomorphic T n m) := rel_preimage_equiv _ _ _.
+
+
+Notation "cohg '≡ᵢ' cohg'" := (struct_isomorphic cohg%cohg cohg'%cohg)
+  (at level 70) : cohg_scope.
+
+#[export] Instance isomorphic_struct_isomorphic {T n m} :
+  subrelation (@isomorphic T n m) struct_isomorphic.
+Proof.
+  refine norm_verts_isomorphic.
+Qed.
+
+#[export] Instance cohg_vert_eq_struct_isomorphic {T n m} :
+  subrelation (@cohg_vert_eq T n m) struct_isomorphic.
+Proof.
+  unfold struct_isomorphic.
+  now intros ? ? <-.
+Qed.
+
+Lemma struct_isomorphic_alt {T n m} :
+  @struct_isomorphic T n m ≡ rtc (cohg_vert_eq ∪ isomorphic).
+Proof.
+  apply relation_subseteq_antisymm; apply relation_subseteq_iff.
+  - intros cohg cohg' Heq.
+    transitivity (norm_verts cohg); [apply rtc_once; left; now rewrite norm_verts_vert_eq|].
+    transitivity (norm_verts cohg'); [|apply rtc_once; left; now rewrite norm_verts_vert_eq].
+    apply rtc_once; right; apply Heq.
+  - intros cohg cohg' Heq.
+    induction Heq as [|a b c Hab Hbc IH]; [done|].
+    rewrite <- IH.
+    destruct Hab as [Hab|Hab]; now rewrite Hab.
+Qed.
+
+Inductive cohg_syntactic_eq `{Equiv T} {n m} : relation (CospanHyperGraph T n m) :=
+  | cohg_syntactic_eq_relabel_reindex cohg cohg' fv fe : Inj eq eq fv -> Inj eq eq fe ->
+    cohg_eq (norm_verts cohg) (norm_verts cohg') ->
+    cohg_syntactic_eq cohg (relabel_graph fv (reindex_graph fe cohg')).
+
+
+Notation "cohg '≡ₛ' cohg'" := (cohg_syntactic_eq cohg%cohg cohg'%cohg)
+  (at level 70) : cohg_scope.
+
+Lemma cohg_syntactic_eq_exists `{Equiv T} {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ₛ cohg' <-> exists cohg'' fv fe, Inj eq eq fv /\ Inj eq eq fe /\
+    cohg_eq (norm_verts cohg) (norm_verts cohg'') /\
+      cohg' = relabel_graph fv (reindex_graph fe cohg'').
+Proof.
+  split; [|naive_solver eauto using cohg_syntactic_eq].
+  intros Heq.
+  induction Heq.
+  eauto 7.
+Qed.
+
+#[export] Instance isomorphic_cohg_syntactic_eq `{Equiv T, Reflexive T equiv} {n m} :
+  subrelation (@isomorphic T n m) cohg_syntactic_eq.
+Proof.
+  intros cohg cohg' (fv & fe & Hfv & Hfe & ->)%isomorphic_exists.
+  constructor; [apply _..|].
+  apply mk_cohg_eq; [done..|].
+  split; [|done].
+  intros i; hnf.
+  reflexivity.
+Qed.
+
+#[export] Instance cohg_eq_cohg_syntactic_eq `{Equiv T} {n m} :
+  subrelation (@cohg_eq T n m _) cohg_syntactic_eq.
+Proof.
+  intros cohg cohg' Heq.
+  apply cohg_syntactic_eq_exists.
+  exists cohg', id, id.
+  do 3 (split; [apply id_inj||now apply norm_verts_cohg_eq|]).
+  now rewrite relabel_graph_id, reindex_graph_id.
+Qed.
+
+#[export] Instance cohg_vert_eq_cohg_syntactic_eq `{Equiv T, Reflexive T equiv} {n m} :
+  subrelation (@cohg_vert_eq T n m) cohg_syntactic_eq.
+Proof.
+  intros cohg cohg' Heq.
+  apply cohg_syntactic_eq_exists.
+  exists cohg', id, id.
+  do 2 (split; [apply id_inj|]).
+  split; [|now rewrite relabel_graph_id, reindex_graph_id].
+  rewrite <- Heq.
+  apply mk_cohg_eq; [done..|].
+  split; [|done].
+  intros i; hnf.
+  reflexivity.
+Qed.
+
+Lemma relabel_graph_cohg_eq_inv_l `{Equiv T} f
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  relabel_graph f cohg ≡ₕ cohg' -> exists cohg'',
+    cohg' = relabel_graph f cohg'' /\ cohg ≡ₕ cohg''.
+Proof.
+  intros Heq.
+  exists (mk_cohg (mk_hg (union_with (λ tio tio',
+    Some (tio.1.1, tio'.1.2, tio'.2)) (hyperedges cohg') cohg)
+    (hypervertices cohg)) (inputs cohg) (outputs cohg)).
+  split.
+  - apply cohg_ext; [|symmetry; apply Heq..].
+    cbn.
+    apply hg_ext; [|symmetry; apply Heq].
+    cbn.
+    apply map_eq.
+    intros i.
+    specialize (Heq.2.2.1 i) as Hlook.
+    cbn in Hlook.
+    rewrite lookup_fmap in Hlook.
+    rewrite lookup_fmap, lookup_union_with.
+    apply option_relation_Forall2 in Hlook.
+    destruct ((hyperedges cohg) !! i) as [hi|] eqn:Hhi,
+      ((hyperedges cohg') !! i) as [hi'|] eqn:Hhi'; [cbn in *|done..].
+    f_equal.
+    rewrite (surjective_pairing hi'), (surjective_pairing hi'.1).
+    cbn.
+    rewrite <- (Hlook.1.2), <- Hlook.2.
+    rewrite (surjective_pairing hi), (surjective_pairing hi.1).
+    done.
+  - apply mk_cohg_eq; [done..|].
+    cbn.
+    split; [|done].
+    cbn.
+    intros i.
+    rewrite lookup_union_with.
+    specialize (Heq.2.2.1 i) as Hlook.
+    cbn in Hlook.
+    rewrite lookup_fmap in Hlook.
+    apply option_relation_Forall2 in Hlook.
+    destruct ((hyperedges cohg) !! i) as [hi|] eqn:Hhi,
+      ((hyperedges cohg') !! i) as [hi'|] eqn:Hhi'; [cbn in *|done..|constructor].
+    f_equiv.
+    split; [|done].
+    split; [|done].
+    cbn.
+    rewrite (surjective_pairing hi), (surjective_pairing hi.1) in Hlook.
+    apply Hlook.1.1.
+Qed.
+
+Lemma reindex_graph_cohg_eq_inv_l `{Equiv T} f `{Hf : !Inj eq eq f}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  reindex_graph f cohg ≡ₕ cohg' -> exists cohg'',
+    cohg' = reindex_graph f cohg'' /\ cohg ≡ₕ cohg''.
+Proof.
+  intros Heq.
+  set (finv' := invfun f (elements (dom (hyperedges cohg)))).
+  specialize (partial_injection_extension _
+    finv' (invfun_inj _ _ (fun _ _ _ _ => Hf _ _))) as Hfinv.
+  destruct Hfinv as (finv & Hfinv & Hfinv_eq).
+
+  exists (reindex_graph finv cohg').
+  split.
+  - rewrite reindex_graph_compose by apply _.
+    symmetry.
+    apply reindex_graph_id_strong.
+    intros fi _ Hfi%elem_of_dom_2.
+    cbn.
+    specialize Heq.2.2.1 as Hdom%dom_proper.
+    cbn in Hdom.
+    rewrite dom_kmap' in Hdom.
+    rewrite <- Hdom in Hfi.
+    apply elem_of_map in Hfi as (i & -> & Hi).
+    rewrite Forall_fmap, Forall_forall in Hfinv_eq.
+    rewrite Hfinv_eq by now rewrite elem_of_elements.
+    unfold finv'.
+    now rewrite invfun_linv by now first [intros ? ? ? ? ?%Hf|apply elem_of_elements].
+  - apply (reindex_graph_cohg_eq_Proper finv) in Heq.
+    rewrite reindex_graph_compose in Heq by apply _.
+    rewrite reindex_graph_id_strong in Heq; [done|].
+    intros i _ Hi%elem_of_dom_2.
+    cbn.
+    rewrite Forall_fmap, Forall_forall in Hfinv_eq.
+    rewrite Hfinv_eq by now apply elem_of_elements.
+    apply invfun_linv, elem_of_elements, Hi.
+    now intros ? ? ? ? ?%Hf.
+Qed.
+
+
+Lemma norm_verts_id {T n m} (cohg : CospanHyperGraph T n m) :
+  hypervertices cohg = isolated_vertices cohg ->
+  norm_verts cohg = cohg.
+Proof.
+  intros Heq.
+  auto using cohg_ext, hg_ext.
+Qed.
+
+Lemma relabel_graph_set_verts {T n m} f (cohg : CospanHyperGraph T n m) vs :
+  relabel_graph f (set_verts cohg vs) = set_verts (relabel_graph f cohg) (set_map f vs).
+Proof.
+  done.
+Qed.
+
+Lemma hypervertices_subseteq_vertices {T n m} (cohg : CospanHyperGraph T n m) :
+  hypervertices cohg ⊆ vertices cohg.
+Proof.
+  unfold vertices.
+  rewrite <- union_subseteq_l.
+  unfold vertices_hg.
+  rewrite <- union_subseteq_r.
+  done.
+Qed.
+
+Lemma relabel_graph_norm_verts_inv_l `{Equiv T} f `{Hf : !Inj eq eq f}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  norm_verts cohg = relabel_graph f cohg' -> exists cohg'',
+    cohg' = norm_verts cohg'' /\ cohg = relabel_graph f cohg''.
+Proof.
+  set (finv' := invfun f (elements (vertices cohg'))).
+  specialize (partial_injection_extension _
+    finv' (invfun_inj f _ (fun _ _ _ _ => Hf _ _))) as Hfinv.
+  destruct Hfinv as (finv & Hfinv & Hfinv_eq).
+  intros Heq.
+  exists (relabel_graph finv cohg).
+  split.
+  - apply (f_equal (relabel_graph finv)) in Heq.
+    rewrite <- (norm_verts_relabel_graph _) in Heq.
+    rewrite Heq.
+    rewrite relabel_graph_compose.
+    symmetry.
+    apply relabel_graph_id_strong.
+    intros k Hk.
+    cbn.
+    rewrite Forall_fmap, Forall_forall in Hfinv_eq.
+    rewrite Hfinv_eq by now apply elem_of_elements.
+    apply invfun_linv, elem_of_elements, Hk.
+    now intros ? ? ? ? ?%Hf.
+  - symmetry.
+    rewrite relabel_graph_compose.
+    apply relabel_graph_id_strong.
+    intros k Hk.
+    cbn.
+    rewrite Forall_forall in Hfinv_eq.
+    eenough (Hk' : _) by
+    now rewrite Hfinv_eq; [apply invfun_rinv, Hk'|apply Hk'].
+
+    apply (f_equal vertices) in Heq.
+    rewrite vertices_norm_verts, vertices_relabel_graph in Heq.
+    rewrite Heq in Hk.
+    set_solver + Hk.
+Qed.
+
+Lemma reindex_graph_norm_verts_inv_l `{Equiv T} f `{Hf : !Inj eq eq f}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  norm_verts cohg = reindex_graph f cohg' -> exists cohg'',
+    cohg' = norm_verts cohg'' /\ cohg = reindex_graph f cohg''.
+Proof.
+  set (finv' := invfun f (elements (dom $ hyperedges cohg'))).
+  specialize (partial_injection_extension _
+    finv' (invfun_inj f _ (fun _ _ _ _ => Hf _ _))) as Hfinv.
+  destruct Hfinv as (finv & Hfinv & Hfinv_eq).
+  intros Heq.
+  exists (reindex_graph finv cohg).
+  split.
+  - apply (f_equal (reindex_graph finv)) in Heq.
+    rewrite <- (norm_verts_reindex_graph _) in Heq.
+    rewrite Heq.
+    rewrite reindex_graph_compose by apply _.
+    symmetry.
+    apply reindex_graph_id_strong.
+    intros k _ Hk%elem_of_dom_2.
+    cbn.
+    rewrite Forall_fmap, Forall_forall in Hfinv_eq.
+    rewrite Hfinv_eq by now apply elem_of_elements.
+    apply invfun_linv, elem_of_elements, Hk.
+    now intros ? ? ? ? ?%Hf.
+  - symmetry.
+    rewrite reindex_graph_compose by apply _.
+    apply reindex_graph_id_strong.
+    intros k _ Hk%elem_of_dom_2.
+    cbn.
+    rewrite Forall_forall in Hfinv_eq.
+    eenough (Hk' : _) by
+    now rewrite Hfinv_eq; [apply invfun_rinv, Hk'|apply Hk'].
+
+    apply (f_equal (dom ∘ hyperedges ∘ hedges)) in Heq.
+    cbn in Heq.
+    rewrite Heq in Hk.
+    rewrite dom_kmap' in Hk.
+    rewrite (fmap_elements (SB:=Pset) _).
+    now apply elem_of_elements.
+Qed.
+
+
+
+Lemma cohg_syntactic_eq_trans `{Equiv T, Transitive T equiv} {n m} :
+  Transitive (@cohg_syntactic_eq T _ n m).
+Proof.
+  intros cohg cohg' cohg'' Heq1 Heq2.
+  (* induction Heq2 as [cohg' cohg'' fv2 fe2 Hfv2 Hfe2 Heq2]. *)
+  apply cohg_syntactic_eq_exists in Heq2
+    as (cohg23 & fv2 & fe2 & Hfv2 & Hfe2 & Hheq2 & Heq2).
+  apply cohg_syntactic_eq_exists in Heq1
+    as (cohg12 & fv1 & fe1 & Hfv1 & Hfe1 & Hheq1 & Heq1).
+  subst cohg' cohg''.
+
+  rewrite (norm_verts_relabel_graph _), (norm_verts_reindex_graph _) in Hheq2.
+
+  apply relabel_graph_cohg_eq_inv_l in Hheq2 as Hheq2'.
+  destruct Hheq2' as (cohg12' & Heq12 & Hrel).
+  apply (reindex_graph_cohg_eq_inv_l _) in Hrel as Hheq2''.
+  destruct Hheq2'' as (cohg12'' & -> & Hrel').
+
+  apply cohg_syntactic_eq_exists.
+
+  apply (relabel_graph_norm_verts_inv_l _) in Heq12 as
+    (cohg23' & Heq12%eq_sym & ->).
+  apply (reindex_graph_norm_verts_inv_l _) in Heq12 as
+    (cohg12' & -> & ->).
+
+  exists cohg12'.
+  exists (fv2 ∘ fv1), (fe2 ∘ fe1).
+  split; [apply _|].
+  split; [apply _|].
+
+  split.
+  - eapply cohg_eq_trans; eauto.
+  - rewrite <- relabel_graph_compose, <- (reindex_graph_compose _ _).
+    rewrite <- (reindex_relabel_graph fe2 fv1).
+    done.
+Qed.
+
+
+Lemma cohg_syntactic_eq_alt `{Equiv T, Reflexive T equiv,
+  Transitive T equiv} {n m} :
+  (@cohg_syntactic_eq T _ n m) ≡ rtc (cohg_eq ∪ isomorphic ∪ cohg_vert_eq).
+Proof.
+  apply relation_subseteq_antisymm.
+  - apply relation_subseteq_iff.
+    intros cohg cohg' Hcohg.
+    induction Hcohg as [cohg cohg' fv fe Hfv Hfe Heq].
+    rewrite <- (iso_relabel_reindex _ _ _).
+    rewrite <- (norm_verts_vert_eq cohg).
+    rewrite <- (norm_verts_vert_eq cohg').
+    apply (subrel Heq).
+  - rewrite <- (rtc_id cohg_syntactic_eq);
+    [|intros x; apply isomorphic_cohg_syntactic_eq; reflexivity|
+    now apply cohg_syntactic_eq_trans].
+    apply rtc_subseteq.
+    rewrite 2  rel_union_subseteq.
+    split_and!; apply relation_subseteq_iff; apply _.
+Qed.
+
+#[export] Instance cohg_syntactic_eq_equivalence `{Equiv T, Equivalence T equiv}
+  {n m} : Equivalence (@cohg_syntactic_eq T _ n m).
+Proof.
+  erewrite Equivalence_equiv_proper by now apply cohg_syntactic_eq_alt.
+  apply rtc_equivalence.
+  apply _.
+Qed.
+
+Lemma cohg_equiv_alt_gen `{Equiv T} {n m} :
+  (≡@{CospanHyperGraph T n m}) ≡ rel_compose (rtc cohg_eq) cohg_vert_eq.
+Proof.
+  unfold CospanHyperGraph_equiv, equiv at 2.
+  rewrite rtc_union_commute by apply cohg_vert_eq_cohg_eq_commute.
+  f_equiv.
+  now rewrite rtc_id by apply _.
+Qed.
+
+
+Lemma cohg_equiv_alt'_gen `{Equiv T} {n m} :
+  (≡@{CospanHyperGraph T n m}) ≡ rel_preimage norm_verts (rtc cohg_eq).
+Proof.
+  apply relation_subseteq_antisymm; [rewrite cohg_equiv_alt_gen|]; apply relation_subseteq_iff.
+  - intros cohg cohg'' (cohg' & H12 & H23).
+    unfold rel_preimage.
+    rewrite <- H23.
+    now apply (rtc_proper cohg_eq _ norm_verts norm_verts_cohg_eq_Proper).
+  - intros cohg cohg' Heq12.
+    unfold rel_preimage in Heq12.
+    rewrite <- (norm_verts_vert_eq cohg).
+    etransitivity; [|apply (subrel (norm_verts_vert_eq cohg'))].
+    eapply rtc_subrelation, Heq12.
+    apply _.
+Qed.
+
+
+Lemma cohg_equiv_alt `{Equiv T, Equivalence T equiv} {n m} :
+  (≡@{CospanHyperGraph T n m}) ≡ rel_compose cohg_eq cohg_vert_eq.
+Proof.
+  rewrite cohg_equiv_alt_gen.
+  now rewrite rtc_id by apply _.
+Qed.
+
+Lemma cohg_equiv_alt' `{Equiv T, Equivalence T equiv} {n m} :
+  (≡@{CospanHyperGraph T n m}) ≡ rel_preimage norm_verts cohg_eq.
+Proof.
+  rewrite cohg_equiv_alt'_gen.
+  now rewrite rtc_id by apply _.
+Qed.
+
+Lemma cohg_equiv_alt_rel `{Equiv T, Equivalence T equiv} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ cohg' <-> exists cohg'', cohg ≡ₕ cohg'' /\ cohg'' ≡ᵥ cohg'.
+Proof.
+  apply (relation_equiv_iff.1 cohg_equiv_alt).
+Qed.
+
+Lemma cohg_equiv_alt'_rel `{Equiv T, Equivalence T equiv} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ cohg' <-> norm_verts cohg ≡ₕ norm_verts cohg'.
+Proof.
+  apply (relation_equiv_iff.1 cohg_equiv_alt').
+Qed.
+
+
+
+
+
+
+Lemma proper_cohg_equiv_of_vert_eq_unary `{Equiv T1, Equiv T2} {n1 m1 n2 m2}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (cohg_eq ==> cohg_eq) f ->
+  Proper (equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cohg cohg' (cohg'' & Heq%(rtc_proper _ _ _ Hfeq) & Hiso%Hfiso)%(relation_equiv_iff.1 cohg_equiv_alt_gen).
+  etransitivity; [|apply (subrel Hiso)].
+  eapply rtc_subrelation, Heq.
+  apply _.
+Qed.
+
+Lemma proper_cohg_equiv_of_vert_eq_binary `{Equiv T1, Equiv T2, Equiv T3,
+  HT1 : Reflexive T1 equiv, HT2 : Reflexive T2 equiv}
+  {n1 m1 n2 m2 n3 m3}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
+    CospanHyperGraph T3 n3 m3) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) f ->
+  Proper (equiv ==> equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq.
+  intros cohg1 cohg1' (cohg1'' & Hiso1 & Heq1)%(relation_equiv_iff.1 cohg_equiv_alt_gen).
+  intros cohg2 cohg2' (cohg2'' & Hiso2 & Heq2)%(relation_equiv_iff.1 cohg_equiv_alt_gen).
+  transitivity (f cohg1'' cohg2''); [|apply (subrel (Hfiso _ _ Heq1 _ _ Heq2))].
+  apply (rtc_subrelation cohg_eq _ _).
+  pose proof (@cohg_eq_refl T1 _ _ n1 m1) as Hrefl1.
+  pose proof (@cohg_eq_refl T2 _ _ n2 m2) as Hrefl2.
+  now apply (rtc_proper2 _ _ _ _ Hfeq).
+Qed.
+
+Lemma proper_cohg_equiv_of_vert_eq_binary' `{Equiv T1, Equiv T2, Equiv T3}
+  {n1 m1 n2 m2 n3 m3}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
+    CospanHyperGraph T3 n3 m3) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (cohg_eq ==> eq ==> cohg_eq) f ->
+  Proper (eq ==> cohg_eq ==> cohg_eq) f ->
+  Proper (equiv ==> equiv ==> equiv) f.
+Proof.
+  intros Hfiso Hfeq1 Hfeq2.
+  intros cohg1 cohg1' (cohg1'' & Hiso1 & Heq1)%(relation_equiv_iff.1 cohg_equiv_alt_gen).
+  intros cohg2 cohg2' (cohg2'' & Hiso2 & Heq2)%(relation_equiv_iff.1 cohg_equiv_alt_gen).
+  transitivity (f cohg1'' cohg2''); [|apply (subrel (Hfiso _ _ Heq1 _ _ Heq2))].
+  apply (rtc_subrelation cohg_eq _ _).
+  now apply (rtc_proper2' _ _ _ _ Hfeq1 Hfeq2).
+Qed.
+
+
+Lemma struct_isomorphic_alt' {T n m} :
+  @struct_isomorphic T n m ≡
+    rel_compose cohg_vert_eq (rel_compose isomorphic cohg_vert_eq).
+Proof.
+  apply relation_subseteq_antisymm.
+  - apply relation_subseteq_iff.
+    intros cohg cohg' Heq.
+    exists (norm_verts cohg).
+    split; [now rewrite norm_verts_vert_eq|].
+    exists (norm_verts cohg').
+    split; [|now rewrite norm_verts_vert_eq].
+    done.
+  - apply (rel_compose_subseteq_trans _ _ _ (relation_subseteq_iff.2 _)).
+    apply (rel_compose_subseteq_trans _ _ _); now apply (relation_subseteq_iff.2 _).
+Qed.
+
+
+
+Lemma proper_struct_isomorphic_of_vert_eq_unary {T1 T2} {n1 m1 n2 m2}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (isomorphic ==> isomorphic) f ->
+  Proper (struct_isomorphic ==> struct_isomorphic) f.
+Proof.
+  intros Hfeq Hfiso.
+  intros cohg cohg' Heq%Hfiso.
+  rewrite <- (norm_verts_vert_eq cohg), <- (norm_verts_vert_eq cohg').
+  apply (subrel Heq).
+Qed.
+
+Lemma proper_struct_isomorphic_of_vert_eq_binary {T1 T2 T3} {n1 m1 n2 m2 n3 m3}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
+    CospanHyperGraph T3 n3 m3) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (isomorphic ==> isomorphic ==> isomorphic) f ->
+  Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic) f.
+Proof.
+  intros Hfeq Hfiso.
+  intros cohg1 cohg1' Heq1%Hfiso.
+  intros cohg2 cohg2' Heq2%Heq1.
+  rewrite <- (norm_verts_vert_eq cohg1), <- (norm_verts_vert_eq cohg2).
+  rewrite Heq2.
+  now rewrite 2 norm_verts_vert_eq.
+Qed.
+
+
+
+Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_unary `{Equiv T1, Reflexive T1 equiv,
+  Transitive T1 equiv, Equiv T2, Reflexive T2 equiv, Transitive T2 equiv} {n1 m1 n2 m2}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (isomorphic ==> isomorphic) f ->
+  Proper (cohg_eq ==> cohg_eq) f ->
+  Proper (cohg_syntactic_eq ==> cohg_syntactic_eq) f.
+Proof.
+  intros Hfveq Hfiso Hfeq.
+  pose proof (@Proper_equiv_proper).
+  rewrite 2 cohg_syntactic_eq_alt.
+  apply rtc_proper.
+  apply rel_union_proper, _.
+  now apply rel_union_proper.
+Qed.
+
+(*
+Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_binary `{Equiv T1, Reflexive T1 equiv,
+  Transitive T1 equiv, Equiv T2, Reflexive T2 equiv, Transitive T2 equiv} {n1 m1 n2 m2}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (isomorphic ==> isomorphic) f ->
+  Proper (cohg_eq ==> cohg_eq) f ->
+  Proper (cohg_syntactic_eq ==> cohg_syntactic_eq) f. *)
+
+
+Lemma cohg_ext' {T n m} (cohg cohg' : CospanHyperGraph T n m) :
+  inputs cohg = inputs cohg' ->
+  outputs cohg = outputs cohg' ->
+  hyperedges cohg = hyperedges cohg' ->
+  hypervertices cohg = hypervertices cohg' ->
+  cohg = cohg'.
+Proof.
+  auto using cohg_ext, hg_ext.
+Qed.
+
+Lemma referrenced_vertices_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  referrenced_vertices (stack_graphs cohg cohg') =
+  set_map (bcons false) (referrenced_vertices cohg) ∪
+  set_map (bcons true) (referrenced_vertices cohg').
+Proof.
+  unfold referrenced_vertices.
+  cbn.
+  rewrite 2 set_map_union_L, 4 set_map_list_to_set_L.
+  rewrite 2 vec_to_list_app, 4 vec_to_list_map.
+  rewrite union_assoc_L, (union_comm_L (list_to_set _ ∪ _)).
+  rewrite union_assoc_L, <- union_assoc_L.
+  f_equal.
+  - rewrite <- list_to_set_app_L. 
+    apply list_to_set_perm_L.
+    rewrite ! fmap_app.
+    solve_Permutation.
+  - rewrite <- list_to_set_app_L. 
+    rewrite <- 2 kmap_fmap'.
+    apply list_to_set_perm_L.
+    rewrite map_to_list_disj_union by now apply (kmap_inj2_disjoint bcons).
+    rewrite bind_app.
+    rewrite 2 (map_to_list_kmap _), 2 map_to_list_fmap, 
+      ! list_fmap_bind, ! list_bind_fmap.
+    apply eq_reflexivity. 
+    f_equal; apply (fun H => list_bind_ext _ _ _ _ H eq_refl);
+    intros [? [[]]]; now rewrite fmap_app.
+Qed.
+
+Lemma isolated_vertices_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  isolated_vertices (stack_graphs cohg cohg') =
+  set_map (bcons false) (isolated_vertices cohg) ∪
+  set_map (bcons true) (isolated_vertices cohg').
+Proof.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_stack_graphs.
+  cbn.
+  rewrite 2 (set_map_difference_L _).
+  generalize (hypervertices cohg) (hypervertices cohg')
+    (referrenced_vertices cohg) (referrenced_vertices cohg').
+  set_solver.
+Qed.
+
+Lemma norm_verts_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  norm_verts (stack_graphs cohg cohg') =
+  stack_graphs (norm_verts cohg) (norm_verts cohg').
+Proof.
+  apply cohg_ext'; [done..|].
+  cbn.
+  apply isolated_vertices_stack_graphs.
+Qed.
+
+
+Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signature
+  cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq as stack_graphs_vert_eq_mor.
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  hnf.
+  rewrite 2 norm_verts_stack_graphs.
+  now f_equal.
 Qed.

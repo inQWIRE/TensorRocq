@@ -100,7 +100,7 @@ Proof.
   intros [[t i] o] [[t' i'] o'] [[? ?] ?]; split; [split|]; cbn; now f_equal.
 Qed.
 
-Add Parametric Morphism `{Equiv T, Reflexive T equiv} f : (@relabel_hg T f) with signature
+Add Parametric Morphism `{Equiv T} f : (@relabel_hg T f) with signature
   (≡) ==> (≡) as relabel_hg_proper.
 Proof.
   intros hg hg' [Heq Hverts].
@@ -110,7 +110,7 @@ Proof.
   apply relabel_abs_proper_Proper.
 Qed.
 
-Add Parametric Morphism `{Equiv T, Reflexive T equiv} f : (@reindex_hg T f) with signature
+Add Parametric Morphism `{Equiv T} f : (@reindex_hg T f) with signature
   (≡) ==> (≡) as reindex_hg_proper.
 Proof.
   intros hg hg' [Heq Hverts].

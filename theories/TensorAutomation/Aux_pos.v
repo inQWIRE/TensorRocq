@@ -2535,3 +2535,65 @@ Proof.
   rewrite vzip_map.
   done.
 Qed.
+
+Definition Pmap_injmap (m : Pmap positive) (k : positive) : positive :=
+  default (infinite_injection_avoiding (map_to_list m).*2 (Pos.to_nat k)) (m !! k).
+
+Lemma Pmap_injmap_correct m k v : m !! k = Some v ->
+  Pmap_injmap m k = v.
+Proof.
+  unfold Pmap_injmap.
+  now intros ->.
+Qed.
+
+Lemma Pmap_injmap_correct' m k : is_Some (m !! k) ->
+  Pmap_injmap m k = m !!! k.
+Proof.
+  unfold Pmap_injmap.
+  rewrite lookup_total_alt.
+  now intros [? ->].
+Qed.
+
+Lemma Pmap_injmap_correct_dom m k : k ∈ dom m ->
+  Pmap_injmap m k = Pmap_map m k.
+Proof.
+  unfold Pmap_injmap, Pmap_map.
+  now intros [? ->]%elem_of_dom.
+Qed.
+
+#[export] Instance Pmap_injmap_inj m : map_inj m ->
+  Inj eq eq (Pmap_injmap m).
+Proof.
+  intros Hm k l.
+  unfold Pmap_injmap.
+  destruct (m !! k) as [mk|] eqn:Hmk,
+    (m !! l) as [ml|] eqn:Hml;
+    [intros [= ->]; eauto|cbn..|cbn; refine (inj (_ ∘ Pos.to_nat) k l)].
+  - intros ->.
+    apply elem_of_map_to_list, (elem_of_list_fmap_1 snd) in Hmk.
+    now apply infinite_injection_avoiding_avoids in Hmk.
+  - intros <-.
+    apply elem_of_map_to_list, (elem_of_list_fmap_1 snd) in Hml.
+    now apply infinite_injection_avoiding_avoids in Hml.
+Qed.
+
+#[export] Hint Extern 0 (map_inj _) => solve [trivial] : typeclass_instances.
+
+Lemma set_map_Pmap_injmap m X : X ⊆ dom m -> 
+  set_map (Pmap_injmap m) X =@{Pset}
+  set_map (m !!!.) X.
+Proof.
+  intros HX.
+  apply set_map_ext_L.
+  intros k Hk%HX.
+  apply Pmap_injmap_correct'.
+  now apply elem_of_dom in Hk as [? ->].
+Qed.
+
+Lemma set_map_Pmap_injmap_dom m :
+  set_map (Pmap_injmap m) (dom m) =@{Pset}
+  map_img m.
+Proof.
+  rewrite set_map_Pmap_injmap by done.
+  apply set_map_dom_map_img_L.
+Qed.
