@@ -456,24 +456,6 @@ Proof.
   now apply Pmap_injmap_correct_dom.
 Qed.
 
-Lemma swapped_stack_graphs_aux_relabel_disjoint {n m n' m'} f1 f2
-  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
-  vertices cohg1 ## vertices cohg2 ->
-  swapped_stack_graphs_aux (relabel_graph f1 cohg1) (relabel_graph f2 cohg2) =
-  relabel_graph (Pmap_map (fun_to_map f1 (vertices cohg1) ∪ fun_to_map f2 (vertices cohg2)))
-    (swapped_stack_graphs_aux cohg1 cohg2).
-Proof.
-  intros Hdisj.
-  rewrite relabel_swapped_stack_graphs_aux.
-  f_equal.
-  - rewrite (relabel_graph_to_fun_to_map f1).
-    apply relabel_graph_Pmap_map_to_union_l.
-    now rewrite dom_fun_to_map_L.
-  - rewrite (relabel_graph_to_fun_to_map f2).
-    apply relabel_graph_Pmap_map_to_union_r.
-    now rewrite dom_fun_to_map_L.
-Qed.
-
 (* FIXME: Move *)
 Lemma map_inj_disj_union `{FinMap K M} {A}
   (m1 m2 : M A) :
@@ -510,6 +492,170 @@ Lemma map_img_fun_to_map_L `{FinMap K M, FinSet K SK, SemiSet A SA, !LeibnizEqui
   map_img (fun_to_map f X :> M A) =@{SA} set_map f X.
 Proof.
   apply leibniz_equiv_iff, map_img_fun_to_map.
+Qed.
+
+
+Lemma stack_graphs_aux_relabel_disjoint {n m n' m'} f1 f2
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  vertices cohg1 ## vertices cohg2 ->
+  stack_graphs_aux (relabel_graph f1 cohg1) (relabel_graph f2 cohg2) =
+  relabel_graph (Pmap_map (fun_to_map f1 (vertices cohg1) ∪ fun_to_map f2 (vertices cohg2)))
+    (stack_graphs_aux cohg1 cohg2).
+Proof.
+  intros Hdisj.
+  rewrite relabel_stack_graphs_aux.
+  f_equal.
+  - rewrite (relabel_graph_to_fun_to_map f1).
+    apply relabel_graph_Pmap_map_to_union_l.
+    now rewrite dom_fun_to_map_L.
+  - rewrite (relabel_graph_to_fun_to_map f2).
+    apply relabel_graph_Pmap_map_to_union_r.
+    now rewrite dom_fun_to_map_L.
+Qed.
+
+Lemma stack_graphs_aux_reindex_disjoint {n m n' m'} f1 f2
+  `{Hf1 : !Inj eq eq f1, Hf2 : !Inj eq eq f2}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  dom $ hyperedges cohg1 ## dom $ hyperedges cohg2 ->
+  set_map f1 $ dom $ hyperedges cohg1 ##@{Pset} set_map f2 $ dom $ hyperedges cohg2 ->
+  stack_graphs_aux (reindex_graph f1 cohg1) (reindex_graph f2 cohg2) =
+  reindex_graph (Pmap_map (fun_to_map f1 (dom $ hyperedges cohg1) ∪
+    fun_to_map f2 (dom $ hyperedges cohg2)))
+    (stack_graphs_aux cohg1 cohg2).
+Proof.
+  intros Hdisj Hdisjran.
+  rewrite reindex_graph_Pmap_map_to_Pmap_injmap. 2:{
+    cbn.
+    rewrite 2 dom_union_L, 2 dom_fun_to_map_L.
+    done.
+  }
+  rewrite reindex_stack_graphs_aux; [f_equal|].
+  - rewrite (reindex_graph_to_fun_to_map f1).
+    rewrite <- reindex_graph_Pmap_map_to_Pmap_injmap by
+      now rewrite dom_union_L, 2 dom_fun_to_map_L, <- union_subseteq_l'.
+    apply reindex_graph_Pmap_map_to_union_l.
+    now rewrite dom_fun_to_map_L.
+  - rewrite (reindex_graph_to_fun_to_map f2).
+    rewrite <- reindex_graph_Pmap_map_to_Pmap_injmap by
+      now rewrite dom_union_L, 2 dom_fun_to_map_L, <- union_subseteq_r'.
+    apply reindex_graph_Pmap_map_to_union_r.
+    now rewrite dom_fun_to_map_L.
+  - apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L.
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      intros ->.
+      apply Hdisjran in Ha.
+      now apply Ha in Hb.
+Qed.
+
+
+Lemma stack_graphs_aux_isomorphic {n m n' m'}
+  (cohg1 cohg1' : CospanHyperGraph T n m)
+  (cohg2 cohg2' : CospanHyperGraph T n' m') :
+  isomorphic cohg1 cohg1' -> isomorphic cohg2 cohg2' ->
+  hyperedges cohg1 ##ₘ hyperedges cohg2 -> hyperedges cohg1' ##ₘ hyperedges cohg2' ->
+  vertices cohg1 ## vertices cohg2 -> vertices cohg1' ## vertices cohg2' ->
+  isomorphic (stack_graphs_aux cohg1 cohg2) (stack_graphs_aux cohg1' cohg2').
+Proof.
+  intros (fv1 & fe1 & Hfv1 & Hfe1 & ->)%isomorphic_exists
+    (fv2 & fe2 & Hfv2 & Hfe2 & ->)%isomorphic_exists.
+  intros Hdisj Hdisj' Hvdisj Hvdisj'.
+  rewrite stack_graphs_aux_relabel_disjoint by now rewrite 2 (vertices_reindex_graph _).
+  rewrite (stack_graphs_aux_reindex_disjoint _ _ _); [|now apply map_disjoint_dom|].
+  2:{
+    rewrite map_disjoint_dom in Hdisj'.
+    cbn in Hdisj'.
+    rewrite 2 dom_fmap_L in Hdisj'.
+    rewrite 2 dom_kmap_L' in Hdisj'.
+    done.
+  }
+  rewrite reindex_graph_Pmap_map_to_Pmap_injmap. 2:{
+    cbn.
+    now rewrite 2 dom_union_L, 2 dom_fun_to_map_L.
+  }
+  assert (Hinjidx : Inj eq eq (Pmap_injmap
+           (fun_to_map fe1 (dom (hyperedges cohg1) :> Pset) ∪
+           fun_to_map fe2 (dom (hyperedges cohg2) :> Pset)))). 1:{
+    apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L; rewrite map_disjoint_dom in Hdisj.
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      rewrite map_disjoint_dom in Hdisj'.
+      cbn in Hdisj'.
+      rewrite 2 dom_fmap, 2 dom_kmap_L' in Hdisj'.
+      intros ->.
+      now apply Hdisj' in Hb.
+  }
+  rewrite relabel_graph_Pmap_map_to_Pmap_injmap. 2:{
+    rewrite 3 (vertices_reindex_graph _).
+    rewrite vertices_stack_graphs_aux by done.
+    now rewrite dom_union_L, 2 dom_fun_to_map_L.
+  }
+  constructor.
+  - apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L,
+      2 (vertices_reindex_graph _).
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      rewrite (vertices_reindex_graph _) in Ha.
+      rewrite (vertices_reindex_graph _) in Hb.
+      rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _) in Hvdisj'.
+      intros ->.
+      now apply Hvdisj' in Hb.
+  - apply _.
+Qed.
+
+
+Lemma stack_graphs_aux_to_stack_graphs_disjoint {n m n' m'}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  hyperedges cohg1 ##ₘ hyperedges cohg2 ->
+  vertices cohg1 ## vertices cohg2 ->
+  isomorphic (stack_graphs_aux cohg1 cohg2) (stack_graphs cohg1 cohg2).
+Proof.
+  intros Hdisj Hvdisj.
+  unfold stack_graphs.
+  apply stack_graphs_aux_isomorphic.
+  - constructor; apply _.
+  - constructor; apply _.
+  - done.
+  - cbn.
+    apply map_disjoint_fmap.
+    now apply (kmap_inj2_disjoint _).
+  - done.
+  - rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
+    set_solver +.
+Qed.
+
+
+Lemma swapped_stack_graphs_aux_relabel_disjoint {n m n' m'} f1 f2
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  vertices cohg1 ## vertices cohg2 ->
+  swapped_stack_graphs_aux (relabel_graph f1 cohg1) (relabel_graph f2 cohg2) =
+  relabel_graph (Pmap_map (fun_to_map f1 (vertices cohg1) ∪ fun_to_map f2 (vertices cohg2)))
+    (swapped_stack_graphs_aux cohg1 cohg2).
+Proof.
+  intros Hdisj.
+  rewrite relabel_swapped_stack_graphs_aux.
+  f_equal.
+  - rewrite (relabel_graph_to_fun_to_map f1).
+    apply relabel_graph_Pmap_map_to_union_l.
+    now rewrite dom_fun_to_map_L.
+  - rewrite (relabel_graph_to_fun_to_map f2).
+    apply relabel_graph_Pmap_map_to_union_r.
+    now rewrite dom_fun_to_map_L.
 Qed.
 
 Lemma swapped_stack_graphs_aux_reindex_disjoint {n m n' m'} f1 f2
@@ -1201,7 +1347,7 @@ Proof.
       now rewrite fst_zip by done.
     }
     intros Hp%fsts_propogate_subst_subseteq.
-    rewrite vec_to_list_map, fsts_prod_map, snds_prod_map, 
+    rewrite vec_to_list_map, fsts_prod_map, snds_prod_map,
       vec_to_list_zip_with, fst_zip, snd_zip in Hp by done.
     set_solver.
   - apply propogate_subst_vmap_bcons_false_true_vzip_like_strong.
@@ -1666,13 +1812,29 @@ Proof.
   exists f, f; auto.
 Qed.
 
+#[export] Instance compose_graphs_struct_isomorphic_Proper {T n m o} :
+  Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic)
+    (@compose_graphs T n m o).
+Proof.
+  intros ? ? ? ? ? ?; now apply compose_graphs_struct_isomorphic.
+Qed.
+
+#[export] Instance stack_graphs_struct_isomorphic_Proper {T n1 m1 n2 m2} :
+  Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic)
+    (@stack_graphs T n1 m1 n2 m2).
+Proof.
+  intros ? ? ? ? ? ?.
+  unfold struct_isomorphic.
+  rewrite 2 norm_verts_stack_graphs.
+  now apply stack_graphs_isomorphic.
+Qed.
 
 
-Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !EqDecision A} 
-  (Target : CospanHyperGraph T n m) 
-  (G : HyperGraph T) (L : list positive) : 
-    (forall {o p} (v0 : vec positive o) (v1 : vec positive p), 
-      (v0 -> G <- v1) ≡ₜ (v0 -> (subgraph_index Target L) <- v1)) 
+Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+  (Target : CospanHyperGraph T n m)
+  (G : HyperGraph T) (L : list positive) :
+    (forall {o p} (v0 : vec positive o) (v1 : vec positive p),
+      (v0 -> G <- v1) ≡ₜ (v0 -> (subgraph_index Target L) <- v1))
       -> Target ≡ₜ (DoublePushout Target G L).
   Proof.
     intros.
@@ -1686,24 +1848,25 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !EqDecisio
     remember (vertices_hg L1) as Lv.
     remember (vertices_hg C1') as C1v.
     remember (vertices_hg C2') as C2v.
-    remember (list_to_vec (elements (Lv ∩ C1v))) as i.  
+    remember (list_to_vec (elements (Lv ∩ C1v))) as i.
     remember (list_to_vec (elements (Lv ∩ C2v))) as j.
     remember (list_to_vec (elements (C1v ∩ C2v))) as k.
     assert (L1 = {| hyperedges := L1; hypervertices := ∅ |}).
     { rewrite HeqL1; now apply hg_ext. }
-    rewrite compose_graphs_unsafe_to_compose_graphs.
-    erewrite (compose_graphs_unsafe_to_compose_graphs (T:=T)).
-    rewrite (struct_isomorphic_semantic_eq).
-    Check compose_graphs_unsafe_to_compose_graphs.
-    Search (_ ≡ᵢ _ -> _ ≡ₜ _).
-    Search "cohg_semantic_eq".
-    Search "isomorphic".
-    rewrite <- (isomorphic_cohg_syntactic_eq).
-    rewrite (compose_graphs_unsafe_to_compose_graphs 
-      (inputs Target -> C1' <- k +++ i)
-      ((compose_graphs_unsafe (stack_graphs_aux (k -> ∅ <- k) (i -> L1 <- j))
-(k +++ j -> C2' <- outputs Target)))).
-    
+    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
+    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
+    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
+    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
+    refine (compose_graphs_semantic_eq _ _ _ _ _ _).
+    1:{ reflexivity. }
+    refine (compose_graphs_semantic_eq _ _ _ _ _ _); [|reflexivity].
+    rewrite stack_graphs_aux_to_stack_graphs_disjoint by admit.
+    rewrite stack_graphs_aux_to_stack_graphs_disjoint by admit.
+    f_equiv.
+    symmetry.
+    auto.
+Admitted.
+
     (* repeat rewrite <- compose_graphs_aux_to_compose_graphs_unsafe; try done.
     - Check reindex_graph_isomorphic.
       (* rewrite (reindex_is_isomorphic _ _ (inputs Target -> C1' <- k +++ i)). *)
@@ -1721,7 +1884,6 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !EqDecisio
 
     (* From here typeclass resolution is failing (which will be fixed) but
        we can proceed manually. *)
-  Admitted.
 
   Open Scope positive.
 
