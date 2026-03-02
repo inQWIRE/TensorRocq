@@ -2369,5 +2369,25 @@ Proof.
   apply _.
 Qed.
 
+#[export] Instance compose_graphs_semantic_eq {n m o} : 
+  Proper (cohg_semantic_eq ==> cohg_semantic_eq ==> cohg_semantic_eq)
+    (@compose_graphs T n m o).
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  unfold cohg_semantic_eq.
+  rewrite 2 graph_semantics_compose_graphs.
+  now apply compose_tensor_mor.
+Qed.
+
+#[export] Instance stack_graphs_semantic_eq {n1 m1 n2 m2} : 
+  Proper (cohg_semantic_eq ==> cohg_semantic_eq ==> cohg_semantic_eq)
+    (@stack_graphs T n1 m1 n2 m2).
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  unfold cohg_semantic_eq.
+  rewrite 2 graph_semantics_stack_graphs.
+  now apply stack_tensor_mor.
+Qed.
+
 End TensorGraphFacts.
 
