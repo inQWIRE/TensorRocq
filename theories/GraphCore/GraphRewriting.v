@@ -1829,6 +1829,43 @@ Proof.
   now apply stack_graphs_isomorphic.
 Qed.
 
+Lemma vertices_compose_graphs_unsafe {T n m o} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T m o) :
+  outputs cohg = inputs cohg' ->
+  hyperedges cohg ##ₘ hyperedges cohg' ->
+  vertices (compose_graphs_unsafe cohg cohg') =
+  vertices cohg ∪ vertices cohg'.
+Proof.
+  intros Hoi Hdisj.
+  rewrite 3 vertices_vertices_hg_decomp.
+  cbn.
+  rewrite vertices_hg_add_vertices.
+  rewrite vertices_hg_union by done.
+  rewrite <- Hoi.
+  rewrite (union_comm_L (_ ∪ _) (_ ∖ _)).
+  rewrite difference_union_L.
+  set_solver.
+Qed.
+
+Lemma vertices_stack_graphs_aux {T n1 m1 n2 m2} (cohg : CospanHyperGraph T n1 m1)
+  (cohg' : CospanHyperGraph T n2 m2) :
+  hyperedges cohg ##ₘ hyperedges cohg' ->
+  vertices (stack_graphs_aux cohg cohg') =
+  vertices cohg ∪ vertices cohg'.
+Proof.
+  intros Hdisj.
+  rewrite 3 vertices_vertices_hg_decomp.
+  cbn.
+  rewrite vertices_hg_union by done.
+  rewrite 2 vec_to_list_app, !list_to_set_app_L.
+  set_solver.
+Qed.
+
+Lemma vertices_hg_empty {T} : @vertices_hg T ∅ = ∅.
+Proof.
+  done.
+Qed.
+
 
 Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
   (Target : CospanHyperGraph T n m)
@@ -1853,7 +1890,93 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummabl
     remember (list_to_vec (elements (C1v ∩ C2v))) as k.
     assert (L1 = {| hyperedges := L1; hypervertices := ∅ |}).
     { rewrite HeqL1; now apply hg_ext. }
-    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
+    assert (HCL1 : C1 ##ₘ hyperedges L1). admit.
+    assert (Hins : list_to_set (inputs Target) ⊆ C1v). admit.
+    rewrite compose_graphs_unsafe_to_compose_graphs; [|reflexivity|..]. 2:{
+      cbn.
+      rewrite vertices_compose_graphs_unsafe; [|done|].
+      2: {
+        cbn.
+        subst C2'.
+        cbn.
+        subst C2.
+        rewrite (map_empty_union _).
+        apply map_disjoint_difference_r.
+        now apply map_union_subseteq_r.
+      }
+      rewrite vertices_stack_graphs_aux by now simpl; solve_map_disjoint.
+      rewrite vertices_vertices_hg_decomp.
+      cbn.
+      rewrite list_to_set_app_L, (union_assoc_L _).
+      rewrite difference_union_distr_l_L, difference_diag_L, (union_empty_r_L _).
+      rewrite vertices_vertices_hg_decomp; cbn.
+      rewrite (@vertices_hg_empty T).
+      rewrite (union_empty_l_L _).
+      rewrite list_to_set_app_L, (union_idemp_L _).
+      rewrite vertices_vertices_hg_decomp; cbn.
+      rewrite list_to_set_app_L.
+      rewrite <- (union_assoc_L _).
+      rewrite (difference_union_distr_l_L (list_to_set k)).
+      rewrite (subseteq_empty_difference_L (list_to_set k)) by now rewrite vec_to_list_app; set_solver +.
+      rewrite (union_empty_l_L _).
+      rewrite (union_comm_L _ (_ ∪ _)).
+      rewrite <- 2 (union_assoc_L _).
+      rewrite (difference_union_distr_l_L (list_to_set i)).
+      rewrite (subseteq_empty_difference_L (list_to_set i)) by now rewrite vec_to_list_app; set_solver +.
+      rewrite (union_empty_l_L _).
+      rewrite (union_assoc_L _).
+      rewrite (union_comm_L (list_to_set j ∪ _)).
+      rewrite vertices_vertices_hg_decomp; cbn.
+      rewrite list_to_set_app_L.
+      rewrite (union_comm_L (vertices_hg C2') (_ ∪ _)).
+      rewrite <- 2 (union_assoc_L _).
+      rewrite (vec_to_list_app k j), list_to_set_app_L.
+      rewrite <- (union_assoc_L _).
+
+
+      rewrite (difference_union_distr_l_L (list_to_set k)).
+      rewrite (subseteq_empty_difference_L (list_to_set k)) by now rewrite vec_to_list_app; set_solver +.
+      rewrite (union_empty_l_L _).
+      rewrite 2 (union_assoc_L _).
+      rewrite (union_comm_L _ (_ ∪ _)).
+      rewrite 2 (union_assoc_L _).
+      rewrite (union_comm_L (_ ∪ _) (list_to_set j)).
+      rewrite (union_assoc_L (list_to_set j)), (union_idemp_L _).
+      replace <- (vertices_hg L1).
+      replace <- (vertices_hg C1').
+      replace <- (vertices_hg C2').
+      subst i j k.
+      rewrite vec_to_list_app, 3 vec_to_list_to_vec, list_to_set_app_L.
+      rewrite 3 list_to_set_elements_L.
+      rewrite (intersection_comm_L _ C1v).
+      rewrite <- intersection_union_l_L.
+      replace (Lv ∩ C2v ∪ Lv) with Lv by set_solver +.
+      replace (C1v ∪ list_to_set (inputs Target)) with C1v by set_solver +Hins.
+
+      
+
+      replace (Lv ∪ _ ∪ _) with (Lv ∪ C2v) by admit.
+      set_solver +.
+
+      set_solver +.
+      rewrite (set_union_eq_r (Lv ∩ C2v) _).
+      rewrite ((leibniz_equiv_iff _ _).1 (set_union_eq_l (Lv ∩ C2v) _)).
+
+      enough (Hen : )
+      set_solver +.
+      rewrite (difference_union_distr_l_L (list_to_set i)).
+      rewrite (subseteq_empty_difference_L (list_to_set i)) by now rewrite vec_to_list_app; set_solver +.
+      rewrite (union_empty_l_L _).
+      rewrite (union_assoc_L _).
+      rewrite (union_comm_L (list_to_set j ∪ _)).
+
+
+
+      setoid_rewrite .
+      Search ((_ ∪ ?X) ∖ _).
+      rewrite 3 vertices_vertices_hg_decomp.
+
+    }
     rewrite compose_graphs_unsafe_to_compose_graphs by admit.
     rewrite compose_graphs_unsafe_to_compose_graphs by admit.
     rewrite compose_graphs_unsafe_to_compose_graphs by admit.
