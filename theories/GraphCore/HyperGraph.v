@@ -12,6 +12,8 @@ Notation HyperEdge T := (T * list positive * list positive)%type.
 #[export] Instance HyperEdge_equiv `{Equiv T} : Equiv (HyperEdge T) :=
   prod_relation (prod_relation (≡) (=)) (=).
 
+Notation "x → t ← y" := (t, x, y). 
+
 Record HyperGraph {T} := mk_hg {
   (* The edges of the hypergraph *)
   hyperedges : Pmap (T * list positive * list positive);
