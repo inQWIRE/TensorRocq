@@ -395,20 +395,6 @@ Proof.
 Qed.
 
 
-Lemma vertices_hg_union (hg hg' : HyperGraph T) :
-  (hg :> Pmap _) ##ₘ (hg' :> Pmap _) ->
-  vertices_hg (hg ∪ hg') =
-  vertices_hg hg ∪ vertices_hg hg'.
-Proof.
-  intros Hdisj.
-  apply set_eq.
-  intros x.
-  rewrite elem_of_union, 3 elem_of_vertices_hg.
-  change (hypervertices (_ ∪ _)) with (hypervertices hg ∪ hypervertices hg').
-  rewrite elem_of_union.
-  setoid_rewrite lookup_union_Some; [|done].
-  naive_solver.
-Qed.
 
 Lemma tg_abstracts_relabel_abs (f : positive -> positive)
   (hg : Pmap (T * _ * _)) :

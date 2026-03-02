@@ -110,9 +110,6 @@ Proof.
     done.
 Qed.
 
-(* FIXME: Move *)
-Definition subrel' := @subrel.
-#[global] Arguments subrel' {_} _ {_ _} {_ _} _ : assert.
 
 Lemma equiv_of_map_to_list_perm_equiv `{Equiv T, Equivalence T equiv} {n m}
   (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :

@@ -1021,7 +1021,9 @@ Lemma graph_semantics_compose_graphs {n m o}
   graph_semantics (SR:=SR) (compose_graphs cohg cohg') ≡
   compose_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
+  rewrite <- graph_semantics_norm_verts.
   rewrite <- compose_graphs_alt_correct.
+  rewrite graph_semantics_norm_verts.
   apply graph_semantics_compose_graphs_alt.
 Qed.
 

@@ -4422,3 +4422,137 @@ Proof.
   unfold_leibniz.
   apply set_map_dom_map_img.
 Qed.
+
+
+
+Lemma difference_empty_l `{Set_ A SA} (X : SA) :
+  ∅ ∖ X ≡ ∅.
+Proof.
+  set_solver.
+Qed.
+Lemma difference_empty_l_L `{Set_ A SA, !LeibnizEquiv SA} (X : SA) :
+  ∅ ∖ X = ∅.
+Proof.
+  apply leibniz_equiv_iff, difference_empty_l.
+Qed.
+
+
+Lemma fn_lookup_singleton_r `{EqDecision A} (a b : A) :
+  {[a := b]} b = b.
+Proof.
+  now cbv; case_match.
+Qed.
+
+
+Lemma set_map_difference_subseteq `{FinSet A SA, Set_ B SB}
+  (f : A -> B) (X Y : SA)  :
+  set_map f X ∖ set_map f Y ⊆@{SB} set_map f (X ∖ Y).
+Proof.
+  set_solver.
+Qed.
+
+Lemma set_map_difference_strong `{FinSet A SA, Set_ B SB}
+  (f : A -> B) (X Y : SA)
+  (Hf : set_Forall2 (λ x y, f x = f y -> x = y) (X ∪ Y)) :
+  set_map f (X ∖ Y) ≡@{SB} set_map f X ∖ set_map f Y.
+Proof.
+  intros x; split; [|apply set_map_difference_subseteq].
+  rewrite elem_of_difference, 3 elem_of_map.
+  intros (i & -> & [HiX HiY]%elem_of_difference).
+  split; [eauto|].
+  intros (j & Hfij & Hj).
+  enough (i = j) by congruence.
+  revert Hfij.
+  apply Hf.
+  - now apply elem_of_union_l.
+  - now apply elem_of_union_r.
+Qed.
+
+Lemma set_map_difference_strong_L `{FinSet A SA, Set_ B SB, !LeibnizEquiv SB}
+  (f : A -> B) (X Y : SA)
+  (Hf : set_Forall2 (λ x y, f x = f y -> x = y) (X ∪ Y)) :
+  set_map f (X ∖ Y) =@{SB} set_map f X ∖ set_map f Y.
+Proof.
+  apply leibniz_equiv_iff.
+  now apply set_map_difference_strong.
+Qed.
+
+Lemma set_map_fn_singleton_difference `{FinSet A SA, !RelDecision (∈@{SA})}
+  (a b : A) (X Y : SA) :
+  set_map {[a := b]} (X ∖ Y) ≡@{SA}
+  set_map {[a := b]} X ∖ set_map {[a := b]} Y ∪
+  if decide (a ∈ X ∖ Y \/ b ∈ X ∖ Y) then {[b]} else ∅.
+Proof.
+  rewrite set_map_fn_singleton.
+  case_decide as HaXY.
+  - rewrite decide_True by now left.
+    apply elem_of_difference in HaXY as [HaX HaY].
+    rewrite 2 set_map_fn_singleton.
+    rewrite decide_True, decide_False by done.
+    set_solver - HaX HaY.
+  - rewrite (decide_ext _ (b ∈ X ∖ Y)) by naive_solver.
+    rewrite 2 set_map_fn_singleton.
+    apply not_elem_of_difference in HaXY as [HaX | HaY].
+    + rewrite decide_False by done.
+      case_decide as HaY; [|case_decide; set_solver].
+      case_decide as HbXY; [|set_solver].
+      rewrite 2 (union_empty_r _).
+      rewrite difference_disjoint by set_solver.
+      rewrite (difference_disjoint X {[a]}) by set_solver.
+      apply elem_of_difference in HbXY as [HbX HbY].
+      rewrite <- difference_difference_l.
+      rewrite difference_union, (union_comm _).
+      rewrite (subseteq_union _ _).1 by set_solver.
+      set_solver.
+    + rewrite (decide_True _ _ HaY).
+      rewrite (union_empty_r _).
+      rewrite difference_disjoint by set_solver.
+      destruct_decide (decide (b ∈ X ∖ Y)) as HbXY;
+      [|case_decide; set_solver].
+      apply elem_of_difference in HbXY as [HbX HbY].
+      rewrite <- difference_difference_l.
+      rewrite difference_union.
+      case_decide; set_solver.
+Qed.
+
+
+Lemma set_map_fn_singleton_difference_L `{FinSet A SA,
+  !LeibnizEquiv SA, !RelDecision (∈@{SA})}
+  (a b : A) (X Y : SA) :
+  set_map {[a := b]} (X ∖ Y) =@{SA}
+  set_map {[a := b]} X ∖ set_map {[a := b]} Y ∪
+  if decide (a ∈ X ∖ Y \/ b ∈ X ∖ Y) then {[b]} else ∅.
+Proof.
+  unfold_leibniz.
+  apply set_map_fn_singleton_difference.
+Qed.
+
+Lemma difference_singleton_l_case `{FinSet A SA, !RelDecision (∈@{SA})}
+  (a : A) (X : SA) :
+  {[a]} ∖ X ≡ if decide (a ∈ X) then ∅ else {[a]}.
+Proof.
+  case_decide; set_solver.
+Qed.
+
+Lemma difference_singleton_l_case_L `{FinSet A SA,
+  !LeibnizEquiv SA, !RelDecision (∈@{SA})}
+  (a : A) (X : SA) :
+  {[a]} ∖ X = if decide (a ∈ X) then ∅ else {[a]}.
+Proof.
+  apply leibniz_equiv_iff, difference_singleton_l_case.
+Qed.
+
+Lemma set_map_difference_respectful_l `{FinSet A SA, Set_ B SB}
+  (f : A -> B) (X X' Y : SA) : X ∖ Y ≡ X' ∖ Y ->
+  set_map f X ∖ set_map f Y ≡@{SB} set_map f X' ∖ set_map f Y.
+Proof.
+  set_solver.
+Qed.
+
+Lemma set_map_difference_respectful_l_L `{FinSet A SA, Set_ B SB, !LeibnizEquiv SB}
+  (f : A -> B) (X X' Y : SA) : X ∖ Y ≡ X' ∖ Y ->
+  set_map f X ∖ set_map f Y =@{SB} set_map f X' ∖ set_map f Y.
+Proof.
+  intros Heq%(set_map_difference_respectful_l (SB:=SB) f).
+  now unfold_leibniz.
+Qed.

@@ -321,6 +321,7 @@ Proof.
   cbn.
   rewrite hypergraph_apply_hom_relabel, hypergraph_apply_hom_add_vertices,
     hypergraph_apply_hom_union.
+  rewrite 2 vertices_hg_hypergraph_apply_hom.
   done.
 Qed.
 
@@ -342,6 +343,7 @@ Proof.
   cbn.
   rewrite hypergraph_apply_hom_add_vertices,
     hypergraph_apply_hom_union.
+  rewrite 2 vertices_hg_hypergraph_apply_hom.
   done.
 Qed.
 

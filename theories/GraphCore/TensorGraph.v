@@ -47,6 +47,16 @@ Proof.
   destruct tg, tg'; cbn; congruence.
 Qed.
 
+Lemma cohg_ext' {T n m} (cohg cohg' : CospanHyperGraph T n m) :
+  inputs cohg = inputs cohg' ->
+  outputs cohg = outputs cohg' ->
+  hyperedges cohg = hyperedges cohg' ->
+  hypervertices cohg = hypervertices cohg' ->
+  cohg = cohg'.
+Proof.
+  auto using cohg_ext, hg_ext.
+Qed.
+
 Section CospanHyperGraph.
 
   Context {T : Type}.
@@ -208,22 +218,6 @@ Definition vertices (tg : CoHyGraph) : Pset :=
   vertices_hg (tg.(hedges)) ∪
   list_to_set (tg.(inputs) ++ tg.(outputs)).
 
-Lemma elem_of_vertices_hg (hg : HyperGraph T) r :
-  r ∈ vertices_hg hg <->
-  (exists k flu, hg.(hyperedges) !! k = Some flu /\
-      (r ∈ flu.1.2 \/ r ∈ flu.2)) \/
-    r ∈ hg.(hypervertices).
-Proof.
-  unfold vertices_hg.
-  rewrite elem_of_union.
-  f_equiv.
-  rewrite elem_of_list_to_set, elem_of_list_bind.
-  setoid_rewrite elem_of_app.
-  rewrite exists_pair.
-  cbn.
-  setoid_rewrite elem_of_map_to_list.
-  naive_solver.
-Qed.
 
 
 Lemma elem_of_vertices (tg : CoHyGraph) (r : positive) :
@@ -261,181 +255,7 @@ Proof.
   firstorder (subst; econstructor; eauto).
 Qed.
 
-Import TESyntax.
 
-Section HyperGraphFacts.
-
-Implicit Types (hg : HyperGraph T).
-
-Lemma relabel_hg_ext_strong f g (hg : HyperGraph T) :
-  (forall i, i ∈ vertices_hg hg -> f i = g i) ->
-  relabel_hg f hg = relabel_hg g hg.
-Proof.
-  intros Hfg.
-  apply hg_ext; cbn.
-  - apply map_fmap_ext.
-    intros i x Hix.
-    apply relabel_abs_ext_strong; intros r Hr.
-    apply Hfg.
-    rewrite elem_of_vertices_hg.
-    rewrite elem_of_app in Hr.
-    left; eauto.
-  - apply set_map_ext_L.
-    intros i Hi; apply Hfg.
-    unfold vertices_hg.
-    now apply elem_of_union_r.
-Qed.
-
-Lemma relabel_hg_ext f g (hg : HyperGraph T) :
-  (forall i, f i = g i) ->
-  relabel_hg f hg = relabel_hg g hg.
-Proof.
-  intros; apply relabel_hg_ext_strong; auto.
-Qed.
-
-Lemma relabel_hg_id hg : relabel_hg id hg = hg.
-Proof.
-  apply hg_ext; cbn.
-  - erewrite map_fmap_ext; [apply map_fmap_id|].
-    intros; now apply relabel_abs_id.
-  - apply set_map_id_L.
-Qed.
-
-Lemma relabel_hg_id_strong f hg :
-  (forall i, i ∈ vertices_hg hg -> f i = i) ->
-  relabel_hg f hg = hg.
-Proof.
-  intros ->%(relabel_hg_ext_strong f id hg).
-  apply relabel_hg_id.
-Qed.
-
-Lemma relabel_hg_id' f hg :
-  (forall i, f i = i) ->
-  relabel_hg f hg = hg.
-Proof.
-  auto using relabel_hg_id_strong.
-Qed.
-
-Lemma relabel_hg_compose f g hg :
-  relabel_hg g (relabel_hg f hg) =
-  relabel_hg (g ∘ f) hg.
-Proof.
-  apply hg_ext; [|cbn; now rewrite set_map_compose_L].
-  cbn.
-  rewrite <- map_fmap_compose.
-  apply map_fmap_ext.
-  intros; apply relabel_abs_compose.
-Qed.
-
-
-Lemma reindex_hg_ext_strong f g hg :
-  (forall i tabs, hg.(hyperedges) !! i = Some tabs -> f i = g i) ->
-  reindex_hg f hg = reindex_hg g hg.
-Proof.
-  intros Hfg.
-  apply hg_ext; [cbn|done].
-  now apply kmap_ext.
-Qed.
-
-Lemma reindex_hg_ext f g hg :
-  (forall i, f i = g i) -> reindex_hg f hg = reindex_hg g hg.
-Proof.
-  auto using reindex_hg_ext_strong.
-Qed.
-
-Lemma reindex_hg_id hg : reindex_hg id hg = hg.
-Proof.
-  apply hg_ext; cbn; [cbn|done].
-  apply kmap_id.
-Qed.
-
-Lemma reindex_hg_id_strong f hg :
-  (forall i tabs, hg.(hyperedges) !! i = Some tabs -> f i = i) ->
-  reindex_hg f hg = hg.
-Proof.
-  intros ->%(reindex_hg_ext_strong f id hg).
-  apply reindex_hg_id.
-Qed.
-
-Lemma reindex_hg_id' f hg :
-  (forall i, f i = i) ->
-  reindex_hg f hg = hg.
-Proof.
-  auto using reindex_hg_id_strong.
-Qed.
-
-
-Lemma reindex_hg_compose_strong' f g `{Hf : !Inj eq eq f} hg :
-  (forall i j, i ∈ dom hg.(hyperedges) -> j ∈ dom hg.(hyperedges) ->
-    g (f i) = g (f j) -> f i = f j) ->
-  reindex_hg g (reindex_hg f hg) =
-  reindex_hg (g ∘ f) hg.
-Proof.
-  intros Hg.
-  apply hg_ext; [cbn|done].
-  apply map_eq; intros i.
-  apply option_eq; intros [[t low] up].
-  rewrite lookup_kmap_Some_full_gen_dom by
-    now rewrite dom_kmap', set_Forall2_map; exact Hg.
-  rewrite lookup_kmap_Some_full_gen_dom by now intros ? ? ? ? ?%Hg%Hf.
-  setoid_rewrite (lookup_kmap_Some _).
-  naive_solver.
-Qed.
-
-Lemma reindex_hg_compose f g `{!Inj eq eq f, !Inj eq eq g} hg :
-  reindex_hg g (reindex_hg f hg) =
-  reindex_hg (g ∘ f) hg.
-Proof.
-  apply hg_ext; [cbn|done..].
-  apply map_eq; intros i.
-  apply option_eq; intros [[t low] up].
-  rewrite 2 (lookup_kmap_Some _).
-  setoid_rewrite (lookup_kmap_Some _).
-  naive_solver.
-Qed.
-
-
-Lemma reindex_relabel_hg fvert fedge hg :
-  reindex_hg fvert (relabel_hg fedge hg) =
-  relabel_hg fedge (reindex_hg fvert hg).
-Proof.
-  apply hg_ext; [|done..].
-  cbn.
-  apply kmap_fmap'.
-Qed.
-
-Lemma vertices_relabel_hg f hg :
-  vertices_hg (relabel_hg f hg) = set_map f (vertices_hg hg).
-Proof.
-  unfold vertices_hg.
-  cbn.
-  rewrite set_map_union_L, set_map_list_to_set_L.
-  f_equiv.
-  rewrite map_to_list_fmap, list_bind_fmap, list_fmap_bind.
-  unfold compose; cbn.
-  f_equal.
-  apply list_bind_ext; [|done].
-  intros [k [[idx low] up]].
-  cbn.
-  now rewrite fmap_app.
-Qed.
-
-Lemma vertices_reindex_hg f `{Hfint : !Inj eq eq f} hg :
-  vertices_hg (reindex_hg f hg) = vertices_hg hg.
-Proof.
-  unfold vertices_hg.
-  cbn.
-  f_equal.
-  unfold kmap.
-  unfold_leibniz.
-  apply list_to_set_perm.
-  rewrite map_to_list_to_map by now
-    rewrite fsts_prod_map, (NoDup_fmap _); apply NoDup_fst_map_to_list.
-  rewrite list_fmap_bind.
-  reflexivity.
-Qed.
-
-End HyperGraphFacts.
 
 Lemma relabel_graph_ext_strong f g tg :
   (forall i, i ∈ vertices tg -> f i = g i) ->
@@ -782,6 +602,8 @@ Proof.
   easy.
 Qed.
 
+
+
 (* Lemma relabel_graph_cohg_eq f tg tg' : cohg_eq tg tg' ->
   cohg_eq (relabel_graph f ) *)
 
@@ -831,17 +653,6 @@ Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
 
 
 
-Definition hg_add_vertices {T} (hg : HyperGraph T) (vs : Pset) : HyperGraph T :=
-  mk_hg hg.(hyperedges) (vs ∪ hg.(hypervertices)).
-
-Lemma vertices_hg_add_vertices {T} (hg : HyperGraph T) vs :
-  vertices_hg (hg_add_vertices hg vs) = vertices_hg hg ∪ vs.
-Proof.
-  unfold vertices_hg; cbn.
-  rewrite <- (union_assoc_L _).
-  f_equal.
-  apply union_comm_L.
-Qed.
 
 (* TODO: Rewrite with a new Vector.remove function returning a [vec A (pred n)] *)
 Definition add_top_loop {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
@@ -856,6 +667,20 @@ Fixpoint add_top_loops {T n m o} : forall (cohg : CospanHyperGraph T (n + m) (n 
   | 0 => fun cohg => cohg
   | S n =>
     fun cohg => add_top_loops (add_top_loop cohg)
+  end.
+
+Definition add_top_loop' {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
+  relabel_graph {[Vector.hd cohg.(outputs) := Vector.hd cohg.(inputs)]} (
+  Vector.tl cohg.(inputs) ->
+    hg_add_vertices cohg.(hedges) ({[Vector.hd cohg.(inputs)]} ∖ vertices_hg cohg)
+      <- Vector.tl cohg.(outputs)).
+
+Fixpoint add_top_loops' {T n m o} : forall (cohg : CospanHyperGraph T (n + m) (n + o)),
+  CospanHyperGraph T m o :=
+  match n with
+  | 0 => fun cohg => cohg
+  | S n =>
+    fun cohg => add_top_loops' (add_top_loop' cohg)
   end.
 
 
@@ -1005,6 +830,13 @@ Definition isolated_vertices {T n m} (cohg : CospanHyperGraph T n m) :
   cohg.(hedges).(hypervertices)
     ∖ referrenced_vertices cohg.
 
+Lemma referrenced_vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
+  referrenced_vertices cohg =
+  list_to_set (inputs cohg ++ outputs cohg) ∪
+    referrenced_vertices_hg cohg.
+Proof.
+  done.
+Qed.
 
 Lemma vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
   vertices cohg = isolated_vertices cohg ∪ referrenced_vertices cohg.
@@ -1914,15 +1746,6 @@ Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_binary `{Equiv T1, Reflexive T1 eq
   Proper (cohg_syntactic_eq ==> cohg_syntactic_eq) f. *)
 
 
-Lemma cohg_ext' {T n m} (cohg cohg' : CospanHyperGraph T n m) :
-  inputs cohg = inputs cohg' ->
-  outputs cohg = outputs cohg' ->
-  hyperedges cohg = hyperedges cohg' ->
-  hypervertices cohg = hypervertices cohg' ->
-  cohg = cohg'.
-Proof.
-  auto using cohg_ext, hg_ext.
-Qed.
 
 Lemma referrenced_vertices_stack_graphs {T n m n' m'}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
@@ -1968,6 +1791,50 @@ Proof.
   set_solver.
 Qed.
 
+Lemma referrenced_vertices_swapped_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  referrenced_vertices (swapped_stack_graphs cohg cohg') =
+  set_map (bcons false) (referrenced_vertices cohg) ∪
+  set_map (bcons true) (referrenced_vertices cohg').
+Proof.
+  unfold referrenced_vertices.
+  cbn.
+  rewrite 2 set_map_union_L, 4 set_map_list_to_set_L.
+  rewrite 2 vec_to_list_app, 4 vec_to_list_map.
+  rewrite union_assoc_L, (union_comm_L (list_to_set _ ∪ _)).
+  rewrite union_assoc_L, <- union_assoc_L.
+  f_equal.
+  - rewrite <- list_to_set_app_L. 
+    apply list_to_set_perm_L.
+    rewrite ! fmap_app.
+    solve_Permutation.
+  - rewrite <- list_to_set_app_L. 
+    rewrite <- 2 kmap_fmap'.
+    apply list_to_set_perm_L.
+    rewrite map_to_list_disj_union by now apply (kmap_inj2_disjoint bcons).
+    rewrite bind_app.
+    rewrite 2 (map_to_list_kmap _), 2 map_to_list_fmap, 
+      ! list_fmap_bind, ! list_bind_fmap.
+    apply eq_reflexivity. 
+    f_equal; apply (fun H => list_bind_ext _ _ _ _ H eq_refl);
+    intros [? [[]]]; now rewrite fmap_app.
+Qed.
+
+Lemma isolated_vertices_swapped_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  isolated_vertices (swapped_stack_graphs cohg cohg') =
+  set_map (bcons false) (isolated_vertices cohg) ∪
+  set_map (bcons true) (isolated_vertices cohg').
+Proof.
+  unfold isolated_vertices.
+  rewrite referrenced_vertices_swapped_stack_graphs.
+  cbn.
+  rewrite 2 (set_map_difference_L _).
+  generalize (hypervertices cohg) (hypervertices cohg')
+    (referrenced_vertices cohg) (referrenced_vertices cohg').
+  set_solver.
+Qed.
+
 Lemma norm_verts_stack_graphs {T n m n' m'}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
   norm_verts (stack_graphs cohg cohg') =
@@ -1986,4 +1853,78 @@ Proof.
   hnf.
   rewrite 2 norm_verts_stack_graphs.
   now f_equal.
+Qed.
+
+
+Lemma norm_verts_swapped_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  norm_verts (swapped_stack_graphs cohg cohg') =
+  swapped_stack_graphs (norm_verts cohg) (norm_verts cohg').
+Proof.
+  apply cohg_ext'; [done..|].
+  cbn.
+  apply isolated_vertices_swapped_stack_graphs.
+Qed.
+
+
+Add Parametric Morphism {T n m n' m'} : (@swapped_stack_graphs T n m n' m') with signature
+  cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq as swapped_stack_graphs_vert_eq_mor.
+Proof.
+  intros cohg1 cohg1' Heq1 cohg2 cohg2' Heq2.
+  hnf.
+  rewrite 2 norm_verts_swapped_stack_graphs.
+  now f_equal.
+Qed.
+
+
+Lemma relabel_graph_cohg_vert_eq {T n m} f (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ᵥ cohg' ->
+  relabel_graph f cohg ≡ᵥ relabel_graph f cohg'.
+Proof.
+  intros Heq.
+  apply cohg_ext'.
+  - cbn.
+    f_equal.
+    apply (f_equal inputs Heq).
+  - cbn.
+    f_equal.
+    apply (f_equal outputs Heq).
+  - cbn.
+    f_equal.
+    apply (f_equal (hyperedges ∘ hedges) Heq).
+  - cbn.
+    unfold isolated_vertices.
+    rewrite 2 referrenced_vertices_relabel_graph.
+    rewrite <- referrenced_vertices_norm_verts, Heq, referrenced_vertices_norm_verts.
+    apply set_map_difference_respectful_l_L.
+    apply eq_reflexivity.
+    rewrite <- referrenced_vertices_norm_verts at 1.
+    rewrite <- (Heq : _ = _).
+    rewrite referrenced_vertices_norm_verts.
+    apply (f_equal (hypervertices ∘ hedges) Heq).
+Qed.
+
+Add Parametric Morphism {T n m} f : (@relabel_graph T n m f) with signature
+  cohg_vert_eq ==> cohg_vert_eq as relabel_graph_vert_eq_mor.
+Proof.
+  intros cohg cohg'.
+  apply relabel_graph_cohg_vert_eq.
+Qed.
+
+Lemma reindex_graph_cohg_vert_eq {T n m} f `{!Inj eq eq f} (cohg cohg' : CospanHyperGraph T n m) :
+  cohg ≡ᵥ cohg' ->
+  reindex_graph f cohg ≡ᵥ reindex_graph f cohg'.
+Proof.
+  intros Heq.
+  apply cohg_ext'.
+  - cbn.
+    apply (f_equal inputs Heq).
+  - cbn.
+    apply (f_equal outputs Heq).
+  - cbn.
+    f_equal.
+    apply (f_equal (hyperedges ∘ hedges) Heq).
+  - cbn.
+    rewrite 2 (isolated_vertices_reindex_graph _).
+    apply (f_equal (hypervertices ∘ hedges) Heq).
 Qed.

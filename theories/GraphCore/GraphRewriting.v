@@ -11,10 +11,10 @@ Section DPO.
 
   Context {T : Type}.
 
-  Definition all_vertices (H : HyperGraph T) : Pset := 
-    map_fold (fun k h s => (list_to_set h.1.2 ∪ list_to_set h.2) ∪ s) 
+  Definition all_vertices (H : HyperGraph T) : Pset :=
+    map_fold (fun k h s => (list_to_set h.1.2 ∪ list_to_set h.2) ∪ s)
     (H.(hypervertices)) (H.(hyperedges)).
-  
+
 
   Definition compose_graphs_aux {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
@@ -28,10 +28,10 @@ Section DPO.
     let connected_substs :=
         propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
      relabel_graph (subst_by_vec connected_substs) ((vmap (bcons false) tgl.(inputs)) ->
-      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges)) 
-        ((list_to_set (vmap (bcons true) tgr.(inputs)) ∖ 
+      hg_add_vertices (tgl.(hedges) ⊎ tgr.(hedges))
+        ((list_to_set (vmap (bcons true) tgr.(inputs)) ∖
           (vertices_hg (reindex_graph (bcons false) (relabel_graph (bcons false) tgl)) ∪
-           vertices_hg (reindex_graph (bcons true) (relabel_graph (bcons true) tgr))))) 
+           vertices_hg (reindex_graph (bcons true) (relabel_graph (bcons true) tgr)))))
            <- (vmap (bcons true) tgr.(outputs))).
 
 
@@ -55,35 +55,16 @@ Proof.
   unfold compose_graphs_aux.
   rewrite H.
   unfold relabel_graph.
-  rewrite Vector.map_ext with (g:=(λ x : _, x)).
+  rewrite Vector.map_ext with (g:=(λ x : _, x)) by apply subst_by_vec_id.
   rewrite Vector.map_id.
   simpl.
-  rewrite Vector.map_ext with (g:=(λ x : _, x)).
+  rewrite Vector.map_ext with (g:=(λ x : _, x)) by apply subst_by_vec_id.
   rewrite Vector.map_id.
   simpl.
-  rewrite relabel_hg_id'.
+  rewrite relabel_hg_id' by apply subst_by_vec_id.
   reflexivity.
-  all: apply subst_by_vec_id.
 Qed.
 
-
-Lemma relabel_hg_union f (hg hg' : HyperGraph T) :
-  relabel_hg f (hg ∪ hg') =
-  relabel_hg f hg ∪ relabel_hg f hg'.
-Proof.
-  apply hg_ext; cbn.
-  - now rewrite map_fmap_union.
-  - now rewrite set_map_union_L.
-Qed.
-
-Lemma reindex_hg_union f `{Hf : !Inj eq eq f} (hg hg' : HyperGraph T) :
-  reindex_hg f (hg ∪ hg') =
-  reindex_hg f hg ∪ reindex_hg f hg'.
-Proof.
-  apply hg_ext; cbn.
-  - apply (kmap_union _).
-  - done.
-Qed.
 
 
 
@@ -143,34 +124,6 @@ Proof.
   apply susbt_by_vec_propogate_helper.
 Qed.
 
-Lemma hg_add_vertices_empty (hg : HyperGraph T) :
-  hg_add_vertices hg ∅ = hg.
-Proof.
-  apply hg_ext; [done|].
-  cbn -[union].
-  apply union_empty_l_L.
-Qed.
-
-Lemma hg_add_vertices_union (hg : HyperGraph T) vs vs' :
-  hg_add_vertices (hg_add_vertices hg vs) vs' =
-  hg_add_vertices hg (vs ∪ vs').
-Proof.
-  apply hg_ext; [done|].
-  cbn -[union].
-  rewrite (union_assoc_L _).
-  f_equal.
-  apply union_comm_L.
-Qed.
-
-Lemma relabel_hg_add_vertices f (hg : HyperGraph T) vs :
-  relabel_hg f (hg_add_vertices hg vs) =
-  hg_add_vertices (relabel_hg f hg) (set_map f vs).
-Proof.
-  apply hg_ext; [done|].
-  cbn.
-  now rewrite set_map_union_L.
-Qed.
-
 
 Lemma hedges_add_top_loops {n m m'}
   (tg : CospanHyperGraph T (n + m) (n + m')) :
@@ -228,39 +181,210 @@ Qed.
 
 
 
-Lemma compose_graphs_alt_aux_correct {n m o}
-  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
-  add_top_loops (swapped_stack_graphs_aux tgl tgr) =
-    compose_graphs_aux tgl tgr.
+Lemma add_top_loop'_correct {n m}
+  (tg : CospanHyperGraph T (S n) (S m)) :
+  add_top_loop' tg ≡ᵥ add_top_loop tg.
+Proof.
+  apply cohg_ext'; [done..|].
+  cbn.
+  unfold add_top_loop', add_top_loop.
+  unfold isolated_vertices.
+  rewrite 2 referrenced_vertices_relabel_graph.
+  cbn -[union difference].
+  change (referrenced_vertices _) with
+    (referrenced_vertices (vtl (inputs tg) -> hg_add_vertices tg {[vhd (inputs tg)]} <-
+        vtl (outputs tg))).
+  apply leibniz_equiv_iff, set_subseteq_antisymm. 1:{
+    apply difference_mono; [|done].
+    f_equiv.
+    apply union_mono_r.
+    set_solver.
+  }
+  apply (subseteq_union_r _ _ _).1.
+  rewrite (union_comm _ (_ ∖ _)), difference_union.
+  rewrite <- set_map_union.
+  f_equiv.
+  apply union_subseteq, conj, union_subseteq_l', union_subseteq_r.
+  apply singleton_subseteq_l.
+  rewrite (difference_singleton_l_case_L (vhd (inputs tg)) (vertices_hg tg)).
+  case_decide as Hivert.
+  - unfold vertices_hg in Hivert.
+    set_solver.
+  - apply elem_of_union_l, elem_of_union_l, elem_of_singleton.
+    done.
+Qed.
+
+
+Lemma isolated_vertices_add_top_loop {n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  isolated_vertices (add_top_loop cohg) =
+  isolated_vertices cohg ∪ ({[(vhd (inputs cohg))]} ∖ referrenced_vertices (add_top_loop cohg)).
+Proof.
+  unfold isolated_vertices, add_top_loop.
+  rewrite referrenced_vertices_relabel_graph.
+  cbn -[difference union].
+  unfold_leibniz.
+  apply set_subseteq_antisymm.
+  - intros fk [(k & -> & Hkih)%elem_of_map Hkr]%elem_of_difference.
+    rewrite union_comm_L in Hkih.
+    rewrite <- difference_union in Hkih.
+    rewrite elem_of_union, elem_of_difference, elem_of_singleton in Hkih.
+    destruct Hkih as [[Hkh Hkni] | ->].
+    + rewrite fn_lookup_singleton_case in *.
+      case_decide as Hok.
+      * subst k.
+        apply elem_of_union_r, elem_of_difference.
+        split; [|done].
+        now apply elem_of_singleton.
+      * apply elem_of_union_l.
+        apply elem_of_difference, (conj Hkh).
+        intros Hk.
+        apply Hkr.
+        apply elem_of_map.
+        exists k.
+        split; [now rewrite fn_lookup_singleton_ne|].
+        clear Hkh Hkr.
+        unfold referrenced_vertices in Hk.
+        rewrite (Vector.eta (inputs cohg)), (Vector.eta (outputs cohg)) in Hk.
+        cbn -[union] in *.
+        set_solver.
+    + rewrite fn_lookup_singleton_r in *.
+      apply elem_of_union_r, elem_of_difference.
+      split; [|done].
+      now apply elem_of_singleton.
+  - apply union_subseteq, conj.
+    + intros k [Hkh Hkr]%elem_of_difference.
+      unfold referrenced_vertices in Hkr.
+      rewrite (Vector.eta (inputs cohg)), (Vector.eta (outputs cohg)) in Hkr.
+      cbn -[union] in *.
+      apply elem_of_difference, conj.
+      * apply elem_of_map.
+        exists k.
+        rewrite fn_lookup_singleton_ne by set_solver + Hkr.
+        split; [done|].
+        now apply elem_of_union_r.
+      * intros (k' & -> & Hk')%elem_of_map.
+        rewrite fn_lookup_singleton_case in *.
+        case_decide as Hok'; [set_solver + Hkr|].
+        apply Hkr.
+        set_solver +Hk'.
+    + rewrite <- subseteq_union_r.
+      rewrite union_comm_L, difference_union.
+      apply singleton_subseteq_l, elem_of_union_l.
+      apply elem_of_map.
+      exists (vhd (inputs cohg)).
+      rewrite fn_lookup_singleton_r.
+      split; [done|].
+      now apply elem_of_union_l, elem_of_singleton.
+Qed.
+
+
+
+Lemma norm_verts_add_top_loop {n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  norm_verts (add_top_loop cohg) = norm_verts (add_top_loop (norm_verts cohg)).
+Proof.
+  apply cohg_ext'; [done..|].
+  cbn.
+  rewrite 2 isolated_vertices_add_top_loop.
+  rewrite isolated_vertices_norm_verts.
+  done.
+Qed.
+
+Lemma norm_verts_add_top_loops {n m o} (cohg : CospanHyperGraph T (n + m) (n + o)) :
+  norm_verts (add_top_loops cohg) = norm_verts (add_top_loops (norm_verts cohg)).
+Proof.
+  induction n; [cbn; now rewrite norm_verts_idemp|].
+  cbn.
+  now rewrite IHn, norm_verts_add_top_loop, <- IHn.
+Qed.
+
+#[export] Instance add_top_loop_proper {n m} :
+  Proper (@cohg_vert_eq T (S n) (S m) ==> cohg_vert_eq) add_top_loop.
+Proof.
+  intros cohg cohg' Heq.
+  hnf.
+  rewrite norm_verts_add_top_loop, Heq, <- norm_verts_add_top_loop.
+  done.
+Qed.
+
+#[export] Instance add_top_loop'_proper {n m} :
+  Proper (@cohg_vert_eq T (S n) (S m) ==> cohg_vert_eq) add_top_loop'.
+Proof.
+  intros cohg cohg' Heq.
+  rewrite 2 add_top_loop'_correct.
+  now f_equiv.
+Qed.
+
+#[export] Instance add_top_loops_proper {n m o} :
+  Proper (@cohg_vert_eq T (n + m) (n + o) ==> cohg_vert_eq) add_top_loops.
+Proof.
+  intros cohg cohg' Heq.
+  hnf.
+  rewrite norm_verts_add_top_loops, Heq, <- norm_verts_add_top_loops.
+  done.
+Qed.
+
+Lemma add_top_loops'_correct {n m o}
+  (tg : CospanHyperGraph T (n + m) (n + o)) :
+  add_top_loops' tg ≡ᵥ add_top_loops tg.
+Proof.
+  induction n; [done|].
+  cbn.
+  rewrite IHn.
+  now rewrite add_top_loop'_correct.
+Qed.
+
+
+Lemma add_top_loops_alt_vert_eq {n m m'}
+  (tg : CospanHyperGraph T (n + m) (n + m')) :
+  add_top_loops tg ≡ᵥ
+  relabel_graph (subst_by_vec (propogate_subst
+    (vzip (vsplitl tg.(outputs))
+      (vsplitl tg.(inputs)))))
+    (vsplitr tg.(inputs) ->
+      hg_add_vertices tg.(hedges)
+      (list_to_set (vsplitl tg.(inputs)) ∖ vertices_hg tg)
+      <- vsplitr tg.(outputs)).
 Proof.
   rewrite add_top_loops_alt.
+  apply relabel_graph_cohg_vert_eq.
+  apply cohg_ext'; [done..|].
+  cbn.
+  unfold isolated_vertices.
+  cbn.
+  rewrite 2 referrenced_vertices_decomp.
+  cbn.
+  rewrite vertices_hg_decomp.
+  rewrite <- 3 difference_difference_l_L, difference_union_L.
+  set_solver.
+Qed.
+
+
+
+Lemma compose_graphs_alt_aux_correct {n m o}
+  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
+  hyperedges tgl ##ₘ hyperedges tgr ->
+  add_top_loops (swapped_stack_graphs_aux tgl tgr) ≡ᵥ
+    compose_graphs_aux tgl tgr.
+Proof.
+  intros Hdisj.
+  rewrite add_top_loops_alt_vert_eq.
   cbn.
   rewrite 2 vsplitl_app, 2 vsplitr_app.
   unfold compose_graphs_aux.
-  apply cohg_ext.
-  - simpl.
-    f_equal.
-    
-    admit.
-  - f_equal.
-  - f_equal.
-  (* reflexivity. *)
-Admitted.
-  (* reflexivity. *)
-(* Qed. *)
+  rewrite vertices_hg_union by done.
+  reflexivity.
+Qed.
 
 Lemma compose_graphs_alt_correct {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
-  add_top_loops (swapped_stack_graphs tgl tgr) =
+  add_top_loops (swapped_stack_graphs tgl tgr) ≡ᵥ
     compose_graphs tgl tgr.
 Proof.
-  rewrite add_top_loops_alt.
+  rewrite compose_graphs_to_compose_graphs_aux.
+  rewrite <- compose_graphs_alt_aux_correct; [rewrite 2 reindex_relabel_graph; done|].
   cbn.
-  rewrite 2 vsplitl_app, 2 vsplitr_app.
-  rewrite <- 2 reindex_relabel_hg.
-  (* done.
-Qed. *)
-Admitted.
+  now apply (kmap_inj2_disjoint _).
+Qed.
 
 Lemma relabel_stack_graphs_aux {n m n' m'} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T n' m') f :
@@ -298,7 +422,7 @@ Proof.
 Qed.
 
 Lemma stack_graphs_reindex {n m n' m'} (cohg : CospanHyperGraph T n m)
-  (cohg' : CospanHyperGraph T n' m') ft fb 
+  (cohg' : CospanHyperGraph T n' m') ft fb
   `{Hft : !Inj eq eq ft, Hfb : !Inj eq eq fb} :
   stack_graphs (reindex_graph ft cohg) (reindex_graph fb cohg') =
   reindex_graph (pos_map ft fb) (stack_graphs cohg cohg').
@@ -310,7 +434,7 @@ Proof.
 Qed.
 
 Lemma stack_graphs_isomorphic {n m n' m'} (cohg1 cohg1' : CospanHyperGraph T n m)
-  (cohg2 cohg2' : CospanHyperGraph T n' m') : 
+  (cohg2 cohg2' : CospanHyperGraph T n' m') :
   isomorphic cohg1 cohg1' -> isomorphic cohg2 cohg2' ->
   isomorphic (stack_graphs cohg1 cohg2) (stack_graphs cohg1' cohg2').
 Proof.
@@ -319,6 +443,1252 @@ Proof.
   rewrite stack_graphs_relabel, (stack_graphs_reindex _ _ _ _).
   apply (iso_relabel_reindex _ _ _).
 Qed.
+
+
+Lemma relabel_swapped_stack_graphs_aux {n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') f :
+  relabel_graph f (swapped_stack_graphs_aux cohg cohg') =
+  swapped_stack_graphs_aux (relabel_graph f cohg) (relabel_graph f cohg').
+Proof.
+  apply cohg_ext.
+  - cbn; apply relabel_hg_union.
+  - cbn.
+    now rewrite Vector.map_append.
+  - cbn.
+    now rewrite Vector.map_append.
+Qed.
+
+Lemma swapped_stack_graphs_relabel {n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') ft fb :
+  swapped_stack_graphs (relabel_graph ft cohg) (relabel_graph fb cohg') =
+  relabel_graph (pos_map ft fb) (swapped_stack_graphs cohg cohg').
+Proof.
+  unfold swapped_stack_graphs.
+  rewrite relabel_swapped_stack_graphs_aux.
+  rewrite 2 reindex_relabel_graph, 4 relabel_graph_compose.
+  done.
+Qed.
+
+Lemma reindex_swapped_stack_graphs_aux {n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') f `{Hf : !Inj eq eq f} :
+  reindex_graph f (swapped_stack_graphs_aux cohg cohg') =
+  swapped_stack_graphs_aux (reindex_graph f cohg) (reindex_graph f cohg').
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  apply (reindex_hg_union _).
+Qed.
+
+Lemma swapped_stack_graphs_reindex {n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') ft fb
+  `{Hft : !Inj eq eq ft, Hfb : !Inj eq eq fb} :
+  swapped_stack_graphs (reindex_graph ft cohg) (reindex_graph fb cohg') =
+  reindex_graph (pos_map ft fb) (swapped_stack_graphs cohg cohg').
+Proof.
+  unfold swapped_stack_graphs.
+  rewrite (reindex_swapped_stack_graphs_aux _ _ _).
+  rewrite 2 reindex_relabel_graph, 4 (reindex_graph_compose _ _).
+  done.
+Qed.
+
+Lemma swapped_stack_graphs_isomorphic {n m n' m'} (cohg1 cohg1' : CospanHyperGraph T n m)
+  (cohg2 cohg2' : CospanHyperGraph T n' m') :
+  isomorphic cohg1 cohg1' -> isomorphic cohg2 cohg2' ->
+  isomorphic (swapped_stack_graphs cohg1 cohg2) (swapped_stack_graphs cohg1' cohg2').
+Proof.
+  intros (fv1 & fe1 & Hfv1 & Hfe1 & ->)%isomorphic_exists
+    (fv2 & fe2 & Hfv2 & Hfe2 & ->)%isomorphic_exists.
+  rewrite swapped_stack_graphs_relabel, (swapped_stack_graphs_reindex _ _ _ _).
+  apply (iso_relabel_reindex _ _ _).
+Qed.
+
+Lemma swapped_stack_graphs_struct_isomorphic_Proper {n m n' m'} :
+  Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic)
+    (@swapped_stack_graphs T n m n' m').
+Proof.
+  apply proper_struct_isomorphic_of_vert_eq_binary.
+  - apply _.
+  - intros ? ? ? ? ? ?.
+    now apply swapped_stack_graphs_isomorphic.
+Qed.
+
+
+Lemma swapped_stack_graphs_struct_isomorphic {n m n' m'} (cohg1 cohg1' : CospanHyperGraph T n m)
+  (cohg2 cohg2' : CospanHyperGraph T n' m') :
+  cohg1 ≡ᵢ cohg1' -> cohg2 ≡ᵢ cohg2' ->
+  swapped_stack_graphs cohg1 cohg2 ≡ᵢ swapped_stack_graphs cohg1' cohg2'.
+Proof.
+  now intros; apply swapped_stack_graphs_struct_isomorphic_Proper.
+Qed.
+
+Lemma add_top_loop_relabel_graph {n m} f `{Hf : !Inj eq eq f} (cohg : CospanHyperGraph T (S n) (S m)) :
+  add_top_loop (relabel_graph f cohg) =
+  relabel_graph f (add_top_loop cohg).
+Proof.
+  unfold add_top_loop.
+  cbn.
+  rewrite relabel_graph_compose.
+  induction (inputs cohg) as [i ins] using vec_S_inv.
+  induction (outputs cohg) as [o outs] using vec_S_inv.
+  cbn.
+  assert (Hfeq : forall x, ({[f o := f i]} ∘ f) x = (f ∘ {[o := i]}) x). 1:{
+    intros p; cbn.
+    rewrite 2 fn_lookup_singleton_case.
+    rewrite (decide_ext _ _ _ _ (inj_iff f o p)).
+    now case_decide.
+  }
+  apply cohg_ext'.
+  - cbn.
+    rewrite Vector.map_map.
+    apply Vector.map_ext, Hfeq.
+  - cbn.
+    rewrite Vector.map_map.
+    apply Vector.map_ext, Hfeq.
+  - cbn.
+    rewrite <- map_fmap_compose.
+    apply map_fmap_ext.
+    intros _ tio _.
+    cbn.
+    rewrite relabel_abs_compose.
+    apply relabel_abs_ext, Hfeq.
+  - cbn -[union].
+    rewrite 2 set_map_union_L, 2 set_map_singleton_L.
+    rewrite <- Hfeq.
+    f_equal.
+    rewrite set_map_compose_L.
+    apply set_map_ext_L.
+    intros; apply Hfeq.
+Qed.
+
+Lemma add_top_loop_reindex_graph {n m} f (cohg : CospanHyperGraph T (S n) (S m)) :
+  add_top_loop (reindex_graph f cohg) =
+  reindex_graph f (add_top_loop cohg).
+Proof.
+  unfold add_top_loop.
+  rewrite reindex_relabel_graph.
+  done.
+Qed.
+
+Lemma add_top_loop_struct_isomorphic {n m} (cohg cohg' : CospanHyperGraph T (S n) (S m)) :
+  cohg ≡ᵢ cohg' ->
+  add_top_loop cohg ≡ᵢ add_top_loop cohg'.
+Proof.
+  intros (fv & fe & Hfv & Hfe & Heq)%isomorphic_exists.
+  rewrite <- norm_verts_vert_eq, norm_verts_add_top_loop.
+  rewrite <- (norm_verts_vert_eq (add_top_loop cohg')),
+    (norm_verts_add_top_loop cohg').
+  rewrite Heq.
+  rewrite (add_top_loop_relabel_graph _), add_top_loop_reindex_graph.
+  rewrite (norm_verts_vert_eq (add_top_loop _)),
+    (norm_verts_vert_eq (relabel_graph _ _)).
+  apply (subrel' isomorphic).
+  now constructor.
+Qed.
+
+(* FIXME: Move *)
+Lemma vhd_vmap {A B} (f : A -> B) {n} (v : vec A (S n)) :
+  vhd (vmap f v) = f (vhd v).
+Proof.
+  induction v using vec_S_inv.
+  done.
+Qed.
+Lemma vtl_vmap {A B} (f : A -> B) {n} (v : vec A (S n)) :
+  vtl (vmap f v) = vmap f (vtl v).
+Proof.
+  induction v using vec_S_inv.
+  done.
+Qed.
+
+Lemma add_top_loop_eq_relabel {n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  add_top_loop cohg =
+  add_top_loop (relabel_graph {[vhd (outputs cohg) := vhd (inputs cohg)]} cohg).
+Proof.
+  unfold add_top_loop.
+  cbn.
+  rewrite 2 vhd_vmap.
+  rewrite fn_lookup_singleton, fn_lookup_singleton_r.
+  symmetry.
+  rewrite relabel_graph_id' by now intros; rewrite fn_lookup_singleton_case; case_decide.
+  apply cohg_ext'.
+  - cbn.
+    now rewrite vtl_vmap.
+  - cbn.
+    now rewrite vtl_vmap.
+  - done.
+  - cbn -[union difference].
+    rewrite set_map_union_L, set_map_singleton_L, fn_lookup_singleton_r.
+    done.
+Qed.
+
+Lemma add_top_loop_struct_isomorphic_strong {n m} (cohg cohg' : CospanHyperGraph T (S n) (S m)) :
+  relabel_graph {[vhd (outputs cohg) := vhd (inputs cohg)]} cohg ≡ᵢ
+  relabel_graph {[vhd (outputs cohg') := vhd (inputs cohg')]} cohg' ->
+  add_top_loop cohg ≡ᵢ add_top_loop cohg'.
+Proof.
+  intros Hiso.
+  rewrite add_top_loop_eq_relabel.
+  erewrite add_top_loop_struct_isomorphic by apply Hiso.
+  rewrite <- add_top_loop_eq_relabel.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Lemma fn_lookup_singleton_id `{EqDecision A} (a b : A) :
+  {[a := a]} b = b.
+Proof.
+  now rewrite fn_lookup_singleton_case; case_decide.
+Qed.
+
+Lemma add_top_loops_eq_relabel {n m m'}
+  (cohg : CospanHyperGraph T (n + m) (n + m')) :
+  add_top_loops cohg =
+  add_top_loops (relabel_graph (subst_by_vec (propogate_subst
+    $ vzip (vsplitl (outputs cohg)) (vsplitl (inputs cohg)))) cohg).
+Proof.
+  induction n; [cbn; now rewrite relabel_graph_id|].
+  cbn -[propogate_subst].
+  rewrite IHn.
+  f_equal.
+  destruct cohg as [hg ins outs].
+  induction ins as [insl insr] using vec_add_inv.
+  induction outs as [outsl outsr] using vec_add_inv.
+  induction insl as [i insl] using vec_S_inv.
+  induction outsl as [o outsl] using vec_S_inv.
+  cbn -[propogate_subst Vector.append].
+  rewrite 2 vsplitl_app.
+  cbn -[propogate_subst].
+  rewrite 2 vsplitl_map, 2 vsplitl_app.
+  apply cohg_ext.
+  - cbn.
+    rewrite relabel_hg_compose, 2 relabel_hg_add_vertices, relabel_hg_compose.
+    f_equal. 2:{
+      rewrite 2 set_map_singleton_L.
+      rewrite fn_lookup_singleton_r.
+      cbn.
+      rewrite vzip_map.
+      done.
+    }
+    apply relabel_hg_ext.
+    intros k.
+    cbn.
+    rewrite fn_lookup_singleton, fn_lookup_singleton_r.
+    rewrite fn_lookup_singleton_id.
+    rewrite vzip_map.
+    done.
+  - cbn -[Vector.append propogate_subst].
+    rewrite 2 Vector.map_map.
+    apply Vector.map_ext.
+    intros k.
+    rewrite vzip_map.
+    cbn.
+    rewrite fn_lookup_singleton, fn_lookup_singleton_r.
+    rewrite fn_lookup_singleton_id.
+    done.
+  - cbn -[Vector.append propogate_subst].
+    rewrite 2 Vector.map_map.
+    apply Vector.map_ext.
+    intros k.
+    rewrite vzip_map.
+    cbn.
+    rewrite fn_lookup_singleton, fn_lookup_singleton_r.
+    rewrite fn_lookup_singleton_id.
+    done.
+Qed.
+
+Lemma add_top_loops_struct_isomorphic {n m o}
+  (cohg cohg' : CospanHyperGraph T (n + m) (n + o)) :
+  cohg ≡ᵢ cohg' ->
+  add_top_loops cohg ≡ᵢ add_top_loops cohg'.
+Proof.
+  intros Hiso.
+  induction n; [done|].
+  cbn.
+  apply IHn.
+  now apply add_top_loop_struct_isomorphic.
+Qed.
+
+Lemma add_top_loops_struct_isomorphic_strong {n m o}
+  (cohg cohg' : CospanHyperGraph T (n + m) (n + o)) :
+  relabel_graph (subst_by_vec (propogate_subst
+    $ vzip (vsplitl (outputs cohg)) (vsplitl (inputs cohg)))) cohg ≡ᵢ
+  relabel_graph (subst_by_vec (propogate_subst
+    $ vzip (vsplitl (outputs cohg')) (vsplitl (inputs cohg')))) cohg' ->
+  add_top_loops cohg ≡ᵢ add_top_loops cohg'.
+Proof.
+  intros Hiso.
+  rewrite add_top_loops_eq_relabel.
+  erewrite add_top_loops_struct_isomorphic by apply Hiso.
+  rewrite <- add_top_loops_eq_relabel.
+  done.
+Qed.
+
+
+
+Lemma compose_graphs_struct_isomorphic {n m o}
+  (cohg1 cohg1' : CospanHyperGraph T n m) (cohg2 cohg2' : CospanHyperGraph T m o) :
+  cohg1 ≡ᵢ cohg1' -> cohg2 ≡ᵢ cohg2' ->
+  compose_graphs cohg1 cohg2 ≡ᵢ compose_graphs cohg1' cohg2'.
+Proof.
+  intros Heq1 Heq2.
+  rewrite <- 2 compose_graphs_alt_correct.
+  apply add_top_loops_struct_isomorphic.
+  now apply swapped_stack_graphs_struct_isomorphic.
+Qed.
+
+Lemma relabel_graph_to_fun_to_map {n m} f (cohg : CospanHyperGraph T n m) :
+  relabel_graph f cohg = relabel_graph (Pmap_map (fun_to_map f (vertices cohg))) cohg.
+Proof.
+  apply relabel_graph_ext_strong.
+  intros i Hi.
+  symmetry.
+  unfold Pmap_map.
+  now rewrite lookup_fun_to_map_Some_1.
+Qed.
+
+Lemma relabel_graph_Pmap_map_to_union_l {n m} ml mr (cohg : CospanHyperGraph T n m) :
+  vertices cohg ⊆ dom ml ->
+  relabel_graph (Pmap_map ml) cohg =
+  relabel_graph (Pmap_map (ml ∪ mr)) cohg.
+Proof.
+  intros Hvert.
+  apply relabel_graph_ext_strong.
+  intros i [mli Hmli]%Hvert%elem_of_dom.
+  unfold Pmap_map.
+  rewrite lookup_union, Hmli.
+  now destruct (mr !! i).
+Qed.
+
+Lemma relabel_graph_Pmap_map_to_union_r {n m} ml mr (cohg : CospanHyperGraph T n m) :
+  vertices cohg ## dom ml ->
+  relabel_graph (Pmap_map mr) cohg =
+  relabel_graph (Pmap_map (ml ∪ mr)) cohg.
+Proof.
+  intros Hvert.
+  apply relabel_graph_ext_strong.
+  intros i Hi%Hvert%not_elem_of_dom.
+  unfold Pmap_map.
+  rewrite lookup_union, Hi.
+  now rewrite (left_id_L None _).
+Qed.
+
+Lemma relabel_graph_Pmap_map_to_Pmap_injmap {n m} mv (cohg : CospanHyperGraph T n m) :
+  vertices cohg ⊆ dom mv ->
+  relabel_graph (Pmap_map mv) cohg =
+  relabel_graph (Pmap_injmap mv) cohg.
+Proof.
+  intros Hvert.
+  apply relabel_graph_ext_strong.
+  intros i Hi%Hvert.
+  symmetry.
+  now apply Pmap_injmap_correct_dom.
+Qed.
+
+Lemma reindex_graph_to_fun_to_map {n m} f (cohg : CospanHyperGraph T n m) :
+  reindex_graph f cohg = reindex_graph (Pmap_map (fun_to_map f (dom (hyperedges cohg)))) cohg.
+Proof.
+  apply reindex_graph_ext_strong.
+  intros i _ Hi%elem_of_dom_2.
+  symmetry.
+  unfold Pmap_map.
+  now rewrite lookup_fun_to_map_Some_1.
+Qed.
+
+Lemma reindex_graph_Pmap_map_to_union_l {n m} ml mr (cohg : CospanHyperGraph T n m) :
+  dom $ hyperedges cohg ⊆ dom ml ->
+  reindex_graph (Pmap_map ml) cohg =
+  reindex_graph (Pmap_map (ml ∪ mr)) cohg.
+Proof.
+  intros Hvert.
+  apply reindex_graph_ext_strong.
+  intros i _ [mli Hmli]%elem_of_dom_2%Hvert%elem_of_dom.
+  unfold Pmap_map.
+  rewrite lookup_union, Hmli.
+  now destruct (mr !! i).
+Qed.
+
+Lemma reindex_graph_Pmap_map_to_union_r {n m} ml mr (cohg : CospanHyperGraph T n m) :
+  dom $ hyperedges cohg ## dom ml ->
+  reindex_graph (Pmap_map mr) cohg =
+  reindex_graph (Pmap_map (ml ∪ mr)) cohg.
+Proof.
+  intros Hvert.
+  apply reindex_graph_ext_strong.
+  intros i _ Hi%elem_of_dom_2%Hvert%not_elem_of_dom.
+  unfold Pmap_map.
+  rewrite lookup_union, Hi.
+  now rewrite (left_id_L None _).
+Qed.
+
+Lemma reindex_graph_Pmap_map_to_Pmap_injmap {n m} mv (cohg : CospanHyperGraph T n m) :
+  dom $ hyperedges cohg ⊆ dom mv ->
+  reindex_graph (Pmap_map mv) cohg =
+  reindex_graph (Pmap_injmap mv) cohg.
+Proof.
+  intros Hvert.
+  apply reindex_graph_ext_strong.
+  intros i _ Hi%elem_of_dom_2%Hvert.
+  symmetry.
+  now apply Pmap_injmap_correct_dom.
+Qed.
+
+Lemma swapped_stack_graphs_aux_relabel_disjoint {n m n' m'} f1 f2
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  vertices cohg1 ## vertices cohg2 ->
+  swapped_stack_graphs_aux (relabel_graph f1 cohg1) (relabel_graph f2 cohg2) =
+  relabel_graph (Pmap_map (fun_to_map f1 (vertices cohg1) ∪ fun_to_map f2 (vertices cohg2)))
+    (swapped_stack_graphs_aux cohg1 cohg2).
+Proof.
+  intros Hdisj.
+  rewrite relabel_swapped_stack_graphs_aux.
+  f_equal.
+  - rewrite (relabel_graph_to_fun_to_map f1).
+    apply relabel_graph_Pmap_map_to_union_l.
+    now rewrite dom_fun_to_map_L.
+  - rewrite (relabel_graph_to_fun_to_map f2).
+    apply relabel_graph_Pmap_map_to_union_r.
+    now rewrite dom_fun_to_map_L.
+Qed.
+
+(* FIXME: Move *)
+Lemma map_inj_disj_union `{FinMap K M} {A}
+  (m1 m2 : M A) :
+  m1 ##ₘ m2 ->
+  map_inj m1 -> map_inj m2 ->
+  (forall i j a b, m1 !! i = Some a -> m2 !! j = Some b -> a <> b) ->
+  map_inj (m1 ∪ m2).
+Proof.
+  intros Hdisj Hinj1 Hinj2 Hdisjimg.
+  intros i j a.
+  rewrite 2 lookup_union_Some by done.
+  intros [Hm1i|Hm2i] [Hm1j|Hm2j]; [now eauto|..|now eauto];
+  exfalso; eapply (Hdisjimg _ _ a); eauto.
+Qed.
+Lemma fun_to_map_inj `{FinMap K M, FinSet K SK} {A}
+  (f : K -> A) `{Hf : !Inj eq eq f} (X : SK) :
+  map_inj (fun_to_map f X :> M A).
+Proof.
+  intros i j a.
+  rewrite 2 lookup_fun_to_map_Some.
+  now intros [Hi <-] [Hj ?%Hf].
+Qed.
+Lemma map_img_fun_to_map `{FinMap K M, FinSet K SK, SemiSet A SA}
+  (f : K -> A) (X : SK) :
+  map_img (fun_to_map f X :> M A) ≡@{SA} set_map f X.
+Proof.
+  intros k.
+  rewrite elem_of_map, elem_of_map_img.
+  setoid_rewrite lookup_fun_to_map_Some.
+  firstorder.
+Qed.
+Lemma map_img_fun_to_map_L `{FinMap K M, FinSet K SK, SemiSet A SA, !LeibnizEquiv SA}
+  (f : K -> A) (X : SK) :
+  map_img (fun_to_map f X :> M A) =@{SA} set_map f X.
+Proof.
+  apply leibniz_equiv_iff, map_img_fun_to_map.
+Qed.
+
+Lemma swapped_stack_graphs_aux_reindex_disjoint {n m n' m'} f1 f2
+  `{Hf1 : !Inj eq eq f1, Hf2 : !Inj eq eq f2}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  dom $ hyperedges cohg1 ## dom $ hyperedges cohg2 ->
+  set_map f1 $ dom $ hyperedges cohg1 ##@{Pset} set_map f2 $ dom $ hyperedges cohg2 ->
+  swapped_stack_graphs_aux (reindex_graph f1 cohg1) (reindex_graph f2 cohg2) =
+  reindex_graph (Pmap_map (fun_to_map f1 (dom $ hyperedges cohg1) ∪
+    fun_to_map f2 (dom $ hyperedges cohg2)))
+    (swapped_stack_graphs_aux cohg1 cohg2).
+Proof.
+  intros Hdisj Hdisjran.
+  rewrite reindex_graph_Pmap_map_to_Pmap_injmap. 2:{
+    cbn.
+    rewrite 2 dom_union_L, 2 dom_fun_to_map_L.
+    done.
+  }
+  rewrite reindex_swapped_stack_graphs_aux; [f_equal|].
+  - rewrite (reindex_graph_to_fun_to_map f1).
+    rewrite <- reindex_graph_Pmap_map_to_Pmap_injmap by
+      now rewrite dom_union_L, 2 dom_fun_to_map_L, <- union_subseteq_l'.
+    apply reindex_graph_Pmap_map_to_union_l.
+    now rewrite dom_fun_to_map_L.
+  - rewrite (reindex_graph_to_fun_to_map f2).
+    rewrite <- reindex_graph_Pmap_map_to_Pmap_injmap by
+      now rewrite dom_union_L, 2 dom_fun_to_map_L, <- union_subseteq_r'.
+    apply reindex_graph_Pmap_map_to_union_r.
+    now rewrite dom_fun_to_map_L.
+  - apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L.
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      intros ->.
+      apply Hdisjran in Ha.
+      now apply Ha in Hb.
+Qed.
+
+Lemma vertices_swapped_stack_graphs_aux {n m n' m'}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  hyperedges cohg1 ##ₘ hyperedges cohg2 ->
+  vertices (swapped_stack_graphs_aux cohg1 cohg2) =
+  vertices cohg1 ∪ vertices cohg2.
+Proof.
+  intros Hdisj.
+  unfold vertices.
+  cbn.
+  rewrite vertices_hg_union by done.
+  rewrite 2 vec_to_list_app, 5 list_to_set_app_L.
+  apply set_eq.
+  intros k.
+  rewrite !elem_of_union.
+  tauto.
+Qed.
+
+Lemma swapped_stack_graphs_aux_isomorphic {n m n' m'}
+  (cohg1 cohg1' : CospanHyperGraph T n m)
+  (cohg2 cohg2' : CospanHyperGraph T n' m') :
+  isomorphic cohg1 cohg1' -> isomorphic cohg2 cohg2' ->
+  hyperedges cohg1 ##ₘ hyperedges cohg2 -> hyperedges cohg1' ##ₘ hyperedges cohg2' ->
+  vertices cohg1 ## vertices cohg2 -> vertices cohg1' ## vertices cohg2' ->
+  isomorphic (swapped_stack_graphs_aux cohg1 cohg2) (swapped_stack_graphs_aux cohg1' cohg2').
+Proof.
+  intros (fv1 & fe1 & Hfv1 & Hfe1 & ->)%isomorphic_exists
+    (fv2 & fe2 & Hfv2 & Hfe2 & ->)%isomorphic_exists.
+  intros Hdisj Hdisj' Hvdisj Hvdisj'.
+  rewrite swapped_stack_graphs_aux_relabel_disjoint by now rewrite 2 (vertices_reindex_graph _).
+  rewrite (swapped_stack_graphs_aux_reindex_disjoint _ _ _); [|now apply map_disjoint_dom|].
+  2:{
+    rewrite map_disjoint_dom in Hdisj'.
+    cbn in Hdisj'.
+    rewrite 2 dom_fmap_L in Hdisj'.
+    rewrite 2 dom_kmap_L' in Hdisj'.
+    done.
+  }
+  rewrite reindex_graph_Pmap_map_to_Pmap_injmap. 2:{
+    cbn.
+    now rewrite 2 dom_union_L, 2 dom_fun_to_map_L.
+  }
+  assert (Hinjidx : Inj eq eq (Pmap_injmap
+           (fun_to_map fe1 (dom (hyperedges cohg1) :> Pset) ∪
+           fun_to_map fe2 (dom (hyperedges cohg2) :> Pset)))). 1:{
+    apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L; rewrite map_disjoint_dom in Hdisj.
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      rewrite map_disjoint_dom in Hdisj'.
+      cbn in Hdisj'.
+      rewrite 2 dom_fmap, 2 dom_kmap_L' in Hdisj'.
+      intros ->.
+      now apply Hdisj' in Hb.
+  }
+  rewrite relabel_graph_Pmap_map_to_Pmap_injmap. 2:{
+    rewrite 3 (vertices_reindex_graph _).
+    rewrite vertices_swapped_stack_graphs_aux by done.
+    now rewrite dom_union_L, 2 dom_fun_to_map_L.
+  }
+  constructor.
+  - apply Pmap_injmap_inj.
+    apply map_inj_disj_union.
+    + now rewrite map_disjoint_dom, 2 dom_fun_to_map_L,
+      2 (vertices_reindex_graph _).
+    + now apply fun_to_map_inj.
+    + now apply fun_to_map_inj.
+    + intros i j a b Ha%(elem_of_map_img_2 (SA:=Pset))
+        Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite map_img_fun_to_map_L in Ha, Hb.
+      rewrite (vertices_reindex_graph _) in Ha.
+      rewrite (vertices_reindex_graph _) in Hb.
+      rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _) in Hvdisj'.
+      intros ->.
+      now apply Hvdisj' in Hb.
+  - apply _.
+Qed.
+
+
+Lemma swapped_stack_graphs_aux_to_swapped_stack_graphs_disjoint {n m n' m'}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T n' m') :
+  hyperedges cohg1 ##ₘ hyperedges cohg2 ->
+  vertices cohg1 ## vertices cohg2 ->
+  isomorphic (swapped_stack_graphs_aux cohg1 cohg2) (swapped_stack_graphs cohg1 cohg2).
+Proof.
+  intros Hdisj Hvdisj.
+  unfold swapped_stack_graphs.
+  apply swapped_stack_graphs_aux_isomorphic.
+  - constructor; apply _.
+  - constructor; apply _.
+  - done.
+  - cbn.
+    apply map_disjoint_fmap.
+    now apply (kmap_inj2_disjoint _).
+  - done.
+  - rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
+    set_solver +.
+Qed.
+
+Lemma compose_graphs_aux_to_compose_graphs_disjoint {n m o}
+  (cohg1 : CospanHyperGraph T n m) (cohg2 : CospanHyperGraph T m o) :
+  hyperedges cohg1 ##ₘ hyperedges cohg2 ->
+  vertices cohg1 ## vertices cohg2 ->
+  compose_graphs_aux cohg1 cohg2 ≡ᵢ compose_graphs cohg1 cohg2.
+Proof.
+  intros Hdisj Hvdisj.
+  rewrite <- compose_graphs_alt_correct, <- compose_graphs_alt_aux_correct by done.
+  apply add_top_loops_struct_isomorphic.
+  apply (subrel' isomorphic).
+  now apply swapped_stack_graphs_aux_to_swapped_stack_graphs_disjoint.
+Qed.
+
+Definition pos_tail (p : positive) := pos_elim id id p.
+
+Lemma isomorphic_reindex_graph {n m} (f : positive -> positive)
+  `{Hf : !Inj eq eq f} (cohg : CospanHyperGraph T n m) :
+  isomorphic cohg (reindex_graph f cohg).
+Proof.
+  apply isomorphic_exists.
+  exists id, f.
+  rewrite relabel_graph_id.
+  split_and!; [apply _..|done].
+Qed.
+
+Lemma isomorphic_relabel_graph {n m} (f : positive -> positive)
+  `{Hf : !Inj eq eq f} (cohg : CospanHyperGraph T n m) :
+  isomorphic cohg (relabel_graph f cohg).
+Proof.
+  apply isomorphic_exists.
+  exists f, id.
+  rewrite reindex_graph_id.
+  split_and!; [apply _..|done].
+Qed.
+
+Lemma vertices_vertices_hg_decomp {n m} (cohg : CospanHyperGraph T n m) :
+  vertices cohg = vertices_hg cohg ∪ list_to_set (inputs cohg ++ outputs cohg).
+Proof.
+  done.
+Qed.
+
+Lemma subst_by_vec_notin {n} (v : vec _ n) p :
+  p ∉ v.*1 ->
+  subst_by_vec v p = p.
+Proof.
+  revert p; induction v as [|(i, o) n v IHv]; intros p; [done|].
+  cbn.
+  intros Hp.
+  rewrite fn_lookup_singleton_ne by now intros ->; apply Hp; left.
+  apply IHv.
+  eauto using elem_of_list.
+Qed.
+
+(* FIXME: Move *)
+Lemma Pmap_map_insert k v m p :
+  Pmap_map (<[k := v]> m) p = <[k := v]> (Pmap_map m) p.
+Proof.
+  unfold Pmap_map.
+  rewrite lookup_insert_case, fn_lookup_insert_case.
+  case_decide; done.
+Qed.
+
+Lemma subst_by_vec_disj {n} (v : vec _ n) p :
+  v.*1 ## v.*2 ->
+  subst_by_vec v p =
+  Pmap_map (list_to_map v :> Pmap positive) p.
+Proof.
+  revert p; induction v as [|(i, o) n v IHv]; intros p.
+  - cbn.
+    unfold Pmap_map.
+    now rewrite lookup_empty.
+  - cbn.
+    intros Hdisj.
+    rewrite fn_lookup_singleton_case.
+    rewrite Pmap_map_insert, fn_lookup_insert_case.
+    case_decide as Hip.
+    + subst p.
+      now rewrite subst_by_vec_notin by set_solver +Hdisj.
+    + apply IHv.
+      intros k Hk1 Hk2.
+      apply (Hdisj k); now constructor.
+Qed.
+
+
+Lemma subst_by_vec_case {n} (v : vec _ n) p :
+  (p ∈ v.*1 /\ subst_by_vec v p ∈ v.*2) \/
+  (p ∉ v.*1 /\ subst_by_vec v p = p).
+Proof.
+  revert p.
+  induction n as [|n IHn]; [induction v using vec_0_inv; right; split; easy|].
+  intros p.
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite fn_lookup_singleton_case.
+  case_decide as Hip.
+  - left.
+    subst p.
+    split; [constructor|].
+    destruct (IHn v o) as [[? ?]|[? ->]];
+    eauto using elem_of_list.
+  - destruct (IHn v p) as [[? ?]|[? ->]];
+    [eauto using elem_of_list|].
+    right.
+    split; [|done].
+    now rewrite not_elem_of_cons.
+Qed.
+
+(* FIXME: Move *)
+Lemma fn_lookup_singleton_ne_strong `{EqDecision A} (a b c : A) :
+  (a <> b -> a <> c) ->
+  {[a := b]} c = c.
+Proof.
+  rewrite fn_lookup_singleton_case.
+  case_decide; [|done].
+  destruct_decide (decide (a = b)); [now subst|tauto].
+Qed.
+Lemma fn_lookup_singleton_idemp `{EqDecision A} (a b c : A) :
+  {[a := b]} ({[a := b]} c) =@{A} {[a := b]} c.
+Proof.
+  rewrite 2 fn_lookup_singleton_case.
+  destruct_decide (decide (a = c)); case_decide; congruence.
+Qed.
+
+
+Lemma snds_propogate_subst_subseteq {n} (v : vec _ n) :
+  (propogate_subst v).*2 ⊆ v.*2.
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite list_subseteq_cons_iff.
+  split; [constructor|].
+  rewrite IHn.
+  rewrite vec_to_list_map.
+  rewrite snds_prod_map.
+  intros _k (k & -> & Hk)%elem_of_list_fmap.
+  rewrite fn_lookup_singleton_case.
+  case_decide; [constructor|].
+  now constructor.
+Qed.
+
+
+Lemma subst_by_vec_propogate_subst_idemp {n} (v : vec _ n) p :
+  subst_by_vec (propogate_subst v) (subst_by_vec (propogate_subst v) p) =
+  subst_by_vec (propogate_subst v) p.
+Proof.
+  revert p;
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  intros p.
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite (fn_lookup_singleton_case _ _ p).
+  case_decide as Hip.
+  - subst p.
+    rewrite fn_lookup_singleton_ne_strong; [apply IHn|].
+    intros Hio.
+    symmetry.
+    destruct (subst_by_vec_case
+      (propogate_subst (vmap (prod_map {[i := o]} {[i := o]}) v)) o)
+      as [[_ Hin]|[_ ->]]; [|done].
+    intros Heq.
+    rewrite Heq in Hin.
+    apply snds_propogate_subst_subseteq in Hin.
+    rewrite vec_to_list_map, snds_prod_map in Hin.
+    apply elem_of_list_fmap in Hin as (k & Hk & _).
+    rewrite fn_lookup_singleton_case in Hk.
+    case_decide; done.
+  - rewrite fn_lookup_singleton_ne_strong; [apply IHn|].
+    intros Hio.
+    symmetry.
+    destruct (subst_by_vec_case
+      (propogate_subst (vmap (prod_map {[i := o]} {[i := o]}) v)) p)
+      as [[_ Hin]|[_ ->]]; [|done].
+    intros Heq.
+    rewrite Heq in Hin.
+    apply snds_propogate_subst_subseteq in Hin.
+    rewrite vec_to_list_map, snds_prod_map in Hin.
+    apply elem_of_list_fmap in Hin as (k & Hk & _).
+    rewrite fn_lookup_singleton_case in Hk.
+    case_decide; done.
+Qed.
+
+(* Lemma subst_by_vec_propogate_subst_do_subst {n} (v : vec (positive * positive) n)
+  i o p :
+  (i, o) ∈ vec_to_list v ->
+  subst_by_vec (propogate_subst v) p =
+  subst_by_vec (propogate_subst v) ({[i := o]} p).
+Proof.
+  revert i o p;
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i', o') v] using vec_S_inv.
+  intros i o p.
+  cbn [vec_to_list].
+  rewrite elem_of_cons.
+  intros [[= <- <-]| Hio];
+  [cbn; now rewrite fn_lookup_singleton_idemp|].
+   *)
+
+Lemma subst_by_vec_filter_not_id {n} (v : vec _ n) p :
+  subst_by_vec v p =
+  subst_by_vec (list_to_vec (filter (λ io, io.1 <> io.2) (vec_to_list v))) p.
+Proof.
+  revert p; induction v as [|(i, o) n v IHv]; [done|].
+  intros p.
+  cbn.
+  case_decide; [cbn; apply IHv|].
+  subst.
+  rewrite fn_lookup_singleton_id.
+  apply IHv.
+Qed.
+
+Lemma subst_by_vec_helper_bcons_true_id {n}
+  (v : vec _ n) p :
+  Forall (fun io =>
+    io.1 = io.2 \/ (io.1 = bcons false (pos_tail io.1)
+      /\ io.2 = bcons true (pos_tail io.1))) v ->
+  subst_by_vec v (bcons true p) = bcons true p.
+Proof.
+  intros Hall.
+  rewrite subst_by_vec_filter_not_id.
+  apply subst_by_vec_notin.
+  rewrite not_elem_of_list_fmap.
+  intros io Hio.
+  rewrite vec_to_list_to_vec in Hio.
+  apply elem_of_list_filter in Hio as [Hio Hiov].
+  rewrite Forall_forall in Hall.
+  apply Hall in Hiov as [|[Hio1 Hio2]]; [done|].
+  rewrite Hio1.
+  lia.
+Qed.
+
+(* Lemma propogate_subst_disj_alt {n} (v : vec _ n) :
+  Forall (λ io, io.1 = io.2 \/ io.1 ∉ v.*2) v ->
+  propogate_subst v =
+  fun_to_vec (λ i,
+  match list_find (λ io, io.1 = (v !!! i).1) (take i v) with
+  | Some (_, io) => io
+  | None => v !!! i
+  end).
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn [vec_to_list].
+  rewrite Forall_cons.
+  intros [Hio Hv].
+  cbn.
+  f_equal.
+  rewrite IHn.
+  - apply vec_eq; intros p.
+    rewrite 2 lookup_fun_to_vec.
+    rewrite vec_to_list_map.
+    rewrite <- fmap_take, list_find_fmap.
+    cbn.
+  - rewrite vec_to_list_map.
+    rewrite Forall_fmap.
+    rewrite snds_prod_map.
+    rewrite Forall_forall in Hv |- *.
+    intros io' Hio'v.
+    apply Hv in Hio'v as Hio'.
+    cbn in *.
+    simpl.
+    destruct Hio as [-> | Hio].
+    + rewrite 2 fn_lookup_singleton_id.
+      rewrite list_fmap_id' by now intros; rewrite fn_lookup_singleton_id.
+      destruct Hio' as [?|Hio']; [now left|].
+      right.
+      eauto using elem_of_list.
+    + destruct Hio' as [Hio'|Hio']; [now left; f_equal|].
+
+      rewrite fn_lookup_singleton_case.
+
+      case_decide as Hii'.
+      *
+      split; [done|].
+
+    simpl in *.
+    simpl. *)
+
+Lemma vzip_like_vmap {n} i o (v : vec _ n) :
+  Forall (λ io, io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1)
+       ∧ io.2 = bcons true (pos_tail io.1)) ((i, o) :: v) ->
+  Forall (λ io, io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1)
+       ∧ io.2 = bcons true (pos_tail io.1))
+  (vmap (prod_map {[i := o]} {[i := o]}) v).
+Proof.
+  rewrite Forall_cons.
+  intros [Hio Hv].
+  cbn in *.
+  rewrite vec_to_list_map, Forall_fmap.
+  apply (Forall_impl _ _ _ Hv).
+  intros [i' o'].
+  cbn.
+  intros [->|Hio']; [now left; f_equal|].
+  destruct i'; try easy.
+  cbn in *.
+  destruct Hio' as [_ ->].
+  destruct Hio as [->|Hio]; [right; now rewrite 2 fn_lookup_singleton_id|].
+  destruct i; try easy.
+  cbn in Hio.
+  destruct Hio as [_ ->].
+  rewrite fn_lookup_singleton_case.
+  rewrite fn_lookup_singleton_ne by lia.
+  case_decide as Hi; [|by auto].
+  revert Hi.
+  intros [= <-].
+  now left.
+Qed.
+
+
+Lemma propogate_subst_vmap_bcons_false_true_vzip_like {n}
+  (v : vec _ n) :
+  Forall (fun io =>
+    io.1 = io.2 \/ (io.1 = bcons false (pos_tail io.1)
+      /\ io.2 = bcons true (pos_tail io.1))) v ->
+  Forall (fun io =>
+    io.1 = io.2 \/ (io.1 = bcons false (pos_tail io.1)
+      /\ io.2 = bcons true (pos_tail io.1)))
+    (propogate_subst v).
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite 2 Forall_cons.
+  cbn.
+  intros [Hio Hv].
+  split; [exact Hio|].
+  apply IHn.
+  clear IHn.
+  now apply vzip_like_vmap, Forall_cons.
+Qed.
+
+
+
+
+
+(*
+Lemma propogate_subst_vmap_bcons_false_true_vzip {n}
+  (v : vec positive n) :
+  propogate_subst
+    (vmap (prod_map (bcons false) (bcons true))
+      (vzip v v)) =
+  fun_to_vec (λ i,
+  if decide (v !!! i ∈ take i v) then
+    (bcons true $ Pos.of_succ_nat i, bcons true $ Pos.of_succ_nat i)
+  else
+    (bcons false $ Pos.of_succ_nat i, bcons true $ Pos.of_succ_nat i)).
+Proof. *)
+
+
+
+Lemma vzip_like_vmap_strong {n} i o (v : vec _ n) :
+  Forall (λ io, (io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1))
+       ∧ io.2 = bcons true (pos_tail io.1)) ((i, o) :: v) ->
+  Forall (λ io, (io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1))
+       ∧ io.2 = bcons true (pos_tail io.1))
+  (vmap (prod_map {[i := o]} {[i := o]}) v).
+Proof.
+  rewrite Forall_cons.
+  intros [Hio Hv].
+  cbn in *.
+  rewrite vec_to_list_map, Forall_fmap.
+  apply (Forall_impl _ _ _ Hv).
+  intros [i' o'].
+  cbn.
+  intros [[->|Hio'] Ho'].
+  - split; [now left; f_equal|].
+    destruct Hio as [[-> | ->] Ho]; [now rewrite fn_lookup_singleton_id|].
+    cbn.
+    rewrite Ho'.
+    rewrite fn_lookup_singleton_ne by lia.
+    done.
+  - destruct i'; try easy.
+    cbn in *.
+    subst o'.
+    destruct Hio as [[-> | Hi] Hio]; [now rewrite !fn_lookup_singleton_id; auto|].
+    destruct i; try easy.
+    cbn in Hio.
+    subst o.
+    rewrite fn_lookup_singleton_case.
+    rewrite fn_lookup_singleton_ne by lia.
+    case_decide as Hii'; [|by auto].
+    revert Hii'.
+    intros [= <-].
+    auto.
+Qed.
+
+
+Lemma propogate_subst_vmap_bcons_false_true_vzip_like_strong {n}
+  (v : vec _ n) :
+  Forall (λ io, (io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1))
+       ∧ io.2 = bcons true (pos_tail io.1)) v ->
+  Forall (λ io, (io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1))
+       ∧ io.2 = bcons true (pos_tail io.1))
+    (propogate_subst v).
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite 2 Forall_cons.
+  cbn.
+  intros [Hio Hv].
+  split; [exact Hio|].
+  apply IHn.
+  clear IHn.
+  now apply vzip_like_vmap_strong, Forall_cons.
+Qed.
+
+
+Lemma propogate_subst_vmap_bcons_false_true_vzip {n}
+  (v : vec positive n) :
+  Forall (fun io =>
+    io.1 = io.2 \/ (io.1 = bcons false (pos_tail io.1)
+      /\ io.2 = bcons true (pos_tail io.1)))
+    (propogate_subst
+    (vmap (prod_map (bcons false) (bcons true))
+      (vzip v v))).
+Proof.
+  apply propogate_subst_vmap_bcons_false_true_vzip_like.
+  rewrite vec_to_list_map, vec_to_list_zip_with.
+  rewrite Forall_fmap, Forall_lookup.
+  intros k (i, o) Hio%lookup_zip_Some.
+  assert (i = o) as -> by now destruct Hio; congruence.
+  simpl.
+  now right.
+Qed.
+
+
+Lemma subst_by_vec_helper_bcons_false {n}
+  (v : vec _ n) p :
+  Forall (λ io, (io.1 = io.2
+     ∨ io.1 = bcons false (pos_tail io.1))
+       ∧ io.2 = bcons true (pos_tail io.1)) v ->
+  subst_by_vec v (bcons false p) =
+  if decide (bcons false p ∈ (vec_to_list v).*1)
+    then bcons true p else bcons false p.
+Proof.
+  intros Hall.
+  revert p; induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  intros p.
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn in *.
+  apply Forall_cons in Hall as Hall'.
+  destruct Hall' as [Hio Hv].
+  cbn in Hio.
+  destruct Hio as [[<-|Hi] Ho].
+  - rewrite fn_lookup_singleton_id.
+    rewrite IHn by done.
+    apply decide_ext.
+    rewrite elem_of_cons.
+    enough(p~0 <> i) by tauto.
+    now destruct i.
+  - subst o.
+    destruct i; try now contradict Hi.
+    cbn.
+    rewrite fn_lookup_singleton_case.
+    rewrite (decide_ext _ _ _ _ (inj_iff xO i p)).
+    case_decide as Hip.
+    + subst p.
+      rewrite decide_True by constructor.
+      apply subst_by_vec_helper_bcons_true_id.
+      apply (Forall_impl _ _ _ Hv).
+      intros [i' o'].
+      cbn.
+      destruct o'; try easy.
+      cbn.
+      destruct i'; cbn; firstorder congruence.
+    + rewrite IHn by done.
+      apply decide_ext.
+      rewrite elem_of_cons.
+      enough(p~0 <> i~0) by tauto.
+      congruence.
+Qed.
+
+(* FIXME: Move *)
+Lemma list_subseteq_antisymm {A} (l l' : list A) :
+  l ⊆ l' -> l' ⊆ l -> l ≡ l'.
+Proof.
+  firstorder.
+Qed.
+
+Lemma fsts_propogate_subst_subseteq {n} (v : vec _ n) :
+  (propogate_subst v).*1 ⊆ v.*1 ++ v.*2.
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite list_subseteq_cons_iff.
+  split; [now constructor|].
+  rewrite IHn.
+  rewrite vec_to_list_map, fsts_prod_map, snds_prod_map.
+  clear IHn.
+  intros k.
+  rewrite elem_of_app.
+  rewrite 2 elem_of_list_fmap.
+  setoid_rewrite fn_lookup_singleton_case.
+  firstorder case_decide; set_solver.
+Qed.
+
+Lemma fsts_propogate_subst_supseteq {n} (v : vec _ n) :
+  v.*1 ⊆ (propogate_subst v).*1.
+Proof.
+  induction n as [|n IHn]; [now induction v using vec_0_inv|].
+  induction v as [(i, o) v] using vec_S_inv.
+  cbn.
+  rewrite list_subseteq_cons_iff.
+  split; [now constructor|].
+  etransitivity. 2:{
+    apply list_subseteq_skip.
+    apply IHn.
+  }
+  rewrite vec_to_list_map, fsts_prod_map.
+  intros k.
+  rewrite elem_of_cons.
+  rewrite (elem_of_list_fmap {[_:=_]}).
+  setoid_rewrite fn_lookup_singleton_case.
+  intros Hk.
+  destruct_decide (decide (k = i)); [now left|].
+  right.
+  exists k.
+  rewrite decide_False by done.
+  done.
+Qed.
+
+Lemma subst_by_vec_propogate_subst_vmap_bcons_false_true_vzip {n}
+  (v : vec positive n) p :
+  subst_by_vec (propogate_subst
+    (vmap (prod_map (bcons false) (bcons true)) (vzip v v)))
+    (bcons false p) =
+  if decide (p ∈ vec_to_list v) then bcons true p else bcons false p.
+Proof.
+  rewrite subst_by_vec_helper_bcons_false.
+  - apply decide_ext.
+    split. 2:{
+      intros Hp.
+      apply fsts_propogate_subst_supseteq.
+      rewrite vec_to_list_map, fsts_prod_map.
+      apply elem_of_list_fmap_1.
+      rewrite vec_to_list_zip_with.
+      now rewrite fst_zip by done.
+    }
+    intros Hp%fsts_propogate_subst_subseteq.
+    rewrite vec_to_list_map, fsts_prod_map, snds_prod_map, 
+      vec_to_list_zip_with, fst_zip, snd_zip in Hp by done.
+    set_solver.
+  - apply propogate_subst_vmap_bcons_false_true_vzip_like_strong.
+    rewrite vec_to_list_map, Forall_fmap.
+    rewrite vec_to_list_zip_with.
+    rewrite Forall_zip_with by done.
+    apply Forall_Forall2_diag.
+    rewrite Forall_forall.
+    auto.
+Qed.
+
+Lemma compose_graphs_unsafe_to_compose_graphs {n m o}
+  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
+  tgl.(outputs) = tgr.(inputs) ->
+  vertices tgl ∖ list_to_set (outputs tgl) ##
+  vertices tgr ∖ list_to_set (inputs tgr) ->
+  hyperedges tgl ##ₘ hyperedges tgr ->
+  compose_graphs_unsafe tgl tgr ≡ᵢ compose_graphs tgl tgr.
+Proof.
+  intros Hoi Hvdisj Hdisj.
+  rewrite <- compose_graphs_aux_to_compose_graphs_unsafe by done.
+  rewrite <- compose_graphs_alt_aux_correct by done.
+  rewrite <- compose_graphs_alt_correct.
+  apply add_top_loops_struct_isomorphic_strong.
+  cbn.
+  rewrite 4 vsplitl_app.
+  transitivity (relabel_graph
+     (subst_by_vec
+        (propogate_subst
+           (vzip (vmap (bcons false) (outputs tgl))
+              (vmap (bcons true) (inputs tgr)))))
+     (swapped_stack_graphs_aux (relabel_graph (bcons false) tgl)
+      (relabel_graph (bcons true) tgr))). 2:{
+    set (f := (fun i => if decide (i ∈ dom (hyperedges tgl)) then bcons false i else bcons true i)).
+    assert (Hf : Inj eq eq f). 1:{
+      intros i j.
+      unfold f.
+      do 2 case_decide; now intros ?%(inj2 bcons).
+    }
+    rewrite (isomorphic_reindex_graph f).
+    apply eq_reflexivity.
+    rewrite reindex_relabel_graph.
+    rewrite reindex_swapped_stack_graphs_aux by apply _.
+    f_equal.
+    unfold swapped_stack_graphs.
+    rewrite 2 reindex_relabel_graph.
+    f_equal; f_equal.
+    - apply reindex_graph_ext_strong.
+      intros i _ Hi%elem_of_dom_2.
+      unfold f.
+      now rewrite decide_True by done.
+    - apply reindex_graph_ext_strong.
+      intros i _ Hi%elem_of_dom_2.
+      unfold f.
+      rewrite map_disjoint_dom in Hdisj.
+      now rewrite decide_False by now intros ?%Hdisj.
+  }
+  set (f := (fun i =>
+    if decide (i ∈ vertices tgl ∖ list_to_set (outputs tgl)) then
+    bcons false i else bcons true i)).
+  assert (Hf : Inj eq eq f). 1:{
+    intros i j.
+    unfold f.
+    do 2 case_decide; now intros ?%(inj2 bcons).
+  }
+  rewrite (isomorphic_relabel_graph f).
+  rewrite relabel_graph_compose, 2 relabel_swapped_stack_graphs_aux,
+    2 relabel_graph_compose.
+  apply eq_reflexivity.
+  f_equal.
+  - apply relabel_graph_ext_strong.
+    intros i Hi.
+    cbn.
+    rewrite Hoi.
+    rewrite vzip_map.
+    rewrite subst_by_vec_id.
+    rewrite subst_by_vec_propogate_subst_vmap_bcons_false_true_vzip.
+    case_decide as Hii.
+    + cbn.
+      unfold f.
+      now rewrite Hoi, decide_False by now rewrite elem_of_difference, elem_of_list_to_set.
+    + unfold f.
+      now rewrite Hoi, decide_True by now rewrite elem_of_difference, elem_of_list_to_set.
+  - apply relabel_graph_ext_strong.
+    intros i Hi.
+    cbn.
+    rewrite Hoi.
+    rewrite vzip_map.
+    rewrite subst_by_vec_id.
+    rewrite subst_by_vec_helper_bcons_true_id by
+      apply propogate_subst_vmap_bcons_false_true_vzip.
+    unfold f.
+    case_decide as Hii; [|done].
+    apply Hvdisj in Hii as Hii'.
+    rewrite elem_of_difference in Hii, Hii'.
+    rewrite Hoi in Hii.
+    tauto.
+Qed.
+
+
+(* Lemma compose_graphs_aux_struct_isomorphic {n m o}
+  (cohg1 cohg1' : CospanHyperGraph T n m) (cohg2 cohg2' : CospanHyperGraph T m o) :
+  cohg1 ≡ᵢ cohg1' -> cohg2 ≡ᵢ cohg2' ->
+  hyperedges cohg1 ##ₘ hyperedges cohg2 -> hyperedges cohg1' ##ₘ hyperedges cohg2' ->
+  compose_graphs_aux cohg1 cohg2 ≡ᵢ compose_graphs_aux cohg1' cohg2'.
+Proof.
+  intros Heq1 Heq2 Hdisj1 Hdisj2.
+  rewrite <- 2 compose_graphs_alt_aux_correct by done.
+  apply add_top_loops_struct_isomorphic.
+  now apply swapped_stack_graphs_aux_struct_isomorphic.
+Qed. *)
+
 
   Section Paths.
 
@@ -339,12 +1709,12 @@ Qed.
     Definition predecessors (h : HyperEdge T) : Pmap (HyperEdge T) :=
       map_filter (fun ka => predecessor ka.2 h) _ H.(hyperedges).
 
-    Definition all_successors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter 
-      (fun kh' => Exists (fun kh => successor kh'.2 kh.2) (map_to_list G)) 
+    Definition all_successors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter
+      (fun kh' => Exists (fun kh => successor kh'.2 kh.2) (map_to_list G))
       _ H.(hyperedges).
-    
-    Definition all_predecessors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter 
-      (fun kh' => Exists (fun kh => predecessor kh'.2 kh.2) (map_to_list G)) 
+
+    Definition all_predecessors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter
+      (fun kh' => Exists (fun kh => predecessor kh'.2 kh.2) (map_to_list G))
       _ H.(hyperedges).
 
     Fixpoint all_paths_aux
@@ -379,7 +1749,7 @@ Qed.
 
     Instance successor_idx_decide (p p' : positive) (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p'))
       : Decision (successor_idx p p' Sp Sp') := _.
-    
+
     Instance predecessor_idx_decide (p p' : positive) (Sp : is_Some (H.(hyperedges) !! p)) (Sp' : is_Some (H.(hyperedges) !! p'))
       : Decision (predecessor_idx p p' Sp Sp') := _.
 
@@ -398,7 +1768,7 @@ Qed.
       match H.(hyperedges) !! p with
       | Some h => predecessors h
       | None => ∅
-      end.  
+      end.
 
     Definition path_pred_path_symm (h h' : HyperEdge T) :
       path h h' <-> pred_path h' h.
@@ -420,7 +1790,7 @@ Qed.
           * now apply tc_once.
     Qed.
 
-    Definition v_pred (v : positive) (h : HyperEdge T) := 
+    Definition v_pred (v : positive) (h : HyperEdge T) :=
       v ∈ h.1.2.
     Definition v_succ (v : positive) (h : HyperEdge T) :=
       v ∈ h.2.
@@ -440,7 +1810,7 @@ Qed.
         + destruct IHl.
           * left; now right.
           * right. intros C.
-            inversion C; auto. 
+            inversion C; auto.
     Defined.
 
     Definition v_succ_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h).
@@ -456,7 +1826,7 @@ Qed.
         + destruct IHl0.
           * left; now right.
           * right. intros C.
-            inversion C; auto. 
+            inversion C; auto.
     Defined.
 
       Instance vpred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h) := {
@@ -473,13 +1843,13 @@ Qed.
 
   (* Need to produce : list (positive * (list positive * list positive)) *)
   (* Representing the Vertex Idx and the edge indices it is incident to *)
-    Definition vertex_map : Pmap (list positive * list positive) := 
+    Definition vertex_map : Pmap (list positive * list positive) :=
       list_to_map(map_to_list H.(hyperedges) ≫= (fun pe =>
-      let label := pe.1 in 
+      let label := pe.1 in
       (* Edge Idx *)
-      let lefts := pe.2.1.2 in 
+      let lefts := pe.2.1.2 in
       (* All the vertices where this edge is right-incident *)
-      let rights := pe.2.2 in 
+      let rights := pe.2.2 in
       (* All the vertices where this edge is left-incident *)
       ((fun x => (x, (@nil positive, [label]))) <$> lefts) ++
       ((fun x => (x, ([label], @nil positive))) <$> rights))).
@@ -523,7 +1893,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     map_filter (fun ka => (ka.1 ∈ L)) _ H.(hyperedges).
 
   Definition subgraph_index (H : HyperGraph T) (L : list positive) : HyperGraph T :=
-  {| hyperedges := subgraph_index_aux H L; 
+  {| hyperedges := subgraph_index_aux H L;
      hypervertices := ∅ |}.
 
   Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
@@ -572,10 +1942,10 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     - reflexivity.
     - simpl.
       rewrite IHl; auto.
-  Qed.  
+  Qed.
 
-  Lemma list_to_vec_app {A B} {SA : Singleton A B} {UB : Union B} {EB : Empty B} {EAB : ElemOf A B} {LEQ : LeibnizEquiv B} {SSAB : SemiSet A B} (v u : list A) : 
-    @list_to_set A B SA EB UB (list_to_vec v +++ list_to_vec u) = 
+  Lemma list_to_vec_app {A B} {SA : Singleton A B} {UB : Union B} {EB : Empty B} {EAB : ElemOf A B} {LEQ : LeibnizEquiv B} {SSAB : SemiSet A B} (v u : list A) :
+    @list_to_set A B SA EB UB (list_to_vec v +++ list_to_vec u) =
     @list_to_set A B SA EB UB (list_to_vec v) ∪ list_to_set (list_to_vec u).
   Proof.
     induction v.
@@ -635,7 +2005,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
         * apply union_subseteq_r'.
           apply intersection_subseteq_r.
         * apply union_subseteq_r'.
-          apply intersection_subseteq_r. 
+          apply intersection_subseteq_r.
   Qed.
 
 End DPO.
@@ -651,9 +2021,9 @@ End DPO.
     - exact ∅.
   Defined.
 
-  Definition ex_1 : HyperGraph positive := 
+  Definition ex_1 : HyperGraph positive :=
     {| hyperedges := {[ 1 := (1, [2; 1], [3]) ]}; hypervertices := ∅ |}.
-  
+
   Definition ex_2 : HyperGraph positive :=
     {| hyperedges := {[ 2 := (2, [1; 2; 3], []) ]}; hypervertices := ∅ |}.
 
@@ -678,7 +2048,7 @@ End DPO.
   Compute (predecessors example (5, [3; 4], [])).
   Compute (elements (dom (predecessors_idx example 4))).
 
-Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signature 
+Add Parametric Morphism {T n m n' m'} : (@stack_graphs T n m n' m') with signature
   isomorphic ==> isomorphic ==> isomorphic as stack_graphs_isomorphic_mor.
 Proof.
   intros; now apply stack_graphs_isomorphic.

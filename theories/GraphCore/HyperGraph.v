@@ -50,6 +50,13 @@ Definition relabel_hg {T} (f : positive -> positive) (hg : HyperGraph T) :
   HyperGraph T :=
   mk_hg (relabel_abs f <$> hg.(hyperedges)) (set_map f hg.(hypervertices)).
 
+Definition hg_add_vertices {T} (hg : HyperGraph T) (vs : Pset) : HyperGraph T :=
+  mk_hg hg.(hyperedges) (vs ∪ hg.(hypervertices)).
+
+Definition referrenced_vertices_hg {T} (hg : HyperGraph T) : Pset :=
+  list_to_set $ map_to_list hg.(hyperedges)
+    ≫= λ k_flu, k_flu.2.1.2 ++ k_flu.2.2.
+
 Definition vertices_hg {T} (hg : HyperGraph T) : Pset :=
   list_to_set (map_to_list (hg.(hyperedges)) ≫=
     λ k_flu : (positive*(T*list _*list _)), (k_flu.2.1.2 ++ k_flu.2.2)) ∪
@@ -158,51 +165,286 @@ Proof.
   done.
 Qed.
 
-(* Notation HyperGraph T := (Pmap (T * list positive * list positive)).
 
-Definition disj_union_hypergraph {T} (hg0 hg1 : HyperGraph T) : HyperGraph T :=
-  (kmap (bcons false) (relabel_abs (bcons false) <$> hg0) ∪
-    (kmap (bcons true) (relabel_abs (bcons true) <$> hg1))).
+Import TESyntax.
 
-Instance Disjoint_union_hypergraph {T} : DisjUnion (HyperGraph T) :={
-  disj_union := disj_union_hypergraph
-}.
 
-Definition targets {T} (he : HyperEdge T) : list positive :=
-  snd he.
-Definition sources {T} (he : HyperEdge T) : list positive :=
-  snd (fst he).
+Section HyperGraphFacts.
 
-Definition in_target {T} (v e : positive) (hg : HyperGraph T) :=
-  is_Some (In v <$> (targets <$> (hg !! e))).
+Context {T : Type}.
 
-Lemma in_target_means_lookup_succeeds {T} (v e : positive) (hg : HyperGraph T) :
-  in_target v e hg -> is_Some (hg !! e).
+Implicit Types (hg : HyperGraph T).
+
+Lemma elem_of_vertices_hg hg r :
+  r ∈ vertices_hg hg <->
+  (exists k flu, hg.(hyperedges) !! k = Some flu /\
+      (r ∈ flu.1.2 \/ r ∈ flu.2)) \/
+    r ∈ hg.(hypervertices).
 Proof.
-  intros.
-  inversion H.
-  destruct (hg !! e).
-  - easy.
-  - contradict H0; easy.
+  unfold vertices_hg.
+  rewrite elem_of_union.
+  f_equiv.
+  rewrite elem_of_list_to_set, elem_of_list_bind.
+  setoid_rewrite elem_of_app.
+  rewrite exists_pair.
+  cbn.
+  setoid_rewrite elem_of_map_to_list.
+  naive_solver.
 Qed.
 
-Definition in_source {T} (v e : positive) (hg : HyperGraph T) :=
-  is_Some (In v <$> (sources <$> (hg !! e))).
-
-Definition predecessor {T} (h h' : positive) (hg : HyperGraph T) :=
-  exists x, in_target x h hg /\ in_source x h' hg.
-
-Definition successor {T} (h h' : positive) (hg : HyperGraph T) :=
-  exists x, in_target x h' hg /\ in_source x h hg.
-
-
-Local Open Scope positive.
-Definition example_disj_union : HyperGraph positive :=
-  ({[ 1 := (1, [], []) ; 2 := (2, [], []) ]} ⊎ {[ 1 := (2, [1], [1]) ]}).
-
-Definition example_1 : HyperGraph positive := {[ 1:= (1, [], [])]}.
-
-Lemma disjoint_example : example_1 ##ₘ {[ 2 := (2, [], []) ]}.
+Lemma relabel_hg_ext_strong f g (hg : HyperGraph T) :
+  (forall i, i ∈ vertices_hg hg -> f i = g i) ->
+  relabel_hg f hg = relabel_hg g hg.
 Proof.
-  compute_done.
-Qed. *)
+  intros Hfg.
+  apply hg_ext; cbn.
+  - apply map_fmap_ext.
+    intros i x Hix.
+    apply relabel_abs_ext_strong; intros r Hr.
+    apply Hfg.
+    rewrite elem_of_vertices_hg.
+    rewrite elem_of_app in Hr.
+    left; eauto.
+  - apply set_map_ext_L.
+    intros i Hi; apply Hfg.
+    unfold vertices_hg.
+    now apply elem_of_union_r.
+Qed.
+
+Lemma relabel_hg_ext f g (hg : HyperGraph T) :
+  (forall i, f i = g i) ->
+  relabel_hg f hg = relabel_hg g hg.
+Proof.
+  intros; apply relabel_hg_ext_strong; auto.
+Qed.
+
+Lemma relabel_hg_id hg : relabel_hg id hg = hg.
+Proof.
+  apply hg_ext; cbn.
+  - erewrite map_fmap_ext; [apply map_fmap_id|].
+    intros; now apply relabel_abs_id.
+  - apply set_map_id_L.
+Qed.
+
+Lemma relabel_hg_id_strong f hg :
+  (forall i, i ∈ vertices_hg hg -> f i = i) ->
+  relabel_hg f hg = hg.
+Proof.
+  intros ->%(relabel_hg_ext_strong f id hg).
+  apply relabel_hg_id.
+Qed.
+
+Lemma relabel_hg_id' f hg :
+  (forall i, f i = i) ->
+  relabel_hg f hg = hg.
+Proof.
+  auto using relabel_hg_id_strong.
+Qed.
+
+Lemma relabel_hg_compose f g hg :
+  relabel_hg g (relabel_hg f hg) =
+  relabel_hg (g ∘ f) hg.
+Proof.
+  apply hg_ext; [|cbn; now rewrite set_map_compose_L].
+  cbn.
+  rewrite <- map_fmap_compose.
+  apply map_fmap_ext.
+  intros; apply relabel_abs_compose.
+Qed.
+
+
+Lemma reindex_hg_ext_strong f g hg :
+  (forall i tabs, hg.(hyperedges) !! i = Some tabs -> f i = g i) ->
+  reindex_hg f hg = reindex_hg g hg.
+Proof.
+  intros Hfg.
+  apply hg_ext; [cbn|done].
+  now apply kmap_ext.
+Qed.
+
+Lemma reindex_hg_ext f g hg :
+  (forall i, f i = g i) -> reindex_hg f hg = reindex_hg g hg.
+Proof.
+  auto using reindex_hg_ext_strong.
+Qed.
+
+Lemma reindex_hg_id hg : reindex_hg id hg = hg.
+Proof.
+  apply hg_ext; cbn; [cbn|done].
+  apply kmap_id.
+Qed.
+
+Lemma reindex_hg_id_strong f hg :
+  (forall i tabs, hg.(hyperedges) !! i = Some tabs -> f i = i) ->
+  reindex_hg f hg = hg.
+Proof.
+  intros ->%(reindex_hg_ext_strong f id hg).
+  apply reindex_hg_id.
+Qed.
+
+Lemma reindex_hg_id' f hg :
+  (forall i, f i = i) ->
+  reindex_hg f hg = hg.
+Proof.
+  auto using reindex_hg_id_strong.
+Qed.
+
+
+Lemma reindex_hg_compose_strong' f g `{Hf : !Inj eq eq f} hg :
+  (forall i j, i ∈ dom hg.(hyperedges) -> j ∈ dom hg.(hyperedges) ->
+    g (f i) = g (f j) -> f i = f j) ->
+  reindex_hg g (reindex_hg f hg) =
+  reindex_hg (g ∘ f) hg.
+Proof.
+  intros Hg.
+  apply hg_ext; [cbn|done].
+  apply map_eq; intros i.
+  apply option_eq; intros [[t low] up].
+  rewrite lookup_kmap_Some_full_gen_dom by
+    now rewrite dom_kmap', set_Forall2_map; exact Hg.
+  rewrite lookup_kmap_Some_full_gen_dom by now intros ? ? ? ? ?%Hg%Hf.
+  setoid_rewrite (lookup_kmap_Some _).
+  naive_solver.
+Qed.
+
+Lemma reindex_hg_compose f g `{!Inj eq eq f, !Inj eq eq g} hg :
+  reindex_hg g (reindex_hg f hg) =
+  reindex_hg (g ∘ f) hg.
+Proof.
+  apply hg_ext; [cbn|done..].
+  apply map_eq; intros i.
+  apply option_eq; intros [[t low] up].
+  rewrite 2 (lookup_kmap_Some _).
+  setoid_rewrite (lookup_kmap_Some _).
+  naive_solver.
+Qed.
+
+
+Lemma reindex_relabel_hg fvert fedge hg :
+  reindex_hg fvert (relabel_hg fedge hg) =
+  relabel_hg fedge (reindex_hg fvert hg).
+Proof.
+  apply hg_ext; [|done..].
+  cbn.
+  apply kmap_fmap'.
+Qed.
+
+
+
+Lemma vertices_hg_union (hg hg' : HyperGraph T) :
+  (hg :> Pmap _) ##ₘ (hg' :> Pmap _) ->
+  vertices_hg (hg ∪ hg') =
+  vertices_hg hg ∪ vertices_hg hg'.
+Proof.
+  intros Hdisj.
+  apply set_eq.
+  intros x.
+  rewrite elem_of_union, 3 elem_of_vertices_hg.
+  change (hypervertices (_ ∪ _)) with (hypervertices hg ∪ hypervertices hg').
+  rewrite elem_of_union.
+  setoid_rewrite lookup_union_Some; [|done].
+  naive_solver.
+Qed.
+
+Lemma vertices_hg_add_vertices (hg : HyperGraph T) vs :
+  vertices_hg (hg_add_vertices hg vs) = vertices_hg hg ∪ vs.
+Proof.
+  unfold vertices_hg; cbn.
+  rewrite <- (union_assoc_L _).
+  f_equal.
+  apply union_comm_L.
+Qed.
+
+Lemma referrenced_vertices_hg_add_vertices (hg : HyperGraph T) vs :
+  referrenced_vertices_hg (hg_add_vertices hg vs) =
+  referrenced_vertices_hg hg.
+Proof.
+  done.
+Qed.
+
+Lemma vertices_hg_decomp (hg : HyperGraph T) :
+  vertices_hg hg = referrenced_vertices_hg hg ∪ hypervertices hg.
+Proof.
+  done.
+Qed.
+
+Lemma vertices_relabel_hg f hg :
+  vertices_hg (relabel_hg f hg) = set_map f (vertices_hg hg).
+Proof.
+  unfold vertices_hg.
+  cbn.
+  rewrite set_map_union_L, set_map_list_to_set_L.
+  f_equiv.
+  rewrite map_to_list_fmap, list_bind_fmap, list_fmap_bind.
+  unfold compose; cbn.
+  f_equal.
+  apply list_bind_ext; [|done].
+  intros [k [[idx low] up]].
+  cbn.
+  now rewrite fmap_app.
+Qed.
+
+Lemma vertices_reindex_hg f `{Hfint : !Inj eq eq f} hg :
+  vertices_hg (reindex_hg f hg) = vertices_hg hg.
+Proof.
+  unfold vertices_hg.
+  cbn.
+  f_equal.
+  unfold kmap.
+  unfold_leibniz.
+  apply list_to_set_perm.
+  rewrite map_to_list_to_map by now
+    rewrite fsts_prod_map, (NoDup_fmap _); apply NoDup_fst_map_to_list.
+  rewrite list_fmap_bind.
+  reflexivity.
+Qed.
+
+
+Lemma relabel_hg_union f (hg hg' : HyperGraph T) :
+  relabel_hg f (hg ∪ hg') =
+  relabel_hg f hg ∪ relabel_hg f hg'.
+Proof.
+  apply hg_ext; cbn.
+  - now rewrite map_fmap_union.
+  - now rewrite set_map_union_L.
+Qed.
+
+Lemma reindex_hg_union f `{Hf : !Inj eq eq f} (hg hg' : HyperGraph T) :
+  reindex_hg f (hg ∪ hg') =
+  reindex_hg f hg ∪ reindex_hg f hg'.
+Proof.
+  apply hg_ext; cbn.
+  - apply (kmap_union _).
+  - done.
+Qed.
+
+Lemma hg_add_vertices_empty (hg : HyperGraph T) :
+  hg_add_vertices hg ∅ = hg.
+Proof.
+  apply hg_ext; [done|].
+  cbn -[union].
+  apply union_empty_l_L.
+Qed.
+
+Lemma hg_add_vertices_union (hg : HyperGraph T) vs vs' :
+  hg_add_vertices (hg_add_vertices hg vs) vs' =
+  hg_add_vertices hg (vs ∪ vs').
+Proof.
+  apply hg_ext; [done|].
+  cbn -[union].
+  rewrite (union_assoc_L _).
+  f_equal.
+  apply union_comm_L.
+Qed.
+
+Lemma relabel_hg_add_vertices f (hg : HyperGraph T) vs :
+  relabel_hg f (hg_add_vertices hg vs) =
+  hg_add_vertices (relabel_hg f hg) (set_map f vs).
+Proof.
+  apply hg_ext; [done|].
+  cbn.
+  now rewrite set_map_union_L.
+Qed.
+
+End HyperGraphFacts.
+

@@ -545,6 +545,8 @@ Lemma subrel {A} {R1 R2 : relation A} `{H12 : !subrelation R1 R2} {x y} :
 Proof.
   firstorder.
 Qed.
+Definition subrel' := @subrel.
+#[global] Arguments subrel' {_} _ {_ _} {_ _} _ : assert.
 Lemma Reflexive_iff_subseteq {A} (R : relation A) :
   Reflexive R <-> eq ⊆@{relation A} R.
 Proof.
