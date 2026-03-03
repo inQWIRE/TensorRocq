@@ -1475,32 +1475,33 @@ Qed. *)
     Instance predecessor_decide (h h' : HyperEdge T) : Decision (predecessor h h') := _.
 
     Definition successors (h : HyperEdge T) : Pmap (HyperEdge T) :=
-      map_filter (fun ka => successor ka.2 h) _ H.(hyperedges).
+      filter (fun ka => successor ka.2 h) H.(hyperedges).
 
     Definition predecessors (h : HyperEdge T) : Pmap (HyperEdge T) :=
-      map_filter (fun ka => predecessor ka.2 h) _ H.(hyperedges).
+      filter (fun ka => predecessor ka.2 h) H.(hyperedges).
 
-    Definition all_successors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter
-      (fun kh' => Exists (fun kh => successor kh'.2 kh.2) (map_to_list G))
-      _ H.(hyperedges).
+    Definition all_successors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) :=
+      filter (fun kh' => Exists (fun kh => successor kh'.2 kh.2) (map_to_list G))
+      H.(hyperedges).
 
-    Definition all_predecessors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) := map_filter
+    Definition all_predecessors (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) :=
+      filter
       (fun kh' => Exists (fun kh => predecessor kh'.2 kh.2) (map_to_list G))
-      _ H.(hyperedges).
+      H.(hyperedges).
 
     Fixpoint all_paths_aux
       (G : Pmap (HyperEdge T)) (n : nat) : Pmap (HyperEdge T) :=
     match n with
     | 0     => ∅
     | (S k) => let step := all_predecessors G in
-      step ∖ G ∪ all_paths_aux step k
+      step ∪ all_paths_aux step k
     end.
 
     Definition all_paths (G : Pmap (HyperEdge T)) : Pmap (HyperEdge T) :=
-      all_paths_aux G (length (map_to_list H.(hyperedges))).
+      all_paths_aux G (length (map_to_list H.(hyperedges))) ∖ G.
 
     Definition all_paths_idx (pdx : list positive) : Pmap (HyperEdge T) :=
-      all_paths (map_filter (fun ka => ka.1 ∈ pdx) _ (H.(hyperedges))).
+      all_paths (filter (fun ka => ka.1 ∈ pdx) (H.(hyperedges))).
 
     Fixpoint all_predpaths
       (G : Pmap (HyperEdge T)) (n : nat) : Pmap (HyperEdge T) :=
@@ -1571,41 +1572,18 @@ Qed. *)
     Definition v_pred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h).
     Proof.
       unfold v_pred.
-      destruct h as [[]].
-      simpl.
-      induction l.
-      - right. intros X.
-        inversion X.
-      - specialize (decide (v = a)) as [].
-        + subst; left; left.
-        + destruct IHl.
-          * left; now right.
-          * right. intros C.
-            inversion C; auto.
+      apply _.
     Defined.
 
     Definition v_succ_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h).
     Proof.
       unfold v_succ.
-      destruct h as [[]].
-      simpl.
-      induction l0.
-      - right. intros X.
-        inversion X.
-      - specialize (decide (v = a)) as [].
-        + subst; left; left.
-        + destruct IHl0.
-          * left; now right.
-          * right. intros C.
-            inversion C; auto.
-    Defined.
+      apply _.
+    Qed.
 
-      Instance vpred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h) := {
-        decide := v_pred_decide v h
-      }.
-      Instance vsucc_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h) := {
-        decide := v_succ_decide v h
-      }.
+    Instance vpred_decide (v : positive) (h : HyperEdge T) : Decision (v_pred v h) := (_ : Decision (_ ∈ _)).
+
+    Instance vsucc_decide (v : positive) (h : HyperEdge T) : Decision (v_succ v h) := (_ : Decision (_ ∈ _)).
 
     (* Definition all_incident_vertices :=
       (map_to_set (fun k v => list_to_set v.2) H.(hyperedges)). *)
@@ -1660,30 +1638,30 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   Section decompose_defs.
 
   Context (H : HyperGraph T) (L : list positive).
-  
+
   Definition decompose_L1 : HyperGraph T :=
     mk_sub_hg H (subgraph_index_aux H L).
-  
+
   Definition decompose_C1 : HyperGraph T :=
     mk_sub_hg H (all_paths_idx H L).
 
-  Definition decompose_C2 (C1 : HyperGraph T) (isolated : Pset) : HyperGraph T := 
+  Definition decompose_C2 (C1 : HyperGraph T) (isolated : Pset) : HyperGraph T :=
     hg_add_vertices (mk_sub_hg H ((hyperedges H) ∖ (C1 ∪ subgraph_index H L)))
       isolated.
-  
+
   Definition decompose_L1v : Pset :=
     vertices_hg decompose_L1.
-  
+
   Definition decompose_C1v : Pset :=
     vertices_hg decompose_C1.
-  
+
   Definition decompose_C2v C1 isolated : Pset :=
     vertices_hg (decompose_C2 C1 isolated).
 
 
   Definition decompose_iset (inputs : Pset) : Pset :=
     decompose_L1v ∩ (decompose_C1v ∪ inputs).
-  
+
   Definition decompose_jset C1 isolated (outputs : Pset) : Pset :=
     decompose_L1v ∩ (decompose_C2v C1 isolated ∪ outputs).
 
@@ -1693,19 +1671,19 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   End decompose_defs.
 
   Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
-    let ins := list_to_set H.(inputs) in 
-    let outs := list_to_set H.(outputs) in 
-    let isolated := isolated_vertices H in 
+    let ins := list_to_set H.(inputs) in
+    let outs := list_to_set H.(outputs) in
+    let isolated := isolated_vertices H in
     let L1 := decompose_L1 H L in
     let C1 := decompose_C1 H L in
-    let C2 := decompose_C2 H L C1 isolated in 
+    let C2 := decompose_C2 H L C1 isolated in
 
     let i := list_to_vec(elements(decompose_iset H L ins)) in
     let j := list_to_vec(elements(decompose_jset H L C1 isolated outs)) in
     let k := list_to_vec(elements(decompose_kset H L C1 isolated ins outs)) in
     compose_graphs_unsafe (H.(inputs) -> C1 <- (k +++ i)) (compose_graphs_unsafe (
       stack_graphs_aux (k -> ∅ <- k) (i -> L1 <- j)) (
-    k +++ j -> 
+    k +++ j ->
       C2
     <- H.(outputs)
     )).
@@ -1724,37 +1702,239 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   let k := list_to_vec(elements(((C1' ∪ Hin) ∩ (C2' ∪ Hout) ∖ L1'))) in
   compose_graphs_unsafe (
   H.(inputs) -> {| hyperedges := C1; hypervertices := ∅ |}  <- (k +++ i)) (compose_graphs_unsafe ((k +++ i) -> L1 <- (k +++ j)) (
-  k +++ j -> 
-    {| hyperedges := C2; hypervertices := isolated_vertices H |} 
+  k +++ j ->
+    {| hyperedges := C2; hypervertices := isolated_vertices H |}
   <- H.(outputs)
   )). *)
 
-  Lemma all_paths_subset (H L : HyperGraph T) :
-    all_paths H L ⊆ H.
+  Lemma all_paths_aux_subset (H : HyperGraph T) L n :
+    all_paths_aux H L n ⊆ H.
   Proof.
-    generalize dependent L.
-    unfold all_paths.
-    induction (length (map_to_list H.(hyperedges))); intros.
+    revert L; induction n; intros L.
     - apply map_empty_subseteq.
     - simpl.
       apply map_union_least.
-      + apply map_subseteq_difference_l.
-        apply map_filter_subseteq.
+      + apply map_filter_subseteq.
       + apply (IHn (mk_hg (all_predecessors H L) ∅)).
+  Qed.
+
+
+  Lemma all_paths_subset (H : HyperGraph T) L :
+    all_paths H L ⊆ H.
+  Proof.
+    apply map_subseteq_difference_l.
+    apply all_paths_aux_subset.
+  Qed.
+
+  Lemma all_paths_disjoint H L :
+    all_paths H L ##ₘ L.
+  Proof.
+    now apply map_disjoint_difference_l.
   Qed.
 
   Lemma all_paths_idx_subset {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
   Proof.
     unfold all_paths_idx.
-    remember ((map_filter (λ ka : positive * HyperEdge T, ka.1 ∈ L) (λ x : positive * HyperEdge T, decide_rel elem_of x.1 L) H.(hyperedges))) as L'.
-    apply (all_paths_subset H (mk_hg L' ∅)).
+    refine (all_paths_subset H (mk_hg _ ∅)).
   Qed.
-  
-  Lemma all_paths_idx_dom_disjoint {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
+
+  (* FIXME: Move *)
+  Lemma map_to_list_union_agree `{FinMap K M} {A} (m1 m2 : M A) : map_agree m1 m2 ->
+    map_to_list (m1 ∪ m2) ≡ map_to_list m1 ++ map_to_list m2.
   Proof.
+    intros Hagree.
+    intros (k, v).
+    rewrite elem_of_app, 3 elem_of_map_to_list.
+    rewrite lookup_union.
+    specialize (Hagree k).
+    destruct (m1 !! k), (m2 !! k);
+    naive_solver.
+  Qed.
+  Lemma elem_of_map_to_list_difference_agree `{FinMap K M} {A} (m1 m2 : M A) k v :
+    map_agree m1 m2 ->
+    (k, v) ∈ map_to_list (m1 ∖ m2) <->
+    (k, v) ∈ map_to_list m1 /\ (k, v) ∉ map_to_list m2.
+  Proof.
+    intros Hagree.
+    rewrite 3 elem_of_map_to_list.
+    rewrite lookup_difference.
+    specialize (Hagree k).
+    destruct (m1 !! k), (m2 !! k);
+    naive_solver.
+  Qed.
+  Lemma elem_of_map_to_list_difference `{FinMap K M} {A} (m1 m2 : M A) k v :
+    (k, v) ∈ map_to_list (m1 ∖ m2) <->
+    (k, v) ∈ map_to_list m1 /\ m2 !! k = None.
+  Proof.
+    rewrite 2 elem_of_map_to_list.
+    rewrite lookup_difference.
+    destruct (m1 !! k), (m2 !! k);
+    naive_solver.
+  Qed.
+  Lemma TlRel_skip `(R : relation A) (l : list A) (a b : A) :
+    l <> [] ->
+    TlRel R a l -> TlRel R a (b :: l).
+  Proof.
+    intros Hl Hrel.
+    induction Hrel; [done|].
+    now apply (TlRel_cons _ _ _ (_ :: _)).
+  Qed.
+  Lemma TlRel_snoc `(R : relation A) (l : list A) a b :
+    TlRel R b (l ++ [a]) <-> R a b.
+  Proof.
+    split; [|eauto using TlRel].
+    remember (l ++ [a]) as la eqn:Hla.
+    intros Hrel.
+    induction Hrel; [now destruct l|].
+    apply (f_equal last) in Hla.
+    rewrite 2 last_app in Hla.
+    cbn in Hla.
+    congruence.
+  Qed.
+  Lemma Sorted_snoc_inv `(R : relation A) (l : list A) (x : A) :
+    Sorted R (l ++ [x]) -> Sorted R l /\ TlRel R x l.
+  Proof.
+    induction l.
+    - intros; repeat constructor.
+    - cbn.
+      intros [[Hl Hxl]%IHl Halx]%Sorted_inv.
+      destruct l.
+      + split; [repeat constructor|].
+        refine  (TlRel_cons _ _ _ [] _).
+        cbn in Halx.
+        now apply HdRel_inv in Halx.
+      + cbn in Halx.
+        split.
+        * constructor; [done|].
+          apply HdRel_inv in Halx.
+          now constructor.
+        * now apply TlRel_skip; [done|].
+  Qed.
+  Lemma snoc_case `(P : list A -> Prop)
+    (HPnil : P nil)
+    (HPsnoc : forall l a, P (l ++ [a])) :
+    forall l, P l.
+  Proof.
+    intros l.
+    induction l using rev_ind; auto.
+  Qed.
+
+
+
+  Lemma all_predecessors_spec H L i h :
+    (i, h) ∈ map_to_list (all_predecessors H L) <->
+    (i, h) ∈ map_to_list (H :> Pmap _) /\
+    exists i' h', (i', h') ∈ map_to_list L /\
+      predecessor h h'.
+  Proof.
+    rewrite elem_of_map_to_list.
+    unfold all_predecessors.
+    rewrite map_lookup_filter_Some.
+    rewrite elem_of_map_to_list.
+    f_equiv.
+    rewrite Exists_exists, exists_pair.
+    done.
+  Qed.
+
+
+  Lemma all_paths_aux_spec H L n i h :
+    (i, h) ∈ map_to_list (all_paths_aux H L n) <->
+    exists i' h' ihs, (i', h') ∈ map_to_list L /\
+      (i, h) :: ihs ⊆ (map_to_list (H :> Pmap _)) /\
+      Sorted predecessor (h :: ihs.*2 ++ [h']) /\
+      length ihs < n.
+  Proof.
+    revert i h L;
+    induction n; intros i h L. 1:{
+      cbn.
+      rewrite map_to_list_empty.
+      rewrite elem_of_nil.
+      split; [done|].
+      firstorder lia.
+    }
+    cbn.
+    rewrite map_to_list_union_agree. 2:{
+      eapply map_agree_weaken, all_paths_aux_subset;
+      [|apply map_filter_subseteq].
+      reflexivity.
+    }
+    rewrite elem_of_app.
+    rewrite IHn.
+    rewrite all_predecessors_spec.
+    split.
+    - intros [[Hih (i' & h' & Hi'h' & Hhh')]|
+      (i' & h' & ihs & Hi'h' & Hihs & Hsort & Hlen)].
+      + exists i', h', [].
+        split; [done|].
+        split; [set_solver +Hih|].
+        cbn.
+        split; [|clear; lia].
+        now repeat constructor.
+      + apply all_predecessors_spec in Hi'h' as
+        (Hi'h' & i'' & h'' & Hi''h'' & Hpred).
+        exists i'', h'', (ihs ++ [(i', h')]).
+        split; [done|].
+        split; [set_solver +Hi'h' Hihs|].
+        rewrite fmap_app; cbn.
+        split; [|rewrite length_app; cbn; clear -Hlen; lia].
+        apply (Sorted_snoc _ (_ :: (_ ++ [_]))); [done|].
+        now apply (TlRel_cons _ _ _ (_ :: _)).
+    - intros (i' & h' & ihs & Hi'h' & Hihs & Hsort & Hlen).
+
+      induction ihs as [|ihs (i'', h'')] using snoc_case.
+      + left.
+        split; [apply Hihs; constructor|].
+        cbn in Hsort.
+        apply Sorted_inv in Hsort as [_ ?%HdRel_inv].
+        eauto.
+      + right.
+        exists i'', h'', ihs.
+        rewrite all_predecessors_spec.
+        split_and!.
+        * apply Hihs; set_solver +.
+        * exists i', h'.
+          split; [done|].
+          rewrite fmap_app in Hsort.
+          cbn in Hsort.
+          apply Sorted_inv in Hsort as [Hsort _].
+          now apply Sorted_snoc_inv in Hsort as [_ ?%TlRel_snoc].
+        * rewrite <- Hihs.
+          set_solver +.
+        * apply (Sorted_snoc_inv _ (_ :: _)) in Hsort.
+          rewrite fmap_app in Hsort.
+          apply Hsort.1.
+        * rewrite length_app in Hlen.
+          revert Hlen.
+          clear; cbn; lia.
+  Qed.
+
+  Lemma all_paths_dom_subseteq H L : 
+    dom (all_paths H L) ⊆ dom (hyperedges H) ∖ dom L.
+  Proof.
+    apply subseteq_difference_r.
+    - apply map_disjoint_dom.
+      apply all_paths_disjoint.
+    - apply subseteq_dom.
+      apply all_paths_subset.
+  Qed.
+
+  Lemma all_paths_idx_dom_disjoint {n m} (H : CospanHyperGraph T n m) 
+    (L : list positive) : 
+    dom (all_paths_idx H L) ## list_to_set L.
+  Proof.
+    symmetry.
+    intros k HkL.
     unfold all_paths_idx.
-    remember ((map_filter (λ ka : positive * HyperEdge T, ka.1 ∈ L) (λ x : positive * HyperEdge T, decide_rel elem_of x.1 L) H.(hyperedges))) as L'.
-    apply (all_paths_subset H (mk_hg L' ∅)).
+    intros Hk%all_paths_dom_subseteq.
+    rewrite elem_of_difference in Hk.
+    rewrite 2 elem_of_dom, map_lookup_filter in Hk.
+    destruct Hk as [(hk & Hhk) Hk].
+    rewrite Hhk in Hk.
+    cbn in Hk.
+    rewrite elem_of_list_to_set in HkL.
+    case_guard; [|done].
+    apply Hk.
+    done.
   Qed.
 
   Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
@@ -1832,14 +2012,14 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember (Lv ∩ outH) as lout.
       remember (C1v ∪ inpH) as C1vin.
       remember (C2v ∪ outH) as C2vout.
-      replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with  
+      replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with
         ((C1vin ∪ Lv) ∩ C2vout). 2:{
           transitivity ((C1vin ∖ Lv) ∩ (C2vout ∖ Lv) ∪ Lv ∩ C2vout); [|set_solver].
 
           (* rewrite (difference_intersection_distr_l_L C1vin C2vout Lv).
           Unset Printing Notations. *)
           rewrite (union_intersection_r_L (_ ∖ _) (_ ∖ _) (Lv ∩ C2vout)).
-          rewrite (intersection_comm_L Lv C2vout). 
+          rewrite (intersection_comm_L Lv C2vout).
           rewrite (difference_union_intersection_L).
           transitivity ((C1vin ∖ Lv ∪ Lv) ∩ C2vout); [|set_solver].
           rewrite difference_union_L.
@@ -1850,14 +2030,14 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
 
       rewrite (difference_intersection_distr_l_L _ _ (Lv)).
 
-      replace ((C1vin ∪ Lv) ∩ C2vout ∖ (Lv ∪ C2v)) with 
+      replace ((C1vin ∪ Lv) ∩ C2vout ∖ (Lv ∪ C2v)) with
         ((C1vin ∩ outH) ∖ (Lv ∪ C2v)) by set_solver.
       rewrite (union_comm_L (Lv ∪ C2v)), difference_union_L.
       replace ((C1v ∪ (C1vin ∩ outH ∪ (Lv ∪ C2v)))) with
         ((C1v ∪ (inpH ∩ outH) ∪ Lv ∪ C2v)) by set_solver.
       replace (((C1vin ∖ Lv) ∩ C2vout ∖ Lv ∪ Lv ∩ C1vin)
         ∖ (C1v ∪ inpH ∩ outH ∪ Lv ∪ C2v)) with (∅ :> Pset) by set_solver.
-      rewrite union_empty_l_L. 
+      rewrite union_empty_l_L.
         2:{
         set_solver.
 }
@@ -1883,7 +2063,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
 
         set_solver.
         set_solver.
-        2:{ 
+        2:{
 
         }
 
@@ -1922,7 +2102,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
         rewrite difference_union_distr_l_L.
         apply union_subseteq, conj.
         set_solver.
-        2: 
+        2:
         set_solver.
         rewrite (union_comm_L (_ ∪ _)).
         rewrite difference_union_L.
@@ -1935,7 +2115,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       rewrite (difference_union_distr_l_L (C1v ∪ Lv ∪ C2v) passH (Lv ∪ C2v)).
       assert ((k ∪ i) ∖ (C1v ∪ Lv ∪ C2v ∪ (k ∪ j) ∖ (Lv ∪ C2v)) = ∅).
       {
-        
+
         rewrite Heqi, Heqk.
         repeat rewrite difference_union_distr_l_L.
       }
@@ -1944,7 +2124,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember (list_to_set (outputs H)) as outH.
       Search (_ ∪ _ ∖ _).
       rewrite difference_union_distr_l_L.
-      
+
       Search (_ ⊆ _ -> _ = _ ∪ _).
       set_solver.
       Search (vertices_hg _).
@@ -1963,7 +2143,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       + rewrite hg_add_vertices_empty.
         apply union_subseteq_l'.
         apply union_least.
-        * 
+        *
           apply intersection_subseteq_l.
         * apply intersection_subseteq_r.
       + apply union_least.
@@ -2090,7 +2270,7 @@ Definition example_1 : CospanHyperGraph positive 1 1 :=
     remember (vertices_hg C1') as C1v.
     remember (vertices_hg C2') as C2v.
     rewrite HeqC1' in HeqC1v.
-    unfold vertices_hg in HeqC1v.  
+    unfold vertices_hg in HeqC1v.
     simpl.
 
 Check all_paths_idx.
@@ -2125,7 +2305,7 @@ Definition example_1 : CospanHyperGraph positive 1 1 :=
     remember (vertices_hg C1') as C1v.
     remember (vertices_hg C2') as C2v.
     rewrite HeqC1' in HeqC1v.
-    unfold vertices_hg in HeqC1v.  
+    unfold vertices_hg in HeqC1v.
     simpl.
 
 Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
