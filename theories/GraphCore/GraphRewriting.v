@@ -1654,7 +1654,63 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   {| hyperedges := subgraph_index_aux H L;
      hypervertices := ∅ |}.
 
+  Definition mk_sub_hg (H : HyperGraph T) (mh : Pmap (HyperEdge T)) : HyperGraph T :=
+    mk_hg mh (hypervertices H ∩ referrenced_vertices_hg (mk_hg mh ∅)).
+
+  Section decompose_defs.
+
+  Context (H : HyperGraph T) (L : list positive).
+  
+  Definition decompose_L1 : HyperGraph T :=
+    mk_sub_hg H (subgraph_index_aux H L).
+  
+  Definition decompose_C1 : HyperGraph T :=
+    mk_sub_hg H (all_paths_idx H L).
+
+  Definition decompose_C2 (C1 : HyperGraph T) (isolated : Pset) : HyperGraph T := 
+    hg_add_vertices (mk_sub_hg H ((hyperedges H) ∖ (C1 ∪ subgraph_index H L)))
+      isolated.
+  
+  Definition decompose_L1v : Pset :=
+    vertices_hg decompose_L1.
+  
+  Definition decompose_C1v : Pset :=
+    vertices_hg decompose_C1.
+  
+  Definition decompose_C2v C1 isolated : Pset :=
+    vertices_hg (decompose_C2 C1 isolated).
+
+
+  Definition decompose_iset (inputs : Pset) : Pset :=
+    decompose_L1v ∩ (decompose_C1v ∪ inputs).
+  
+  Definition decompose_jset C1 isolated (outputs : Pset) : Pset :=
+    decompose_L1v ∩ (decompose_C2v C1 isolated ∪ outputs).
+
+  Definition decompose_kset C1 isolated (inputs outputs : Pset) : Pset :=
+    ((decompose_C1v ∪ inputs) ∩ (decompose_C2v C1 isolated ∪ outputs) ∖ decompose_L1v).
+
+  End decompose_defs.
+
   Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
+    let ins := list_to_set H.(inputs) in 
+    let outs := list_to_set H.(outputs) in 
+    let isolated := isolated_vertices H in 
+    let L1 := decompose_L1 H L in
+    let C1 := decompose_C1 H L in
+    let C2 := decompose_C2 H L C1 isolated in 
+
+    let i := list_to_vec(elements(decompose_iset H L ins)) in
+    let j := list_to_vec(elements(decompose_jset H L C1 isolated outs)) in
+    let k := list_to_vec(elements(decompose_kset H L C1 isolated ins outs)) in
+    compose_graphs_unsafe (H.(inputs) -> C1 <- (k +++ i)) (compose_graphs_unsafe (
+      stack_graphs_aux (k -> ∅ <- k) (i -> L1 <- j)) (
+    k +++ j -> 
+      C2
+    <- H.(outputs)
+    )).
+
+  (* Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
   let Hin := list_to_set (vec_to_list (H.(inputs))) in
   let Hout := list_to_set (vec_to_list (H.(outputs))) in
   let C1 := all_paths_idx H L in
@@ -1671,7 +1727,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   k +++ j -> 
     {| hyperedges := C2; hypervertices := isolated_vertices H |} 
   <- H.(outputs)
-  )).
+  )). *)
 
   Lemma all_paths_subset (H L : HyperGraph T) :
     all_paths H L ⊆ H.
@@ -1688,6 +1744,13 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   Qed.
 
   Lemma all_paths_idx_subset {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
+  Proof.
+    unfold all_paths_idx.
+    remember ((map_filter (λ ka : positive * HyperEdge T, ka.1 ∈ L) (λ x : positive * HyperEdge T, decide_rel elem_of x.1 L) H.(hyperedges))) as L'.
+    apply (all_paths_subset H (mk_hg L' ∅)).
+  Qed.
+  
+  Lemma all_paths_idx_dom_disjoint {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
   Proof.
     unfold all_paths_idx.
     remember ((map_filter (λ ka : positive * HyperEdge T, ka.1 ∈ L) (λ x : positive * HyperEdge T, decide_rel elem_of x.1 L) H.(hyperedges))) as L'.
