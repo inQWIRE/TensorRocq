@@ -31,6 +31,33 @@ Open Scope ZX_scope.
 
 Open Scope nat_scope.
 
+Locate HyperEdge.
+
+Print HyperEdge.
+
+Locate "ZXG".
+
+Open Scope positive.
+
+Definition example_graph_tp : CospanHyperGraph ZXVERT 1 1 :=
+ [# 1] -> {[ 1 := (Some (true,  0%R), [1], [2; 3]);
+             2 := (Some (false, 0%R), [2; 4], [5]);
+             3 := (Some (true, 0%R), [3], []) ]} <- [# 5].
+
+Locate cohg_semantic_eq.
+
+Search TensorLike.
+Print ZXVERT.
+
+
+
+Lemma teleportation : example_graph_tp ≡ₜ@{ ZXCALC } id_graph 1.
+Proof.
+  unfold example_graph_tp.
+  unfold id_graph.
+  cbv.
+Admitted.
+
 Example example_graph'_semantics : forall b b',
   graph_semantics example_graph'
     [#] [#b;b'] =

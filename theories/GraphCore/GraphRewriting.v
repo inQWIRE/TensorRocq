@@ -1625,19 +1625,6 @@ Qed. *)
       ((fun x => (x, (@nil positive, [label]))) <$> lefts) ++
       ((fun x => (x, ([label], @nil positive))) <$> rights))).
 
-    Instance elemof_hyperedge : ElemOf positive (HyperEdge T) :=
-      (fun p he => p ∈ he.2 \/ p ∈ he.1.2).
-
-    Instance elemof_pair : ElemOf positive (list positive * list positive) :=
-      (fun p pr => p ∈ pr.1 \/ p ∈ pr.2).
-
-    Instance elemof_option `{ElemOf A B} : ElemOf A (option B) :=
-      fun a opb =>
-        match opb with
-        | Some x => a ∈ x
-        | None => False
-        end.
-
     Open Scope positive.
 
     Definition PredMap : Pmap (list positive) :=
@@ -1668,22 +1655,22 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
      hypervertices := ∅ |}.
 
   Definition decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) : CospanHyperGraph T n m :=
+  let Hin := list_to_set (vec_to_list (H.(inputs))) in
+  let Hout := list_to_set (vec_to_list (H.(outputs))) in
   let C1 := all_paths_idx H L in
   let L1 := subgraph_index H L in
   let C2 := H.(hedges).(hyperedges) ∖ (C1 ∪ L1) in
   let C1' := vertices_hg {| hyperedges := C1; hypervertices := ∅ |} in
   let L1' := vertices_hg L1 in
-  let C2' := vertices_hg {| hyperedges := C2; hypervertices := H.(hypervertices) |} in
-  let i := list_to_vec(elements(L1' ∩ C1')) in
-  let j := list_to_vec(elements(L1' ∩ C2')) in
-  let k := list_to_vec(elements(C1' ∩ C2')) in
+  let C2' := vertices_hg {| hyperedges := C2; hypervertices := isolated_vertices H |} in
+  let i := list_to_vec(elements(L1' ∩ (C1' ∪ Hin ))) in
+  let j := list_to_vec(elements(L1' ∩ (C2' ∪ Hout))) in
+  let k := list_to_vec(elements(((C1' ∪ Hin) ∩ (C2' ∪ Hout) ∖ L1'))) in
   compose_graphs_unsafe (
-  H.(inputs) -> {| hyperedges := C1; hypervertices := ∅ |}  <- (k +++ i)
-  ) (compose_graphs_unsafe
-  ( stack_graphs_aux (k -> ∅ <- k)
-                 (i -> L1 <- j)
-  ) (
-  k +++ j -> {| hyperedges := C2; hypervertices := H.(hypervertices) |} <- H.(outputs)
+  H.(inputs) -> {| hyperedges := C1; hypervertices := ∅ |}  <- (k +++ i)) (compose_graphs_unsafe ((k +++ i) -> L1 <- (k +++ j)) (
+  k +++ j -> 
+    {| hyperedges := C2; hypervertices := isolated_vertices H |} 
+  <- H.(outputs)
   )).
 
   Lemma all_paths_subset (H L : HyperGraph T) :
@@ -1737,7 +1724,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     apply cohg_ext; try reflexivity.
     apply hg_ext.
     - simpl.
-      rewrite map_empty_union.
+      (* rewrite map_empty_union. *)
       rewrite map_union_assoc.
       rewrite map_difference_union; [reflexivity|].
       apply map_union_least.
@@ -1748,20 +1735,140 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember (subgraph_index H L) as L1.
       remember (H.(hedges).(hyperedges) ∖ (C1 ∪ L1)) as C2.
       simpl.
+      repeat rewrite hg_empty_union.
+      repeat rewrite union_empty_l_L.
       (* We rebuild the let expressions used in the decompose function.
          This helps alleviate the pain. *)
       remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
-      (* remember ({| hyperedges := L1; hypervertices := ∅ |}) as L1'. *)
-      remember ({| hyperedges := C2; hypervertices := hypervertices H |}) as C2'.
+      remember ({| hyperedges := C2; hypervertices := isolated_vertices H |}) as C2'.
       remember (vertices_hg L1) as Lv.
-      (* remember (all_vertices L1') as Lv'. *)
       remember (vertices_hg C1') as C1v.
       remember (vertices_hg C2') as C2v.
       repeat rewrite union_empty_l_L.
       repeat rewrite hg_empty_union.
+      repeat rewrite vec_to_list_app.
+      repeat rewrite list_to_set_app_L.
       repeat rewrite list_to_vec_app.
       repeat rewrite list_to_set_list_to_vec.
       repeat rewrite list_to_set_elements_L.
+      rewrite vertices_hg_add_vertices.
+      rewrite vertices_hg_union.
+      rewrite <- HeqLv, <- HeqC2v.
+      remember (C1v ∩ C2v ∪ list_to_set (inputs H) ∩ list_to_set (outputs H)) as k.
+      remember (Lv ∩ C1v ∪ Lv ∩ list_to_set (inputs H)) as i.
+      remember ((Lv ∩ C2v ∪ Lv ∩ list_to_set (outputs H))) as j.
+      replace (hypervertices L1) with (@empty Pset _) by (rewrite HeqL1; now unfold subgraph_index).
+      rewrite union_empty_l_L.
+      remember (C1v ∩ C2v) as c12.
+      remember (list_to_set (inputs H)) as inpH.
+      remember (list_to_set (outputs H)) as outH.
+      remember (inpH ∩ outH) as passH.
+      remember (Lv ∩ C1v) as lc1.
+      remember (Lv ∩ inpH) as lin.
+      remember (Lv ∩ C2v) as lc2.
+      remember (Lv ∩ outH) as lout.
+      remember (C1v ∪ inpH) as C1vin.
+      remember (C2v ∪ outH) as C2vout.
+      replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with  
+        ((C1vin ∪ Lv) ∩ C2vout). 2:{
+          transitivity ((C1vin ∖ Lv) ∩ (C2vout ∖ Lv) ∪ Lv ∩ C2vout); [|set_solver].
+
+          (* rewrite (difference_intersection_distr_l_L C1vin C2vout Lv).
+          Unset Printing Notations. *)
+          rewrite (union_intersection_r_L (_ ∖ _) (_ ∖ _) (Lv ∩ C2vout)).
+          rewrite (intersection_comm_L Lv C2vout). 
+          rewrite (difference_union_intersection_L).
+          transitivity ((C1vin ∖ Lv ∪ Lv) ∩ C2vout); [|set_solver].
+          rewrite difference_union_L.
+          reflexivity.
+
+        }
+      rewrite 
+
+      rewrite (difference_intersection_distr_l_L _ _ (Lv)).
+
+      apply leibniz_equiv_iff, set_subseteq_antisymm; cycle 1.
+      + rewrite ?union_subseteq.
+        split_and!; [..|set_solver].
+        admit.
+        rewrite <- subseteq_union_r.
+        apply union_subseteq.
+        split; [|set_solver].
+        rewrite intersection_union_l_L.
+        rewrite <- subseteq_union_r.
+        apply union_subseteq; split; [set_solver|].
+
+        set_solver.
+        set_solver.
+        2:{ 
+
+        }
+
+
+        set_solver.
+        set_solver.
+        rewrite (intersection_comm_L (C1v ∪ _) (_ ∪ _)).
+        rewrite (difference_intersection_distr_l_L (C2v ∪ _)).
+        rewrite difference_union_L.
+        set_solver.
+
+
+      admit.
+
+
+
+
+
+
+      rewrite Heqi, Heqj, Heqk.
+      rewrite (difference_union_distr_l_L (c12 ∪ passH) (lc2 ∪ lout)).
+      rewrite (difference_union_distr_l_L lc2 lout).
+      replace (lc2 ∖ (Lv ∪ C2v)) with (@empty Pset _) by set_solver.
+      replace (lout ∖ (Lv ∪ C2v)) with (@empty Pset _) by set_solver.
+      rewrite (difference_union_distr_l_L c12 passH (Lv ∪ C2v)).
+      replace (c12 ∖ (Lv ∪ C2v)) with (@empty Pset _) by set_solver.
+      rewrite 2 union_empty_l_L.
+      rewrite union_empty_r_L.
+      unfold isolated_vertices.
+      apply leibniz_equiv_iff.
+      apply set_subseteq_antisymm.
+      + admit.
+      + apply union_subseteq, conj.
+        rewrite difference_union_distr_l_L.
+        apply union_subseteq, conj.
+        rewrite difference_union_distr_l_L.
+        apply union_subseteq, conj.
+        set_solver.
+        2: 
+        set_solver.
+        rewrite (union_comm_L (_ ∪ _)).
+        rewrite difference_union_L.
+        set_solver.
+        apply union_subseteq, conj; [|set_solver +].
+        apply subseteq_union_r.
+      remember (passH ∖ (Lv ∪ C2v)) as passMinus.
+      rewrite (difference_union_distr_l_L (Lv ∪ C2v) passH (Lv ∪ C2v)).
+      repeat rewrite union_assoc_L.
+      rewrite (difference_union_distr_l_L (C1v ∪ Lv ∪ C2v) passH (Lv ∪ C2v)).
+      assert ((k ∪ i) ∖ (C1v ∪ Lv ∪ C2v ∪ (k ∪ j) ∖ (Lv ∪ C2v)) = ∅).
+      {
+        
+        rewrite Heqi, Heqk.
+        repeat rewrite difference_union_distr_l_L.
+      }
+      rewrite Heqi, Heqj, Heqk.
+      remember (list_to_set (inputs H)) as inpH.
+      remember (list_to_set (outputs H)) as outH.
+      Search (_ ∪ _ ∖ _).
+      rewrite difference_union_distr_l_L.
+      
+      Search (_ ⊆ _ -> _ = _ ∪ _).
+      set_solver.
+      Search (vertices_hg _).
+      rewrite Heqi, Heqj, Heqk.
+      set_solver.
+
+      rewrite HeqL1 at 1.
       remember (vertices_hg L1) as Lv'.
       rewrite (subseteq_empty_difference_L _ (Lv' ∪ C2v)),
               (subseteq_empty_difference_L _ (C1v ∪ _)).
@@ -1773,7 +1880,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       + rewrite hg_add_vertices_empty.
         apply union_subseteq_l'.
         apply union_least.
-        * apply intersection_subseteq_l.
+        * 
+          apply intersection_subseteq_l.
         * apply intersection_subseteq_r.
       + apply union_least.
         * apply union_subseteq_r'.
@@ -1867,6 +1975,76 @@ Proof.
 Qed.
 
 
+Check all_paths_idx.
+Check subgraph_index.
+Print HyperGraph.
+
+Open Scope positive.
+
+Definition example_1 : CospanHyperGraph positive 1 1 :=
+  [# 1 ] -> {| hyperedges := {[ 1 := (1, [],[]) ]};
+     hypervertices := ∅
+  |} <- [# 1].
+
+  Lemma decompose_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
+  Proof.
+    unfold example_1.
+    rewrite (decompose_is_graph) with (L:=[]).
+    unfold decompose.
+    unfold inputs.
+    unfold outputs.
+    remember (all_paths_idx ([# 1] -> ∅ <- [# 1]) []) as C1.
+    remember (subgraph_index ([# 1] -> ∅ <- [# 1]) []) as L1.
+    remember ((([# 1] -> ∅ <- [# 1])).(hedges).(hyperedges) ∖ (C1 ∪ L1)) as C2.
+    simpl.
+    (* We rebuild the let expressions used in the decompose function.
+       This helps alleviate the pain. *)
+    remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
+    remember ({| hyperedges := L1; hypervertices := ∅ |}) as L1'.
+    remember ({| hyperedges := C2; hypervertices := ∅ |}) as C2'.
+    remember (vertices_hg L1) as Lv.
+    (* remember (all_vertices L1') as Lv'. *)
+    remember (vertices_hg C1') as C1v.
+    remember (vertices_hg C2') as C2v.
+    rewrite HeqC1' in HeqC1v.
+    unfold vertices_hg in HeqC1v.  
+    simpl.
+
+Check all_paths_idx.
+Check subgraph_index.
+Print HyperGraph.
+
+Open Scope positive.
+
+Definition example_1 : CospanHyperGraph positive 1 1 :=
+  [# 1 ] -> {| hyperedges := {[ 1 := (1, [],[]) ]};
+     hypervertices := ∅
+  |} <- [# 1].
+
+  Lemma decompose_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
+  Proof.
+    unfold example_1.
+    rewrite (decompose_is_graph) with (L:=[]).
+    unfold decompose.
+    unfold inputs.
+    unfold outputs.
+    remember (all_paths_idx ([# 1] -> ∅ <- [# 1]) []) as C1.
+    remember (subgraph_index ([# 1] -> ∅ <- [# 1]) []) as L1.
+    remember ((([# 1] -> ∅ <- [# 1])).(hedges).(hyperedges) ∖ (C1 ∪ L1)) as C2.
+    simpl.
+    (* We rebuild the let expressions used in the decompose function.
+       This helps alleviate the pain. *)
+    remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
+    remember ({| hyperedges := L1; hypervertices := ∅ |}) as L1'.
+    remember ({| hyperedges := C2; hypervertices := ∅ |}) as C2'.
+    remember (vertices_hg L1) as Lv.
+    (* remember (all_vertices L1') as Lv'. *)
+    remember (vertices_hg C1') as C1v.
+    remember (vertices_hg C2') as C2v.
+    rewrite HeqC1' in HeqC1v.
+    unfold vertices_hg in HeqC1v.  
+    simpl.
+
 Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
   (Target : CospanHyperGraph T n m)
   (G : HyperGraph T) (L : list positive) :
@@ -1890,92 +2068,49 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummabl
     remember (list_to_vec (elements (C1v ∩ C2v))) as k.
     assert (L1 = {| hyperedges := L1; hypervertices := ∅ |}).
     { rewrite HeqL1; now apply hg_ext. }
-    assert (HCL1 : C1 ##ₘ hyperedges L1). admit.
-    assert (Hins : list_to_set (inputs Target) ⊆ C1v). admit.
-    rewrite compose_graphs_unsafe_to_compose_graphs; [|reflexivity|..]. 2:{
-      cbn.
-      rewrite vertices_compose_graphs_unsafe; [|done|].
-      2: {
-        cbn.
-        subst C2'.
-        cbn.
-        subst C2.
-        rewrite (map_empty_union _).
-        apply map_disjoint_difference_r.
-        now apply map_union_subseteq_r.
-      }
-      rewrite vertices_stack_graphs_aux by now simpl; solve_map_disjoint.
-      rewrite vertices_vertices_hg_decomp.
-      cbn.
-      rewrite list_to_set_app_L, (union_assoc_L _).
-      rewrite difference_union_distr_l_L, difference_diag_L, (union_empty_r_L _).
-      rewrite vertices_vertices_hg_decomp; cbn.
-      rewrite (@vertices_hg_empty T).
-      rewrite (union_empty_l_L _).
-      rewrite list_to_set_app_L, (union_idemp_L _).
-      rewrite vertices_vertices_hg_decomp; cbn.
-      rewrite list_to_set_app_L.
-      rewrite <- (union_assoc_L _).
-      rewrite (difference_union_distr_l_L (list_to_set k)).
-      rewrite (subseteq_empty_difference_L (list_to_set k)) by now rewrite vec_to_list_app; set_solver +.
-      rewrite (union_empty_l_L _).
-      rewrite (union_comm_L _ (_ ∪ _)).
-      rewrite <- 2 (union_assoc_L _).
-      rewrite (difference_union_distr_l_L (list_to_set i)).
-      rewrite (subseteq_empty_difference_L (list_to_set i)) by now rewrite vec_to_list_app; set_solver +.
-      rewrite (union_empty_l_L _).
-      rewrite (union_assoc_L _).
-      rewrite (union_comm_L (list_to_set j ∪ _)).
-      rewrite vertices_vertices_hg_decomp; cbn.
-      rewrite list_to_set_app_L.
-      rewrite (union_comm_L (vertices_hg C2') (_ ∪ _)).
-      rewrite <- 2 (union_assoc_L _).
-      rewrite (vec_to_list_app k j), list_to_set_app_L.
-      rewrite <- (union_assoc_L _).
-
-
-      rewrite (difference_union_distr_l_L (list_to_set k)).
-      rewrite (subseteq_empty_difference_L (list_to_set k)) by now rewrite vec_to_list_app; set_solver +.
-      rewrite (union_empty_l_L _).
-      rewrite 2 (union_assoc_L _).
-      rewrite (union_comm_L _ (_ ∪ _)).
-      rewrite 2 (union_assoc_L _).
-      rewrite (union_comm_L (_ ∪ _) (list_to_set j)).
-      rewrite (union_assoc_L (list_to_set j)), (union_idemp_L _).
-      replace <- (vertices_hg L1).
-      replace <- (vertices_hg C1').
-      replace <- (vertices_hg C2').
-      subst i j k.
-      rewrite vec_to_list_app, 3 vec_to_list_to_vec, list_to_set_app_L.
-      rewrite 3 list_to_set_elements_L.
-      rewrite (intersection_comm_L _ C1v).
-      rewrite <- intersection_union_l_L.
-      replace (Lv ∩ C2v ∪ Lv) with Lv by set_solver +.
-      replace (C1v ∪ list_to_set (inputs Target)) with C1v by set_solver +Hins.
-
-      
-
-      replace (Lv ∪ _ ∪ _) with (Lv ∪ C2v) by admit.
-      set_solver +.
-
-      set_solver +.
-      rewrite (set_union_eq_r (Lv ∩ C2v) _).
-      rewrite ((leibniz_equiv_iff _ _).1 (set_union_eq_l (Lv ∩ C2v) _)).
-
-      enough (Hen : )
-      set_solver +.
-      rewrite (difference_union_distr_l_L (list_to_set i)).
-      rewrite (subseteq_empty_difference_L (list_to_set i)) by now rewrite vec_to_list_app; set_solver +.
-      rewrite (union_empty_l_L _).
-      rewrite (union_assoc_L _).
-      rewrite (union_comm_L (list_to_set j ∪ _)).
-
-
-
-      setoid_rewrite .
-      Search ((_ ∪ ?X) ∖ _).
-      rewrite 3 vertices_vertices_hg_decomp.
-
+    rewrite compose_graphs_unsafe_to_compose_graphs.
+    2:{ reflexivity. }
+    2:{ simpl.
+        rewrite Heqi, Heqk.
+        rewrite list_to_vec_app.
+        repeat rewrite list_to_set_list_to_vec.
+        repeat rewrite list_to_set_elements_L.
+        rewrite <- Heqi, <- Heqk.
+        unfold vertices.
+        simpl.
+        rewrite list_to_set_app_L.
+        rewrite hg_empty_union.
+        rewrite <- HeqC1v, <- HeqC2v, <- HeqLv.
+        rewrite Heqi, Heqk, Heqj.
+        rewrite list_to_set_app_L.
+        repeat rewrite list_to_vec_app.
+        repeat rewrite list_to_set_list_to_vec.
+        repeat rewrite list_to_set_elements_L.
+        remember  (C1v ∩ C2v ∪ Lv ∩ C1v) as intr.
+        rewrite 3 difference_union_distr_l.
+        rewrite  (difference_union_distr_l_L (intr) (list_to_set (outputs Target))).
+        rewrite difference_diag.
+        rewrite union_empty_l_L.
+        rewrite union_empty_r_L.
+        rewrite (subseteq_empty_difference_L ((C1v ∩ C2v ∪ Lv ∩ C2v))).
+        rewrite hg_add_vertices_empty.
+        rewrite vertices_hg_union.
+        rewrite <- HeqC2v, <- HeqLv.
+        rewrite (difference_union_distr_l_L Lv).
+        rewrite disjoint_union_l.
+        rewrite 4 disjoint_union_r.
+        repeat split.
+        - set_solver.
+        - set_solver.
+        - rewrite Heqintr.
+          Search (_ ## _ ∖ _).
+          set_solver.
+          admit.
+        - admit.
+        - admit.
+        - admit.
+        - admit.
+        - admit.
     }
     rewrite compose_graphs_unsafe_to_compose_graphs by admit.
     rewrite compose_graphs_unsafe_to_compose_graphs by admit.
@@ -1989,24 +2124,6 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummabl
     symmetry.
     auto.
 Admitted.
-
-    (* repeat rewrite <- compose_graphs_aux_to_compose_graphs_unsafe; try done.
-    - Check reindex_graph_isomorphic.
-      (* rewrite (reindex_is_isomorphic _ _ (inputs Target -> C1' <- k +++ i)). *)
-      Search compose_graphs_aux.
-      Search reindex_graph.
-      admit.
-    - simpl.
-      rewrite vmap_id'; [done|].
-      intros.
-      now rewrite subst_by_vec_id.
-    - simpl.
-      rewrite vmap_id'; [done|].
-      intros.
-      now rewrite subst_by_vec_id. *)
-
-    (* From here typeclass resolution is failing (which will be fixed) but
-       we can proceed manually. *)
 
   Open Scope positive.
 
