@@ -1783,9 +1783,29 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
           reflexivity.
 
         }
-      rewrite 
+      (* rewrite  *)
 
       rewrite (difference_intersection_distr_l_L _ _ (Lv)).
+
+      replace ((C1vin ∪ Lv) ∩ C2vout ∖ (Lv ∪ C2v)) with 
+        ((C1vin ∩ outH) ∖ (Lv ∪ C2v)) by set_solver.
+      rewrite (union_comm_L (Lv ∪ C2v)), difference_union_L.
+      replace ((C1v ∪ (C1vin ∩ outH ∪ (Lv ∪ C2v)))) with
+        ((C1v ∪ (inpH ∩ outH) ∪ Lv ∪ C2v)) by set_solver.
+      replace (((C1vin ∖ Lv) ∩ C2vout ∖ Lv ∪ Lv ∩ C1vin)
+        ∖ (C1v ∪ inpH ∩ outH ∪ Lv ∪ C2v)) with (∅ :> Pset) by set_solver.
+      rewrite union_empty_l_L. 
+        2:{
+        set_solver.
+}
+        subst C2vout.
+        subst C1vin.
+
+        set_solver.
+
+        set_solver.
+        set_solver.
+      }
 
       apply leibniz_equiv_iff, set_subseteq_antisymm; cycle 1.
       + rewrite ?union_subseteq.
