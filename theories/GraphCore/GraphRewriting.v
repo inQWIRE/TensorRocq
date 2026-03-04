@@ -1658,31 +1658,32 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   Definition decompose_L1 : HyperGraph T :=
     mk_sub_hg H (subgraph_index_aux H L).
 
-  Definition decompose_C1 : HyperGraph T :=
-    mk_sub_hg H (all_paths_idx H L).
+  Definition decompose_C1 inputs : HyperGraph T :=
+    hg_add_vertices (mk_sub_hg H (all_paths_idx H L)) (hypervertices H ∩ inputs).
 
-  Definition decompose_C2 (C1 : HyperGraph T) (isolated : Pset) : HyperGraph T :=
+  Definition decompose_C2 (C1 : HyperGraph T) (isolated : Pset)
+    outputs : HyperGraph T :=
     hg_add_vertices (mk_sub_hg H ((hyperedges H) ∖ (C1 ∪ subgraph_index H L)))
-      isolated.
+      (hypervertices H ∩ outputs ∪ isolated).
 
   Definition decompose_L1v : Pset :=
     vertices_hg decompose_L1.
 
-  Definition decompose_C1v : Pset :=
-    vertices_hg decompose_C1.
+  Definition decompose_C1v inputs : Pset :=
+    vertices_hg (decompose_C1 inputs).
 
-  Definition decompose_C2v C1 isolated : Pset :=
-    vertices_hg (decompose_C2 C1 isolated).
+  Definition decompose_C2v C1 isolated outputs : Pset :=
+    vertices_hg (decompose_C2 C1 isolated outputs).
 
 
   Definition decompose_iset (inputs : Pset) : Pset :=
-    decompose_L1v ∩ (decompose_C1v ∪ inputs).
+    decompose_L1v ∩ (decompose_C1v inputs ∪ inputs).
 
   Definition decompose_jset C1 isolated (outputs : Pset) : Pset :=
-    decompose_L1v ∩ (decompose_C2v C1 isolated ∪ outputs).
+    decompose_L1v ∩ (decompose_C2v C1 isolated outputs ∪ outputs).
 
   Definition decompose_kset C1 isolated (inputs outputs : Pset) : Pset :=
-    ((decompose_C1v ∪ inputs) ∩ (decompose_C2v C1 isolated ∪ outputs) ∖ decompose_L1v).
+    ((decompose_C1v inputs ∪ inputs) ∩ (decompose_C2v C1 isolated outputs ∪ outputs) ∖ decompose_L1v).
 
   End decompose_defs.
 
@@ -1691,13 +1692,13 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     let outs := list_to_set H.(outputs) in
     let isolated := isolated_vertices H in
     let L1 := decompose_L1 H L in
-    let C1 := decompose_C1 H L in
-    let C2 := decompose_C2 H L C1 isolated in
+    let C1 := decompose_C1 H L ins in
+    let C2 := decompose_C2 H L C1 isolated outs in
 
     let i := list_to_vec(elements(decompose_iset H L ins)) in
     let j := list_to_vec(elements(decompose_jset H L C1 isolated outs)) in
     let k := list_to_vec(elements(decompose_kset H L C1 isolated ins outs)) in
-    compose_graphs_unsafe (H.(inputs) -> C1 <- (k +++ i)) (compose_graphs_unsafe (
+    compose_graphs_unsafe' (H.(inputs) -> C1 <- (k +++ i)) (compose_graphs_unsafe' (
       stack_graphs_aux (k -> ∅ <- k) (i -> L1 <- j)) (
     k +++ j ->
       C2
@@ -1978,8 +1979,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     set_solver.
   Qed.
 
-  Lemma decompose_L1_C1_disjoint H L :
-    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C1 H L.
+  Lemma decompose_L1_C1_disjoint H L inputs :
+    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C1 H L inputs.
   Proof.
     cbn.
     symmetry.
@@ -1989,8 +1990,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     auto.
   Qed.
 
-  Lemma decompose_C1_C2_disjoint_gen H L C1 isolated :
-    hyperedges $ C1 ##ₘ hyperedges $ decompose_C2 H L C1 isolated.
+  Lemma decompose_C1_C2_disjoint_gen H L C1 isolated outputs :
+    hyperedges $ C1 ##ₘ hyperedges $ decompose_C2 H L C1 isolated outputs.
   Proof.
     cbn.
     symmetry.
@@ -1998,8 +1999,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     apply map_union_subseteq_l.
   Qed.
 
-  Lemma decompose_L1_C2_disjoint H L C1 isolated :
-    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C2 H L C1 isolated.
+  Lemma decompose_L1_C2_disjoint H L C1 isolated outputs :
+    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C2 H L C1 isolated outputs.
   Proof.
     cbn.
     symmetry.
@@ -2009,13 +2010,13 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   Qed.
 
   Lemma decompose_L1v_C1v_subseteq H L inputs :
-    decompose_L1v H L ∩ decompose_C1v H L ⊆ decompose_iset H L inputs.
+    decompose_L1v H L ∩ decompose_C1v H L inputs ⊆ decompose_iset H L inputs.
   Proof.
     set_solver.
   Qed.
 
   Lemma decompose_L1v_C2v_subseteq H L C1 isolated outputs :
-    decompose_L1v H L ∩ decompose_C2v H L C1 isolated ⊆
+    decompose_L1v H L ∩ decompose_C2v H L C1 isolated outputs ⊆
       decompose_jset H L C1 isolated outputs.
   Proof.
     set_solver.
@@ -2028,15 +2029,15 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     apply map_filter_subseteq.
   Qed.
 
-  Lemma decompose_C1_subseteq H L :
-    hyperedges $ decompose_C1 H L ⊆ hyperedges H.
+  Lemma decompose_C1_subseteq H L inputs :
+    hyperedges $ decompose_C1 H L inputs ⊆ hyperedges H.
   Proof.
     cbn.
     apply all_paths_idx_subset.
   Qed.
 
-  Lemma decompose_C2_subseteq H L C1 isolated :
-    hyperedges $ decompose_C2 H L C1 isolated ⊆ hyperedges H.
+  Lemma decompose_C2_subseteq H L C1 isolated outputs :
+    hyperedges $ decompose_C2 H L C1 isolated outputs ⊆ hyperedges H.
   Proof.
     cbn.
     now apply map_subseteq_difference_l.
@@ -2062,24 +2063,27 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     rewrite vertices_hg_decomp.
     cbn.
     apply union_subseteq, conj.
-    + apply referenced_vertices_hg_subseteq.
+    - apply referenced_vertices_hg_subseteq.
       apply decompose_L1_subseteq.
-    + rewrite intersection_subseteq_r.
+    - rewrite intersection_subseteq_r.
       apply referenced_vertices_hg_subseteq.
       cbn.
       apply map_filter_subseteq.
   Qed.
 
-  Lemma decompose_C1v_referenced H L :
-    decompose_C1v H L ⊆ referenced_vertices_hg H.
+  Lemma decompose_C1v_referenced H L inputs :
+    decompose_C1v H L inputs ⊆ referenced_vertices_hg H ∪ hypervertices H ∩ inputs.
   Proof.
     unfold decompose_C1v.
     rewrite vertices_hg_decomp.
     cbn.
-    apply union_subseteq, conj.
-    + apply referenced_vertices_hg_subseteq.
+    rewrite 2 union_subseteq; split_and!.
+    - apply union_subseteq_l'. 
+      apply referenced_vertices_hg_subseteq.
       apply decompose_C1_subseteq.
-    + rewrite intersection_subseteq_r.
+    - apply union_subseteq_r. 
+    - rewrite intersection_subseteq_r.
+      apply union_subseteq_l'.
       apply referenced_vertices_hg_subseteq.
       cbn.
       apply all_paths_idx_subset.
@@ -2104,34 +2108,34 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     decompose_C1v H L ∩ decompose_C2v H L (decompose_C1 H L) isolated ⊆
       decompose_kset H L (decompose_C1 H L) isolated inputs outputs. *)
 
-  Lemma difference_intersection_distr_l' `{Set_ A SA} (X Y Z : SA) : 
+  Lemma difference_intersection_distr_l' `{Set_ A SA} (X Y Z : SA) :
     X ∩ Y ∖ Z ≡ (X ∖ Z) ∩ (Y ∖ Z).
   Proof.
     set_solver.
   Qed.
-  
-  Lemma difference_intersection_distr_l'_L `{Set_ A SA, !LeibnizEquiv SA} (X Y Z : SA) : 
+
+  Lemma difference_intersection_distr_l'_L `{Set_ A SA, !LeibnizEquiv SA} (X Y Z : SA) :
     X ∩ Y ∖ Z = (X ∖ Z) ∩ (Y ∖ Z).
   Proof.
     unfold_leibniz.
     apply difference_intersection_distr_l'.
   Qed.
 
-  Lemma decompose_iset_disjoint_kset H L C1 isolated inputs outputs : 
+  Lemma decompose_iset_disjoint_kset H L C1 isolated inputs outputs :
     decompose_iset H L inputs ## decompose_kset H L C1 isolated inputs outputs.
   Proof.
     set_solver.
   Qed.
-  
-  Lemma decompose_jset_disjoint_kset H L C1 isolated inputs outputs : 
+
+  Lemma decompose_jset_disjoint_kset H L C1 isolated inputs outputs :
     decompose_jset H L C1 isolated outputs ## decompose_kset H L C1 isolated inputs outputs.
   Proof.
     set_solver.
   Qed.
 
-  Lemma decompose_iset_union_kset H L C1 isolated inputs outputs : 
+  (* Lemma decompose_iset_union_kset H L C1 isolated inputs outputs :
     decompose_iset H L inputs ∪ decompose_kset H L C1 isolated inputs outputs =
-    decompose_C1v H L ∪ inputs ∪ 
+    decompose_C1v H L ∪ inputs ∪
       decompose_L1v H L ∩ (decompose_C1v H L ∪ inputs) ∪
       decompose_C2v H L C1 isolated ∖ decompose_L1v H L.
   Proof.
@@ -2146,11 +2150,11 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     (* set_solver.
     rewrite (union_intersection_l_L (_ ∩ _) (_ ∖ _) (_ ∖ _)).
     rewrite difference_union. *)
-  Admitted.
+  Admitted. *)
 
-  Lemma decompose_C1v_C2v_subseteq H L isolated inputs outputs :
+  (* Lemma decompose_C1v_C2v_subseteq H L isolated inputs outputs :
     isolated ## referenced_vertices_hg H ∪ inputs ∪ outputs ->
-    decompose_C1v H L ∩ 
+    decompose_C1v H L ∩
       (decompose_L1v H L ∪ decompose_C2v H L (decompose_C1 H L) isolated) ⊆
       decompose_kset H L (decompose_C1 H L) isolated inputs outputs
       ∪ decompose_jset H L (decompose_C1 H L) isolated outputs.
@@ -2160,7 +2164,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     rewrite union_subseteq; split; try
     set_solver.
     - unfold decompose_kset, decompose_jset.
-  Admitted.
+  Admitted. *)
 
 
   Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
@@ -2187,7 +2191,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
 
   (* Open Scope positive.
   Definition bad_case : CospanHyperGraph positive 0 0 :=
-  [#] -> 
+  [#] ->
   (mk_hg ({[ 1 := (1, [], [1]); 2 := (2, [1], [2]); 3 := (3, [1; 2], []) ]}) ∅)
   <- [#].
 
@@ -2203,7 +2207,112 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     Opaque compose_graphs_unsafe.
     cbn.
   Admitted. *)
-    
+
+  Lemma decompose_C1_L1_C2_total H L isolated inputs outputs :
+    hyperedges (decompose_C1 H L inputs ∪ decompose_L1 H L ∪
+      decompose_C2 H L (decompose_C1 H L inputs) isolated outputs) =
+    hyperedges H.
+  Proof.
+    cbn -[decompose_C1].
+    apply map_difference_union.
+    apply map_union_least.
+    - apply decompose_C1_subseteq.
+    - apply decompose_L1_subseteq.
+  Qed.
+
+  Lemma referenced_vertices_hg_union (H G : HyperGraph T) :
+    hyperedges H ##ₘ hyperedges G ->
+    referenced_vertices_hg (H ∪ G) =
+    referenced_vertices_hg H ∪ referenced_vertices_hg G.
+  Proof.
+    intros Hdisj.
+    unfold referenced_vertices_hg.
+    cbn.
+    rewrite map_to_list_disj_union by done.
+    now rewrite bind_app, list_to_set_app_L.
+  Qed.
+
+  Lemma decompose_C1_L1_C2_total_refererenced_vertices_hg H L isolated inputs outputs :
+    referenced_vertices_hg (decompose_C1 H L inputs) ∪
+      referenced_vertices_hg (decompose_L1 H L) ∪
+      referenced_vertices_hg (decompose_C2 H L (decompose_C1 H L inputs) isolated outputs) =
+    referenced_vertices_hg H.
+  Proof.
+    pose proof (decompose_L1_C1_disjoint H L inputs).
+    pose proof (decompose_L1_C2_disjoint H L (decompose_C1 H L inputs) isolated outputs).
+    pose proof (decompose_C1_C2_disjoint_gen H L (decompose_C1 H L inputs) isolated outputs).
+
+    rewrite <- referenced_vertices_hg_union by done.
+    rewrite <- referenced_vertices_hg_union by now apply map_disjoint_union_l.
+    unfold referenced_vertices_hg.
+    now rewrite decompose_C1_L1_C2_total.
+  Qed.
+
+  Lemma hypervertices_decomp_isolated_referenced {n m} (H : CospanHyperGraph T n m) :
+    hypervertices H = isolated_vertices H ∪ (hypervertices H ∩ referenced_vertices H).
+  Proof.
+    unfold isolated_vertices.
+    now rewrite difference_union_intersection_L.
+  Qed.
+
+  Lemma hypervertices_decompose {n m} (H : CospanHyperGraph T n m) (L : list positive) :
+  hypervertices (decompose H L) = hypervertices H.
+  Proof.
+    cbv delta [decompose] beta.
+    remember (list_to_set (inputs H)) as ins.
+    remember (list_to_set (outputs H)) as outs.
+    remember (isolated_vertices H) as isolated.
+    remember (decompose_L1 H L) as L1.
+    cbv zeta.
+    remember (decompose_C1 H L _) as C1.
+    remember (decompose_C2 H L C1 isolated _) as C2.
+    remember (decompose_iset H L ins) as i.
+    remember (decompose_jset H L C1 isolated outs) as j.
+    remember (decompose_kset H L C1 isolated ins outs) as k.
+    simpl.
+    rewrite hg_empty_union.
+    rewrite (union_empty_l_L (hypervertices L1)).
+    rewrite vertices_hg_add_vertices.
+    rewrite 2 list_to_vec_app.
+    rewrite 3 list_to_set_list_to_vec.
+    rewrite 3 list_to_set_elements_L.
+    rewrite vertices_hg_union by now subst; apply decompose_L1_C2_disjoint.
+    remember (vertices_hg C1) as C1v.
+    remember (vertices_hg C2) as C2v.
+    remember (vertices_hg L1) as Lv.
+    replace (hypervertices C1) with (hypervertices H ∩ (referenced_vertices_hg C1 ∪ ins)) by (subst; set_solver +).
+    replace (hypervertices L1) with (hypervertices H ∩ referenced_vertices_hg L1) by (subst; reflexivity).
+    replace (hypervertices C2) with (isolated_vertices H ∪ hypervertices H ∩ (referenced_vertices_hg C2 ∪ outs)) by (subst; set_solver +).
+    apply leibniz_equiv_iff.
+    rewrite vec_to_list_app, 3 list_to_set_app_L, 2 vec_to_list_to_vec, 2 list_to_set_elements_L.
+    apply set_subseteq_antisymm.
+    - set_solver.
+    - rewrite (union_difference
+        ((hypervertices H) ∩ (referenced_vertices_hg C1 ∪ referenced_vertices_hg L1
+        ∪ referenced_vertices_hg C2)) (hypervertices H)) at 1 by apply intersection_subseteq_l.
+      rewrite union_subseteq.
+      split. 1:{
+        rewrite <- (union_subseteq_r ((k ∪ i) ∖ _)).
+        set_solver +.
+      }
+      transitivity (isolated_vertices H ∪ 
+        hypervertices H ∩ list_to_set (inputs H) ∪
+        hypervertices H ∩ list_to_set (outputs H)). 1:{
+        subst.
+        rewrite decompose_C1_L1_C2_total_refererenced_vertices_hg.
+        transitivity (hypervertices H ∖ referenced_vertices_hg H); [set_solver|].
+        rewrite hypervertices_decomp_isolated_referenced at 1.
+        set_solver +.
+      }
+      rewrite 2 union_subseteq; split_and!.
+      + do 4 apply union_subseteq_r'.
+        apply union_subseteq_l.
+      + apply union_subseteq_r'.
+        apply union_subseteq_l'.
+        set_solver +Heqins.
+      + do 5 apply union_subseteq_r'.
+        set_solver +Heqouts.
+  Qed.
 
   Lemma decompose_is_graph {n m} (H : CospanHyperGraph T n m) (L : list positive) :
   H = decompose H L.
@@ -2217,31 +2326,9 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       apply map_union_least.
       + apply all_paths_idx_subset.
       + apply map_filter_subseteq.
-    - cbv delta [decompose] beta.
-      remember (list_to_set (inputs H)) as ins.
-      remember (list_to_set (outputs H)) as outs.
-      remember (isolated_vertices H) as isolated.
-      remember (decompose_L1 H L) as L1.
-      remember (decompose_C1 H L) as C1.
-      cbv zeta.
-      remember (decompose_C2 H L C1 isolated) as C2.
-      remember (decompose_iset H L ins) as i.
-      remember (decompose_jset H L C1 isolated outs) as j.
-      remember (decompose_kset H L C1 isolated ins outs) as k.
-      simpl.
-      rewrite hg_empty_union.
-      rewrite union_empty_l_L.
-      rewrite vertices_hg_add_vertices.
-      rewrite 2 list_to_vec_app.
-      rewrite 3 list_to_set_list_to_vec.
-      rewrite 3 list_to_set_elements_L.
-      rewrite vertices_hg_union.
-      remember (vertices_hg C1) as C1v.
-      remember (vertices_hg C2) as C2v.
-      remember (vertices_hg L1) as Lv.
-      replace (hypervertices C1) with (hypervertices H ∩ referenced_vertices_hg C1) by (subst; reflexivity).
-      replace (hypervertices L1) with (hypervertices H ∩ referenced_vertices_hg L1) by (subst; reflexivity).
-      replace (hypervertices C2) with (isolated_vertices H ∪ hypervertices H ∩ referenced_vertices_hg C2) by (subst; reflexivity).
+    - symmetry. apply hypervertices_decompose.
+  Qed.
+
 
 
 
@@ -2250,8 +2337,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       simpl.
       rewrite <- HeqC1.
       Search (vertices_hg _).
-      
-      
+
+
       (* We rebuild the let expressions used in the decompose function.
          This helps alleviate the pain. *)
       remember ({| hyperedges := C2; hypervertices := isolated_vertices H |}) as C2'.
@@ -2284,7 +2371,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember (C1v ∪ inpH) as C1vin.
       remember (C2v ∪ outH) as C2vout.
       replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with
-      replace ((C1vin ∪ Lv) ∩ C2vout ∖ (Lv ∪ C2v)) with 
+      replace ((C1vin ∪ Lv) ∩ C2vout ∖ (Lv ∪ C2v)) with
         ((C1vin ∩ outH) ∖ (Lv ∪ C2v)) by set_solver.
       rewrite (union_comm_L (Lv ∪ C2v)), difference_union_L.
 
@@ -2298,7 +2385,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       Search (_ ∪ _).
       replace (Lv ∪ Lv ∩ C2vout) with Lv by set_solver.
 
-      replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with  
+      replace (C1vin ∩ C2vout ∖ Lv ∪ Lv ∩ C2vout) with
 
         ((C1vin ∪ Lv) ∩ C2vout). 2:{
           transitivity ((C1vin ∖ Lv) ∩ (C2vout ∖ Lv) ∪ Lv ∩ C2vout); [|set_solver].
