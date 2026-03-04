@@ -2005,28 +2005,28 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     set_solver.
   Qed.
 
-  Lemma decompose_L1_subseteq H L : 
+  Lemma decompose_L1_subseteq H L :
     hyperedges $ decompose_L1 H L ⊆ hyperedges H.
   Proof.
     cbn.
     apply map_filter_subseteq.
   Qed.
-  
-  Lemma decompose_C1_subseteq H L : 
+
+  Lemma decompose_C1_subseteq H L :
     hyperedges $ decompose_C1 H L ⊆ hyperedges H.
   Proof.
     cbn.
     apply all_paths_idx_subset.
   Qed.
-  
-  Lemma decompose_C2_subseteq H L C1 isolated : 
+
+  Lemma decompose_C2_subseteq H L C1 isolated :
     hyperedges $ decompose_C2 H L C1 isolated ⊆ hyperedges H.
   Proof.
     cbn.
     now apply map_subseteq_difference_l.
   Qed.
 
-  Lemma referrenced_vertices_hg_subseteq (H G : HyperGraph T) : 
+  Lemma referrenced_vertices_hg_subseteq (H G : HyperGraph T) :
     hyperedges H ⊆ hyperedges G ->
     referrenced_vertices_hg H ⊆ referrenced_vertices_hg G.
   Proof.
@@ -2039,7 +2039,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     eauto.
   Qed.
 
-  Lemma decompose_L1v_referrenced H L : 
+  Lemma decompose_L1v_referrenced H L :
     decompose_L1v H L ⊆ referrenced_vertices_hg H.
   Proof.
     unfold decompose_L1v.
@@ -2048,34 +2048,45 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     apply union_subseteq, conj.
     + apply referrenced_vertices_hg_subseteq.
       apply decompose_L1_subseteq.
-    + rewrite intersection_subseteq_r. 
+    + rewrite intersection_subseteq_r.
       apply referrenced_vertices_hg_subseteq.
       cbn.
       apply map_filter_subseteq.
   Qed.
-  
-  Lemma decompose_C1v_referrenced H L : 
-    decompose_C1v H L ⊆ referrenced_vertices_hg H.
 
-  Lemma decompose_C1v_C2v_subseteq H L C1 isolated inputs outputs :
+  Lemma decompose_C1v_referrenced H L :
+    decompose_C1v H L ⊆ referrenced_vertices_hg H.
+  Proof.
+    unfold decompose_C1v.
+    rewrite vertices_hg_decomp.
+    cbn.
+    apply union_subseteq, conj.
+    + apply referrenced_vertices_hg_subseteq.
+      apply decompose_C1_subseteq.
+    + rewrite intersection_subseteq_r.
+      apply referrenced_vertices_hg_subseteq.
+      cbn.
+      apply all_paths_idx_subset.
+  Qed.
+
+  Lemma hypervertices_mk_sub_hg H L :
+    hypervertices (mk_sub_hg H L) = hypervertices H ∩ referrenced_vertices_hg (mk_hg L ∅).
+  Proof.
+    done.
+  Qed.
+
+  Lemma referrenced_vertices_hg_mk_sub_hg H L :
+    referrenced_vertices_hg (mk_sub_hg H L) =
+    referrenced_vertices_hg (mk_hg L ∅).
+  Proof.
+    done.
+  Qed.
+
+  (* FALSE!!!! *)
+  (* Lemma decompose_C1v_C2v_subseteq H L isolated inputs outputs :
     isolated ## referrenced_vertices_hg H ->
     decompose_C1v H L ∩ decompose_C2v H L (decompose_C1 H L) isolated ⊆
-      decompose_kset H L C1 isolated inputs outputs.
-  Proof.
-    unfold decompose_kset.
-    unfold decompose_C2v.
-    rewrite vertices_hg_decomp.
-    cbn -[decompose_C1].
-    set_solver.
-
-    
-    simpl.
-    set_solver.
-    unfold decompose_C2v.
-
-    set_unfold.
-    set_solver.
-  Qed.
+      decompose_kset H L (decompose_C1 H L) isolated inputs outputs. *)
 
 
   Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
