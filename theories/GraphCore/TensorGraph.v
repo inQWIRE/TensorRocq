@@ -814,7 +814,7 @@ Qed.
 Definition abs_vertices {T} (hg : (HyperEdge T)) : Pset :=
   list_to_set (hg.1.2 ++ hg.2).
 
-Definition referrenced_vertices {T n m} (cohg : CospanHyperGraph T n m) :
+Definition referenced_vertices {T n m} (cohg : CospanHyperGraph T n m) :
   Pset :=
   list_to_set (cohg.(inputs) ++ cohg.(outputs))
     ∪ list_to_set (map_to_list cohg.(hedges).(hyperedges)
@@ -823,29 +823,29 @@ Definition referrenced_vertices {T n m} (cohg : CospanHyperGraph T n m) :
 Definition isolated_vertices {T n m} (cohg : CospanHyperGraph T n m) :
   Pset :=
   cohg.(hedges).(hypervertices)
-    ∖ referrenced_vertices cohg.
+    ∖ referenced_vertices cohg.
 
-Lemma referrenced_vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
-  referrenced_vertices cohg =
+Lemma referenced_vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
+  referenced_vertices cohg =
   list_to_set (inputs cohg ++ outputs cohg) ∪
-    referrenced_vertices_hg cohg.
+    referenced_vertices_hg cohg.
 Proof.
   done.
 Qed.
 
 Lemma vertices_decomp {T n m} (cohg : CospanHyperGraph T n m) :
-  vertices cohg = isolated_vertices cohg ∪ referrenced_vertices cohg.
+  vertices cohg = isolated_vertices cohg ∪ referenced_vertices cohg.
 Proof.
   unfold vertices, isolated_vertices.
   rewrite difference_union_L.
-  unfold vertices_hg, referrenced_vertices.
+  unfold vertices_hg, referenced_vertices.
   apply set_eq.
   intros ?.
   rewrite 4 elem_of_union; tauto.
 Qed.
 
-Lemma isolated_referrenced_disjoint {T n m} (cohg : CospanHyperGraph T n m) :
-  isolated_vertices cohg ## referrenced_vertices cohg.
+Lemma isolated_referenced_disjoint {T n m} (cohg : CospanHyperGraph T n m) :
+  isolated_vertices cohg ## referenced_vertices cohg.
 Proof.
   unfold isolated_vertices.
   now apply disjoint_difference_l1.
@@ -858,8 +858,8 @@ Definition set_verts {T n m} (cohg : CospanHyperGraph T n m)
 Definition norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
   CospanHyperGraph T n m := set_verts cohg (isolated_vertices cohg).
 
-Lemma referrenced_vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
-  referrenced_vertices (norm_verts cohg) = referrenced_vertices cohg.
+Lemma referenced_vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
+  referenced_vertices (norm_verts cohg) = referenced_vertices cohg.
 Proof.
   reflexivity.
 Qed.
@@ -870,7 +870,7 @@ Proof.
   unfold isolated_vertices.
   cbn.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_norm_verts.
+  rewrite referenced_vertices_norm_verts.
   apply difference_twice_L.
 Qed.
 
@@ -879,7 +879,7 @@ Lemma vertices_norm_verts {T n m} (cohg : CospanHyperGraph T n m) :
   vertices (norm_verts cohg) = vertices cohg.
 Proof.
   now rewrite 2 vertices_decomp,
-    isolated_vertices_norm_verts, referrenced_vertices_norm_verts.
+    isolated_vertices_norm_verts, referenced_vertices_norm_verts.
 Qed.
 
 
@@ -909,11 +909,11 @@ Proof.
 Qed.
 
 
-Add Parametric Morphism `{Equiv T} {n m} : (@referrenced_vertices T n m)
-  with signature cohg_eq ==> eq as referrenced_vertices_cohg_eq.
+Add Parametric Morphism `{Equiv T} {n m} : (@referenced_vertices T n m)
+  with signature cohg_eq ==> eq as referenced_vertices_cohg_eq.
 Proof.
   intros cohg cohg' (Hins & Houts & [Heq Hverts]).
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   rewrite <- Hins, Houts.
   f_equal.
   apply map_to_list_equiv in Heq.
@@ -1084,8 +1084,8 @@ Proof.
   now destruct cohg as [[]].
 Qed.
 
-Lemma referrenced_vertices_set_verts {T n m} (cohg : CospanHyperGraph T n m) vs :
-  referrenced_vertices (set_verts cohg vs) = referrenced_vertices cohg.
+Lemma referenced_vertices_set_verts {T n m} (cohg : CospanHyperGraph T n m) vs :
+  referenced_vertices (set_verts cohg vs) = referenced_vertices cohg.
 Proof.
   done.
 Qed.
@@ -1113,10 +1113,10 @@ Proof.
     unfold isolated_vertices; cbn.
     symmetry.
     rewrite <- Heq.2.2.2.
-    rewrite referrenced_vertices_set_verts.
-    erewrite <- referrenced_vertices_cohg_eq by apply Heq.
+    rewrite referenced_vertices_set_verts.
+    erewrite <- referenced_vertices_cohg_eq by apply Heq.
     symmetry.
-    unfold referrenced_vertices.
+    unfold referenced_vertices.
     etransitivity; [|apply Hveq.2.2.2].
     rewrite <- Hveq.1, <- Hveq.2.1, <- Hveq.2.2.1.
     done.
@@ -1126,11 +1126,11 @@ Qed.
 Definition struct_isomorphic {T n m} (cohg cohg' : CospanHyperGraph T n m) :=
   isomorphic (norm_verts cohg) (norm_verts cohg').
 
-Lemma referrenced_vertices_relabel_graph {T n m} f (cohg : CospanHyperGraph T n m) :
-  referrenced_vertices (relabel_graph f cohg) =
-  set_map f (referrenced_vertices cohg).
+Lemma referenced_vertices_relabel_graph {T n m} f (cohg : CospanHyperGraph T n m) :
+  referenced_vertices (relabel_graph f cohg) =
+  set_map f (referenced_vertices cohg).
 Proof.
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   cbn.
   rewrite 2 vec_to_list_map, <- fmap_app.
   rewrite set_map_union_L, 2 set_map_list_to_set_L.
@@ -1149,7 +1149,7 @@ Lemma isolated_vertices_relabel_graph {T n m} f `{Hf : !Inj eq eq f}
   set_map f (isolated_vertices cohg).
 Proof.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_relabel_graph.
+  rewrite referenced_vertices_relabel_graph.
   cbn.
   now rewrite (set_map_difference_L _).
 Qed.
@@ -1163,12 +1163,12 @@ Proof.
   done.
 Qed.
 
-Lemma referrenced_vertices_reindex_graph {T n m}
+Lemma referenced_vertices_reindex_graph {T n m}
   f `{Hf : !Inj eq eq f} (cohg : CospanHyperGraph T n m) :
-  referrenced_vertices (reindex_graph f cohg) =
-  referrenced_vertices cohg.
+  referenced_vertices (reindex_graph f cohg) =
+  referenced_vertices cohg.
 Proof.
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   cbn.
   f_equal.
   rewrite (map_to_list_kmap _).
@@ -1183,7 +1183,7 @@ Lemma isolated_vertices_reindex_graph {T n m} f `{Hf : !Inj eq eq f}
   isolated_vertices cohg.
 Proof.
   unfold isolated_vertices.
-  rewrite (referrenced_vertices_reindex_graph _).
+  rewrite (referenced_vertices_reindex_graph _).
   done.
 Qed.
 
@@ -1742,13 +1742,13 @@ Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_binary `{Equiv T1, Reflexive T1 eq
 
 
 
-Lemma referrenced_vertices_stack_graphs {T n m n' m'}
+Lemma referenced_vertices_stack_graphs {T n m n' m'}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
-  referrenced_vertices (stack_graphs cohg cohg') =
-  set_map (bcons false) (referrenced_vertices cohg) ∪
-  set_map (bcons true) (referrenced_vertices cohg').
+  referenced_vertices (stack_graphs cohg cohg') =
+  set_map (bcons false) (referenced_vertices cohg) ∪
+  set_map (bcons true) (referenced_vertices cohg').
 Proof.
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   cbn.
   rewrite 2 set_map_union_L, 4 set_map_list_to_set_L.
   rewrite 2 vec_to_list_app, 4 vec_to_list_map.
@@ -1778,21 +1778,21 @@ Lemma isolated_vertices_stack_graphs {T n m n' m'}
   set_map (bcons true) (isolated_vertices cohg').
 Proof.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_stack_graphs.
+  rewrite referenced_vertices_stack_graphs.
   cbn.
   rewrite 2 (set_map_difference_L _).
   generalize (hypervertices cohg) (hypervertices cohg')
-    (referrenced_vertices cohg) (referrenced_vertices cohg').
+    (referenced_vertices cohg) (referenced_vertices cohg').
   set_solver.
 Qed.
 
-Lemma referrenced_vertices_swapped_stack_graphs {T n m n' m'}
+Lemma referenced_vertices_swapped_stack_graphs {T n m n' m'}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
-  referrenced_vertices (swapped_stack_graphs cohg cohg') =
-  set_map (bcons false) (referrenced_vertices cohg) ∪
-  set_map (bcons true) (referrenced_vertices cohg').
+  referenced_vertices (swapped_stack_graphs cohg cohg') =
+  set_map (bcons false) (referenced_vertices cohg) ∪
+  set_map (bcons true) (referenced_vertices cohg').
 Proof.
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   cbn.
   rewrite 2 set_map_union_L, 4 set_map_list_to_set_L.
   rewrite 2 vec_to_list_app, 4 vec_to_list_map.
@@ -1822,11 +1822,11 @@ Lemma isolated_vertices_swapped_stack_graphs {T n m n' m'}
   set_map (bcons true) (isolated_vertices cohg').
 Proof.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_swapped_stack_graphs.
+  rewrite referenced_vertices_swapped_stack_graphs.
   cbn.
   rewrite 2 (set_map_difference_L _).
   generalize (hypervertices cohg) (hypervertices cohg')
-    (referrenced_vertices cohg) (referrenced_vertices cohg').
+    (referenced_vertices cohg) (referenced_vertices cohg').
   set_solver.
 Qed.
 
@@ -1889,13 +1889,13 @@ Proof.
     apply (f_equal (hyperedges ∘ hedges) Heq).
   - cbn.
     unfold isolated_vertices.
-    rewrite 2 referrenced_vertices_relabel_graph.
-    rewrite <- referrenced_vertices_norm_verts, Heq, referrenced_vertices_norm_verts.
+    rewrite 2 referenced_vertices_relabel_graph.
+    rewrite <- referenced_vertices_norm_verts, Heq, referenced_vertices_norm_verts.
     apply set_map_difference_respectful_l_L.
     apply eq_reflexivity.
-    rewrite <- referrenced_vertices_norm_verts at 1.
+    rewrite <- referenced_vertices_norm_verts at 1.
     rewrite <- (Heq : _ = _).
-    rewrite referrenced_vertices_norm_verts.
+    rewrite referenced_vertices_norm_verts.
     apply (f_equal (hypervertices ∘ hedges) Heq).
 Qed.
 
@@ -1953,6 +1953,62 @@ Section Compose.
 
   Definition compose_graphs_unsafe {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set (tgr.(inputs)) ∖ (vertices_hg tgl ∪ vertices_hg tgr)) <- tgr.(outputs).
+
+  
+  Definition compose_graphs_unsafe' {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
+    tgl.(inputs) ->  hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) 
+      (list_to_set (tgr.(inputs)) ∖ (vertices_hg tgl ∪ vertices_hg tgr ∪ list_to_set (tgl.(inputs) ++ tgr.(outputs)))) <- tgr.(outputs).
+
+Lemma isolated_vertices_alt_vertices {n m} (cohg : CospanHyperGraph T n m) : 
+  isolated_vertices cohg = vertices cohg ∖ referenced_vertices cohg.
+Proof.
+  rewrite vertices_decomp.
+  rewrite difference_union_distr_l_L.
+  rewrite difference_diag_L.
+  unfold isolated_vertices.
+  rewrite union_empty_r_L.
+  now rewrite difference_twice_L.
+Qed.
+
+Lemma cohg_vert_eq_alt_vertices {n m} (cohg cohg' : CospanHyperGraph T n m) : 
+  cohg ≡ᵥ cohg' <->
+  inputs cohg = inputs cohg' /\
+  outputs cohg = outputs cohg' /\
+  hyperedges cohg = hyperedges cohg' /\
+  vertices cohg = vertices cohg'.
+Proof.
+  rewrite cohg_vert_eq_alt.
+  apply and_iff_from_l; [done|].
+  intros Hins _.
+  apply and_iff_from_l; [done|].
+  intros Houts _.
+  apply and_iff_from_l; [done|].
+  intros Hhe _.
+  split.
+  - intros Hisol.
+    rewrite 2 vertices_decomp, Hisol.
+    f_equal.
+    unfold referenced_vertices.
+    congruence.
+  - rewrite 2 isolated_vertices_alt_vertices.
+    intros ->.
+    unfold referenced_vertices.
+    congruence.
+Qed.
+
+Lemma compose_graphs_unsafe'_correct {n m o} 
+  (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : 
+  compose_graphs_unsafe' tgl tgr ≡ᵥ compose_graphs_unsafe tgl tgr.
+Proof.
+  apply cohg_vert_eq_alt_vertices.
+  split_and!; [done..|].
+  unfold vertices.
+  cbn.
+  rewrite 2 vertices_hg_add_vertices.
+  rewrite <- (difference_difference_l_L (list_to_set tgr.(inputs))).
+  rewrite <- (union_assoc_L _), difference_union_L.
+  apply union_assoc_L.
+Qed.
 
 Lemma compose_graphs_to_compose_graphs_aux {n m o}
   (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) :
@@ -2102,10 +2158,10 @@ Proof.
   cbn.
   unfold add_top_loop', add_top_loop.
   unfold isolated_vertices.
-  rewrite 2 referrenced_vertices_relabel_graph.
+  rewrite 2 referenced_vertices_relabel_graph.
   cbn -[union difference].
-  change (referrenced_vertices _) with
-    (referrenced_vertices (vtl (inputs tg) -> hg_add_vertices tg {[vhd (inputs tg)]} <-
+  change (referenced_vertices _) with
+    (referenced_vertices (vtl (inputs tg) -> hg_add_vertices tg {[vhd (inputs tg)]} <-
         vtl (outputs tg))).
   apply leibniz_equiv_iff, set_subseteq_antisymm. 1:{
     apply difference_mono; [|done].
@@ -2130,10 +2186,10 @@ Qed.
 
 Lemma isolated_vertices_add_top_loop {n m} (cohg : CospanHyperGraph T (S n) (S m)) :
   isolated_vertices (add_top_loop cohg) =
-  isolated_vertices cohg ∪ ({[(vhd (inputs cohg))]} ∖ referrenced_vertices (add_top_loop cohg)).
+  isolated_vertices cohg ∪ ({[(vhd (inputs cohg))]} ∖ referenced_vertices (add_top_loop cohg)).
 Proof.
   unfold isolated_vertices, add_top_loop.
-  rewrite referrenced_vertices_relabel_graph.
+  rewrite referenced_vertices_relabel_graph.
   cbn -[difference union].
   unfold_leibniz.
   apply set_subseteq_antisymm.
@@ -2156,7 +2212,7 @@ Proof.
         exists k.
         split; [now rewrite fn_lookup_singleton_ne|].
         clear Hkh Hkr.
-        unfold referrenced_vertices in Hk.
+        unfold referenced_vertices in Hk.
         rewrite (Vector.eta (inputs cohg)), (Vector.eta (outputs cohg)) in Hk.
         cbn -[union] in *.
         set_solver.
@@ -2166,7 +2222,7 @@ Proof.
       now apply elem_of_singleton.
   - apply union_subseteq, conj.
     + intros k [Hkh Hkr]%elem_of_difference.
-      unfold referrenced_vertices in Hkr.
+      unfold referenced_vertices in Hkr.
       rewrite (Vector.eta (inputs cohg)), (Vector.eta (outputs cohg)) in Hkr.
       cbn -[union] in *.
       apply elem_of_difference, conj.
@@ -2264,7 +2320,7 @@ Proof.
   cbn.
   unfold isolated_vertices.
   cbn.
-  rewrite 2 referrenced_vertices_decomp.
+  rewrite 2 referenced_vertices_decomp.
   cbn.
   rewrite vertices_hg_decomp.
   rewrite <- 3 difference_difference_l_L, difference_union_L.

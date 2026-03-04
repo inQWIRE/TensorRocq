@@ -471,8 +471,8 @@ Lemma spgraph_pre_isos_correct_aux {T n m} (cosphg cosphg' : CospanSPHyperGraph 
     size (spisolated_vertices cosphg) = size (spisolated_vertices cosphg') /\
     dom mhe = dom cosphg.(sphedges).(sphyperedges) /\
     (forall i j a, mhe !! i = Some a -> mhe !! j = Some a -> i = j) /\
-    dom mv = spreferrenced_vertices cosphg /\
-    map_img mv = spreferrenced_vertices cosphg' /\
+    dom mv = spreferenced_vertices cosphg /\
+    map_img mv = spreferenced_vertices cosphg' /\
     map_relation (λ _ '(t', v') '(t, v),
       (t, t') ∈ ts /\
       v = v') (λ _ _, False) (λ _ _, False)
@@ -501,7 +501,7 @@ Proof.
   split; [done|].
   split; [apply Hinj; intros ???; now rewrite lookup_empty|].
   split; [rewrite Hdom_mv, Hdom_mvi;
-    unfold spreferrenced_vertices; f_equal;
+    unfold spreferenced_vertices; f_equal;
     rewrite list_to_set_bind_L, set_map_union_list_L;
     f_equal; rewrite <- 3 list_fmap_compose;
     apply list_fmap_ext; intros _ [k [t v]] _; cbn;
@@ -509,7 +509,7 @@ Proof.
     rewrite elem_of_list_to_set, gmultiset_elem_of_elements,
     elem_of_map; setoid_rewrite gmultiset_elem_of_dom; set_solver +|].
   split; [rewrite Himg_mv, Himg_mvi;
-    unfold spreferrenced_vertices; f_equal;
+    unfold spreferenced_vertices; f_equal;
     rewrite list_to_set_bind_L, set_map_union_list_L;
     f_equal; rewrite <- 3 list_fmap_compose;
     apply list_fmap_ext; intros _ [k [t v]] _; cbn;
@@ -550,7 +550,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply spisolated_referrenced_disjoint.
+    apply spisolated_referenced_disjoint.
   }
   eapply (spisomorphic_of_partial_inj_dom' _ _
     (Pmap_map (misol ∪ mv)) (Pmap_map mhe)).
@@ -570,7 +570,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply spisolated_referrenced_disjoint.
+      apply spisolated_referenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - symmetry.
@@ -644,8 +644,8 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%spisolated_referrenced_disjoint; apply Href.
-        unfold spreferrenced_vertices.
+        intros Href%spisolated_referenced_disjoint; apply Href.
+        unfold spreferenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         exists (i, (t, v)).
@@ -679,7 +679,7 @@ Proof.
         unfold Pmap_map.
         enough (a ∈ dom mv) as Hadom by now apply elem_of_dom in Hadom as [? ->].
         rewrite Hdom_mv.
-        unfold spreferrenced_vertices.
+        unfold spreferenced_vertices.
         apply union_subseteq_r.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         apply lookup_kmap_Some_2 in Htv as (i' & Hi' & <-).
@@ -709,7 +709,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply spisolated_referrenced_disjoint.
+    apply spisolated_referenced_disjoint.
   }
   etransitivity; [
   eapply rtc_once, or_introl, (spisomorphic_of_partial_inj_dom' _ _
@@ -730,7 +730,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply spisolated_referrenced_disjoint.
+      apply spisolated_referenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - apply rtc_once, or_intror.
@@ -805,8 +805,8 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%spisolated_referrenced_disjoint; apply Href.
-        unfold spreferrenced_vertices.
+        intros Href%spisolated_referenced_disjoint; apply Href.
+        unfold spreferenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         exists (i, (t, v)).
@@ -841,7 +841,7 @@ Proof.
         unfold Pmap_map.
         enough (a ∈ dom mv) as Hadom by now apply elem_of_dom in Hadom as [? ->].
         rewrite Hdom_mv.
-        unfold spreferrenced_vertices.
+        unfold spreferenced_vertices.
         apply union_subseteq_r.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         apply lookup_kmap_Some_2 in Htv as (i' & Hi' & <-).

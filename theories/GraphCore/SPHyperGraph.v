@@ -14,9 +14,9 @@ Record SPHyperGraph {T} := mk_sphg {
   (* The edges of the hypergraph *)
   sphyperedges : Pmap (SPHyperEdge T);
   (* Additional vertices of the hypergraph, which are often
-    disjoint from the referrenced vertices of [sphyperedges]
+    disjoint from the referenced vertices of [sphyperedges]
     (in practice, we only care about the subset of [sphypervertices]
-    not referrenced in [sphyperedges], but do not enforce disjointness) *)
+    not referenced in [sphyperedges], but do not enforce disjointness) *)
   sphypervertices : Pset;
 }.
 

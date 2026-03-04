@@ -388,11 +388,11 @@ Proof.
 Qed.
 
 
-Lemma referrenced_vertices_graph_apply_hom cohg :
-  referrenced_vertices (graph_apply_hom f cohg) =
-  referrenced_vertices cohg.
+Lemma referenced_vertices_graph_apply_hom cohg :
+  referenced_vertices (graph_apply_hom f cohg) =
+  referenced_vertices cohg.
 Proof.
-  unfold referrenced_vertices.
+  unfold referenced_vertices.
   f_equal.
   cbn.
   rewrite map_to_list_fmap, list_fmap_bind.
@@ -404,7 +404,7 @@ Lemma isolated_vertices_graph_apply_hom cohg :
   isolated_vertices cohg.
 Proof.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_graph_apply_hom.
+  rewrite referenced_vertices_graph_apply_hom.
   done.
 Qed.
 

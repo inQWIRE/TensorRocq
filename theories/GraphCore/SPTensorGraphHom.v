@@ -388,11 +388,11 @@ Proof.
 Qed.
 
 
-Lemma spreferrenced_vertices_spgraph_apply_hom cosphg :
-  spreferrenced_vertices (spgraph_apply_hom f cosphg) =
-  spreferrenced_vertices cosphg.
+Lemma spreferenced_vertices_spgraph_apply_hom cosphg :
+  spreferenced_vertices (spgraph_apply_hom f cosphg) =
+  spreferenced_vertices cosphg.
 Proof.
-  unfold spreferrenced_vertices.
+  unfold spreferenced_vertices.
   f_equal.
   cbn.
   rewrite map_to_list_fmap, list_fmap_bind.
@@ -404,7 +404,7 @@ Lemma spisolated_vertices_spgraph_apply_hom cosphg :
   spisolated_vertices cosphg.
 Proof.
   unfold spisolated_vertices.
-  rewrite spreferrenced_vertices_spgraph_apply_hom.
+  rewrite spreferenced_vertices_spgraph_apply_hom.
   done.
 Qed.
 

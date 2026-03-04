@@ -1043,7 +1043,7 @@ Proof.
 Qed.
 
 
-Definition spreferrenced_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
+Definition spreferenced_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
   Pset :=
   list_to_set (cosphg.(spinputs) ++ cosphg.(spoutputs))
     ∪ list_to_set (map_to_list (cosphg.(sphedges).(sphyperedges)) ≫=
@@ -1052,22 +1052,22 @@ Definition spreferrenced_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
 Definition spisolated_vertices {T n m} (cosphg : CospanSPHyperGraph T n m) :
   Pset :=
   cosphg.(sphedges).(sphypervertices)
-    ∖ spreferrenced_vertices cosphg.
+    ∖ spreferenced_vertices cosphg.
 
 
 Lemma vertices_decomp {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  vertices cosphg = spisolated_vertices cosphg ∪ spreferrenced_vertices cosphg.
+  vertices cosphg = spisolated_vertices cosphg ∪ spreferenced_vertices cosphg.
 Proof.
   unfold vertices, spisolated_vertices.
   rewrite difference_union_L.
-  unfold vertices_sphg, spreferrenced_vertices.
+  unfold vertices_sphg, spreferenced_vertices.
   apply set_eq.
   intros ?.
   rewrite 4 elem_of_union; tauto.
 Qed.
 
-Lemma spisolated_referrenced_disjoint {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  spisolated_vertices cosphg ## spreferrenced_vertices cosphg.
+Lemma spisolated_referenced_disjoint {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spisolated_vertices cosphg ## spreferenced_vertices cosphg.
 Proof.
   unfold spisolated_vertices.
   now apply disjoint_difference_l1.
@@ -1080,8 +1080,8 @@ Definition set_spverts {T n m} (cosphg : CospanSPHyperGraph T n m)
 Definition norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
   CospanSPHyperGraph T n m := set_spverts cosphg (spisolated_vertices cosphg).
 
-Lemma spreferrenced_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  spreferrenced_vertices (norm_spverts cosphg) = spreferrenced_vertices cosphg.
+Lemma spreferenced_vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  spreferenced_vertices (norm_spverts cosphg) = spreferenced_vertices cosphg.
 Proof.
   reflexivity.
 Qed.
@@ -1092,7 +1092,7 @@ Proof.
   unfold spisolated_vertices.
   cbn.
   unfold spisolated_vertices.
-  rewrite spreferrenced_vertices_norm_spverts.
+  rewrite spreferenced_vertices_norm_spverts.
   apply difference_twice_L.
 Qed.
 
@@ -1101,7 +1101,7 @@ Lemma vertices_norm_spverts {T n m} (cosphg : CospanSPHyperGraph T n m) :
   vertices (norm_spverts cosphg) = vertices cosphg.
 Proof.
   now rewrite 2 vertices_decomp,
-    spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
+    spisolated_vertices_norm_spverts, spreferenced_vertices_norm_spverts.
 Qed.
 
 
@@ -1120,11 +1120,11 @@ Qed.
 
 
 
-Add Parametric Morphism `{Equiv T} {n m} : (@spreferrenced_vertices T n m)
-  with signature cosphg_eq ==> eq as spreferrenced_vertices_cosphg_eq.
+Add Parametric Morphism `{Equiv T} {n m} : (@spreferenced_vertices T n m)
+  with signature cosphg_eq ==> eq as spreferenced_vertices_cosphg_eq.
 Proof.
   intros cosphg cosphg' (Hins & Houts & [Heq Hverts]).
-  unfold spreferrenced_vertices.
+  unfold spreferenced_vertices.
   rewrite <- Hins, Houts.
   f_equal.
   apply map_to_list_equiv in Heq.

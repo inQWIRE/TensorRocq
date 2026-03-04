@@ -18,9 +18,9 @@ Record HyperGraph {T} := mk_hg {
   (* The edges of the hypergraph *)
   hyperedges : Pmap (T * list positive * list positive);
   (* Additional vertices of the hypergraph, which are often
-    disjoint from the referrenced vertices of [hyperedges]
+    disjoint from the referenced vertices of [hyperedges]
     (in practice, we only care about the subset of [hypervertices]
-    not referrenced in [hyperedges], but do not enforce disjointness) *)
+    not referenced in [hyperedges], but do not enforce disjointness) *)
   hypervertices : Pset;
 }.
 
@@ -55,7 +55,7 @@ Definition relabel_hg {T} (f : positive -> positive) (hg : HyperGraph T) :
 Definition hg_add_vertices {T} (hg : HyperGraph T) (vs : Pset) : HyperGraph T :=
   mk_hg hg.(hyperedges) (vs ∪ hg.(hypervertices)).
 
-Definition referrenced_vertices_hg {T} (hg : HyperGraph T) : Pset :=
+Definition referenced_vertices_hg {T} (hg : HyperGraph T) : Pset :=
   list_to_set $ map_to_list hg.(hyperedges)
     ≫= λ k_flu, k_flu.2.1.2 ++ k_flu.2.2.
 
@@ -357,15 +357,15 @@ Proof.
   apply union_comm_L.
 Qed.
 
-Lemma referrenced_vertices_hg_add_vertices (hg : HyperGraph T) vs :
-  referrenced_vertices_hg (hg_add_vertices hg vs) =
-  referrenced_vertices_hg hg.
+Lemma referenced_vertices_hg_add_vertices (hg : HyperGraph T) vs :
+  referenced_vertices_hg (hg_add_vertices hg vs) =
+  referenced_vertices_hg hg.
 Proof.
   done.
 Qed.
 
 Lemma vertices_hg_decomp (hg : HyperGraph T) :
-  vertices_hg hg = referrenced_vertices_hg hg ∪ hypervertices hg.
+  vertices_hg hg = referenced_vertices_hg hg ∪ hypervertices hg.
 Proof.
   done.
 Qed.

@@ -472,8 +472,8 @@ Lemma spgraph_pre_isos_correct_aux {T n m} (cosphg cosphg' : CospanSPHyperGraph 
     size (spisolated_vertices cosphg) = size (spisolated_vertices cosphg') /\
     dom mhe = dom cosphg.(sphedges).(sphyperedges) /\
     (forall i j a, mhe !! i = Some a -> mhe !! j = Some a -> i = j) /\
-    dom mv = spreferrenced_vertices cosphg /\
-    map_img mv = spreferrenced_vertices cosphg' /\
+    dom mv = spreferenced_vertices cosphg /\
+    map_img mv = spreferenced_vertices cosphg' /\
     map_relation (λ _ '(t', v') '(t, v),
       (t, t') ∈ ts /\
       v = v') (λ _ _, False) (λ _ _, False)
@@ -502,7 +502,7 @@ Proof.
   split; [done|].
   split; [apply Hinj; intros ???; now rewrite lookup_empty|].
   split; [rewrite Hdom_mv, Hdom_mvi;
-    unfold spreferrenced_vertices; f_equal;
+    unfold spreferenced_vertices; f_equal;
     rewrite list_to_set_bind_L, set_map_union_list_L;
     f_equal; rewrite <- 3 list_fmap_compose;
     apply list_fmap_ext; intros _ [k [t v]] _; cbn;
@@ -510,7 +510,7 @@ Proof.
     rewrite elem_of_list_to_set, gmultiset_elem_of_elements,
     elem_of_map; setoid_rewrite gmultiset_elem_of_dom; set_solver +|].
   split; [rewrite Himg_mv, Himg_mvi;
-    unfold spreferrenced_vertices; f_equal;
+    unfold spreferenced_vertices; f_equal;
     rewrite list_to_set_bind_L, set_map_union_list_L;
     f_equal; rewrite <- 3 list_fmap_compose;
     apply list_fmap_ext; intros _ [k [t v]] _; cbn;
@@ -551,7 +551,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply spisolated_referrenced_disjoint.
+    apply spisolated_referenced_disjoint.
   }
   eapply (spisomorphic_of_partial_inj_dom' _ _
     (Pmap_map (misol ∪ mv)) (Pmap_map mhe)).
@@ -571,7 +571,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply spisolated_referrenced_disjoint.
+      apply spisolated_referenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - symmetry.
@@ -645,8 +645,8 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%spisolated_referrenced_disjoint; apply Href.
-        unfold spreferrenced_vertices.
+        intros Href%spisolated_referenced_disjoint; apply Href.
+        unfold spreferenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         exists (i, (t, v)).
@@ -680,7 +680,7 @@ Proof.
         unfold Pmap_map.
         enough (a ∈ dom mv) as Hadom by now apply elem_of_dom in Hadom as [? ->].
         rewrite Hdom_mv.
-        unfold spreferrenced_vertices.
+        unfold spreferenced_vertices.
         apply union_subseteq_r.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         apply lookup_kmap_Some_2 in Htv as (i' & Hi' & <-).
@@ -710,7 +710,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply spisolated_referrenced_disjoint.
+    apply spisolated_referenced_disjoint.
   }
   etransitivity; [
   eapply rtc_once, or_introl, (spisomorphic_of_partial_inj_dom' _ _
@@ -731,7 +731,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply spisolated_referrenced_disjoint.
+      apply spisolated_referenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - apply rtc_once, or_intror.
@@ -806,8 +806,8 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%spisolated_referrenced_disjoint; apply Href.
-        unfold spreferrenced_vertices.
+        intros Href%spisolated_referenced_disjoint; apply Href.
+        unfold spreferenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         exists (i, (t, v)).
@@ -842,7 +842,7 @@ Proof.
         unfold Pmap_map.
         enough (a ∈ dom mv) as Hadom by now apply elem_of_dom in Hadom as [? ->].
         rewrite Hdom_mv.
-        unfold spreferrenced_vertices.
+        unfold spreferenced_vertices.
         apply union_subseteq_r.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         apply lookup_kmap_Some_2 in Htv as (i' & Hi' & <-).
@@ -1910,16 +1910,16 @@ Proof.
 Qed.
 
 
-Lemma spreferrenced_vertices_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
-  vs : spreferrenced_vertices (set_spverts cohg vs) = spreferrenced_vertices cohg.
+Lemma spreferenced_vertices_set_spverts {n m} (cohg : CospanSPHyperGraph T n m)
+  vs : spreferenced_vertices (set_spverts cohg vs) = spreferenced_vertices cohg.
 Proof.
   done.
 Qed.
 
-Lemma spreferrenced_vertices_relabel_spgraph f {n m} (cohg : CospanSPHyperGraph T n m) :
-  spreferrenced_vertices (relabel_spgraph f cohg) = set_map f (spreferrenced_vertices cohg).
+Lemma spreferenced_vertices_relabel_spgraph f {n m} (cohg : CospanSPHyperGraph T n m) :
+  spreferenced_vertices (relabel_spgraph f cohg) = set_map f (spreferenced_vertices cohg).
 Proof.
-  unfold spreferrenced_vertices; cbn.
+  unfold spreferenced_vertices; cbn.
   rewrite set_map_union_L, set_map_list_to_set_L.
   f_equal; [now rewrite 2 vec_to_list_map, fmap_app|].
   rewrite set_map_list_to_set_L.
@@ -1935,10 +1935,10 @@ Proof.
   done.
 Qed.
 
-Lemma spreferrenced_vertices_reindex_spgraph f `{Hf : !Inj eq eq f} {n m} (cohg : CospanSPHyperGraph T n m) :
-  spreferrenced_vertices (reindex_spgraph f cohg) = spreferrenced_vertices cohg.
+Lemma spreferenced_vertices_reindex_spgraph f `{Hf : !Inj eq eq f} {n m} (cohg : CospanSPHyperGraph T n m) :
+  spreferenced_vertices (reindex_spgraph f cohg) = spreferenced_vertices cohg.
 Proof.
-  unfold spreferrenced_vertices; cbn.
+  unfold spreferenced_vertices; cbn.
   f_equal.
   rewrite (map_to_list_kmap _).
   rewrite list_fmap_bind.
@@ -1956,15 +1956,15 @@ Proof.
   apply (size_set_eq_exists_map (M:=Pmap)) in Hverts as Hmv'.
   destruct Hmv' as (mv' & Hdommv' & Himgmv' & Hinj).
 
-  assert (Himgfv : forall v, v ∈ spreferrenced_vertices cohg ->
-    fv v ∈ spreferrenced_vertices cohg'). 1:{
+  assert (Himgfv : forall v, v ∈ spreferenced_vertices cohg ->
+    fv v ∈ spreferenced_vertices cohg'). 1:{
     intros v Hv.
-    apply (f_equal spreferrenced_vertices) in Heq.
-    rewrite spreferrenced_vertices_set_spverts in Heq.
+    apply (f_equal spreferenced_vertices) in Heq.
+    rewrite spreferenced_vertices_set_spverts in Heq.
     rewrite Heq.
-    rewrite spreferrenced_vertices_relabel_spgraph,
-      (spreferrenced_vertices_reindex_spgraph _).
-    rewrite spreferrenced_vertices_set_spverts.
+    rewrite spreferenced_vertices_relabel_spgraph,
+      (spreferenced_vertices_reindex_spgraph _).
+    rewrite spreferenced_vertices_set_spverts.
     now apply elem_of_map_2.
   }
 
@@ -1972,7 +1972,7 @@ Proof.
     (λ i, default (fv i) (mv' !! i)) fe).
   - intros i j.
     rewrite vertices_decomp, 2 elem_of_union.
-    rewrite spisolated_vertices_norm_spverts, spreferrenced_vertices_norm_spverts.
+    rewrite spisolated_vertices_norm_spverts, spreferenced_vertices_norm_spverts.
     intros [Hii|Hir];
     [apply Hdommv' in Hii as Hmi;
     apply elem_of_dom in Hmi as [mi Hmi];
@@ -1980,7 +1980,7 @@ Proof.
     rewrite Himgmv' in Hmii
     |replace (mv' !! i) with (@None positive) by
       (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
-      intros ?%spisolated_referrenced_disjoint);
+      intros ?%spisolated_referenced_disjoint);
      cbn;
      specialize (Himgfv i Hir) as Hfir];
     (intros [Hji|Hjr];
@@ -1990,16 +1990,16 @@ Proof.
     rewrite Himgmv' in Hmji
     |replace (mv' !! j) with (@None positive) by
       (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
-      intros ?%spisolated_referrenced_disjoint);
+      intros ?%spisolated_referenced_disjoint);
      cbn;
      specialize (Himgfv j Hjr) as Hfjr]).
     + intros <-.
       revert Hmi Hmj.
       apply Hinj.
     + intros ->.
-      now apply spisolated_referrenced_disjoint in Hmii.
+      now apply spisolated_referenced_disjoint in Hmii.
     + intros <-.
-      now apply spisolated_referrenced_disjoint in Hmji.
+      now apply spisolated_referenced_disjoint in Hmji.
     + apply Hfv.
   - intros ? ? ? ?; apply Hfe.
   - apply cosphg_ext; [apply sphg_ext|..].
@@ -2014,9 +2014,9 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
+      refine (disjoint_sym _ _ (spisolated_referenced_disjoint cohg) _ _).
       apply elem_of_map_to_list in Hitv.
-      unfold spreferrenced_vertices.
+      unfold spreferenced_vertices.
       apply elem_of_union_r.
       apply elem_of_list_to_set.
       apply elem_of_list_bind.
@@ -2045,8 +2045,8 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
-      unfold spreferrenced_vertices.
+      refine (disjoint_sym _ _ (spisolated_referenced_disjoint cohg) _ _).
+      unfold spreferenced_vertices.
       apply elem_of_union_l.
       apply elem_of_list_to_set.
       now apply elem_of_app; left.
@@ -2059,8 +2059,8 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (spisolated_referrenced_disjoint cohg) _ _).
-      unfold spreferrenced_vertices.
+      refine (disjoint_sym _ _ (spisolated_referenced_disjoint cohg) _ _).
+      unfold spreferenced_vertices.
       apply elem_of_union_l.
       apply elem_of_list_to_set.
       now apply elem_of_app; right.
@@ -2080,7 +2080,7 @@ Lemma spisolated_vertices_set_spverts_spisolated_vertices
 Proof.
   unfold spisolated_vertices at 1 2.
   cbn.
-  rewrite spreferrenced_vertices_set_spverts.
+  rewrite spreferenced_vertices_set_spverts.
   unfold spisolated_vertices.
   now rewrite difference_twice_L.
 Qed.
@@ -2122,7 +2122,7 @@ Qed.
 
 Lemma norm_spverts_equiv_of_map_to_list_perm_equiv `{Equivalence T equiv} {n m}
   (mv : Pmap positive) (cohg cohg' : CospanSPHyperGraph T n m) :
-  spreferrenced_vertices cohg ⊆ dom mv ->
+  spreferenced_vertices cohg ⊆ dom mv ->
   map_inj mv ->
   size (spisolated_vertices cohg) = size (spisolated_vertices cohg') ->
   PermutationA (rel_preimage snd (prod_relation equiv eq))
@@ -2138,12 +2138,12 @@ Proof.
   apply spequiv_of_set_spverts_empty_equiv; [done|].
   apply (spequiv_of_map_to_list_perm_equiv' mv); [|done..].
   rewrite vertices_decomp.
-  rewrite spreferrenced_vertices_set_spverts.
+  rewrite spreferenced_vertices_set_spverts.
   unfold spisolated_vertices.
-  rewrite spreferrenced_vertices_set_spverts.
+  rewrite spreferenced_vertices_set_spverts.
   cbn -[difference].
   rewrite <- Hdom.
-  generalize (spreferrenced_vertices cohg).
+  generalize (spreferenced_vertices cohg).
   set_solver +.
 Qed.
 
@@ -2189,7 +2189,7 @@ Proof.
   destruct Hmv'_alt as [Hins Houts].
   apply (norm_spverts_equiv_of_map_to_list_perm_equiv mv).
   - apply subseteq_dom in Hsubs as Hdoms.
-    unfold spreferrenced_vertices.
+    unfold spreferenced_vertices.
     rewrite union_subseteq.
     split.
     + apply pupdates_correct in Hmv' as Hmv'_alt.

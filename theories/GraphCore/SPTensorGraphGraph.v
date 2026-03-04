@@ -254,11 +254,11 @@ Proof.
   done.
 Qed.
 
-Lemma spreferrenced_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
-  spreferrenced_vertices (cohg2cosphg cohg) =
-  referrenced_vertices cohg.
+Lemma spreferenced_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
+  spreferenced_vertices (cohg2cosphg cohg) =
+  referenced_vertices cohg.
 Proof.
-  unfold referrenced_vertices, spreferrenced_vertices.
+  unfold referenced_vertices, spreferenced_vertices.
   f_equal.
   cbn.
   rewrite map_to_list_fmap, list_fmap_bind.
@@ -276,7 +276,7 @@ Lemma spisolated_vertices_cohg2cosphg {T n m} (cohg : CospanHyperGraph T n m) :
   isolated_vertices cohg.
 Proof.
   unfold isolated_vertices, spisolated_vertices.
-  rewrite spreferrenced_vertices_cohg2cosphg.
+  rewrite spreferenced_vertices_cohg2cosphg.
   done.
 Qed.
 
@@ -504,11 +504,11 @@ Proof.
   now rewrite elements_list_to_set_disj, app_nil_r.
 Qed.
 
-Lemma referrenced_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
-  referrenced_vertices (cosphg2cohg cosphg) =
-  spreferrenced_vertices cosphg.
+Lemma referenced_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) :
+  referenced_vertices (cosphg2cohg cosphg) =
+  spreferenced_vertices cosphg.
 Proof.
-  unfold referrenced_vertices, spreferrenced_vertices.
+  unfold referenced_vertices, spreferenced_vertices.
   f_equal.
   cbn.
   rewrite map_to_list_fmap, list_fmap_bind.
@@ -525,7 +525,7 @@ Lemma isolated_vertices_cosphg2cohg {T n m} (cosphg : CospanSPHyperGraph T n m) 
   spisolated_vertices cosphg.
 Proof.
   unfold isolated_vertices, spisolated_vertices.
-  now rewrite referrenced_vertices_cosphg2cohg.
+  now rewrite referenced_vertices_cosphg2cohg.
 Qed.
 
 

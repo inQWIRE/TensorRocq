@@ -323,15 +323,15 @@ Proof.
   apply (size_set_eq_exists_map (M:=Pmap)) in Hverts as Hmv'.
   destruct Hmv' as (mv' & Hdommv' & Himgmv' & Hinj).
 
-  assert (Himgfv : forall v, v ∈ referrenced_vertices cohg ->
-    fv v ∈ referrenced_vertices cohg'). 1:{
+  assert (Himgfv : forall v, v ∈ referenced_vertices cohg ->
+    fv v ∈ referenced_vertices cohg'). 1:{
     intros v Hv.
-    apply (f_equal referrenced_vertices) in Heq.
-    rewrite referrenced_vertices_set_verts in Heq.
+    apply (f_equal referenced_vertices) in Heq.
+    rewrite referenced_vertices_set_verts in Heq.
     rewrite Heq.
-    rewrite referrenced_vertices_relabel_graph,
-      (referrenced_vertices_reindex_graph _).
-    rewrite referrenced_vertices_set_verts.
+    rewrite referenced_vertices_relabel_graph,
+      (referenced_vertices_reindex_graph _).
+    rewrite referenced_vertices_set_verts.
     now apply elem_of_map_2.
   }
 
@@ -339,7 +339,7 @@ Proof.
     (λ i, default (fv i) (mv' !! i)) fe).
   - intros i j.
     rewrite vertices_decomp, 2 elem_of_union.
-    rewrite isolated_vertices_norm_verts, referrenced_vertices_norm_verts.
+    rewrite isolated_vertices_norm_verts, referenced_vertices_norm_verts.
     intros [Hii|Hir];
     [apply Hdommv' in Hii as Hmi;
     apply elem_of_dom in Hmi as [mi Hmi];
@@ -347,7 +347,7 @@ Proof.
     rewrite Himgmv' in Hmii
     |replace (mv' !! i) with (@None positive) by
       (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
-      intros ?%isolated_referrenced_disjoint);
+      intros ?%isolated_referenced_disjoint);
      cbn;
      specialize (Himgfv i Hir) as Hfir];
     (intros [Hji|Hjr];
@@ -357,16 +357,16 @@ Proof.
     rewrite Himgmv' in Hmji
     |replace (mv' !! j) with (@None positive) by
       (now symmetry; apply not_elem_of_dom; rewrite Hdommv';
-      intros ?%isolated_referrenced_disjoint);
+      intros ?%isolated_referenced_disjoint);
      cbn;
      specialize (Himgfv j Hjr) as Hfjr]).
     + intros <-.
       revert Hmi Hmj.
       apply Hinj.
     + intros ->.
-      now apply isolated_referrenced_disjoint in Hmii.
+      now apply isolated_referenced_disjoint in Hmii.
     + intros <-.
-      now apply isolated_referrenced_disjoint in Hmji.
+      now apply isolated_referenced_disjoint in Hmji.
     + apply Hfv.
   - intros ? ? ? ?; apply Hfe.
   - apply cohg_ext; [apply hg_ext|..].
@@ -380,9 +380,9 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
+      refine (disjoint_sym _ _ (isolated_referenced_disjoint cohg) _ _).
       apply elem_of_map_to_list in Hitv.
-      unfold referrenced_vertices.
+      unfold referenced_vertices.
       apply elem_of_union_r.
       apply elem_of_list_to_set.
       apply elem_of_list_bind.
@@ -410,8 +410,8 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
-      unfold referrenced_vertices.
+      refine (disjoint_sym _ _ (isolated_referenced_disjoint cohg) _ _).
+      unfold referenced_vertices.
       apply elem_of_union_l.
       apply elem_of_list_to_set.
       now apply elem_of_app; left.
@@ -424,8 +424,8 @@ Proof.
       enough (mv' !! v = None) as -> by done.
       apply not_elem_of_dom.
       rewrite Hdommv'.
-      refine (disjoint_sym _ _ (isolated_referrenced_disjoint cohg) _ _).
-      unfold referrenced_vertices.
+      refine (disjoint_sym _ _ (isolated_referenced_disjoint cohg) _ _).
+      unfold referenced_vertices.
       apply elem_of_union_l.
       apply elem_of_list_to_set.
       now apply elem_of_app; right.
@@ -445,7 +445,7 @@ Lemma isolated_vertices_set_verts_isolated_vertices
 Proof.
   unfold isolated_vertices at 1 2.
   cbn.
-  rewrite referrenced_vertices_set_verts.
+  rewrite referenced_vertices_set_verts.
   unfold isolated_vertices.
   now rewrite difference_twice_L.
 Qed.
@@ -487,7 +487,7 @@ Qed.
 
 Lemma norm_verts_equiv_of_map_to_list_perm_equiv `{Equivalence T equiv} {n m}
   (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
-  referrenced_vertices cohg ⊆ dom mv ->
+  referenced_vertices cohg ⊆ dom mv ->
   map_inj mv ->
   size (isolated_vertices cohg) = size (isolated_vertices cohg') ->
   PermutationA (rel_preimage snd (prod_relation equiv eq))
@@ -503,12 +503,12 @@ Proof.
   apply spequiv_of_set_verts_empty_equiv; [done|].
   apply (spequiv_of_map_to_list_perm_equiv' mv); [|done..].
   rewrite vertices_decomp.
-  rewrite referrenced_vertices_set_verts.
+  rewrite referenced_vertices_set_verts.
   unfold isolated_vertices.
-  rewrite referrenced_vertices_set_verts.
+  rewrite referenced_vertices_set_verts.
   cbn -[difference].
   rewrite <- Hdom.
-  generalize (referrenced_vertices cohg).
+  generalize (referenced_vertices cohg).
   set_solver +.
 Qed. *)
 
@@ -857,8 +857,8 @@ Lemma graph_pre_isos_correct_aux {T n m} (cohg cohg' : CospanHyperGraph T n m) :
     size (isolated_vertices cohg) = size (isolated_vertices cohg') /\
     dom mhe = dom cohg.(hedges).(hyperedges) /\
     (forall i j a, mhe !! i = Some a -> mhe !! j = Some a -> i = j) /\
-    dom mv = referrenced_vertices cohg /\
-    map_img mv = referrenced_vertices cohg' /\
+    dom mv = referenced_vertices cohg /\
+    map_img mv = referenced_vertices cohg' /\
     map_relation (λ _ '(t', ins', outs') '(t, ins, outs),
       (t, t') ∈ ts /\
       ins = ins' /\ outs = outs') (λ _ _, False) (λ _ _, False)
@@ -887,10 +887,10 @@ Proof.
   split; [done|].
   split; [apply Hinj; intros ???; now rewrite lookup_empty|].
   split; [rewrite Hdom_mv, Hdom_mvi;
-    unfold referrenced_vertices; f_equal;
+    unfold referenced_vertices; f_equal;
     rewrite list_to_set_bind_L, <- list_fmap_compose; done|].
   split; [rewrite Himg_mv, Himg_mvi;
-    unfold referrenced_vertices; f_equal;
+    unfold referenced_vertices; f_equal;
     rewrite list_to_set_bind_L, <- list_fmap_compose; done|].
   split; [done|].
   pose proof Hallio as Hall2.
@@ -927,7 +927,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply isolated_referrenced_disjoint.
+    apply isolated_referenced_disjoint.
   }
   eapply (isomorphic_of_partial_inj_dom' _ _
     (Pmap_map (misol ∪ mv)) (Pmap_map mhe)).
@@ -947,7 +947,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply isolated_referrenced_disjoint.
+      apply isolated_referenced_disjoint.
   - apply Pmap_map_inj_on; [now rewrite Hdom_mhe|].
     apply Hmhe_inj.
   - symmetry.
@@ -1019,8 +1019,8 @@ Proof.
         enough (misol !! k = None) as -> by now rewrite (left_id_L None _).
         apply not_elem_of_dom.
         rewrite Hdom_misol.
-        intros Href%isolated_referrenced_disjoint; apply Href.
-        unfold referrenced_vertices.
+        intros Href%isolated_referenced_disjoint; apply Href.
+        unfold referenced_vertices.
         apply elem_of_union; right.
         rewrite elem_of_list_to_set, elem_of_list_bind.
         exists (i, tio).
@@ -1098,7 +1098,7 @@ Proof.
   assert (Hdisj : misol ##ₘ mv). 1:{
     apply map_disjoint_dom.
     rewrite Hdom_misol, Hdom_mv.
-    apply isolated_referrenced_disjoint.
+    apply isolated_referenced_disjoint.
   }
 
   assert (Hinjun : map_inj (misol ∪ mv)). 1:{
@@ -1112,7 +1112,7 @@ Proof.
       apply (elem_of_map_img_2 (SA:=Pset)) in Hj.
       rewrite Himg_mv in Hj.
       revert Hi Hj.
-      apply isolated_referrenced_disjoint.
+      apply isolated_referenced_disjoint.
   }
 
   apply cohg_syntactic_eq_trans with (relabel_graph (Pmap_injmap (misol ∪ mv))
@@ -1210,15 +1210,15 @@ Proof.
         split.
         - apply not_elem_of_dom.
           rewrite Hdom_misol.
-          intros Href%isolated_referrenced_disjoint; apply Href.
-          unfold referrenced_vertices.
+          intros Href%isolated_referenced_disjoint; apply Href.
+          unfold referenced_vertices.
           apply elem_of_union; right.
           rewrite elem_of_list_to_set, elem_of_list_bind.
           exists (i, tio).
           split; [apply Hk|].
           now apply elem_of_map_to_list.
         - rewrite Hdom_mv.
-          unfold referrenced_vertices.
+          unfold referenced_vertices.
           apply elem_of_union_r, elem_of_list_to_set.
           apply elem_of_list_bind.
           apply elem_of_map_to_list in Hi.
