@@ -1626,7 +1626,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   |} <- G.(outputs).
 
   Definition subgraph_index_aux (H : HyperGraph T) (L : list positive) : Pmap (HyperEdge T) :=
-    map_filter (fun ka => (ka.1 ∈ L)) _ H.(hyperedges).
+    filter (fun ka => (ka.1 ∈ L)) H.(hyperedges).
 
   Definition subgraph_index (H : HyperGraph T) (L : list positive) : HyperGraph T :=
   {| hyperedges := subgraph_index_aux H L;
@@ -1732,7 +1732,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     now apply map_disjoint_difference_l.
   Qed.
 
-  Lemma all_paths_idx_subset {n m} (H : CospanHyperGraph T n m) (L : list positive) : all_paths_idx H L ⊆ H.
+  Lemma all_paths_idx_subset H (L : list positive) : all_paths_idx H L ⊆ H.
   Proof.
     unfold all_paths_idx.
     refine (all_paths_subset H (mk_hg _ ∅)).
@@ -1817,6 +1817,18 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   Proof.
     intros l.
     induction l using rev_ind; auto.
+  Qed.
+  Lemma difference_disjoint_same_r_2 `{Set_ A SA} (X Y Z : SA) :
+    X ∩ Y ⊆ Z -> X ∖ Z ## Y ∖ Z.
+  Proof.
+    set_solver.
+  Qed.
+  Lemma difference_disjoint_same_r `{Set_ A SA, !RelDecision (∈@{SA})}
+    (X Y Z : SA) : X ∖ Z ## Y ∖ Z <-> X ∩ Y ⊆ Z.
+  Proof.
+    split; [|apply difference_disjoint_same_r_2].
+    intros Hdisj k.
+    destruct_decide (decide (k ∈ Z)); set_solver.
   Qed.
 
 
@@ -1908,7 +1920,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
           clear; cbn; lia.
   Qed.
 
-  Lemma all_paths_dom_subseteq H L : 
+  Lemma all_paths_dom_subseteq H L :
     dom (all_paths H L) ⊆ dom (hyperedges H) ∖ dom L.
   Proof.
     apply subseteq_difference_r.
@@ -1918,8 +1930,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       apply all_paths_subset.
   Qed.
 
-  Lemma all_paths_idx_dom_disjoint {n m} (H : CospanHyperGraph T n m) 
-    (L : list positive) : 
+  Lemma all_paths_idx_dom_disjoint H
+    (L : list positive) :
     dom (all_paths_idx H L) ## list_to_set L.
   Proof.
     symmetry.
@@ -1936,6 +1948,135 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     apply Hk.
     done.
   Qed.
+
+  Lemma subgraph_index_aux_dom_subseteq H L :
+    dom (subgraph_index_aux H L) ⊆ dom H.(hyperedges) ∩ list_to_set L.
+  Proof.
+    intros k Hk%elem_of_dom.
+    unfold subgraph_index_aux in Hk.
+    rewrite map_lookup_filter in Hk.
+    destruct (H.(hyperedges) !! k) as [mk|] eqn:Hmk; [|cbn in *; now destruct Hk].
+    cbn in Hk.
+    apply guard_is_Some in Hk.
+    rewrite elem_of_intersection, elem_of_dom.
+    set_solver.
+  Qed.
+
+  Lemma decompose_L1_C1_disjoint H L :
+    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C1 H L.
+  Proof.
+    cbn.
+    symmetry.
+    apply map_disjoint_dom.
+    intros k Hk%all_paths_idx_dom_disjoint
+      HkL%subgraph_index_aux_dom_subseteq%intersection_subseteq_r.
+    auto.
+  Qed.
+
+  Lemma decompose_C1_C2_disjoint_gen H L C1 isolated :
+    hyperedges $ C1 ##ₘ hyperedges $ decompose_C2 H L C1 isolated.
+  Proof.
+    cbn.
+    symmetry.
+    apply map_disjoint_difference_l.
+    apply map_union_subseteq_l.
+  Qed.
+
+  Lemma decompose_L1_C2_disjoint H L C1 isolated :
+    hyperedges $ decompose_L1 H L ##ₘ hyperedges $ decompose_C2 H L C1 isolated.
+  Proof.
+    cbn.
+    symmetry.
+    apply map_disjoint_dom.
+    rewrite dom_difference_L, dom_union_L.
+    set_solver.
+  Qed.
+
+  Lemma decompose_L1v_C1v_subseteq H L inputs :
+    decompose_L1v H L ∩ decompose_C1v H L ⊆ decompose_iset H L inputs.
+  Proof.
+    set_solver.
+  Qed.
+
+  Lemma decompose_L1v_C2v_subseteq H L C1 isolated outputs :
+    decompose_L1v H L ∩ decompose_C2v H L C1 isolated ⊆
+      decompose_jset H L C1 isolated outputs.
+  Proof.
+    set_solver.
+  Qed.
+
+  Lemma decompose_L1_subseteq H L : 
+    hyperedges $ decompose_L1 H L ⊆ hyperedges H.
+  Proof.
+    cbn.
+    apply map_filter_subseteq.
+  Qed.
+  
+  Lemma decompose_C1_subseteq H L : 
+    hyperedges $ decompose_C1 H L ⊆ hyperedges H.
+  Proof.
+    cbn.
+    apply all_paths_idx_subset.
+  Qed.
+  
+  Lemma decompose_C2_subseteq H L C1 isolated : 
+    hyperedges $ decompose_C2 H L C1 isolated ⊆ hyperedges H.
+  Proof.
+    cbn.
+    now apply map_subseteq_difference_l.
+  Qed.
+
+  Lemma referrenced_vertices_hg_subseteq (H G : HyperGraph T) : 
+    hyperedges H ⊆ hyperedges G ->
+    referrenced_vertices_hg H ⊆ referrenced_vertices_hg G.
+  Proof.
+    unfold referrenced_vertices_hg.
+    intros HHG.
+    intros k (ktio & Hktio & HkH)%elem_of_list_to_set%elem_of_list_bind.
+    apply map_to_list_submseteq in HHG.
+    pose proof (elem_of_submseteq _ _ _ HkH HHG).
+    rewrite elem_of_list_to_set, elem_of_list_bind.
+    eauto.
+  Qed.
+
+  Lemma decompose_L1v_referrenced H L : 
+    decompose_L1v H L ⊆ referrenced_vertices_hg H.
+  Proof.
+    unfold decompose_L1v.
+    rewrite vertices_hg_decomp.
+    cbn.
+    apply union_subseteq, conj.
+    + apply referrenced_vertices_hg_subseteq.
+      apply decompose_L1_subseteq.
+    + rewrite intersection_subseteq_r. 
+      apply referrenced_vertices_hg_subseteq.
+      cbn.
+      apply map_filter_subseteq.
+  Qed.
+  
+  Lemma decompose_C1v_referrenced H L : 
+    decompose_C1v H L ⊆ referrenced_vertices_hg H.
+
+  Lemma decompose_C1v_C2v_subseteq H L C1 isolated inputs outputs :
+    isolated ## referrenced_vertices_hg H ->
+    decompose_C1v H L ∩ decompose_C2v H L (decompose_C1 H L) isolated ⊆
+      decompose_kset H L C1 isolated inputs outputs.
+  Proof.
+    unfold decompose_kset.
+    unfold decompose_C2v.
+    rewrite vertices_hg_decomp.
+    cbn -[decompose_C1].
+    set_solver.
+
+    
+    simpl.
+    set_solver.
+    unfold decompose_C2v.
+
+    set_unfold.
+    set_solver.
+  Qed.
+
 
   Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
   Proof.
