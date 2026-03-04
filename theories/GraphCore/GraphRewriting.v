@@ -2239,9 +2239,9 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
       remember (vertices_hg C1) as C1v.
       remember (vertices_hg C2) as C2v.
       remember (vertices_hg L1) as Lv.
-      replace (hypervertices C1) with (hypervertices H ∩ referrenced_vertices_hg C1) by (subst; reflexivity).
-      replace (hypervertices L1) with (hypervertices H ∩ referrenced_vertices_hg L1) by (subst; reflexivity).
-      replace (hypervertices C2) with (isolated_vertices H ∪ hypervertices H ∩ referrenced_vertices_hg C2) by (subst; reflexivity).
+      replace (hypervertices C1) with (hypervertices H ∩ referenced_vertices_hg C1) by (subst; reflexivity).
+      replace (hypervertices L1) with (hypervertices H ∩ referenced_vertices_hg L1) by (subst; reflexivity).
+      replace (hypervertices C2) with (isolated_vertices H ∪ hypervertices H ∩ referenced_vertices_hg C2) by (subst; reflexivity).
 
 
 
