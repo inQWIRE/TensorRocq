@@ -2088,6 +2088,63 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     decompose_C1v H L ∩ decompose_C2v H L (decompose_C1 H L) isolated ⊆
       decompose_kset H L (decompose_C1 H L) isolated inputs outputs. *)
 
+  Lemma difference_intersection_distr_l' `{Set_ A SA} (X Y Z : SA) : 
+    X ∩ Y ∖ Z ≡ (X ∖ Z) ∩ (Y ∖ Z).
+  Proof.
+    set_solver.
+  Qed.
+  
+  Lemma difference_intersection_distr_l'_L `{Set_ A SA, !LeibnizEquiv SA} (X Y Z : SA) : 
+    X ∩ Y ∖ Z = (X ∖ Z) ∩ (Y ∖ Z).
+  Proof.
+    unfold_leibniz.
+    apply difference_intersection_distr_l'.
+  Qed.
+
+  Lemma decompose_iset_disjoint_kset H L C1 isolated inputs outputs : 
+    decompose_iset H L inputs ## decompose_kset H L C1 isolated inputs outputs.
+  Proof.
+    set_solver.
+  Qed.
+  
+  Lemma decompose_jset_disjoint_kset H L C1 isolated inputs outputs : 
+    decompose_jset H L C1 isolated outputs ## decompose_kset H L C1 isolated inputs outputs.
+  Proof.
+    set_solver.
+  Qed.
+
+  Lemma decompose_iset_union_kset H L C1 isolated inputs outputs : 
+    decompose_iset H L inputs ∪ decompose_kset H L C1 isolated inputs outputs =
+    decompose_C1v H L ∪ inputs ∪ 
+      decompose_L1v H L ∩ (decompose_C1v H L ∪ inputs) ∪
+      decompose_C2v H L C1 isolated ∖ decompose_L1v H L.
+  Proof.
+    unfold decompose_iset, decompose_kset.
+    rewrite (difference_intersection_distr_l'_L (_ ∪ _)).
+    rewrite union_intersection_l_L.
+    rewrite (union_comm_L (decompose_L1v H L ∩ _) (_ ∖ _)).
+    rewrite (intersection_comm_L (decompose_L1v H L)).
+    rewrite difference_union_intersection_L.
+    rewrite intersection_union_l_L.
+    rewrite (intersection_assoc_L _), (intersection_idemp_L _).
+    set_solver.
+    rewrite (union_intersection_l_L (_ ∩ _) (_ ∖ _) (_ ∖ _)).
+    rewrite difference_union
+
+  Lemma decompose_C1v_C2v_subseteq H L isolated inputs outputs :
+    isolated ## referrenced_vertices_hg H ∪ inputs ∪ outputs ->
+    decompose_C1v H L ∩ 
+      (decompose_L1v H L ∪ decompose_C2v H L (decompose_C1 H L) isolated) ⊆
+      decompose_kset H L (decompose_C1 H L) isolated inputs outputs
+      ∪ decompose_jset H L (decompose_C1 H L) isolated outputs.
+  Proof.
+    intros Hdisj.
+    rewrite intersection_union_l_L.
+    rewrite union_subseteq; split; try
+    set_solver.
+    - unfold decompose_kset, decompose_jset.
+
+
 
   Lemma list_to_set_list_to_vec {A B} `{SA : Singleton A B} `{EB : Empty B} `{UB : Union B}  (l : list A) : @list_to_set A B SA EB UB (list_to_vec l) = list_to_set l.
   Proof.
