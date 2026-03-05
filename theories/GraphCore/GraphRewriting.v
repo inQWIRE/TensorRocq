@@ -2741,97 +2741,35 @@ Open Scope positive.
   Qed.
 
 
-Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
-  (Target : CospanHyperGraph T n m)
-  (G : HyperGraph T) (L : list positive) :
-    (forall {o p} (v0 : vec positive o) (v1 : vec positive p),
-      (v0 -> G <- v1) ≡ₜ (v0 -> (subgraph_index Target L) <- v1))
-      -> Target ≡ₜ (DoublePushout Target G L).
+  Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+    (Target : CospanHyperGraph T n m)
+    (G : HyperGraph T) (L : list positive) :
+      (forall {o p} (v0 : vec positive o) (v1 : vec positive p),
+        (v0 -> G <- v1) ≡ₜ (v0 -> (subgraph_index Target L) <- v1))
+        -> Target ≡ₜ (DoublePushout Target G L).
   Proof.
-    intros.
-    rewrite (decompose_is_graph Target L) at 1.
-    cbv delta [decompose DoublePushout] beta.
-
-    remember (list_to_set (inputs Target)) as ins.
-    remember (list_to_set (outputs Target)) as outs.
-    remember (isolated_vertices Target) as isolated.
-    remember (decompose_L1 Target L) as L1.
-    cbv zeta.
-    remember (decompose_C1 Target L _) as C1.
-    remember (decompose_C2 Target L C1 isolated _) as C2.
-    remember (decompose_iset Target L ins) as i.
-    remember (decompose_jset Target L C1 isolated outs) as j.
-    remember (decompose_kset Target L C1 isolated ins outs) as k.
-    simpl.
-    remember (all_paths_idx Target L) as C1.
-    remember (subgraph_index Target L) as L1.
-    remember (Target.(hedges).(hyperedges) ∖ (C1 ∪ L1)) as C2.
-    remember ({| hyperedges := C1; hypervertices := ∅ |}) as C1'.
-    remember ({| hyperedges := C2; hypervertices := hypervertices Target |}) as C2'.
-    remember (vertices_hg L1) as Lv.
-    remember (vertices_hg C1') as C1v.
-    remember (vertices_hg C2') as C2v.
-    remember (list_to_vec (elements (Lv ∩ C1v))) as i.
-    remember (list_to_vec (elements (Lv ∩ C2v))) as j.
-    remember (list_to_vec (elements (C1v ∩ C2v))) as k.
-    assert (L1 = {| hyperedges := L1; hypervertices := ∅ |}).
-    { rewrite HeqL1; now apply hg_ext. }
-    rewrite compose_graphs_unsafe_to_compose_graphs.
-    2:{ reflexivity. }
-    2:{ simpl.
-        rewrite Heqi, Heqk.
-        rewrite list_to_vec_app.
-        repeat rewrite list_to_set_list_to_vec.
-        repeat rewrite list_to_set_elements_L.
-        rewrite <- Heqi, <- Heqk.
-        unfold vertices.
-        simpl.
-        rewrite list_to_set_app_L.
-        rewrite hg_empty_union.
-        rewrite <- HeqC1v, <- HeqC2v, <- HeqLv.
-        rewrite Heqi, Heqk, Heqj.
-        rewrite list_to_set_app_L.
-        repeat rewrite list_to_vec_app.
-        repeat rewrite list_to_set_list_to_vec.
-        repeat rewrite list_to_set_elements_L.
-        remember  (C1v ∩ C2v ∪ Lv ∩ C1v) as intr.
-        rewrite 3 difference_union_distr_l.
-        rewrite  (difference_union_distr_l_L (intr) (list_to_set (outputs Target))).
-        rewrite difference_diag.
-        rewrite union_empty_l_L.
-        rewrite union_empty_r_L.
-        rewrite (subseteq_empty_difference_L ((C1v ∩ C2v ∪ Lv ∩ C2v))).
-        rewrite hg_add_vertices_empty.
-        rewrite vertices_hg_union.
-        rewrite <- HeqC2v, <- HeqLv.
-        rewrite (difference_union_distr_l_L Lv).
-        rewrite disjoint_union_l.
-        rewrite 4 disjoint_union_r.
-        repeat split.
-        - set_solver.
-        - set_solver.
-        - rewrite Heqintr.
-          Search (_ ## _ ∖ _).
-          set_solver.
-          admit.
-        - admit.
-        - admit.
-        - admit.
-        - admit.
-        - admit.
-    }
-    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
-    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
-    rewrite compose_graphs_unsafe_to_compose_graphs by admit.
-    refine (compose_graphs_semantic_eq _ _ _ _ _ _).
-    1:{ reflexivity. }
-    refine (compose_graphs_semantic_eq _ _ _ _ _ _); [|reflexivity].
-    rewrite stack_graphs_aux_to_stack_graphs_disjoint by admit.
-    rewrite stack_graphs_aux_to_stack_graphs_disjoint by admit.
+    intros Heq.
+    rewrite (DPO_equiv_aux Target L) at 1.
+    unfold DoublePushout.
+    f_equiv.
+    f_equiv.
     f_equiv.
     symmetry.
-    auto.
-Admitted.
+    rewrite Heq.
+    apply (subrel' cohg_vert_eq).
+    apply cohg_vert_eq_alt_vertices.
+    split_and!; [done..|].
+    rewrite 2 vertices_vertices_hg_decomp.
+    cbn.
+    rewrite 2 vertices_hg_decomp.
+    cbn.
+    f_equal.
+    rewrite union_empty_r_L.
+    apply leibniz_equiv_iff, set_subseteq_antisymm.
+    - apply union_subseteq_l.
+    - apply union_least, intersection_subseteq_r.
+      done.
+  Qed.
 
   Open Scope positive.
 
