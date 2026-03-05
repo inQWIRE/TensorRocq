@@ -2078,10 +2078,10 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     rewrite vertices_hg_decomp.
     cbn.
     rewrite 2 union_subseteq; split_and!.
-    - apply union_subseteq_l'. 
+    - apply union_subseteq_l'.
       apply referenced_vertices_hg_subseteq.
       apply decompose_C1_subseteq.
-    - apply union_subseteq_r. 
+    - apply union_subseteq_r.
     - rewrite intersection_subseteq_r.
       apply union_subseteq_l'.
       apply referenced_vertices_hg_subseteq.
@@ -2295,7 +2295,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
         rewrite <- (union_subseteq_r ((k ∪ i) ∖ _)).
         set_solver +.
       }
-      transitivity (isolated_vertices H ∪ 
+      transitivity (isolated_vertices H ∪
         hypervertices H ∩ list_to_set (inputs H) ∪
         hypervertices H ∩ list_to_set (outputs H)). 1:{
         subst.
@@ -2329,8 +2329,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     - symmetry. apply hypervertices_decompose.
   Qed.
 
-  
-  Definition DoublePushout_unsafe {n m} (H : CospanHyperGraph T n m) (G : HyperGraph T) 
+
+  Definition DoublePushout_unsafe {n m} (H : CospanHyperGraph T n m) (G : HyperGraph T)
     (L : list positive) : CospanHyperGraph T n m :=
     let ins := list_to_set H.(inputs) in
     let outs := list_to_set H.(outputs) in
@@ -2349,8 +2349,8 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     <- H.(outputs)
     )).
 
-  
-  Definition DoublePushout {n m} (H : CospanHyperGraph T n m) (G : HyperGraph T) 
+
+  Definition DoublePushout {n m} (H : CospanHyperGraph T n m) (G : HyperGraph T)
     (L : list positive) : CospanHyperGraph T n m :=
     let ins := list_to_set H.(inputs) in
     let outs := list_to_set H.(outputs) in
@@ -2369,7 +2369,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
     <- H.(outputs)
     )).
 
-  Lemma decompose_is_DoublePushout_unsafe {n m} (H : CospanHyperGraph T n m) L : 
+  Lemma decompose_is_DoublePushout_unsafe {n m} (H : CospanHyperGraph T n m) L :
     decompose H L = DoublePushout_unsafe H (decompose_L1 H L) L.
   Proof.
     done.
@@ -2394,7 +2394,7 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
   k +++ j -> {| hyperedges := C2; hypervertices := H.(hypervertices) |} <- H.(outputs)
   )). *)
 
-  
+
 
 End DPO.
 
@@ -2532,7 +2532,7 @@ Open Scope positive.
 
   (* Lemma DoublePushout_unsafe_to_safe *)
 
-  
+
   Lemma vertices_compose_graphs_unsafe' {T n m o} (cohg : CospanHyperGraph T n m)
     (cohg' : CospanHyperGraph T m o) :
     outputs cohg = inputs cohg' ->
@@ -2551,7 +2551,7 @@ Open Scope positive.
   Proof.
     rewrite (decompose_is_graph H L) at 1.
     cbv delta [decompose DoublePushout] beta.
-    
+
     remember (list_to_set (inputs H)) as ins.
     remember (list_to_set (outputs H)) as outs.
     remember (isolated_vertices H) as isolated.
@@ -2563,7 +2563,7 @@ Open Scope positive.
     remember (decompose_jset H L C1 isolated outs) as j.
     remember (decompose_kset H L C1 isolated ins outs) as k.
     simpl.
-    rewrite 2 compose_graphs_unsafe'_to_compose_graphs, 
+    rewrite 2 compose_graphs_unsafe'_to_compose_graphs,
       (fun H1 H2 => subrel (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
     - done.
     - cbn.
@@ -2605,7 +2605,26 @@ Open Scope positive.
       rewrite union_assoc_L.
       rewrite intersection_union_r_L.
       apply union_least, intersection_subseteq_l.
-      admit.
+      rewrite (union_empty_l_L _).
+      transitivity ((vertices_hg C1 ∪ list_to_set (inputs H)) ∩
+        ((j ∪ (vertices_hg C2 ∪ vertices_hg L1 ∪ list_to_set (outputs H))) ∪ (k ∪ i)));
+      [apply eq_reflexivity; set_solver +|].
+      rewrite intersection_union_l_L.
+      apply union_least, intersection_subseteq_r.
+      rewrite intersection_union_r_L.
+      apply union_least.
+      + rewrite ! (intersection_union_l_L (vertices_hg C1)).
+        rewrite 3 union_subseteq.
+        split_and!. 
+        1, 3: set_solver.
+        * admit.
+        * admit.
+      + rewrite ! (intersection_union_l_L (list_to_set (inputs H))).
+        rewrite 3 union_subseteq.
+        split_and!. 
+        1, 3: set_solver.
+        * admit.
+        * admit.
     - cbn.
       rewrite map_empty_union.
       apply map_disjoint_union_r.
@@ -2626,7 +2645,7 @@ Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummabl
     intros.
     rewrite (decompose_is_graph Target L) at 1.
     cbv delta [decompose DoublePushout] beta.
-    
+
     remember (list_to_set (inputs Target)) as ins.
     remember (list_to_set (outputs Target)) as outs.
     remember (isolated_vertices Target) as isolated.
