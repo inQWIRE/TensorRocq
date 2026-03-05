@@ -2135,9 +2135,9 @@ Definition decompose_left {n m} (G : CospanHyperGraph T n m) (L : HyperGraph T) 
 
   (* Lemma decompose_iset_union_kset H L C1 isolated inputs outputs :
     decompose_iset H L inputs ∪ decompose_kset H L C1 isolated inputs outputs =
-    decompose_C1v H L ∪ inputs ∪
-      decompose_L1v H L ∩ (decompose_C1v H L ∪ inputs) ∪
-      decompose_C2v H L C1 isolated ∖ decompose_L1v H L.
+    decompose_C1v H L inputs ∪ inputs ∪
+      decompose_L1v H L ∩ (decompose_C1v H L inputs ∪ inputs) ∪
+      decompose_C2v H L C1 isolated outputs ∖ decompose_L1v H L.
   Proof.
     unfold decompose_iset, decompose_kset.
     rewrite (difference_intersection_distr_l'_L (_ ∪ _)).
@@ -2546,35 +2546,109 @@ Open Scope positive.
     now apply vertices_compose_graphs_unsafe.
   Qed.
 
+  Lemma decompose_vertices_C1_ins_C2_outs_subseteq {T} (H : HyperGraph T) L isolated ins outs :
+    isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
+    (vertices_hg (decompose_C1 H L ins) ∪ ins) ∩
+    (vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ∪ outs) ⊆
+    decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
+    decompose_iset H L ins.
+  Proof.
+    intros Hisol.
+    unfold decompose_kset.
+    unfold decompose_iset.
+    unfold decompose_C1v, decompose_C2v.
+    replace (vertices_hg _ ∪ outs) with
+      (referenced_vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ∪
+        outs ∪ isolated). 2:{
+      rewrite <- union_assoc_L, (union_comm_L outs), union_assoc_L.
+      apply leibniz_equiv_iff, set_subseteq_antisymm.
+      - apply union_least, union_subseteq_r.
+        rewrite vertices_hg_decomp.
+        cbn.
+        apply union_least, union_subseteq_l', union_subseteq_r', union_subseteq_l', union_subseteq_r.
+        apply union_subseteq_l', union_subseteq_l.
+      - apply union_least, union_subseteq_r.
+        rewrite vertices_hg_decomp.
+        apply union_least; [apply union_subseteq_l', union_subseteq_l|].
+        cbn.
+        rewrite (union_comm_L (_ ∪ isolated)), (union_assoc_L _).
+        apply union_least, union_subseteq_l', union_subseteq_r.
+
+        rewrite <- intersection_union_l_L.
+        rewrite intersection_subseteq_r.
+        apply union_least, union_subseteq_r.
+        apply union_subseteq_l', union_subseteq_l.
+    }
+    rewrite intersection_union_l_L.
+    rewrite (disjoint_intersection_L _ isolated).1. 2:{
+      fold (decompose_C1v H L ins).
+      pose proof (decompose_C1v_referenced H L ins).
+      set_solver.
+    }
+    rewrite (union_empty_r_L _).
+    replace (vertices_hg _ ∪ ins) with (referenced_vertices_hg (decompose_C1 H L ins) ∪ ins). 2:{
+      apply leibniz_equiv_iff, set_subseteq_antisymm.
+      - apply union_least, union_subseteq_r.
+        rewrite vertices_hg_decomp.
+        apply union_subseteq_l', union_subseteq_l.
+      - apply union_least, union_subseteq_r.
+        rewrite vertices_hg_decomp.
+        apply union_least; [apply union_subseteq_l|].
+        cbn.
+        rewrite <- intersection_union_l_L.
+        rewrite (union_comm_L ins).
+        now rewrite intersection_subseteq_r.
+    }
+    rewrite intersection_union_l_L at 1.
+    rewrite 2 (intersection_union_r_L _ ins) at 1.
+    rewrite 3 union_subseteq.
+    split_and!;
+    intros k Hk;
+    destruct_decide (decide (k ∈ decompose_L1v H L)) as Hk'; set_solver -Hisol.
+  Qed.
+
+
   Lemma decompose_vertices_C1_C2_subseteq {T} (H : HyperGraph T) L isolated ins outs :
     isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
-    vertices_hg (decompose_C1 H L ins) ∩ 
+    vertices_hg (decompose_C1 H L ins) ∩
     vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ⊆
     decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
     decompose_iset H L ins.
-  Admitted.
+  Proof.
+    intros ?%(decompose_vertices_C1_ins_C2_outs_subseteq H L isolated ins outs).
+    set_solver.
+  Qed.
 
   Lemma decompose_vertices_C1_outs_subseteq {T} (H : HyperGraph T) L isolated ins outs :
     isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
     vertices_hg (decompose_C1 H L ins) ∩ outs ⊆
     decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
     decompose_iset H L ins.
-  Admitted.
+  Proof.
+    intros ?%(decompose_vertices_C1_ins_C2_outs_subseteq H L isolated ins outs).
+    set_solver.
+  Qed.
 
-  
+
   Lemma decompose_vertices_ins_C2_subseteq {T} (H : HyperGraph T) L isolated ins outs :
     isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
     ins ∩ vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ⊆
     decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
     decompose_iset H L ins.
-  Admitted.
-  
+  Proof.
+    intros ?%(decompose_vertices_C1_ins_C2_outs_subseteq H L isolated ins outs).
+    set_solver.
+  Qed.
+
   Lemma decompose_vertices_ins_outs_subseteq {T} (H : HyperGraph T) L isolated ins outs :
     isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
     ins ∩ outs ⊆
     decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
     decompose_iset H L ins.
-  Admitted.
+  Proof.
+    intros ?%(decompose_vertices_C1_ins_C2_outs_subseteq H L isolated ins outs).
+    set_solver.
+  Qed.
 
   Lemma DPO_equiv_aux {T n m} (H : CospanHyperGraph T n m) L :
     H ≡ᵢ DoublePushout H (decompose_L1 H L) L.
@@ -2642,18 +2716,18 @@ Open Scope positive.
       rewrite intersection_union_l_L.
       apply union_least, intersection_subseteq_r.
       rewrite intersection_union_r_L.
-      assert (Hdisj : isolated_vertices H ## referenced_vertices_hg H ∪ 
-        list_to_set (inputs H) ∪ list_to_set (outputs H)) by set_solver. 
+      assert (Hdisj : isolated_vertices H ## referenced_vertices_hg H ∪
+        list_to_set (inputs H) ∪ list_to_set (outputs H)) by set_solver.
       apply union_least.
       + rewrite ! (intersection_union_l_L (vertices_hg C1)).
         rewrite 3 union_subseteq.
-        split_and!. 
+        split_and!.
         1, 3: set_solver.
         * now subst; apply decompose_vertices_C1_C2_subseteq.
         * now subst; apply decompose_vertices_C1_outs_subseteq.
       + rewrite ! (intersection_union_l_L (list_to_set (inputs H))).
         rewrite 3 union_subseteq.
-        split_and!. 
+        split_and!.
         1, 3: set_solver.
         * now subst; apply decompose_vertices_ins_C2_subseteq.
         * now subst; apply decompose_vertices_ins_outs_subseteq.
@@ -2664,7 +2738,7 @@ Open Scope positive.
       + symmetry.
         subst; apply decompose_L1_C1_disjoint.
       + subst; apply decompose_C1_C2_disjoint_gen.
-Admitted.
+  Qed.
 
 
 Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
