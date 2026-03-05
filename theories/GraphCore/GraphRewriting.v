@@ -2471,7 +2471,7 @@ Definition example_1 : CospanHyperGraph positive 1 1 :=
      hypervertices := ∅
   |} <- [# 1].
 
-  (* Lemma decompose_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
+  (* Lemma decompose_ex_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
   Proof.
     unfold example_1.
     rewrite (decompose_is_graph) with (L:=[]).
@@ -2506,7 +2506,7 @@ Open Scope positive.
      hypervertices := ∅
   |} <- [# 1]. *)
 
-  (* Lemma decompose_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
+  (* Lemma decompose_ex_1 : example_1 = ([# 1] -> ∅ <- [# 1]).
   Proof.
     unfold example_1.
     rewrite (decompose_is_graph) with (L:=[]).
@@ -2545,6 +2545,36 @@ Open Scope positive.
     rewrite compose_graphs_unsafe'_correct, vertices_norm_verts.
     now apply vertices_compose_graphs_unsafe.
   Qed.
+
+  Lemma decompose_vertices_C1_C2_subseteq {T} (H : HyperGraph T) L isolated ins outs :
+    isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
+    vertices_hg (decompose_C1 H L ins) ∩ 
+    vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ⊆
+    decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
+    decompose_iset H L ins.
+  Admitted.
+
+  Lemma decompose_vertices_C1_outs_subseteq {T} (H : HyperGraph T) L isolated ins outs :
+    isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
+    vertices_hg (decompose_C1 H L ins) ∩ outs ⊆
+    decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
+    decompose_iset H L ins.
+  Admitted.
+
+  
+  Lemma decompose_vertices_ins_C2_subseteq {T} (H : HyperGraph T) L isolated ins outs :
+    isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
+    ins ∩ vertices_hg (decompose_C2 H L (decompose_C1 H L ins) isolated outs) ⊆
+    decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
+    decompose_iset H L ins.
+  Admitted.
+  
+  Lemma decompose_vertices_ins_outs_subseteq {T} (H : HyperGraph T) L isolated ins outs :
+    isolated ## referenced_vertices_hg H ∪ ins ∪ outs ->
+    ins ∩ outs ⊆
+    decompose_kset H L (decompose_C1 H L ins) isolated ins outs ∪
+    decompose_iset H L ins.
+  Admitted.
 
   Lemma DPO_equiv_aux {T n m} (H : CospanHyperGraph T n m) L :
     H ≡ᵢ DoublePushout H (decompose_L1 H L) L.
@@ -2612,19 +2642,21 @@ Open Scope positive.
       rewrite intersection_union_l_L.
       apply union_least, intersection_subseteq_r.
       rewrite intersection_union_r_L.
+      assert (Hdisj : isolated_vertices H ## referenced_vertices_hg H ∪ 
+        list_to_set (inputs H) ∪ list_to_set (outputs H)) by set_solver. 
       apply union_least.
       + rewrite ! (intersection_union_l_L (vertices_hg C1)).
         rewrite 3 union_subseteq.
         split_and!. 
         1, 3: set_solver.
-        * admit.
-        * admit.
+        * now subst; apply decompose_vertices_C1_C2_subseteq.
+        * now subst; apply decompose_vertices_C1_outs_subseteq.
       + rewrite ! (intersection_union_l_L (list_to_set (inputs H))).
         rewrite 3 union_subseteq.
         split_and!. 
         1, 3: set_solver.
-        * admit.
-        * admit.
+        * now subst; apply decompose_vertices_ins_C2_subseteq.
+        * now subst; apply decompose_vertices_ins_outs_subseteq.
     - cbn.
       rewrite map_empty_union.
       apply map_disjoint_union_r.
