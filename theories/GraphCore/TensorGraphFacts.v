@@ -1,4 +1,4 @@
-Require Import TensorGraphExpr TensorGraphSemantics.
+Require Export TensorGraphExpr TensorGraphSemantics.
 Require Import Aux_pos.
 Require Import Tensor.
 From stdpp Require Import list fin_maps.

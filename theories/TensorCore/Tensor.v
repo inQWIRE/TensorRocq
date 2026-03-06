@@ -256,6 +256,47 @@ Definition tensor_to_dimensionless `{SR : SemiRing R rO rI radd rmul req}
   fun n' m' v' w' =>
   default rO (vec_cast_opt v' n ≫= λ v, vec_cast_opt w' m ≫= λ w, Some (t v w)).
 
+Definition fn_delta_tensor_l `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n m}
+  (f : vec A n -> vec A m) : Tensor n m A := 
+  fun v w => delta_tensor (f v) w.
+
+Definition fn_delta_tensor_r `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n m}
+  (f : vec A m -> vec A n) : Tensor n m A := 
+  fun v w => delta_tensor v (f w).
+
+Definition assoc_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} n m o : Tensor (n + m + o) (n + (m + o)) A :=
+  fn_delta_tensor_l (fun v => vsplitl (vsplitl v) +++ (vsplitr (vsplitl v) +++ vsplitr v)).
+
+Definition invassoc_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} n m o : Tensor (n + (m + o)) (n + m + o) A :=
+  fn_delta_tensor_l (fun v => (vsplitl v +++ vsplitl (vsplitr v)) +++ vsplitr (vsplitr v)).
+
+Definition perm_tensor `{SA : Summable A, EqA : EqDecision A,
+  SR : SemiRing R rO rI radd rmul req} {n m} (f : fin n -> fin m) : Tensor n m A :=
+  fun v w => 
+  delta_tensor v (fun_to_vec $ (w !!!.) ∘ f).
+
+Definition permute_tensor_l {A n m o} (f : fin n -> fin m) (t : Tensor n o A) : Tensor m o A :=
+  fun v w => t (fun_to_vec $ (v !!!.) ∘ f) w.
+
+Definition permute_tensor_r {A n m o} (f : fin m -> fin o) (t : Tensor n m A) : Tensor n o A :=
+  fun v w => t v (fun_to_vec $ (w !!!.) ∘ f).
+
+Definition tensor_wrap_l_under {A n m o} (t : Tensor n (m + o) A) : Tensor (n + o) m A :=
+  fun v w => t (vsplitl v) (w +++ vsplitr v).
+
+Definition tensor_wrap_r_under {A n m o} (t : Tensor n (m + o) A) : Tensor (n + o) m A :=
+  fun v w => t (vsplitl v) (w +++ vsplitr v).
+
+Definition strong_permute_tensor {A n m n' m'} (f : fin (n + m) -> fin (n' + m'))
+  (t : Tensor n m A) : Tensor n' m' A :=
+  fun v w => t (vsplitl (fun_to_vec $ (v +++ w !!!.) ∘ f))
+    (vsplitr (fun_to_vec $ (v +++ w !!!.) ∘ f)).
+
+
 #[global] Arguments const_tensor {_} {_ _} _ _ _ / : assert.
 #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
 #[global] Arguments compose_tensor {_ _} {_ _ _ _ _ _} {_ _ _} (_ _) _ _ / : assert.
@@ -272,6 +313,27 @@ Definition tensor_to_dimensionless `{SR : SemiRing R rO rI radd rmul req}
 #[global] Arguments stack_n_tensor_1 {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
 #[global] Arguments tensor_to_dimensionless {_ _ _ _ _ _} {_} {_ _} _ _ _ _ _ / : assert.
 #[global] Arguments tensor_11_to_fun {_} _ _ _ / : assert.
+
+#[global] Arguments fn_delta_tensor_l {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
+#[global] Arguments fn_delta_tensor_r {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
+
+#[global] Arguments assoc_tensor {_ _ _} {_ _ _ _ _ _} _ _ _ _ _ / : assert.
+#[global] Arguments invassoc_tensor {_ _ _} {_ _ _ _ _ _} _ _ _ _ _ / : assert.
+#[global] Arguments perm_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
+
+#[global] Arguments permute_tensor_l {_ _ _ _} _ _ _ _ / : assert.
+#[global] Arguments permute_tensor_r {_ _ _ _} _ _ _ _ / : assert.
+
+#[global] Arguments tensor_wrap_l_under {_ _ _ _} _ _ _ / : assert.
+#[global] Arguments tensor_wrap_r_under {_ _ _ _} _ _ _ / : assert.
+
+#[global] Arguments strong_permute_tensor {_ _ _ _ _} _ _ _ _ / : assert.
+
+
+
+
+
+
 
 Add Parametric Morphism `{SA : Summable A,
   SR : SemiRing R rO rI radd rmul req} {n m} :
