@@ -150,6 +150,33 @@ Proof.
   now repeat f_equiv.
 Qed.
 
+Lemma referenced_vertices_hg_strongperm_eq {T} (hg hg' : HyperGraph T) :
+  map_relation (λ _ tio tio', abs_strongperm_eq tio tio')
+    (λ _ _, False) (λ _ _, False) (hyperedges hg) (hyperedges hg') ->
+  referenced_vertices_hg hg = referenced_vertices_hg hg'.
+Proof.
+  intros Heq%map_relation_to_map_to_list.
+  unfold referenced_vertices_hg.
+  induction Heq; [done|].
+  cbn.
+  rewrite 2 (list_to_set_app_L (_ ++ _)).
+  f_equal; [|done].
+  apply list_to_set_perm_L.
+  now unfold abs_strongperm_eq in *.
+Qed.
+
+
+Lemma vertices_hg_strongperm_eq {T} (hg hg' : HyperGraph T) :
+  map_relation (λ _ tio tio', abs_strongperm_eq tio tio')
+    (λ _ _, False) (λ _ _, False) (hyperedges hg) (hyperedges hg') ->
+  hypervertices hg = hypervertices hg' ->
+    vertices_hg hg = vertices_hg hg'.
+Proof.
+  intros Heq%referenced_vertices_hg_strongperm_eq.
+  rewrite 2 vertices_hg_decomp.
+  congruence.
+Qed.
+
 Add Parametric Morphism {T n m o} : (@compose_graphs_aux T n m o)
   with signature hg_strongperm_eq ==> hg_strongperm_eq ==> hg_strongperm_eq
     as compose_graphs_aux_strongperm_mor.
@@ -159,7 +186,8 @@ Proof.
   unfold compose_graphs_aux.
   rewrite <- Hins1, <- Hins2, <- Houts1, <- Houts2.
   f_equiv.
-  split_and!; [try done..|now do 2 f_equal/=|].
+  split_and!; [try done..|do 2 f_equal /=; try done; f_equal; 
+    now apply vertices_hg_strongperm_eq|].
   cbn.
   now apply map_relation_union.
 Qed.
@@ -172,7 +200,8 @@ Proof.
     cohg2 cohg2' (Hins2 & Houts2 & Hverts2 & Hrel2).
   unfold compose_graphs_unsafe.
   rewrite <- ?Hins1, <- ?Hins2, <- ?Houts1, <- ?Houts2.
-  split_and!; [try done..|now do 2 f_equal/=|].
+  split_and!; [try done..|do 2 f_equal /=; try done; f_equal; 
+    now apply vertices_hg_strongperm_eq|].
   cbn.
   now apply map_relation_union.
 Qed.
@@ -219,7 +248,7 @@ Section Correctness.
 
 Context `{TensT : TensorLike R rO rI radd rmul req A T}.
 
-Lemma graph_mabs_hg_strongperm_eq 
+Lemma graph_mabs_hg_strongperm_eq
   {n m} (cohg cohg' : CospanHyperGraph T n m) :
   hg_strongperm_eq cohg cohg' ->
   graph_mabs cohg.(hedges) = graph_mabs cohg'.(hedges).

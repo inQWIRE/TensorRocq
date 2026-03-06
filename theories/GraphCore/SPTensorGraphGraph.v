@@ -3,7 +3,9 @@ Require Import TEPerm TensorGraph TensorGraphSP GraphRewriting.
 
 (* FIXME: Move *)
 
+(* FIXME: Repair!!! *)
 
+(* 
 Definition abs2tv {A} `{Countable B} (abs : A * list B * list B) : A * gmultiset B :=
   (abs.1.1, list_to_set_disj (abs.1.2 ++ abs.2) :> gmultiset B).
 
@@ -576,4 +578,4 @@ Proof.
   symmetry.
   apply rtc_once; right.
   now apply cosphg2cohg_cosphg_eq.
-Qed.
+Qed. *)

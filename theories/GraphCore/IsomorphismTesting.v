@@ -1592,15 +1592,19 @@ Definition hyperedge_map_monos_extending
   hyperedge_map_monos_extending_aux (map_to_list hg)
     (map_to_list hg') mhe_mv.
 
-Definition graph_monos {n m} (cohg cohg' : CospanHyperGraph T n m) :
+Definition graph_monos {i j n m} (subcohg : CospanHyperGraph T i j)
+  (cohg : CospanHyperGraph T n m) :
   list (Piso * Piso) :=
-  if decide (size (isolated_vertices cohg) <= size (isolated_vertices cohg')) then
-    hyperedge_map_isos_extending cohg.(hedges).(hyperedges)
-        cohg'.(hedges).(hyperedges) (∅, ∅)
+  if decide (size (isolated_vertices subcohg) <= size (isolated_vertices cohg)) then
+    hyperedge_map_isos_extending subcohg.(hedges).(hyperedges)
+        cohg.(hedges).(hyperedges) (∅, ∅)
   else
     [].
 
 
+(* Definition graph_matches {i j n m} (subcohg : CospanHyperGraph T i j)
+  (cohg : CospanHyperGraph T n m) : 
+  list (list positive) *)
 
 
 
