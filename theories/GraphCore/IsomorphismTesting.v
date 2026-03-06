@@ -1565,4 +1565,43 @@ Proof.
   now case_match.
 Qed.
 
+
+
+
+Fixpoint hyperedge_map_monos_extending_aux
+  (hg hg' : list (positive * (HyperEdge T)))
+  (mhe_mv : Piso * Piso) :
+  list (Piso * Piso) :=
+  match hg with
+  | [] => [mhe_mv]
+  | (k, (t, ins, outs)) :: hg =>
+    list_select (λ k_tio, t ≡ k_tio.2.1.1 /\
+      length (k_tio.2.1.2) = length ins /\
+      length (k_tio.2.2) = length outs) hg' ≫= λ '(k_tio, hg'rest),
+      default [] (mhe' ← pupdate k k_tio.1 mhe_mv.1;
+        mv' ← pupdates (zip (ins ++ outs) (k_tio.2.1.2 ++ k_tio.2.2))
+          mhe_mv.2;
+        Some (hyperedge_map_monos_extending_aux hg hg'rest
+         (mhe', mv')))
+  end.
+
+
+Definition hyperedge_map_monos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mhe_mv : Piso * Piso) :
+  list (Piso * Piso) :=
+  hyperedge_map_monos_extending_aux (map_to_list hg)
+    (map_to_list hg') mhe_mv.
+
+Definition graph_monos {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  list (Piso * Piso) :=
+  if decide (size (isolated_vertices cohg) <= size (isolated_vertices cohg')) then
+    hyperedge_map_isos_extending cohg.(hedges).(hyperedges)
+        cohg'.(hedges).(hyperedges) (∅, ∅)
+  else
+    [].
+
+
+
+
+
 End dec_equiv.
