@@ -1596,7 +1596,7 @@ Definition graph_monos {i j n m} (subcohg : CospanHyperGraph T i j)
   (cohg : CospanHyperGraph T n m) :
   list (Piso * Piso) :=
   if decide (size (isolated_vertices subcohg) <= size (isolated_vertices cohg)) then
-    hyperedge_map_isos_extending subcohg.(hedges).(hyperedges)
+    hyperedge_map_monos_extending subcohg.(hedges).(hyperedges)
         cohg.(hedges).(hyperedges) (∅, ∅)
   else
     [].

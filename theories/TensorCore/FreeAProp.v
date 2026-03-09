@@ -1,10 +1,69 @@
-Require Export Homomorphism AProp FreeSemiRing.
+Require Export Homomorphism AProp FreeSemiRing GraphTerm.
 
 (* FIXME: Move *)
 #[export] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.
 Proof.
   do 2 constructor; repeat (hnf; intros); lia.
 Qed.
+
+
+(* FIXME: Move *)
+Lemma DoublePushout_with_struct_isomorphic {T n m}
+  (H : CospanHyperGraph T n m) (G : HyperGraph T)
+  L {ni nj} (i : vec _ ni) (j : vec _ nj) G' :
+  (i -> G <- j) ≡ᵢ G' ->
+  DoublePushout_with H G L i j ≡ᵢ
+  let ins := list_to_set (inputs H) in
+  let outs := list_to_set (outputs H) in
+  let isolated := isolated_vertices H in
+  let L1 := decompose_L1 H L in
+  let C1 := decompose_C1 H L ins in
+  let C2 := decompose_C2 H L C1 isolated outs in
+  let k := list_to_vec (elements (decompose_kset H L C1 isolated ins outs)) in
+  compose_graphs (inputs H -> C1 <- k +++ i)
+    (compose_graphs (stack_graphs (k -> ∅ <- k) G')
+       (k +++ j -> C2 <- outputs H)).
+Proof.
+  intros Hiso.
+  unfold DoublePushout_with.
+  f_equiv.
+  f_equiv.
+  f_equiv.
+  done.
+Qed.
+
+
+
+(* FIXME: Move *)
+Tactic Notation "vm_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  vm_compute in Hx;
+  subst x.
+
+(* FIXME: Move *)
+Lemma hd_elem_of {A} (a : A) (l : list A) : l <> [] ->
+  hd a l ∈ l.
+Proof.
+  destruct l; [easy|constructor].
+Qed.
+
+
+Lemma graph_to_term_correctness `{Equiv T} {n m} (cohg : CospanHyperGraph T n m) ap :
+  graph_to_term cohg = Some ap ->
+  cohg ≡ₛ AProp_graph_semantics ap ->
+  cohg ≡ₛ AProp_graph_semantics ap.
+Proof.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Definition graph_to_term' `{Inhabited T} {n m} (cohg : CospanHyperGraph T n m) :
+  AProp T n m :=
+  default (Agen inhabitant n m) (graph_to_term cohg).
+
+
 
 Lemma id_SRH_subrel `{SR : SemiRing R rO rI radd rmul req,
   SR' : SemiRing R rO rI radd rmul req'} :
@@ -166,6 +225,15 @@ Proof.
   now apply SigTens_graph_semantics_correct.
 Qed.
 
+Lemma SigTens_graph_semantics_correct''
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  (Sig : Signature A) {n m} (ap : AProp Sig.(gens) n m) :
+  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  (graph_semantics (TensT:=SignatureTensorLike Sig) (AProp_graph_semantics ap))
+  (AProp_semantics (TensT:=SignatureTensorLike Sig) ap).
+Proof.
+  apply AProp_graph_semantics_correct.
+Qed.
 
 Lemma SigTens_graph_semantics_syntactic_eq
   `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
@@ -186,6 +254,47 @@ Ltac smcat :=
   apply graph_iso_partial_test_correct;
   vm_compute; exact (eq_refl true).
 
+Lemma SignatureTensorLike_base_correct
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  (Sig : Signature A) {n m} (ap : AProp Sig.(gens) n m) :
+  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  (AProp_semantics (TensT:=SignatureTensorLike_base Sig) ap)
+  (AProp_semantics (TensT:=SignatureTensorLike Sig) ap).
+Proof.
+  induction ap; [done..| | |done].
+  - cbn.
+    intros v w Hv Hw.
+    cbn.
+    (* symmetry. *)
+    change (sum_of ?f) with (id (sum_of f)) at 1.
+    rewrite (sum_of_SRH id (Hf:=id_FSR_eq_eqg _ _)).
+    apply (sum_of_ext' (SR:=FSR_SR_eqg nat (SigTensRel Sig))).
+    intros u Hu%SummedElement_iff.
+    cbn.
+    apply FSR_eqg_mul.
+    + apply IHap1; apply _.
+    + apply IHap2; apply _.
+  - cbn.
+    intros v w Hv Hw.
+    cbn.
+    apply FSR_eqg_mul.
+    + apply IHap1; apply _.
+    + apply IHap2; apply _.
+Qed.
+
+Lemma SigTens_graph_semantics_semantic_eq
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  (Sig : Signature A) {n m} (ap ap' : AProp Sig.(gens) n m) :
+  AProp_graph_semantics ap ≡ₜ@{SignatureTensorLike Sig} AProp_graph_semantics ap' ->
+  ap ≡ᵣ ap'.
+Proof.
+  unfold SigTensAProp_eq.
+  unfold cohg_semantic_eq.
+  rewrite 2 SigTens_graph_semantics_correct''.
+  rewrite 2 SignatureTensorLike_base_correct.
+  done.
+Qed.
+
 
 Section BoolExample.
 
@@ -193,6 +302,7 @@ Notation "x == y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) : {n & {m & (AProp (fin 7) n m * AProp (fin 7) n m)%type}})
   (at level 70).
 
+#[export] Instance fin_inhabited {n} : Inhabited (fin (S n)) := populate 0%fin.
 
 Let T := Agen (0%fin : fin 7) 0 1.
 Let F := Agen (1%fin : fin 7) 0 1.
@@ -294,24 +404,123 @@ Qed.
 
 Lemma test_rw : (T * T ;' AND) ≡ᵣ@{BOOL} T.
 Proof.
-  remember (AProp_graph_semantics (T * Aid 1 ;' AND)) as GLHS.
-  remember (AProp_graph_semantics (T * T ;' AND)) as GTarg.
-  vm_compute in HeqGLHS, HeqGTarg.
-  remember (graph_monos GLHS GTarg).
-  rewrite HeqGLHS, HeqGTarg in Heql.
-  vm_compute in Heql. (* Shouldn't be empty... *)
-  unfold graph_monos in Heql.
-  case_decide as Hsize. 2:{
-    vm_compute in Hsize.
-    lia.
-  }
 
+  remember (T * Aid 1 ;' AND)%aprop as LHS.
+  remember (T * T ;' AND)%aprop as Targ.
+  remember (AProp_graph_semantics LHS) as GLHS.
+  pose proof HeqGLHS as HeqGLHS_perm.
+  remember (AProp_graph_semantics Targ) as GTarg.
+
+  rewrite HeqLHS in HeqGLHS.
+  rewrite HeqTarg in HeqGTarg.
+  vm_compute in HeqGLHS, HeqGTarg.
+  remember (prod_map Piso_map Piso_map <$> graph_monos GLHS GTarg) as l.
+  pose proof Heql as Heql_perm.
+  remember (hd (∅, ∅) l) as mhe_mv.
+
+  pose proof Heqmhe_mv as Heqmhe_mv_perm.
+  rewrite HeqGLHS, HeqGTarg in Heql.
   vm_compute in Heql.
-  
-  transitivity (T ;' ())%aprop; [smcat|].
+  rewrite Heql in Heqmhe_mv.
+  vm_compute in Heqmhe_mv.
+  remember (relabel_graph (Pmap_injmap mhe_mv.2) $
+    reindex_graph (Pmap_injmap mhe_mv.1) GLHS) as GLHS_L.
+  transitivity (
+    (* let GLHS := (AProp_graph_semantics (T * Aid 1 ;' AND)) in
+    let GTarg := (AProp_graph_semantics (T * T ;' AND)) in
+    let mhe_mv := hd (∅, ∅) (prod_map Piso_map Piso_map <$> graph_monos GLHS GTarg) in
+    let GLHS_L := relabel_graph (Pmap_injmap mhe_mv.2) $
+    reindex_graph (Pmap_injmap mhe_mv.1) GLHS in  *)
+
+    let ins := list_to_set (inputs GTarg) in
+    let outs := list_to_set (outputs GTarg) in
+    let isolated := isolated_vertices GTarg in
+    let L1 := decompose_L1 GTarg (map_to_list mhe_mv.1).*2 in
+    let C1 := decompose_C1 GTarg (map_to_list mhe_mv.1).*2 ins in
+    let C2 := decompose_C2 GTarg (map_to_list mhe_mv.1).*2 C1
+        isolated outs in
+    let k := list_to_vec (elements (decompose_kset GTarg
+      (map_to_list mhe_mv.1).*2 C1 isolated ins outs)) in
+    graph_to_term' (inputs GTarg -> C1 <- k +++ inputs GLHS_L) ;'
+      (Aid _ * (LHS) ;'
+      graph_to_term' (k +++ outputs GLHS_L -> C2 <- outputs GTarg)))%aprop.
+
+  1:{
+  apply SigTens_graph_semantics_semantic_eq.
+
+
+
+
+  transitivity GTarg; [subst; reflexivity|].
+
+  transitivity (DoublePushout_with GTarg GLHS_L
+    (map_to_list mhe_mv.1).*2 (inputs GLHS_L) (outputs GLHS_L)).
+  1:{
+    pose proof (DPO_with_equiv (TensT:=SignatureTensorLike BOOL)
+      GTarg (hedges GLHS_L) (map_to_list mhe_mv.1).*2
+        (inputs GLHS_L) (outputs GLHS_L)) as Heq.
+    tspecialize Heq. 1:{
+      subst;
+      vm_compute;
+      done.
+    }
+    tspecialize Heq. 1:{
+      subst;
+      vm_compute;
+      done.
+    }
+    tspecialize Heq. 1:{
+      apply eq_reflexivity.
+      subst;
+      vm_compute;
+      done.
+    }
+    apply Heq.
+  }
+  etransitivity. 1:{
+    apply (subrel' struct_isomorphic).
+    eapply (DoublePushout_with_struct_isomorphic _ _ _ _ _ GLHS).
+    symmetry.
+    apply (subrel' isomorphic).
+    assert (Hmhe_mv : mhe_mv ∈ l) by now rewrite Heqmhe_mv_perm;
+      apply hd_elem_of; rewrite Heql; easy.
+    rewrite Heql_perm in Hmhe_mv.
+    apply elem_of_list_fmap in Hmhe_mv as (mhe_mv' & -> & _).
+    subst GLHS GLHS_L.
+    constructor; simpl;
+    apply Pmap_injmap_inj;
+      apply Piso_map_inj.
+  }
+  cbn.
+  apply compose_graphs_semantic_eq, compose_graphs_semantic_eq.
+  - apply (subrel' cohg_syntactic_eq).
+    apply graph_iso_partial_test_correct.
+    subst; vm_compute; done.
+  - apply stack_graphs_semantic_eq.
+    + apply (subrel' cohg_syntactic_eq).
+      apply graph_iso_partial_test_correct.
+      subst; vm_compute; done.
+    + rewrite HeqGLHS_perm.
+      done.
+  - apply (subrel' cohg_syntactic_eq).
+    apply graph_iso_partial_test_correct.
+    subst; vm_compute; done.
+  }
+  clear HeqGLHS_perm Heqmhe_mv_perm Heql_perm.
+  revert LHS HeqLHS.
+  subst.
+  intros LHS HeqLHS.
+  etransitivity;
+  [apply eq_reflexivity; vm_compute; done|].
+  subst LHS.
   etransitivity.
-  apply Acompose_sigeq.
-  done.
+  apply Acompose_sigeq; [done|].
+  apply Acompose_sigeq; [|done].
+  match goal with
+  |- ?a * _ == _ => 
+
+    refine (Astack_sigeq BOOL a a _ _ _ _); [done|]
+  end.
   apply T_AND.
   smcat.
 Qed.
