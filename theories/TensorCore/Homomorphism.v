@@ -1,4 +1,4 @@
-Require Export Basics Setoid Morphisms Algebra.
+Require Export Basics Setoid Morphisms Algebra Summable.
 
 
 Class SemiRingHomomorphism `{SR : SemiRing R rO rI radd rmul req,
@@ -19,9 +19,9 @@ Qed.
 
 
 #[export] Instance compose_SRH `{SR : SemiRing R rO rI radd rmul req,
-  SR' : SemiRing R' rO' rI' radd' rmul' req', 
+  SR' : SemiRing R' rO' rI' radd' rmul' req',
   SR'' : SemiRing R'' rO'' rI'' radd'' rmul'' req''}
-  (f : R -> R') (g : R' -> R') : 
+  (f : R -> R') (g : R' -> R') :
   SemiRingHomomorphism g -> SemiRingHomomorphism f ->
   SemiRingHomomorphism (compose g f).
 Proof.
@@ -35,4 +35,19 @@ Proof.
     rewrite Hfadd; auto.
   - intros x y.
     rewrite Hfmul; auto.
+Qed.
+
+Lemma sum_of_SRH `{SR : SemiRing R rO rI radd rmul req,
+  SR' : SemiRing R' rO' rI' radd' rmul' req'} (f : R -> R')
+  `{Hf : !SemiRingHomomorphism f}
+  `{Summable A} (g : A -> R) :
+  req' (f (∑ a, g a)) (∑ a, f (g a)).
+Proof.
+  unfold_sum_of; gen_sum_elem l.
+  pose proof (SR'.(Req_equiv) : Equivalence req').
+  induction l; [apply Hf|].
+  cbn.
+  rewrite SRH_radd.
+  apply SR'; [done|].
+  done.
 Qed.
