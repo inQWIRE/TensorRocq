@@ -291,6 +291,31 @@ Proof.
   smcat.
 Qed.
 
+
+Lemma test_rw : (T * T ;' AND) ≡ᵣ@{BOOL} T.
+Proof.
+  remember (AProp_graph_semantics (T * Aid 1 ;' AND)) as GLHS.
+  remember (AProp_graph_semantics (T * T ;' AND)) as GTarg.
+  vm_compute in HeqGLHS, HeqGTarg.
+  remember (graph_monos GLHS GTarg).
+  rewrite HeqGLHS, HeqGTarg in Heql.
+  vm_compute in Heql. (* Shouldn't be empty... *)
+  unfold graph_monos in Heql.
+  case_decide as Hsize. 2:{
+    vm_compute in Hsize.
+    lia.
+  }
+
+  vm_compute in Heql.
+  
+  transitivity (T ;' ())%aprop; [smcat|].
+  etransitivity.
+  apply Acompose_sigeq.
+  done.
+  apply T_AND.
+  smcat.
+Qed.
+
 (* TODO: Notation for signature based on let- bindings, e.g.
   declaring T would give something like:
 
