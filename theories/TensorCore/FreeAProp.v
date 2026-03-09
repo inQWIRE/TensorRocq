@@ -123,16 +123,6 @@ Proof.
   - apply Hy; apply _.
 Qed.
 
-(* FIXME: Move *)
-Declare Scope aprop_scope.
-Delimit Scope aprop_scope with aprop.
-Bind Scope aprop_scope with AProp.
-
-Notation "x * y" := (Astack x%aprop y%aprop) : aprop_scope.
-
-Notation "x ;' y" := (Acompose x%aprop y%aprop)
-  (at level 50, left associativity) : aprop_scope.
-
 
 Notation "d  '≡ᵣ@{' Sig '}'  d'" := (SigTensAProp_eq Sig d%aprop d'%aprop)
   (at level 70).

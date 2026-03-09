@@ -45,14 +45,22 @@ Fixpoint map_aprop {T T'} (f : T -> T') {n m} (ap : AProp T n m) : AProp T' n m 
 
 Definition cast_aprop {T n m n' m'}
   (Hn : n = n') (Hm : m = m') (ap : AProp T n m) : AProp T n' m' :=
-  match Hn, Hm with
-  | eq_refl, eq_refl => ap
+  match Nat.eq_dec n n' with
+  | left Hn' =>
+    match Nat.eq_dec m m' with
+    | left Hm' => match Hn', Hm' with
+      | eq_refl, eq_refl => ap
+      end
+    | right HFm => False_rect _ (HFm Hm)
+    end
+  | right HFn => False_rect _ (HFn Hn)
   end.
 
 Lemma cast_aprop_id {T n m} (ap : AProp T n m) Hn Hm : cast_aprop Hn Hm ap = ap.
 Proof.
-  rewrite (proof_irrel Hn eq_refl), (proof_irrel Hm eq_refl).
-  done.
+  unfold cast_aprop.
+  do 2 (case_match; try done).
+  now rewrite 2 (proof_irrel _ eq_refl).
 Qed.
 
 #[global] Arguments cast_aprop {_ _ _ _ _} !_ !_ _ / : assert.
@@ -96,27 +104,40 @@ Proof.
   revert n' m' ap';
   induction ap; intros n' m' []; try done; cbn.
   - intros <-.
-    exists eq_refl, eq_refl; constructor.
+    exists eq_refl, eq_refl.
+    rewrite cast_aprop_id.
+    constructor.
   - intros [<- <-].
-    exists eq_refl, eq_refl; constructor.
+    exists eq_refl, eq_refl.
+    rewrite cast_aprop_id.
+    constructor.
   - intros <-.
-    exists eq_refl, eq_refl; constructor.
+    exists eq_refl, eq_refl.
+    rewrite cast_aprop_id.
+    constructor.
   - intros <-.
-    exists eq_refl, eq_refl; constructor.
+    exists eq_refl, eq_refl.
+    rewrite cast_aprop_id.
+    constructor.
   - intros [Hap1 Hap2].
     apply IHap1 in Hap1 as (Hn & Hm & Hap1).
     apply IHap2 in Hap2 as (Hm' & Ho & Hap2).
     subst.
     rewrite (proof_irrel Hm' eq_refl) in Hap2.
     exists eq_refl, eq_refl.
+    rewrite ? cast_aprop_id in *.
     now constructor.
   - intros [Hap1 Hap2].
     apply IHap1 in Hap1 as (Hn & Hm & Hap1).
     apply IHap2 in Hap2 as (Hm' & Ho & Hap2).
     subst.
-    exists eq_refl, eq_refl; now constructor.
+    exists eq_refl, eq_refl.
+    rewrite ? cast_aprop_id in *.
+    now constructor.
   - intros (HR & <- & <-).
-    exists eq_refl, eq_refl; now constructor.
+    exists eq_refl, eq_refl.
+    rewrite cast_aprop_id.
+    now constructor.
 Qed.
 
 Lemma AProp_relation_alt_correct_inv {T T'} (R : T -> T' -> Prop)
@@ -135,7 +156,8 @@ Lemma AProp_relation_alt_correct_gen {T T'} (R : T -> T' -> Prop)
     exists Hn Hm, AProp_relation R (cast_aprop Hn Hm ap) ap'.
 Proof.
   split; [apply AProp_relation_alt_correct_fwd|].
-  now intros (<- & <- & Heq%AProp_relation_alt_correct_inv).
+  intros (<- & <- & Heq%AProp_relation_alt_correct_inv).
+  now rewrite cast_aprop_id in *.
 Qed.
 
 Lemma AProp_relation_alt_correct {T T'} (R : T -> T' -> Prop)
@@ -409,7 +431,8 @@ Qed.
 Lemma aprop_quote_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
   ape apv : Quote ape apv -> Quote (cast_aprop Hn Hm ape) (cast_aprop Hn Hm apv).
 Proof.
-  now subst.
+  subst.
+  now rewrite 2 cast_aprop_id.
 Qed.
 
 End quote.
@@ -509,3 +532,118 @@ Fixpoint AProp_graph_semantics_alt {T n m}
   | Agen t n m => graph_of_tensor t n m
   end. *)
 
+
+
+Declare Scope aprop_scope.
+Delimit Scope aprop_scope with aprop.
+Bind Scope aprop_scope with AProp.
+
+Notation "x * y" := (Astack x%aprop y%aprop) : aprop_scope.
+
+Notation "x ;' y" := (Acompose x%aprop y%aprop)
+  (at level 50, left associativity) : aprop_scope.
+
+Definition AProp_graph_eq {T n m} `{Equiv T} : relation (AProp T n m) :=
+  fun ap ap' => 
+  AProp_graph_semantics ap ≡ₛ AProp_graph_semantics ap'.
+
+Notation "ap ≡ₐ ap'" := (AProp_graph_eq ap ap') (at level 70) : aprop_scope.
+
+
+(* cast_aprop
+
+Definition a_perm (n : nat) : nat -> nat :=
+  swap_perm 0 (n-1) n. *)
+
+Definition atop_to_bottom {T} (n : nat) : AProp T n n :=
+  match n with 
+  | 0 => Aid 0
+  | S n => 
+    cast_aprop eq_refl (Nat.add_comm n 1) (Aswap 1 n)
+  end.
+
+Definition aprop_aswap {T} (n : nat) : AProp T n n :=
+  match n with
+  | 0 => Aid 0
+  | S n => 
+    cast_aprop (Nat.add_comm n 1) eq_refl
+      (Aswap n 1 ;' Aid 1 * atop_to_bottom n)
+  end.
+
+
+
+
+Lemma aprop_to_top_pf : forall a n, 
+  (S a `min` n + (n - S a `min` n) = n)%nat.
+Proof. intros a n; lia. Qed.
+
+Definition aprop_to_top {T} (a n : nat) : AProp T n n :=
+  cast_aprop (aprop_to_top_pf a n) (aprop_to_top_pf a n) 
+  (aprop_aswap (S a `min` n) * Aid (n - (S a `min` n))).
+
+Fixpoint aprop_of_swap_list {T} (l : list nat) : AProp T (length l) (length l) :=
+	match l with 
+	| [] as l => Aid _
+	| a::l' => 
+		aprop_to_top a (1+length l')
+		;' (@cast_aprop T (length l' + 1) (length l' + 1) (1+length l') (1+length l')
+			  (Nat.add_comm _ _) (Nat.add_comm _ _) (aprop_of_swap_list l' * Aid 1))
+	end.
+
+
+Fixpoint aprop_of_sw {T} (n : nat) (l : list nat) : AProp T n n :=
+  match n with 
+  | 0 => Aid 0
+  | S n => 
+    match l with 
+    | [] => Aid _
+    | a :: l => 
+      aprop_to_top a (S n) ;'
+      Aid 1 *
+      aprop_of_sw n ((λ k, if decide (a < k) then Nat.pred k else k) <$> l)
+    end
+  end.
+
+
+Definition Asw {T} (l : list nat) : AProp T (length l) (length l) :=
+  aprop_of_sw (length l) l.
+
+Notation "'sw' l" := (Asw l) (at level 10) : aprop_scope.
+
+
+
+
+Section Example.
+
+
+#[local] Instance Equiv_bool : Equiv bool := eq.
+
+Example test120 : 
+  (aprop_of_sw 3 [1; 2; 0] ≡ₐ Aswap 1 1 * @Aid bool 1 ;' Aid 1 * Aswap 1 1)%aprop.
+Proof.
+  apply graph_iso_partial_test_correct.
+  vm_compute.
+  done.
+Qed.
+
+Example test12043 : 
+  (aprop_of_sw 5 [1; 2; 0; 4; 3] ≡ₐ 
+    (Aswap 1 1 * @Aid bool 1 ;' Aid 1 * Aswap 1 1) *
+    Aswap 1 1)%aprop.
+Proof.
+  apply graph_iso_partial_test_correct.
+  vm_compute.
+  done.
+Qed.
+
+Example test12043' : 
+  (sw [1; 2; 0; 4; 3] ≡ₐ 
+    (Aswap 1 1 * @Aid bool 1 ;' Aid 1 * Aswap 1 1) *
+    Aswap 1 1)%aprop.
+Proof.
+  Time apply graph_iso_partial_test_correct;
+  vm_compute;
+  done.
+Qed.
+
+End Example.
