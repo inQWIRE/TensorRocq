@@ -105,6 +105,11 @@ Inductive FreeSemiRingEquiv `{SR : SemiRing R rO rI radd rmul req}
 
 #[global] Existing Instance FreeSemiRingEquiv.
 
+
+Definition FSR_mono R `{SR : SemiRing R rO rI radd rmul req}
+  {X} (x : X) : FreeSemiRing R X :=
+  [(rI, [x])].
+
 Section FreeSemiRing.
 
 Context (R : Type) `{SR : SemiRing R rO rI radd rmul req}.
@@ -378,6 +383,10 @@ Qed.
 Inductive FSR_eqg {X} (R : relation (FreeSemiRing X)) : relation (FreeSemiRing X) :=
   | FSReq_eqg x y : x ≡ y -> FSR_eqg R x y
   | FSR_eqg_rel x y : R x y -> FSR_eqg R x y
+  | FSR_eqg_add x x' y y' : FSR_eqg R x x' -> FSR_eqg R y y' ->
+    FSR_eqg R (FSR_add x y) (FSR_add x' y')
+  | FSR_eqg_mul x x' y y' : FSR_eqg R x x' -> FSR_eqg R y y' ->
+    FSR_eqg R (FSR_mul x y) (FSR_mul x' y')
   | FSR_eqg_symm x y : FSR_eqg R x y -> FSR_eqg R y x
   | FSR_eqg_trans x y z : FSR_eqg R x y -> FSR_eqg R y z -> FSR_eqg R x z.
 
@@ -397,6 +406,43 @@ Proof.
 Qed.
 
 
+Section FSR_SR_eqg.
+
+Context {X : Type}.
+
+Let FSR := (FreeSemiRing X).
+
+Add Ring FSR : (@FSR_SR X).(RSRth)
+  (setoid (@FSR_SR X).(Req_equiv) (@FSR_SR X).(Req_ext)).
+
+Definition FSR_SR_eqg (RX : relation (FreeSemiRing X)) :
+  SemiRing (FreeSemiRing X) FSR_zero FSR_one FSR_add FSR_mul (FSR_eqg RX).
+Proof.
+  split; [..|now constructor; apply _]; split.
+  - done.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros; apply (subrel' equiv).
+    ring.
+  - intros ? ? ? ? ? ?; now apply FSR_eqg_add.
+  - intros ? ? ? ? ? ?; now apply FSR_eqg_mul.
+Qed.
+
+End FSR_SR_eqg.
+
+Definition FSR_incl {X} (r : R) : FreeSemiRing X :=
+  [(r, [])].
+
 Definition FSR_eval {X} (f : X -> R) (x : FreeSemiRing X) : R :=
   Rlist_sum ((λ rxs, rxs.1 * Rlist_prod (f <$> rxs.2)) <$> x).
 
@@ -412,6 +458,18 @@ Proof.
 Qed.
 
 Lemma FSR_eval_one : FSR_eval FSR_one == 1.
+Proof.
+  cbn.
+  ring.
+Qed.
+
+Lemma FSR_eval_incl r : FSR_eval (FSR_incl r) == r.
+Proof.
+  cbn.
+  ring.
+Qed.
+
+Lemma FSR_eval_mono x : FSR_eval (FSR_mono R x) == f x.
 Proof.
   cbn.
   ring.
@@ -463,16 +521,22 @@ Proof.
 Qed.
 
 
-Lemma FSR_eval_eqg RX (Hf : forall x y, RX x y -> FSR_eval x == FSR_eval y) x y : 
+Lemma FSR_eval_eqg RX (Hf : forall x y, RX x y -> FSR_eval x == FSR_eval y) x y :
   FSR_eqg RX x y -> FSR_eval x == FSR_eval y.
 Proof.
   intros Hxy.
   induction Hxy.
   - now apply FSR_eval_equiv.
   - now apply Hf.
+  - rewrite 2 FSR_eval_add.
+    now f_equiv.
+  - rewrite 2 FSR_eval_mul.
+    now f_equiv.
   - now symmetry.
   - etransitivity; eauto.
 Qed.
+
+End FSR_eval.
 
 End FreeSemiRing.
 
