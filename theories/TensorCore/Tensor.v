@@ -330,6 +330,35 @@ Definition strong_permute_tensor {A n m n' m'} (f : fin (n + m) -> fin (n' + m')
 #[global] Arguments strong_permute_tensor {_ _ _ _ _} _ _ _ _ / : assert.
 
 
+(* FIXME: Move *) 
+Lemma SummedElement_fun_to_vec_iff `{Summable A} {n} 
+  (f : fin n -> A) : SummedElement (fun_to_vec f) <->  (forall i, SummedElement (f i)).
+Proof.
+  rewrite SummedElement_vec_iff_Forall.
+  rewrite Forall_vlookup.
+  apply forall_iff.
+  intros i.
+  now rewrite lookup_fun_to_vec.
+Qed.
+#[export] Instance SummedElement_fun_to_vec `{Summable A} {n} 
+  (f : fin n -> A) : (forall i, SummedElement (f i)) -> SummedElement (fun_to_vec f).
+Proof.
+  now rewrite SummedElement_fun_to_vec_iff.
+Qed.
+#[export] Instance SummedElement_vlookup `{Summable A} {n} 
+  (v : vec A n) i : SummedElement v -> SummedElement (v !!! i).
+Proof.
+  rewrite SummedElement_vec_iff_Forall, Forall_vlookup.
+  auto.
+Qed.
+
+Add Parametric Morphism `{SA : Summable A,
+  SR : SemiRing R rO rI radd rmul req} {n m n' m'} f :
+    (@strong_permute_tensor A n m n' m' f) with signature
+    equiv ==> equiv as strong_permute_tensor_mor.
+Proof.
+  intros r r' Hr v w Hv Hm; apply Hr; apply _.
+Qed.
 
 
 
@@ -696,6 +725,20 @@ Qed.
 
 (* TODO: More *)
 
+
+
+(* Lemma strong_permute_tensor_compose {n m n' m' n'' m''} 
+  (f : fin (n + m) -> fin (n' + m')) (g : fin (n' + m') -> fin (n'' + m'')) 
+  (t : Tensor n m A) : 
+  strong_permute_tensor g (strong_permute_tensor f t) ≡ strong_permute_tensor (g ∘ f) t.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  apply eq_reflexivity.
+  do 2 f_equal.
+  
+  refine (eq_reflexivity _ _ _); [apply SR|]. *)
+  
 
 
 End TensorOpFacts.
