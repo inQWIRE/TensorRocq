@@ -381,13 +381,13 @@ Inductive FSR_eqg {X} (R : relation (FreeSemiRing X)) : relation (FreeSemiRing X
   | FSR_eqg_symm x y : FSR_eqg R x y -> FSR_eqg R y x
   | FSR_eqg_trans x y z : FSR_eqg R x y -> FSR_eqg R y z -> FSR_eqg R x z.
 
-#[export] Instance FSR_eqg_FSReq_subrelation {X} (RX : relation (FreeSemiRing X)) : 
+#[export] Instance FSR_eqg_FSReq_subrelation {X} (RX : relation (FreeSemiRing X)) :
   subrelation equiv (FSR_eqg RX) := FSReq_eqg RX.
 
-#[export] Instance FSR_eqg_R_subrelation {X} (RX : relation (FreeSemiRing X)) : 
+#[export] Instance FSR_eqg_R_subrelation {X} (RX : relation (FreeSemiRing X)) :
   subrelation RX (FSR_eqg RX) := FSR_eqg_rel RX.
 
-#[export] Instance FSR_eqg_equivalence {X} (RX : relation (FreeSemiRing X)) : 
+#[export] Instance FSR_eqg_equivalence {X} (RX : relation (FreeSemiRing X)) :
   Equivalence (FSR_eqg RX).
 Proof.
   split.
@@ -396,12 +396,90 @@ Proof.
   - refine (FSR_eqg_trans RX).
 Qed.
 
+
+Definition FSR_eval {X} (f : X -> R) (x : FreeSemiRing X) : R :=
+  Rlist_sum ((λ rxs, rxs.1 * Rlist_prod (f <$> rxs.2)) <$> x).
+
+Section FSR_eval.
+
+Context {X} (f : X -> R).
+
+Local Notation FSR_eval := (FSR_eval f).
+
+Lemma FSR_eval_zero : FSR_eval FSR_zero == 0.
+Proof.
+  done.
+Qed.
+
+Lemma FSR_eval_one : FSR_eval FSR_one == 1.
+Proof.
+  cbn.
+  ring.
+Qed.
+
+Lemma FSR_eval_add x y : FSR_eval (FSR_add x y) ==
+  FSR_eval x + FSR_eval y.
+Proof.
+  unfold FSR_add, FSR_eval.
+  rewrite fmap_app, Rlist_sum_app.
+  done.
+Qed.
+
+Lemma FSR_eval_mul x y : FSR_eval (FSR_mul x y) ==
+  FSR_eval x * FSR_eval y.
+Proof.
+  unfold FSR_mul, FSR_eval.
+  rewrite <- list_fmap_compose.
+  induction x; [cbn; ring|].
+  cbn.
+  rewrite fmap_app.
+  rewrite Rlist_sum_app.
+  rewrite distr_l.
+  f_equiv; [|done].
+  rewrite <- list_fmap_compose.
+  unfold compose.
+  cbn.
+  clear IHx.
+  induction y; [cbn; ring|].
+  cbn.
+  rewrite IHy.
+  rewrite fmap_app, Rlist_prod_app.
+  ring.
+Qed.
+
+Lemma FSR_eval_equiv x y : x ≡ y -> FSR_eval x == FSR_eval y.
+Proof.
+  intros Hxy.
+  unfold FSR_eval.
+  induction Hxy; try solve [cbn; ring].
+  - f_equiv.
+    eapply fmap_PermutationA; [|eassumption].
+    intros [r xs] [s ys] [Hrs Hxy].
+    cbn.
+    f_equiv; [done|].
+    now apply Rlist_prod_perm, fmap_Permutation.
+  - now symmetry.
+  - etransitivity; eauto.
+Qed.
+
+
+Lemma FSR_eval_eqg RX (Hf : forall x y, RX x y -> FSR_eval x == FSR_eval y) x y : 
+  FSR_eqg RX x y -> FSR_eval x == FSR_eval y.
+Proof.
+  intros Hxy.
+  induction Hxy.
+  - now apply FSR_eval_equiv.
+  - now apply Hf.
+  - now symmetry.
+  - etransitivity; eauto.
+Qed.
+
 End FreeSemiRing.
 
 
 
 
-  
+
 
 
 
