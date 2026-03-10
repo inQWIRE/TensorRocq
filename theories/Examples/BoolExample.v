@@ -29,7 +29,7 @@ Definition BOOL : Signature bool := {|
     (1, 0) (* F̄ *);
     (1, 0) (* disc *)
     ] !!!.);
-  rules :=  [
+  rules := rules_of_rule_list [
       T * Aid 1 ;' AND === Aid 1 ;
       F * Aid 1 ;' AND === disc ;' T ;
       Aswap 1 1 ;' AND === AND ;

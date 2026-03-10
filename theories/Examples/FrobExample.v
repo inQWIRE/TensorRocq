@@ -15,7 +15,7 @@ Notation v := (Agen (3%fin :> fin 4) 1 0) (only parsing).
 Definition Frob : Signature bool := {|
   gens := fin 4;
   gen_arity := ([# (2,1); (0,1); (1,2); (1,0)] !!!.);
-  rules :=  [
+  rules := rules_of_rule_list [
 
 (* (m, u) forms a monoid *)
 (* rule assoc : *) m * Aid 1 ;' m === Aid 1 * m ;' m ;

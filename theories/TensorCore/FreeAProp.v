@@ -8,10 +8,15 @@ Structure Signature {A : Type} `{SA : Summable A, EqA : EqDecision A} := {
 
   #[canonical=no] gen_arity : gens -> (nat * nat);
   (* #[canonical=no] gen_arity_proper : Proper (equiv ==> eq) gen_arity; *)
-  #[canonical=no] rules : list ({n & {m & (AProp gens n m * AProp gens n m)%type}});
+  #[canonical=no] rules : forall {n m}, relation (AProp gens n m);
 }.
 
 #[global] Arguments Signature _ {_ _}.
+
+Definition rules_of_rule_list {T} 
+  (rules : list ({n & {m & (AProp T n m * AProp T n m)%type}})) :
+  (forall n m, relation (AProp T n m)) :=
+  fun n m ap ap' => existT n (existT m (ap, ap')) ∈ rules.
 
 Inductive SigTens `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) : Type :=
@@ -43,7 +48,7 @@ Inductive APropEqRel `{SA : Summable A, EqA : EqDecision A}
 Inductive SigTensRel `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) : relation (FreeSemiRing nat (SigTens Sig)) :=
   | SigTensRelIn {n m} (lhs rhs : AProp Sig.(gens) n m) :
-    existT n (existT m (lhs, rhs)) ∈ Sig.(rules) ->
+    Sig.(rules) lhs rhs ->
     forall x y,
     APropEqRel Sig lhs rhs x y -> SigTensRel Sig x y.
 
@@ -107,7 +112,7 @@ Notation "d '≡ᵣ' d'" := (d%aprop ≡ᵣ@{_} d'%aprop)
 
 Lemma rules_hold `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) {n m} (lhs rhs : AProp Sig.(gens) n m) :
-  existT n (existT m (lhs, rhs)) ∈ Sig.(rules) ->
+  Sig.(rules) lhs rhs ->
   lhs ≡ᵣ rhs.
 Proof.
   intros Hrule.
