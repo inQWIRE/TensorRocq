@@ -54,7 +54,7 @@ Notation "'sp'" := (@Agen _ 5%fin 1 1) (only printing).
 
 Notation "x == y" :=
   (x ≡ᵣ@{Hopf} y)
-  (at level 70).
+  (at level 70, y custom aprop).
 
 (* (m, u) forms a monoid *)
 Lemma assoc : m * Aid 1 ;' m == Aid 1 * m ;' m.
@@ -89,12 +89,9 @@ Proof. apply rules_hold. repeat constructor. Qed.
 Lemma antiR : n ;' Aid 1 * s ;' m == v ;' u.
 Proof. apply rules_hold. repeat constructor. Qed.
 
-
-Notation id := (Aid 1).
-
-Definition m2 : AProp _ _ _ := id * Aswap 1 1 * id ;' m * m.
+Definition m2 : AProp _ _ _ := [[id * Aswap 1 1 * id ;' m * m]].
 Definition u2 : AProp _ _ _ := u * u.
-Definition n2 : AProp _ _ _ := n * n ;' id * Aswap 1 1 * id.
+Definition n2 : AProp _ _ _ := [[n * n ;' id * Aswap 1 1 * id]].
 Definition v2 : AProp _ _ _ := v * v.
 Definition s2 : AProp _ _ _ := s * s.
 
@@ -174,7 +171,7 @@ Proof.
   smcat.
 Qed.
 
-Lemma antiL2 : n2 ;' s2 * id * id ;' m2 ==
+Lemma antiL2 : [[n2 ;' s2 * id * id ;' m2]] ==
   v2 ;' u2.
 Proof.
   srw antiL.
@@ -182,7 +179,7 @@ Proof.
   smcat.
 Qed.
 
-Lemma antiR2 : n2 ;' id * id * s2 ;' m2 == v2 * u2.
+Lemma antiR2 : [[n2 ;' id * id * s2 ;' m2]] == v2 * u2.
 Proof.
   srw antiR.
   srw antiR.

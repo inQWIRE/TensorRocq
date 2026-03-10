@@ -186,7 +186,7 @@ Proof.
   remember (term_rewrite_helper _ _ _) as x.
   clear Heqx.
   intros Heq.
-  destruct x as [[k [C1 C2]]|]; [|done].
+  destruct x as [ [k [C1 C2] ]|]; [|done].
   intros Hiso.
   rewrite <- AProp_graph_semantics_correct.
   unfold AProp_graph_eq in Hiso.

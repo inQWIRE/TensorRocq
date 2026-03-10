@@ -88,8 +88,6 @@ Proof.
   smcat.
 Qed.
 
-Notation id := (Aid 1).
-
 Definition cup : AProp _ _ _ := u ;' n.
 Definition cap : AProp _ _ _ := m ;' v.
 

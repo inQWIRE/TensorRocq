@@ -228,7 +228,7 @@ Proof.
   remember (term_rewrite_helper _ _ _) as x.
   clear Heqx.
   intros Heq.
-  destruct x as [[k [C1 C2]]|]; [|done].
+  destruct x as [ [k [C1 C2] ]|]; [|done].
   intros Hiso.
   unfold SigTensAProp_eq.
   rewrite SignatureTensorLike_base_correct.
@@ -262,7 +262,7 @@ Proof.
   remember (term_rewrite_helper _ _ _) as x.
   clear Heqx.
   intros Heq.
-  destruct x as [[k [C1 C2]]|]; [|done].
+  destruct x as [ [k [C1 C2] ]|]; [|done].
   intros Hiso.
   rewrite Hiso.
   unfold SigTensAProp_eq.
@@ -292,7 +292,7 @@ Proof.
   remember (term_rewrite_helper _ _ _) as x.
   clear Heqx.
   intros Heq.
-  destruct x as [[k [C1 C2]]|]; [|done].
+  destruct x as [ [k [C1 C2] ]|]; [|done].
   intros Hiso.
   rewrite Hiso.
   unfold SigTensAProp_eq.

@@ -24,7 +24,7 @@ Fixpoint Astacks {T A} {n : A -> nat} {m : A -> nat}
 
 
 #[export] Instance rel_preimage_dec' {A B} (f : A -> B) (R : relation B) x y :
-  Decision (R (f x) (f y)) -> Decision (rel_preimage f R x y) := id.
+  Decision (R (f x) (f y)) -> Decision (rel_preimage f R x y) := λ H, H.
 
 Definition get_extractable_edges {T} (inputs : Pset)
   (edges : Pmap (HyperEdge T)) :=
