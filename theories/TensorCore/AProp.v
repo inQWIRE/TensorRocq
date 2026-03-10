@@ -640,7 +640,7 @@ Definition aprop_to_top {T} (a n : nat) : AProp T n n :=
 Fixpoint aprop_of_sw {T} (n : nat) (l : list nat) : AProp T n n :=
   if decide (n <= 2) then
     match n with
-    | 2 => if decide (head l = Some 0) then Aid 2 else Aswap 1 1
+    | 2 => if decide (head l = Some 1) then Aswap 1 1 else Aid 2
     | _ => Aid _
     end
   else

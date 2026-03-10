@@ -1,6 +1,16 @@
 Require Export TensorGraph AProp.
 
 
+(* FIXME: Move *)
+Tactic Notation "vm_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  vm_compute in Hx;
+  subst x.
+
+
+
 Fixpoint Astacks {T A} {n : A -> nat} {m : A -> nat}
   (f : forall a, AProp T (n a) (m a)) (l : list A) : AProp T (sum_list_with n l) (sum_list_with m l) :=
   match l with
@@ -71,8 +81,8 @@ Definition layer_to_aprop {T n} (es : list (HyperEdge T))
   let es_outputs := foldr app [] es.*2 in
   let unused_inputs := filter (.∉ es_inputs) (vec_to_list inputs) in 
   t ← layer_to_stack es inputs;
-  Some ((aprop_of_sw n ((λ k, default (pos_to_nat_pred k) $ list_index k inputs)
-    <$> es_inputs) ;' (* TODO: Check this is the right permutation!!!! *)
+  Some ((aprop_of_sw n (((λ k, default (pos_to_nat_pred k) $ list_index k inputs)
+    <$> (es_inputs ++ unused_inputs)))  ;' (* TODO: Check this is the right permutation!!!! *)
   t)%aprop, es_outputs ++ unused_inputs).
 
 Definition aprop_perm_of_empty_graph {T n m}
@@ -202,5 +212,40 @@ Proof.
   intros [= <-].
   apply graph_iso_partial_test_correct; vm_compute; done.
 Qed.
+
+
+Example bug_case_1 : 
+  let G := ([#74%positive; 19%positive] ->
+       mk_hg
+         (list_to_map
+             [(32%positive, (true, [], [68%positive]))])
+         {[19%positive; 74%positive]} <- [#19%positive; 68%positive; 74%positive]) in 
+  forall ap,
+  graph_to_term G = Some ap ->
+  G ≡ₛ AProp_graph_semantics ap.
+Proof.
+  cbv zeta.
+
+
+  vm_eval (graph_to_term _).
+  intros _ [= <-].
+  apply graph_iso_partial_test_correct.
+  vm_compute.
+  done.
+
+  (* unfold graph_to_term.
+  vm_compute (size _).
+  unfold graph_to_term_aux.
+  vm_eval (hyperedges _).
+  vm_eval (get_simultaneously_extractable_edges _ _).
+  vm_eval (inputs _).
+  unfold layer_to_aprop.
+  vm_eval (fmap (M:=list) _ _).
+  vm_eval (fmap (M:=list) _ _).
+  vm_eval (layer_to_aprop _ _).
+  cbn. *)
+Qed.
+    
+
 
 End Example.

@@ -34,13 +34,6 @@ Qed.
 
 
 
-(* FIXME: Move *)
-Tactic Notation "vm_eval" uconstr(pat) :=
-  let x := fresh "x" in
-  let Hx := fresh "Hx" in
-  remember pat as x eqn:Hx in *;
-  vm_compute in Hx;
-  subst x.
 
 (* FIXME: Move *)
 Lemma hd_elem_of {A} (a : A) (l : list A) : l <> [] ->
@@ -99,25 +92,25 @@ Definition aprop_is_id {T n m} (ap : AProp T n m) : option (n = m) :=
 
 Fixpoint cleanup_id_stack {T n m} (ap : AProp T n m) : AProp T n m :=
   match ap in AProp _ n m return AProp _ n m with
-  | @Astack _ n1 m1 n2 m2 ap1 ap2 => 
+  | @Astack _ n1 m1 n2 m2 ap1 ap2 =>
     let ap1' := cleanup_id_stack ap1 in
     let ap2' := cleanup_id_stack ap2 in
     match aprop_is_id ap1' with
     | Some Heq1 =>
       match decide (n1 = 0) with
-      | left Hn10 => 
+      | left Hn10 =>
         cast_aprop (eq_sym (eq_trans (f_equal (λ k, k + _) Hn10) (Nat.add_0_l _)))
           (eq_sym (eq_trans (f_equal (λ k, k + _) (eq_trans (eq_sym Heq1) Hn10)) (Nat.add_0_l _))) ap2'
       | right _ =>
         match aprop_is_id ap2' with
-        | Some Heq2 => 
+        | Some Heq2 =>
           cast_aprop eq_refl (f_equal2 Nat.add Heq1 Heq2) (Aid (_ + _))
         | None => ap1' * ap2'
         end
       end
-    | None => 
+    | None =>
       match aprop_is_id ap2' with
-      | Some Heq2 => 
+      | Some Heq2 =>
         match decide (n2 = 0) with
         | left Hn20 =>
           cast_aprop (eq_sym (eq_trans (f_equal (Nat.add _) Hn20) (Nat.add_0_r _)))
@@ -132,12 +125,12 @@ Fixpoint cleanup_id_stack {T n m} (ap : AProp T n m) : AProp T n m :=
   | @Acompose _ i j k ap1 ap2 =>
     let ap1' := cleanup_id_stack ap1 in
     match aprop_is_id ap1' with
-    | Some Heq => 
+    | Some Heq =>
       cast_aprop (eq_sym Heq) eq_refl (cleanup_id_stack ap2)
     | None =>
       let ap2' := cleanup_id_stack ap2 in
       match aprop_is_id ap2' with
-      | Some Heq => 
+      | Some Heq =>
         cast_aprop eq_refl Heq ap1'
       | None =>
         ap1' ;' ap2'
@@ -489,6 +482,37 @@ Proof.
   apply Heq.
 Qed.
 
+Lemma Sig_rewrite_helper_correctness'_r2l
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  `{Sig : Signature A}
+  `{EqDecision Sig.(gens), Inhabited Sig.(gens)}
+  {n m} (Targ : AProp Sig.(gens) n m) {i j} (LHS RHS : AProp Sig.(gens) i j) (match_number : nat) :
+  RHS ≡ᵣ LHS ->
+  (match term_rewrite_helper Targ LHS match_number with
+   | None => True
+   | Some (existT k (C1, C2)) =>
+    (Targ ≡ᵣ mk_aprop_surrounds C1 LHS C2)%aprop ->
+    Targ ≡ᵣ
+    mk_aprop_surrounds C1 RHS C2
+  end).
+Proof.
+  remember (term_rewrite_helper _ _ _) as x.
+  clear Heqx.
+  intros Heq.
+  destruct x as [[k [C1 C2]]|]; [|done].
+  intros Hiso.
+  rewrite Hiso.
+  unfold SigTensAProp_eq.
+  rewrite 2 SignatureTensorLike_base_correct.
+  cbn.
+  apply compose_tensor_mor; [|done].
+  apply compose_tensor_mor; [done|].
+  apply stack_tensor_mor; [done|].
+  rewrite <- 2 SignatureTensorLike_base_correct.
+  symmetry.
+  apply Heq.
+Qed.
+
 
 Ltac smc_clean_lhs :=
   match goal with
@@ -513,45 +537,88 @@ Ltac smc_clean :=
     vm_eval (cleanup_id_stack RHS)
   end.
 
-Ltac srw_lhs lem :=
+Ltac srw_lhs_l2r lem n :=
   match goal with
   |- SigTensAProp_eq ?Sig ?LHS _ =>
     specialize (Sig_rewrite_helper_correctness' (Sig:=Sig) LHS
-    _ _ 0 lem);
+    _ _ n lem);
     vm_eval (term_rewrite_helper _ _ _);
     intros ->; [unfold mk_aprop_surrounds; smc_clean_lhs|smcat]
   end.
 
-Ltac srw_rhs lem :=
+Ltac srw_rhs_l2r lem n :=
   match goal with
   |- SigTensAProp_eq ?Sig _ ?RHS =>
     specialize (Sig_rewrite_helper_correctness' (Sig:=Sig) RHS
-    _ _ 0 lem);
+    _ _ n lem);
     vm_eval (term_rewrite_helper _ _ _);
     intros ->; [unfold mk_aprop_surrounds; smc_clean_rhs|smcat]
   end.
 
-Ltac srw lem :=
-  first [srw_lhs lem|srw_rhs lem].
+Ltac srw_l2r lem :=
+  first [srw_lhs_l2r lem constr:(O)|srw_rhs_l2r lem constr:(O)].
+
+
+Ltac srw_lhs_r2l lem n :=
+  match goal with
+  |- SigTensAProp_eq ?Sig ?LHS _ =>
+    specialize (Sig_rewrite_helper_correctness'_r2l (Sig:=Sig) LHS
+    _ _ n lem);
+    vm_eval (term_rewrite_helper _ _ _);
+    intros ->; [unfold mk_aprop_surrounds; smc_clean_lhs|smcat]
+  end.
+
+Ltac srw_rhs_r2l lem n :=
+  match goal with
+  |- SigTensAProp_eq ?Sig _ ?RHS =>
+    specialize (Sig_rewrite_helper_correctness'_r2l (Sig:=Sig) RHS
+    _ _ n lem);
+    vm_eval (term_rewrite_helper _ _ _);
+    intros ->; [unfold mk_aprop_surrounds; smc_clean_rhs|smcat]
+  end.
+
+Ltac srw_r2l lem :=
+  first [srw_lhs_r2l lem constr:(O)|srw_rhs_r2l lem constr:(O)].
+
+Tactic Notation "srw_lhs" uconstr(lem) "at" constr(n) :=
+  srw_lhs_l2r lem n.
 
 Tactic Notation "srw_lhs" uconstr(lem) :=
-  srw_lhs lem.
+  srw_lhs_l2r lem O.
+
+Tactic Notation "srw_rhs" uconstr(lem) "at" constr(n) :=
+  srw_rhs_l2r lem n.
 
 Tactic Notation "srw_rhs" uconstr(lem) :=
-  srw_rhs lem.
+  srw_rhs_l2r lem O.
 
 Tactic Notation "srw" uconstr(lem) :=
-  srw lem.
+  srw_l2r lem.
 
 
+Tactic Notation "srw_lhs" "<-" uconstr(lem) "at" constr(n) :=
+  srw_lhs_r2l lem n.
+
+Tactic Notation "srw_lhs" "<-" uconstr(lem) :=
+  srw_lhs_r2l lem O.
+
+Tactic Notation "srw_rhs" "<-" uconstr(lem) "at" constr(n) :=
+  srw_rhs_r2l lem n.
+
+Tactic Notation "srw_rhs" "<-" uconstr(lem) :=
+  srw_rhs_r2l lem O.
+
+Tactic Notation "srw" "<-" uconstr(lem) :=
+  srw_r2l lem.
+
+
+#[export] Instance fin_inhabited {n} : Inhabited (fin (S n)) := populate 0%fin.
 
 Section BoolExample.
 
-Notation "x == y" :=
+Notation "x === y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) : {n & {m & (AProp (fin 7) n m * AProp (fin 7) n m)%type}})
   (at level 70).
-
-#[export] Instance fin_inhabited {n} : Inhabited (fin (S n)) := populate 0%fin.
 
 Notation T := (Agen (0%fin :> fin 7) 0 1) (only parsing).
 
@@ -567,19 +634,6 @@ Notation coF := (Agen (5%fin :> fin 7) 1 0) (only parsing).
 
 Notation disc := (Agen (6%fin :> fin 7) 1 0) (only parsing).
 
-(* Notation T := (@Agen _ (0%fin :> fin 7) 0 1).
-
-Notation F := (@Agen _ (1%fin :> fin 7) 0 1).
-
-Notation AND := (@Agen _ (2%fin :> fin 7) 2 1).
-
-Notation OR := (@Agen _ (3%fin :> fin 7) 2 1).
-
-Notation coT := (@Agen _ (4%fin :> fin 7) 1 0).
-
-Notation coF := (@Agen _ (5%fin :> fin 7) 1 0).
-
-Notation disc := (@Agen _ (6%fin :> fin 7) 1 0). *)
 
 Definition BOOL : Signature bool := {|
   gens := fin 7;
@@ -592,27 +646,27 @@ Definition BOOL : Signature bool := {|
     (1, 0) (* disc *)
     ] !!!.);
   rules :=  [
-      T * Aid 1 ;' AND == Aid 1 ;
-      F * Aid 1 ;' AND == disc ;' T ;
-      Aswap 1 1 ;' AND == AND ;
-      AND * Aid 1 ;' AND == Aid 1 * AND ;' AND ;
-      AND ;' coT == coT * coT ;
+      T * Aid 1 ;' AND === Aid 1 ;
+      F * Aid 1 ;' AND === disc ;' T ;
+      Aswap 1 1 ;' AND === AND ;
+      AND * Aid 1 ;' AND === Aid 1 * AND ;' AND ;
+      AND ;' coT === coT * coT ;
 
 
-      F * Aid 1 ;' OR == Aid 1 ;
-      T * Aid 1 ;' OR == disc ;' T ;
-      Aswap 1 1 ;' OR == OR ;
-      OR * Aid 1 ;' OR == Aid 1 * OR ;' OR ;
-      OR ;' coF == coF * coF ;
+      F * Aid 1 ;' OR === Aid 1 ;
+      T * Aid 1 ;' OR === disc ;' T ;
+      Aswap 1 1 ;' OR === OR ;
+      OR * Aid 1 ;' OR === Aid 1 * OR ;' OR ;
+      OR ;' coF === coF * coF ;
 
-      T ;' coT == Aid 0;
-      F ;' coF == Aid 0;
+      T ;' coT === Aid 0;
+      F ;' coF === Aid 0;
 
-      T ;' coF == F ;' coT;
+      T ;' coF === F ;' coT;
 
-      T ;' disc == F ;' disc;
-      AND ;' disc == disc * disc;
-      OR ;' disc == disc * disc
+      T ;' disc === F ;' disc;
+      AND ;' disc === disc * disc;
+      OR ;' disc === disc * disc
 
      ];
 |}.
@@ -631,19 +685,6 @@ Notation "'coF'" := (@Agen _ 5%fin 1 0) (only printing).
 
 Notation "'disc'" := (@Agen _ 6%fin 1 0) (only printing).
 
-(* Notation "'T'" := (@Agen _ 0%fin _ _) (only printing).
-
-Notation "'F'" := (@Agen _ 1%fin _ _) (only printing).
-
-Notation "'AND'" := (Agen 2%fin _ _) (only printing).
-
-Notation "'OR'" := (Agen 3%fin _ _) (only printing).
-
-Notation "'coT'" := (Agen 4%fin _ _) (only printing).
-
-Notation "'coF'" := (Agen 5%fin _ _) (only printing).
-
-Notation "'disc'" := (Agen 6%fin _ _) (only printing). *)
 
 
 
@@ -710,11 +751,8 @@ Qed.
 
 Lemma test_rw' : (T * T ;' AND) ≡ᵣ@{BOOL} T.
 Proof.
-  Time specialize (Sig_rewrite_helper_correctness' (Sig:=BOOL) (T * T;' AND)
-    _ _ 0 (T_AND));
-  vm_eval (term_rewrite_helper _ _ _);
-  intros ->; [unfold mk_aprop_surrounds|smcat];
-  smcat.
+  srw T_AND.
+  done.
 Qed.
 
 (* TODO: Notation for signature based on let- bindings, e.g.
@@ -727,4 +765,97 @@ Qed.
 
 End BoolExample.
 
+
+Section FrobExample.
+
+
+
+Notation "x === y" :=
+  (existT _ (existT _ (x%aprop, y%aprop)) :
+    {n & {m & (AProp (fin 4) n m * AProp (fin 4) n m)%type}})
+  (at level 70).
+
+Notation m := (Agen (0%fin :> fin 4) 2 1) (only parsing).
+Notation u := (Agen (1%fin :> fin 4) 0 1) (only parsing).
+Notation n := (Agen (2%fin :> fin 4) 1 2) (only parsing).
+Notation v := (Agen (3%fin :> fin 4) 1 0) (only parsing).
+
+
+Definition Frob : Signature bool := {|
+  gens := fin 4;
+  gen_arity := ([# (2,1); (0,1); (1,2); (1,0)] !!!.);
+  rules :=  [
+
+(* (m, u) forms a monoid *)
+(* rule assoc : *) m * Aid 1 ;' m === Aid 1 * m ;' m ;
+(* rule unitL : *) u * Aid 1 ;' m === Aid 1 ;
+(* rule unitR : *) Aid 1 * u ;' m === Aid 1 ;
+
+(* (n, v) forms a comonoid *)
+(* rule coassoc : *) n ;' n * Aid 1 === n ;' Aid 1 * n ;
+(* rule counitL : *) n ;' v * Aid 1 === Aid 1 ;
+(* rule counitR : *) n ;' Aid 1 * v === Aid 1 ;
+
+(* there are many equivalent formulations of the Frobenius condition. Here's one: *)
+(* rule frob : *) n * Aid 1 ;' Aid 1 * m === Aid 1 * n ;' m * Aid 1
+
+     ];
+|}.
+
+
+Notation "'m'" := (@Agen _ 0%fin 2 1) (only printing).
+Notation "'u'" := (@Agen _ 1%fin 0 1) (only printing).
+Notation "'n'" := (@Agen _ 2%fin 1 2) (only printing).
+Notation "'v'" := (@Agen _ 3%fin 1 0) (only printing).
+
+Notation "x == y" :=
+  (x ≡ᵣ@{Frob} y)
+  (at level 70).
+
+(* (m, u) forms a monoid *)
+Lemma assoc : m * Aid 1 ;' m == Aid 1 * m ;' m.
+Proof. apply rules_hold. repeat constructor. Qed.
+Lemma unitL : u * Aid 1 ;' m == Aid 1.
+Proof. apply rules_hold. repeat constructor. Qed.
+Lemma unitR : Aid 1 * u ;' m == Aid 1.
+Proof. apply rules_hold. repeat constructor. Qed.
+
+(* (n, v) forms a comonoid *)
+Lemma coassoc : n ;' n * Aid 1 == n ;' Aid 1 * n.
+Proof. apply rules_hold. repeat constructor. Qed.
+Lemma counitL : n ;' v * Aid 1 == Aid 1.
+Proof. apply rules_hold. repeat constructor. Qed.
+Lemma counitR : n ;' Aid 1 * v == Aid 1.
+Proof. apply rules_hold. repeat constructor. Qed.
+
+(* there are many equivalent formulations of the Frobenius condition. Here's one: *)
+Lemma frob : n * Aid 1 ;' Aid 1 * m == Aid 1 * n ;' m * Aid 1.
+Proof. apply rules_hold. repeat constructor. Qed.
+
+(* The rule above is equivalent to the slightly more familiar pair of rules:
+  frobL : n * id ; id * m = m ; n
+  frobR : id * n ; m * id = m ; n
+If m and n were both commutative, one of these would imply the other, and either
+would imply "frob". However, for non-commutative Frobenius algebras, we need them
+both. *)
+
+Lemma frobL : n * Aid 1 ;' Aid 1 * m == m ;' n.
+Proof.
+  transitivity (u * n * Aid 1 ;' m * m)%aprop;
+  [srw unitL; smcat|].
+  srw <- frob.
+  srw assoc.
+  srw frob.
+  srw unitL.
+  smcat.
+Qed.
+
+Lemma frobR : Aid 1 * n ;' m * Aid 1 == m ;' n.
+Proof.
+  srw <- frob.
+  srw frobL.
+  smcat.
+Qed.
+
+End FrobExample.
 
