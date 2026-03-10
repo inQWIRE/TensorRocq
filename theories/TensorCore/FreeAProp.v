@@ -435,6 +435,36 @@ Proof.
   apply Heq.
 Qed.
 
+Ltac srw_lhs lem :=
+  match goal with
+  |- SigTensAProp_eq ?Sig ?LHS _ =>
+    specialize (Sig_rewrite_helper_correctness' (Sig:=Sig) LHS
+    _ _ 0 lem);
+    vm_eval (term_rewrite_helper _ _ _);
+    intros ->; [unfold mk_aprop_surrounds|smcat]
+  end.
+
+Ltac srw_rhs lem :=
+  match goal with
+  |- SigTensAProp_eq ?Sig _ ?RHS =>
+    specialize (Sig_rewrite_helper_correctness' (Sig:=Sig) RHS
+    _ _ 0 lem);
+    vm_eval (term_rewrite_helper _ _ _);
+    intros ->; [unfold mk_aprop_surrounds|smcat]
+  end.
+
+Ltac srw lem :=
+  first [srw_lhs lem|srw_rhs lem].
+
+Tactic Notation "srw_lhs" uconstr(lem) :=
+  srw_lhs lem.
+
+Tactic Notation "srw_rhs" uconstr(lem) :=
+  srw_rhs lem.
+
+Tactic Notation "srw" uconstr(lem) :=
+  srw lem.
+
 
 Section BoolExample.
 
@@ -544,20 +574,17 @@ Qed.
 
 Lemma test_rw : (F * F ;' OR) ≡ᵣ@{BOOL} F.
 Proof.
-  specialize (Sig_rewrite_helper_correctness' (Sig:=BOOL) (F * F;' OR)
-    _ _ 0 (F_OR));
-  vm_eval (term_rewrite_helper _ _ _);
-  intros ->; [unfold mk_aprop_surrounds|smcat].
+  srw F_OR.
   smcat.
 Qed.
 
 
 Lemma test_rw' : (T * T ;' AND) ≡ᵣ@{BOOL} T.
 Proof.
-  specialize (Sig_rewrite_helper_correctness' (Sig:=BOOL) (T * T;' AND)
+  Time specialize (Sig_rewrite_helper_correctness' (Sig:=BOOL) (T * T;' AND)
     _ _ 0 (T_AND));
   vm_eval (term_rewrite_helper _ _ _);
-  intros ->; [unfold mk_aprop_surrounds|smcat].
+  intros ->; [unfold mk_aprop_surrounds|smcat];
   smcat.
 Qed.
 
