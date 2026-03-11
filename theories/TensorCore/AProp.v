@@ -538,6 +538,11 @@ Definition AProp_graph_eq {T n m} `{Equiv T} : relation (AProp T n m) :=
   AProp_graph_semantics ap ≡ₛ AProp_graph_semantics ap'.
 
 
+Definition AProp_semantic_eq  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A} `{Equiv T, Equivalence T equiv}
+    `{TensT : !TensorLike R A T} {n m} : relation (AProp T n m) :=
+  fun ap ap' => AProp_semantics (TensT:=TensT) ap ≡
+    AProp_semantics (TensT:=TensT) ap'.
 
 Declare Custom Entry aprop.
 
@@ -597,6 +602,14 @@ Notation "[[  x  ]]" := (x%aprop) (at level 4,
 Notation "ap  ≡ₐ  ap'" := (AProp_graph_eq ap%aprop ap'%aprop) (at level 70,
   only parsing) : aprop_scope.
 
+
+Notation "ap  '≡ₛ@{' TensT '}'  ap'" := (AProp_semantic_eq (TensT := TensT) ap ap') 
+  (in custom aprop at level 70,
+  ap custom aprop, ap' custom aprop, only parsing).
+
+Notation "ap  '≡ₛ'  ap'" := (AProp_semantic_eq ap ap') 
+  (in custom aprop at level 70,
+  ap custom aprop, ap' custom aprop).
 
 (* Check [[id * id ≡ₐ id 2 ]]%aprop. *)
 

@@ -6,7 +6,6 @@ Structure Signature {A : Type} `{SA : Summable A, EqA : EqDecision A} := {
   (* #[canonical=no] gens_equiv :> Equiv gens;
   #[canonical=no] gens_equivalence :> @Equivalence gens equiv; *)
 
-  #[canonical=no] gen_arity : gens -> (nat * nat);
   (* #[canonical=no] gen_arity_proper : Proper (equiv ==> eq) gen_arity; *)
   #[canonical=no] rules : forall {n m}, relation (AProp gens n m);
 }.
@@ -20,9 +19,8 @@ Definition rules_of_rule_list {T}
 
 Inductive SigTens `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) : Type :=
-  | SigTensApp (f : Sig.(gens))
-    (v : vec A (Sig.(gen_arity) f).1)
-    (w : vec A (Sig.(gen_arity) f).2) : SigTens Sig.
+  | SigTensApp (f : Sig.(gens)) {n m}
+    (v : vec A n) (w : vec A m) : SigTens Sig.
 
 #[export] Instance Sig_gens_equiv `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) : Equiv Sig.(gens) := eq.
@@ -32,8 +30,7 @@ Definition SignatureTensorLike_base `{SA : Summable A, EqA : EqDecision A}
     (SR:=FSR_SR nat) A
     (Sig.(gens)) := {|
   interpretTensor f :=
-    tensor_to_dimensionless
-    (SR:=FSR_SR nat) (fun v w => FSR_mono nat (SigTensApp Sig f v w));
+    fun n m v w => FSR_mono nat (SigTensApp Sig f v w);
 |}.
 
 Inductive APropEqRel `{SA : Summable A, EqA : EqDecision A}
@@ -57,8 +54,7 @@ Inductive SigTensRel `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) : TensorLike (FreeSemiRing nat (SigTens Sig))
     (SR:=FSR_SR_eqg nat (SigTensRel Sig)) A
     Sig.(gens) := {|
-  interpretTensor f :=
-    tensor_to_dimensionless (fun v w => FSR_mono _ (SigTensApp Sig f v w));
+  interpretTensor f := fun n m v w => FSR_mono _ (SigTensApp Sig f v w);
 |}.
 
 Definition SigTensAProp_eq `{SA : Summable A, EqA : EqDecision A}
@@ -416,8 +412,6 @@ Class Instantiation {A : Type} `{SA : Summable A, EqA : EqDecision A}
   (Sig : Signature A) `{SR : SemiRing R rO rI radd rmul req}
   `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
   (f : Sig.(gens) -> T) := {
-  instantiation_strict : forall g : Sig.(gens), forall n m,
-    (n, m) <> Sig.(gen_arity) g -> TensT.(interpretTensor) (f g) n m ≡ const_tensor rO;
   instantiation_rules_hold : forall n m (lhs rhs : AProp _ n m),
   Sig.(rules) lhs rhs ->
   AProp_semantics (TensT:=TensT) $ map_aprop f lhs ≡
@@ -472,13 +466,10 @@ Definition rel_image {A B} (f : A -> B) (RA : relation A) : relation B :=
 
 
 Lemma AProp_semantics_via_free (f : Sig.(gens) -> T) {n m} (ap : AProp Sig.(gens) n m) :
-  (forall g : Sig.(gens), forall n m,
-    (n, m) <> Sig.(gen_arity) g -> interpretTensor (f g) n m ≡ const_tensor 0) ->
   AProp_semantics (map_aprop f ap) ≡
   λ (v : vec A n) (w : vec A m), FSR_eval (SigTens_eval f)
      (FSR_map nat2SR (AProp_semantics (TensT:=SignatureTensorLike_base Sig) ap v w)).
 Proof.
-  intros Hf.
   induction ap.
   - cbn.
     intros v w Hv Hw.
@@ -528,22 +519,6 @@ Proof.
   - intros v w Hv Hw.
     simpl.
     cbn.
-    rewrite 2 vec_cast_opt_spec.
-    case_guard as Hm. 2:{
-      cbn.
-      rewrite option_bind_None_r.
-      cbn.
-      apply Hf; [|done..].
-      now intros ?%(f_equal snd).
-    }
-    case_guard as Hn. 2:{
-      cbn.
-      apply Hf; [|done..].
-      now intros ?%(f_equal fst).
-    }
-    cbn.
-    subst.
-    rewrite 2 cast_id.
     ring.
 Qed.
 
@@ -588,3 +563,4 @@ Proof.
   - now apply Heq.
 Qed.
 
+End SignatureSemantics.

@@ -19,12 +19,18 @@ Fixpoint Astacks {T A} {n : A -> nat} {m : A -> nat}
   end.
 
 (* FIXME: Move *)
-#[export] Instance rel_preimage_dec {A B} (f : A -> B) (R : relation B) :
+Definition rel_preimage_dec {A B} (f : A -> B) (R : relation B) :
   RelDecision R -> RelDecision (rel_preimage f R) := fun HR x y => HR (f x) (f y).
 
+#[export] Hint Extern 0 (RelDecision (rel_preimage ?f ?R)) => 
+  notypeclasses refine (rel_preimage_dec f R _) : typeclass_instances.
 
-#[export] Instance rel_preimage_dec' {A B} (f : A -> B) (R : relation B) x y :
+Definition rel_preimage_dec' {A B} (f : A -> B) (R : relation B) x y :
   Decision (R (f x) (f y)) -> Decision (rel_preimage f R x y) := λ H, H.
+
+#[export] Hint Extern 0 (Decision (rel_preimage ?f ?R ?x ?y)) => 
+  notypeclasses refine (rel_preimage_dec' f R x y _) : typeclass_instances.
+
 
 Definition get_extractable_edges {T} (inputs : Pset)
   (edges : Pmap (HyperEdge T)) :=
