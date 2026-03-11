@@ -4556,3 +4556,19 @@ Proof.
   intros Heq%(set_map_difference_respectful_l (SB:=SB) f).
   now unfold_leibniz.
 Qed.
+
+#[export] Instance prod_map_proper `{RA : relation A, RB : relation B, RC : relation C,
+  RD : relation D} (f : A -> C) (g : B -> D) :
+  Proper (RA ==> RC) f -> Proper (RB ==> RD) g ->
+  Proper (prod_relation RA RB ==> prod_relation RC RD) (prod_map f g).
+Proof.
+  firstorder.
+Qed.
+
+#[export] Instance prod_map_proper_equiv `{Equiv A, Equiv B, Equiv C, Equiv D}
+  (f : A -> C) (g : B -> D) :
+  Proper (equiv ==> equiv) f -> Proper (equiv ==> equiv) g ->
+  Proper (equiv ==> equiv) (prod_map f g).
+Proof.
+  apply prod_map_proper.
+Qed.

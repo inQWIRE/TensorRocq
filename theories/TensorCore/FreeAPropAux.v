@@ -1,11 +1,5 @@
 Require Export Homomorphism AProp FreeSemiRing GraphTerm.
 
-(* FIXME: Move *)
-#[export] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); lia.
-Qed.
-
 
 (* FIXME: Move *)
 Lemma DoublePushout_with_struct_isomorphic {T n m}
@@ -200,23 +194,3 @@ Proof.
 Qed.
 
 
-
-
-
-Lemma id_SRH_subrel `{SR : SemiRing R rO rI radd rmul req,
-  SR' : SemiRing R rO rI radd rmul req'} :
-  subrelation req req' ->
-  SemiRingHomomorphism (SR:=SR) (SR':=SR') id.
-Proof.
-  intros Hreq.
-  split; [apply _|..];
-  intros; repeat apply SR'.
-Qed.
-
-#[export] Instance id_FSR_eq_eqg `{SR : SemiRing R rO rI radd rmul req}
-  X (RX : relation (FreeSemiRing R X)) :
-  SemiRingHomomorphism (SR:=FSR_SR R (X:=X)) (SR' := FSR_SR_eqg R RX) id.
-Proof.
-  apply id_SRH_subrel.
-  apply _.
-Qed.
