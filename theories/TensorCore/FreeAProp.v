@@ -482,6 +482,25 @@ Proof.
   apply Heq.
 Qed. *)
 
+Lemma rules_of_rule_list_instantiation_helper {A : Type} `{SA : Summable A, EqA : EqDecision A}
+  (Sig : Signature A) `{SR : SemiRing R rO rI radd rmul req}
+  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
+  (f : Sig.(gens) -> T) 
+  (rule_list : list {n & {m & (AProp Sig.(gens) n m * AProp Sig.(gens) n m)%type}}) :
+  Forall (fun '(existT n (existT m (lhs, rhs))) =>
+    AProp_semantics (TensT:=TensT) $ map_aprop f lhs ≡
+    AProp_semantics (TensT:=TensT) $ map_aprop f rhs) rule_list ->
+  forall n m (lhs rhs : AProp _ n m),
+  rules_of_rule_list rule_list _ _ lhs rhs ->
+  AProp_semantics (TensT:=TensT) $ map_aprop f lhs ≡
+  AProp_semantics (TensT:=TensT) $ map_aprop f rhs.
+Proof.
+  intros Hall n m lhs rhs Hin.
+  unfold rules_of_rule_list in Hin.
+  rewrite Forall_forall in Hall.
+  apply Hall in Hin.
+  done.
+Qed.
 
 Section SignatureSemantics.
 
