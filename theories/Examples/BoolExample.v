@@ -212,11 +212,6 @@ Proof. Time now repeat srw T_AND. Qed. *)
 
 Check (eq_refl false).
 
-Fixpoint nstackT (n : nat) :=
-  match n with
-  | 0 => Aid 0
-  | (S k) => T * (nstackT k)
-  end.
 
 (* TODO: Notation for signature based on let- bindings, e.g.
   declaring T would give something like:
