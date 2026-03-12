@@ -68,6 +68,7 @@ Inductive ZXEq : forall {n m}, relation (ZX n m) :=
 
 Definition ZX_sig : Signature bool := {|
   gens := fin 3 * Qc;
+  gens_equiv := eq;
   rules n m := ZXEq
 |}.
 

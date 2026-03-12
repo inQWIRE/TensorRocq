@@ -142,6 +142,7 @@ Notation T := (Agen (3%fin :> fin 4) 1 1) (only parsing).
 
 #[canonical=yes] Definition CliffordT : Signature bool := {|
   gens := fin 4;
+  gens_equiv := eq;
   rules := rules_of_rule_list [
       H ;' H === id
      ];

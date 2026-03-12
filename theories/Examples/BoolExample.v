@@ -22,6 +22,7 @@ Print Signature.
 
 Definition BOOL : Signature bool := {|
   gens := fin 7;
+  gens_equiv := eq;
   rules := rules_of_rule_list [
       T * Aid 1 ;' AND === Aid 1 ;
       F * Aid 1 ;' AND === disc ;' T ;

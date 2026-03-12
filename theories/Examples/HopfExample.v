@@ -18,7 +18,7 @@ Notation sp := (Agen (5%fin :> fin 6) 1 1) (only parsing).
 
 Definition Hopf : Signature bool := {|
   gens := fin 6;
-  gen_arity := ([# (2,1); (0,1); (1,2); (1,0); (1, 1); (1, 1)] !!!.);
+  gens_equiv := eq;
   rules := rules_of_rule_list [
 
 (* (m, u) forms a monoid *)
