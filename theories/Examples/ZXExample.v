@@ -6,11 +6,11 @@ Require Import QArith Qcanon.
 
 Declare Custom Entry print_qc.
 
-Notation "q" := (q) (only printing, q constr, in custom print_qc at level 0).
+Notation "q" := (q%Qc%Q) (only printing, q constr at level 9, in custom print_qc at level 0).
 
-Notation "q " := (Qcmake q%Q _) (only printing, q constr, in custom print_qc at level 0).
+Notation "q " := (Qcmake q%Q _) (only printing, q constr at level 9, in custom print_qc at level 0).
 
-Notation " q" := (Q2Qc q%Q) (only printing, q constr, in custom print_qc at level 0).
+Notation " q" := (Q2Qc q%Q) (only printing, q constr  at level 9, in custom print_qc at level 0).
 
 
 Local Open Scope aprop_scope.
@@ -27,11 +27,13 @@ Notation X n m q := (Agen (1%fin :> fin 3, q%Qc) n m) (only parsing).
 Notation H n     := (Agen (2%fin :> fin 3, 0)    n n) (only parsing).
 
 Notation "'Z' n m q" := (Agen (0%fin, q) n m) (only printing, 
+  n at level 9, m at level 9,
   q custom print_qc, at level 10).
 Notation "'X' n m q" := (Agen (1%fin, q) n m) (only printing, 
+  n at level 9, m at level 9,
   q custom print_qc, at level 10).
-Notation "'H' n"     := (Agen (2%fin, 0) n n) (only printing,
-                     at level 10).
+Notation "'H' n"     := (Agen (2%fin, _) n n) (only printing,
+  n at level 9, at level 10).
 
 Inductive ZXEq : forall {n m}, relation (ZX n m) :=
   | ZXEq_Z_add_2 n m q :
