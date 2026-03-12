@@ -59,6 +59,8 @@ Class MonoidSize `{MD : Monoid M mO madd meq} (f : M -> nat) := {
   msize_add x y : f (madd x y) = f x + f y;
 }.
 
+#[global] Hint Mode MonoidSize + - - - - - : typeclass_instances.
+
 #[export] Instance nat_MonoidSize : MonoidSize id.
 Proof.
   split; [apply _|done..].
