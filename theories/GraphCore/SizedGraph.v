@@ -646,35 +646,6 @@ Proof.
   intros; now do 2 f_equiv.
 Qed. *)
 
-Definition map_sized_graph {N M} {T n m} (f : N -> M) (scohg : SizedCospanHyperGraph N T n m) :
-  SizedCospanHyperGraph M T n m :=
-  mk_scohg scohg (f <$> scohg.(sized_map)).
-
-(* FIXME: Move *)
-Definition enlarge_hypergraph {T} (f : positive -> list positive)
-  (hg : HyperGraph T) : HyperGraph T :=
-  mk_hg ((λ tio, (tio.1.1, tio.1.2 ≫= f, tio.2 ≫= f)) <$> hg.(hyperedges))
-    (set_bind (list_to_set ∘ f) hg.(hypervertices)).
-
-Definition enlarge_graph {T n m} (f : positive -> list positive)
-  (cohg : CospanHyperGraph T n m) : CospanHyperGraph T _ _ :=
-  list_to_vec ((cohg.(inputs) :> list _) ≫= f) ->
-    enlarge_hypergraph f cohg
-    <- list_to_vec ((cohg.(outputs) :> list _) ≫= f).
-
-
-Definition bind_sized_graph {N} {T n m} (scohg : SizedCospanHyperGraph (list N) T n m) :
-  SizedCospanHyperGraph N T _ _ :=
-  mk_scohg (enlarge_graph (λ k, imap (λ i (v : N), encode (k, i)) (scohg.(sized_map) !!! k))
-    scohg)
-    (list_to_map (map_to_list scohg.(sized_map) ≫=
-      λ k_ns, imap (λ i v, (encode (k_ns.1, i), v)) k_ns.2)).
-
-Definition map_list_sized_graph {N M} {T n m} (f : N -> list M) (scohg : SizedCospanHyperGraph N T n m) :
-  SizedCospanHyperGraph M T _ _ :=
-  mk_scohg (enlarge_graph (λ k, imap (λ i (v : M), encode (k, i)) ((f <$> scohg.(sized_map)) !!! k)) scohg)
-    (list_to_map (map_to_list scohg.(sized_map) ≫=
-    λ k_n, imap (λ i v, (encode (k_n.1, i), v)) (f k_n.2))).
 
 (*
 Definition abs_vertices {N T} (hg : (HyperEdge T)) : Pset :=
@@ -827,7 +798,7 @@ Definition scohg_vert_eq {N T} {n m} (cohg cohg' : SizedCospanHyperGraph N T n m
 
 
 
-#[export] Instance cohg_vert_equiv {N T n m} : Equivalence (@scohg_vert_eq N T n m).
+#[export] Instance scohg_vert_equiv {N T n m} : Equivalence (@scohg_vert_eq N T n m).
 Proof.
   split.
   - done.
@@ -1974,7 +1945,7 @@ Proof.
   rewrite relabel_hg_id' by apply subst_by_vec_id.
   reflexivity.
 Qed. *)
-(* 
+(*
 Lemma inputs_add_top_loops {n m m'}
   (tg : SizedCospanHyperGraph N T (n + m) (n + m')) :
   (add_top_loops tg).(inputs) =
@@ -2294,3 +2265,5 @@ Proof.
 Qed. *)
 
 End Compose.
+
+
