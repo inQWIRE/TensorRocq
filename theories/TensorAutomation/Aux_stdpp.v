@@ -2933,21 +2933,21 @@ Qed.
 Definition fin_rev {n} (i : fin n) : fin n :=
   nat_to_fin (fin_rev_pf $ fin_to_nat_lt i).
 
-Lemma fin_to_nat_rev {n} (i : fin n) : 
+Lemma fin_to_nat_rev {n} (i : fin n) :
   fin_rev i =@{nat} n - S i.
 Proof.
   apply fin_to_nat_to_fin.
 Qed.
 
-Lemma vlookup_rev {A n} (v : vec A n) i : 
-  Vector.rev v !!! i = 
+Lemma vlookup_rev {A n} (v : vec A n) i :
+  Vector.rev v !!! i =
   v !!! fin_rev i.
 Proof.
   symmetry.
   apply vlookup_lookup.
-  assert (Hvi : is_Some (vec_to_list (Vector.rev v) !! (i:>nat))) by now 
+  assert (Hvi : is_Some (vec_to_list (Vector.rev v) !! (i:>nat))) by now
     apply lookup_lt_is_Some;
-    rewrite length_vec_to_list; 
+    rewrite length_vec_to_list;
     apply fin_to_nat_lt.
 
   destruct Hvi as [vi Hvi].
@@ -2955,10 +2955,10 @@ Proof.
     symmetry.
     apply vlookup_lookup' in Hvi as [? <-];
     f_equal;
-    apply fin_to_nat_inj; 
+    apply fin_to_nat_inj;
     now rewrite fin_to_nat_to_fin.
   }
-  rewrite vec_to_list_rev, reverse_lookup in Hvi by 
+  rewrite vec_to_list_rev, reverse_lookup in Hvi by
     now rewrite length_vec_to_list; apply fin_to_nat_lt.
   rewrite <- Hvi.
   now rewrite fin_to_nat_rev, length_vec_to_list.
@@ -3318,7 +3318,7 @@ Proof.
   cbn.
   do 2 f_equal; apply proof_irrel.
 Qed.
-Lemma vec_cast_opt_Some {A n} (v : vec A n) m w : 
+Lemma vec_cast_opt_Some {A n} (v : vec A n) m w :
   vec_cast_opt v m = Some w <->
   exists H, w = Vector.cast v H.
 Proof.
@@ -3329,7 +3329,7 @@ Proof.
   intros [= <-].
   eauto.
 Qed.
-Lemma vec_cast_opt_is_Some {A n} (v : vec A n) m :  
+Lemma vec_cast_opt_is_Some {A n} (v : vec A n) m :
   is_Some (vec_cast_opt v m) <-> n = m.
 Proof.
   rewrite is_Some_alt.
@@ -3911,6 +3911,671 @@ Proof.
   eauto.
 Qed.
 
+Definition countable_order `{Countable A} (a b : A) : Prop :=
+  (encode a < encode b)%positive.
+
+#[export] Instance countable_order_StrictOrder `{Countable A} : StrictOrder (countable_order (A:=A)).
+Proof.
+  split; [|unfold countable_order, Transitive; intros; etransitivity; eauto].
+  intros x.
+  unfold countable_order, complement.
+  lia.
+Qed.
+
+(* Lemma gmap_key_dec `{Countable A} p : Decision (gmap_key A p).
+Proof.
+  destruct (decode p :> option A) eqn:Hp.
+   *)
+
+
+Definition countable_order_initseg_aux `{Countable A} (n : nat) : list A :=
+  omap (λ k, decode k ≫= λ b, guard (encode b = k) ;; Some b)
+  (Pos.of_succ_nat <$> seq 0 n).
+
+
+Definition countable_order_initseg `{Countable A} (a : A) : list A :=
+  countable_order_initseg_aux (Nat.pred (Pos.to_nat (encode a))).
+
+Lemma countable_order_initseg_lt `{Countable A} (a : A) :
+  Forall (λ b, countable_order b a) (countable_order_initseg a).
+Proof.
+  rewrite Forall_forall.
+  intros i (pi & Hpi & Hdecode)%elem_of_list_omap.
+  assert (pi = encode i) as ->. 1:{
+    apply bind_Some in Hdecode as (i' & Hdecode & Hdecenc).
+    case_guard as Heq; [|done].
+    cbn in Hdecenc.
+    congruence.
+  }
+  apply elem_of_list_fmap in Hpi as (? & Heq & ?%elem_of_seq).
+  unfold countable_order.
+  lia.
+Qed.
+
+Lemma elem_of_countable_order_initseg `{Countable A} (a b : A) :
+  b ∈ countable_order_initseg a <-> countable_order b a.
+Proof.
+  split.
+  - pose proof (countable_order_initseg_lt a) as Ha.
+    rewrite Forall_forall in Ha.
+    apply Ha.
+  - unfold countable_order.
+    intros Henc.
+    apply elem_of_list_omap.
+    exists (encode b).
+    split; [rewrite elem_of_list_fmap; exists (Nat.pred (Pos.to_nat (encode b)));
+      rewrite elem_of_seq; lia|].
+    rewrite decode_encode.
+    cbn.
+    now case_guard.
+Qed.
+
+Lemma countable_order_initseg_aux_mono `{Countable A} (n m : nat) :
+  n <= m ->
+  countable_order_initseg_aux (A:=A) n `prefix_of` countable_order_initseg_aux m.
+Proof.
+  intros Hab.
+  replace m with (n + (m - n)) by lia.
+  unfold countable_order_initseg_aux.
+  rewrite seq_app.
+  rewrite fmap_app, omap_app.
+  now apply prefix_app_r.
+Qed.
+
+Lemma countable_order_initseg_mono `{Countable A} (a b : A) :
+  countable_order a b ->
+  countable_order_initseg a `prefix_of` countable_order_initseg b.
+Proof.
+  unfold countable_order.
+  intros Hab.
+  apply countable_order_initseg_aux_mono.
+  lia.
+Qed.
+
+(* FIXME: Move *)
+Lemma InA_eq {A} (a : A) l :
+  InA eq a l <-> In a l.
+Proof.
+  split; [|apply (In_InA _)].
+  intros ?%InA_alt; naive_solver.
+Qed.
+
+Lemma NoDupA_eq {A} (l : list A) :
+  NoDupA eq l <-> NoDup l.
+Proof.
+  split; intros Hl; induction Hl; (repeat constructor); now rewrite ?InA_eq, ?elem_of_list_In in *.
+Qed.
+
+Lemma StronglySorted_lookup `(R : relation A) (l : list A) :
+  StronglySorted R l <->
+    forall i j, i < j ->
+      option_relation R (λ _, True) (λ _, False) (l !! i) (l !! j).
+Proof.
+  split.
+  - intros Hsort.
+    induction Hsort as [|a l Hsort IHl Hal]; [now intros; rewrite 2 lookup_nil|].
+    intros [|i] j Hij.
+    + cbn.
+      destruct j; [lia|].
+      cbn.
+      case_match eqn:Hlj; [|done].
+      rewrite Forall_forall in Hal.
+      apply Hal.
+      now apply elem_of_list_lookup_2 in Hlj.
+    + destruct j; [lia|].
+      apply IHl.
+      lia.
+  - induction l as [|a l IHl]; intros Hl; [constructor|].
+    constructor.
+    + apply IHl.
+      intros i j Hij.
+      apply (Hl (S i) (S j)).
+      lia.
+    + rewrite Forall_lookup.
+      intros j b Hjb.
+      specialize (Hl 0 (S j) ltac:(lia)).
+      cbn in Hl.
+      unfold lookup in *.
+      now rewrite Hjb in Hl.
+Qed.
+
+
+Lemma elem_of_countable_order_initseg_aux `{Countable A} (n : nat) (a : A) :
+  a ∈ countable_order_initseg_aux n <->
+  (encode a < Pos.of_succ_nat n)%positive.
+Proof.
+  split.
+  - intros (_ & (k & -> & Hk%elem_of_seq)%elem_of_list_fmap & Hdecenc)%elem_of_list_omap.
+    destruct (decode (Pos.of_succ_nat k)) as [a'|] eqn:Ha'; [|done].
+    cbn in Hdecenc.
+    case_guard as Henc; [cbn in Hdecenc|done].
+    replace a' with a in * by congruence.
+    lia.
+  - intros Henc.
+    apply elem_of_list_omap.
+    exists (encode a).
+    split; [apply elem_of_list_fmap; exists (Nat.pred (Pos.to_nat (encode a))); rewrite elem_of_seq; lia|].
+    rewrite decode_encode.
+    cbn.
+    case_guard; done.
+Qed.
+
+Lemma countable_order_initseg_aux_Sorted `{Countable A} (n : nat) :
+  Sorted countable_order (countable_order_initseg_aux n :> list A).
+Proof.
+  unfold countable_order_initseg_aux.
+  induction n; [done|].
+  replace (S n) with (n + 1) by lia.
+  rewrite seq_app, fmap_app, omap_app.
+  apply (SortA_app (eqA:=eq) _); [done|..].
+  - cbn.
+    case_match; repeat constructor.
+  - cbn.
+    case_match eqn:Hdec; [|easy].
+    intros b c.
+    rewrite 2 InA_eq.
+    rewrite <- 2 elem_of_list_In.
+    rewrite elem_of_list_singleton.
+    intros Hb ->.
+    apply elem_of_countable_order_initseg_aux in Hb.
+    destruct (decode (Pos.of_succ_nat n)) as [a'|] eqn:Ha'; [|done].
+    cbn in Hdec.
+    case_guard as Henc; [cbn in Hdec|done].
+    replace a' with a in * by congruence.
+    unfold countable_order.
+    lia.
+Qed.
+
+
+Lemma countable_order_initseg_aux_StronglySorted `{Countable A} (n : nat) :
+  StronglySorted countable_order (countable_order_initseg_aux n :> list A).
+Proof.
+  apply Sorted_StronglySorted, countable_order_initseg_aux_Sorted.
+  apply countable_order_StrictOrder.
+Qed.
+
+Lemma countable_order_initseg_aux_NoDup `{Countable A} (n : nat) :
+  NoDup (countable_order_initseg_aux n :> list A).
+Proof.
+  apply NoDupA_eq.
+  apply (SortA_NoDupA _ (ltA:=countable_order) (countable_order_StrictOrder) _).
+  apply countable_order_initseg_aux_Sorted.
+Qed.
+
+Lemma max_list_with_elem_of_le {A} (f : A -> nat) a (l : list A) :
+  a ∈ l -> f a <= max_list_with f l.
+Proof.
+  revert a.
+  apply Forall_forall.
+  induction l; constructor.
+  - cbn; lia.
+  - apply (Forall_impl _ _ _ IHl).
+    cbn.
+    lia.
+Qed.
+
+Lemma max_list_with_app {A} (f : A -> nat) (l l' : list A) :
+  max_list_with f (l ++ l') =
+  max_list_with f l `max` max_list_with f l'.
+Proof.
+  induction l; cbn; lia.
+Qed.
+
+Definition countably_infinite_encode_bound `{Countable A, Infinite A}
+  (n : nat) : nat :=
+  max_list_with (Pos.to_nat)
+    (encode (A:=A) ∘ infinite_injection <$> seq 0 n).
+
+Lemma countably_infinite_encode_bound_correct `{Countable A, Infinite A}
+  (n : nat) :
+  n <= length (countable_order_initseg_aux (A:=A) (countably_infinite_encode_bound (A:=A) n)).
+Proof.
+  rewrite <- (length_seq 0 n) at 1.
+  rewrite <- (length_fmap (infinite_injection (A:=A))).
+  apply NoDup_incl_length.
+  - apply NoDup_ListNoDup.
+    apply (NoDup_fmap _), NoDup_seq.
+  - intros a.
+    rewrite <- 2 elem_of_list_In.
+    intros (k & -> & Hk)%elem_of_list_fmap.
+    apply elem_of_countable_order_initseg_aux.
+    unfold countably_infinite_encode_bound.
+    pose proof (max_list_with_elem_of_le (Pos.to_nat) (encode (A:=A) (infinite_injection k))
+      (encode (A:=A) ∘ infinite_injection <$> seq 0 n)) as Hk'.
+    tspecialize Hk' by now refine (elem_of_list_fmap_1 _ _ _ Hk).
+    lia.
+Qed.
+
+Lemma countably_infinite_encode_bound_mono `{Countable A, Infinite A}
+  (n m : nat) : n <= m ->
+  countably_infinite_encode_bound (A:=A) n
+    <= countably_infinite_encode_bound (A:=A) m.
+Proof.
+  intros Hn.
+  induction Hn; [done|].
+  unfold countably_infinite_encode_bound in *.
+  replace (S m) with (m + 1) by lia.
+  rewrite seq_app, fmap_app, max_list_with_app.
+  lia.
+Qed.
+
+(* FIXME: Move *)
+Lemma NoDup_take {A} n (l : list A) :
+  NoDup l -> NoDup (take n l).
+Proof.
+  rewrite <- (take_drop n l) at 1.
+  now intros ?%NoDup_app.
+Qed.
+Lemma NoDup_drop {A} n (l : list A) :
+  NoDup l -> NoDup (drop n l).
+Proof.
+  rewrite <- (take_drop n l) at 1.
+  now intros ?%NoDup_app.
+Qed.
+
+Definition countably_infinite_bijection `{Countable A, Infinite A}
+  (p : positive) : A :=
+  default (fresh [])
+    (countable_order_initseg_aux (countably_infinite_encode_bound (A:=A) (Pos.to_nat p))
+     !! (Nat.pred (Pos.to_nat p))).
+
+Definition countably_infinite_bijection_inv `{Countable A, Infinite A}
+  (a : A) : positive :=
+  Pos.of_succ_nat (length (countable_order_initseg a)).
+
+
+#[export] Instance countably_infinite_bijection_mono `{Countable A, Infinite A} :
+  Proper (Pos.lt ==> countable_order (A:=A)) countably_infinite_bijection.
+Proof.
+  intros k l Hkl.
+  set (k' := Pos.to_nat k).
+  set (l' := Pos.to_nat l).
+  set (bnd := countably_infinite_encode_bound (A:=A) l').
+  unfold countably_infinite_bijection.
+  pose proof (countable_order_initseg_aux_Sorted (A:=A) bnd) as Hsort.
+  apply Sorted_StronglySorted in Hsort; [|apply countable_order_StrictOrder].
+
+
+  pose proof (countable_order_initseg_aux_mono (A:=A)
+    (countably_infinite_encode_bound (A:=A) k') bnd) as Hkpref.
+  tspecialize Hkpref by now apply countably_infinite_encode_bound_mono; lia.
+
+  rewrite (fun H => prefix_lookup_lt _ _ _ H Hkpref) by
+    now apply (fun H => Nat.lt_le_trans _ _ _ H
+      (countably_infinite_encode_bound_correct (A:=A) _)); lia.
+  fold l' bnd.
+  set (a_s := countable_order_initseg_aux bnd).
+  pose proof (countably_infinite_encode_bound_correct (A:=A) l') as Hlen.
+  pose proof (countably_infinite_encode_bound_mono (A:=A) k' l' ltac:(lia)).
+  assert (is_Some (a_s !! (Nat.pred k'))) as Hk'some by
+    now apply lookup_lt_is_Some; subst a_s bnd k' l'; lia.
+  assert (is_Some (a_s !! (Nat.pred l'))) as Hl'some by
+    now apply lookup_lt_is_Some; subst a_s bnd k' l'; lia.
+  destruct Hk'some as [a Ha].
+  destruct Hl'some as [b Hb].
+  fold k' l'.
+  rewrite Ha, Hb.
+  cbn.
+  rewrite StronglySorted_lookup in Hsort.
+  specialize (Hsort (Nat.pred k') (Nat.pred l') ltac:(lia)).
+  fold a_s in Hsort.
+  rewrite Ha, Hb in Hsort.
+  now cbn in Hsort.
+Qed.
+
+#[export] Instance countably_infinite_bijection_inj `{Countable A, Infinite A} :
+  Inj eq (=@{A}) countably_infinite_bijection.
+Proof.
+  intros k l.
+  set (k' := Pos.to_nat k).
+  set (l' := Pos.to_nat l).
+  set (bnd := countably_infinite_encode_bound (A:=A) (max k' l')).
+  unfold countably_infinite_bijection.
+  pose proof (countable_order_initseg_aux_NoDup (A:=A) bnd) as Hdup.
+  pose proof (countable_order_initseg_aux_mono (A:=A)
+    (countably_infinite_encode_bound (A:=A) k') bnd) as Hkpref.
+  tspecialize Hkpref by now apply countably_infinite_encode_bound_mono; lia.
+  pose proof (countable_order_initseg_aux_mono (A:=A)
+    (countably_infinite_encode_bound (A:=A) l') bnd) as Hlpref.
+  tspecialize Hlpref by now apply countably_infinite_encode_bound_mono; lia.
+  rewrite (fun H => prefix_lookup_lt _ _ _ H Hkpref) by
+    now apply (fun H => Nat.lt_le_trans _ _ _ H
+      (countably_infinite_encode_bound_correct (A:=A) _)); lia.
+  rewrite (fun H => prefix_lookup_lt _ _ _ H Hlpref) by
+    now apply (fun H => Nat.lt_le_trans _ _ _ H
+      (countably_infinite_encode_bound_correct (A:=A) _)); lia.
+  set (a_s := countable_order_initseg_aux bnd).
+  pose proof (countably_infinite_encode_bound_correct (A:=A) (max k' l')) as Hlen.
+  pose proof (countably_infinite_encode_bound_mono (A:=A) k' (max k' l') ltac:(lia)).
+  pose proof (countably_infinite_encode_bound_mono (A:=A) l' (max k' l') ltac:(lia)).
+  assert (is_Some (a_s !! (Nat.pred k'))) as Hk'some by
+    now apply lookup_lt_is_Some; subst a_s bnd k' l'; lia.
+  assert (is_Some (a_s !! (Nat.pred l'))) as Hl'some by
+    now apply lookup_lt_is_Some; subst a_s bnd k' l'; lia.
+  destruct Hk'some as [a Ha].
+  destruct Hl'some as [b Hb].
+  fold k' l'.
+  rewrite Ha, Hb.
+  cbn.
+  intros <-.
+  enough (Nat.pred k' = Nat.pred l') by lia.
+  subst k' l'.
+  revert Ha Hb.
+  apply NoDup_lookup, Hdup.
+Qed.
+
+
+#[export] Instance countably_infinite_bijection_mono_inj `{Countable A, Infinite A} :
+  Inj Pos.lt (countable_order (A:=A)) countably_infinite_bijection.
+Proof.
+  intros k l.
+  destruct_decide (decide (l <= k)%positive) as Hkl.
+  1: {
+    destruct_decide (decide (l < k)%positive) as Hkllt.
+    - apply (countably_infinite_bijection_mono (A:=A)) in Hkllt.
+      intros HF.
+      exfalso.
+      eapply irreflexivity; [apply (countable_order_StrictOrder (A:=A)).(StrictOrder_Irreflexive)|].
+      etransitivity; eauto.
+    - replace k with l by lia.
+      intros []%(irreflexivity _).
+  }
+  lia.
+Qed.
+
+
+Lemma countably_infinite_bijection_spec_gen `{Countable A, Infinite A}
+  (p : positive) (a : A) : countably_infinite_bijection p = a <->
+    exists n, countable_order_initseg_aux n !! Nat.pred (Pos.to_nat p) = Some a.
+Proof.
+  split.
+  - unfold countably_infinite_bijection.
+    assert (is_Some (countable_order_initseg_aux (A:=A)
+      (countably_infinite_encode_bound (A:=A) (Pos.to_nat p))
+      !! Nat.pred (Pos.to_nat p))) as Hsome.
+    1:{
+      apply lookup_lt_is_Some.
+      eapply Nat.lt_le_trans; [|apply countably_infinite_encode_bound_correct].
+      lia.
+    }
+    destruct Hsome as [b Hb].
+    rewrite Hb.
+    cbn.
+    intros ->.
+    eauto.
+  - intros (n & Hp).
+    unfold countably_infinite_bijection.
+    pose proof (countable_order_initseg_aux_mono (A:=A)
+      n (max n (countably_infinite_encode_bound (A:=A) (Pos.to_nat p)))) as Hnpref.
+    tspecialize Hnpref by lia.
+    pose proof (countable_order_initseg_aux_mono (A:=A)
+      (countably_infinite_encode_bound (A:=A) (Pos.to_nat p))
+      (max n (countably_infinite_encode_bound (A:=A) (Pos.to_nat p)))) as Hbpref.
+    tspecialize Hbpref by lia.
+    rewrite (fun H => prefix_lookup_lt _ _ _ H Hnpref) in Hp by now apply lookup_lt_Some in Hp.
+    rewrite (fun H => prefix_lookup_lt _ _ _ H Hbpref) by
+      now apply (fun H => Nat.lt_le_trans _ _ _ H
+        (countably_infinite_encode_bound_correct (A:=A) _)); lia.
+    rewrite Hp.
+    done.
+Qed.
+
+(* Lemma countable_order_initseg_aux_take  *)
+
+Lemma countable_order_initseg_aux_lookup_Some_1 `{Countable A} n m (a : A) :
+  countable_order_initseg_aux n !! m = Some a ->
+  length (countable_order_initseg a) = m.
+Proof.
+  intros Ha.
+  transitivity (length (take m
+    (countable_order_initseg_aux (A:=A) n))).
+  2:{
+    rewrite length_take.
+    apply lookup_lt_Some in Ha.
+    lia.
+  }
+  apply Permutation_length.
+  apply NoDup_Permutation; [apply countable_order_initseg_aux_NoDup|
+    apply NoDup_take, countable_order_initseg_aux_NoDup|].
+  intros b.
+  rewrite elem_of_countable_order_initseg.
+  unfold countable_order.
+  rewrite elem_of_take.
+  pose proof (countable_order_initseg_aux_StronglySorted (A:=A) n) as Hsort.
+  rewrite StronglySorted_lookup in Hsort.
+
+  split.
+  - intros Hlt.
+    assert (Hb : b ∈ countable_order_initseg_aux n) by
+      now apply elem_of_countable_order_initseg_aux;
+        apply elem_of_list_lookup_2, elem_of_countable_order_initseg_aux in Ha; lia.
+    apply elem_of_list_lookup in Hb as (i & Hi).
+    exists i.
+    split; [done|].
+    assert (i <> m). 1:{
+      intros ->.
+      replace a with b in * by congruence.
+      lia.
+    }
+    enough (~ (m < i)) by lia.
+    intros HF%Hsort.
+    rewrite Ha, Hi in HF.
+    cbn in HF.
+    unfold countable_order in HF.
+    lia.
+  - intros (i & Hi & Hip%Hsort).
+    rewrite Hi, Ha in Hip.
+    cbn in Hip.
+    unfold countable_order in Hip.
+    lia.
+Qed.
+
+Lemma countable_order_initseg_aux_lookup_Some `{Countable A} n m (a : A) :
+  countable_order_initseg_aux n !! m = Some a <->
+  length (countable_order_initseg a) = m /\ (encode a < Pos.of_succ_nat n)%positive.
+Proof.
+  split.
+  - intros Ha.
+    apply elem_of_list_lookup_2 in Ha as Ha'.
+    apply elem_of_countable_order_initseg_aux in Ha'.
+    split; [|done].
+    now apply (countable_order_initseg_aux_lookup_Some_1 n).
+  - intros [Hlen Henc].
+    apply elem_of_countable_order_initseg_aux in Henc.
+    apply elem_of_list_lookup in Henc as (i & Hi).
+    apply countable_order_initseg_aux_lookup_Some_1 in Hi as Him.
+    congruence.
+Qed.
+
+
+
+
+Lemma countably_infinite_bijection_spec `{Countable A, Infinite A}
+  (p : positive) (a : A) : countably_infinite_bijection p = a <->
+    length (countable_order_initseg a) = Nat.pred (Pos.to_nat p).
+Proof.
+  split.
+  - rewrite countably_infinite_bijection_spec_gen.
+    intros (n & Hpa).
+    now apply countable_order_initseg_aux_lookup_Some_1 in Hpa.
+  - intros Hlen.
+    rewrite countably_infinite_bijection_spec_gen.
+    exists (Pos.to_nat (encode a)).
+    apply countable_order_initseg_aux_lookup_Some.
+    split; [done|].
+    lia.
+Qed.
+
+
+Lemma countably_infinite_bijection_to_inv_spec `{Countable A, Infinite A}
+  (p : positive) (a : A) : countably_infinite_bijection p = a <->
+    countably_infinite_bijection_inv a = p.
+Proof.
+  rewrite countably_infinite_bijection_spec.
+  unfold countably_infinite_bijection_inv.
+  lia.
+Qed.
+
+Lemma countably_infinite_bijection_inv_spec `{Countable A, Infinite A}
+  (p : positive) (a : A) : countably_infinite_bijection_inv a = p <->
+    length (countable_order_initseg a) = Nat.pred (Pos.to_nat p).
+Proof.
+  unfold countably_infinite_bijection_inv.
+  lia.
+Qed.
+
+
+#[export] Instance countably_infinite_bijection_inv_linv `{Countable A, Infinite A} :
+  Cancel eq (countably_infinite_bijection_inv (A:=A)) countably_infinite_bijection.
+Proof.
+  intros i.
+  rewrite countably_infinite_bijection_inv_spec.
+  now apply countably_infinite_bijection_spec.
+Qed.
+
+#[export] Instance countably_infinite_bijection_inv_rinv `{Countable A, Infinite A} :
+  Cancel eq countably_infinite_bijection (countably_infinite_bijection_inv (A:=A)).
+Proof.
+  intros i.
+  rewrite countably_infinite_bijection_spec.
+  now apply countably_infinite_bijection_inv_spec.
+Qed.
+
+#[export] Instance countably_infinite_bijection_inv_inj `{Countable A, Infinite A} :
+  Inj eq eq (countably_infinite_bijection_inv (A:=A)).
+Proof.
+  apply cancel_inj.
+Qed.
+
+Lemma countably_infinite_exists_bijection `{Countable A, Infinite A,
+  Countable B, Infinite B} : exists (g : A -> B) (ginv : B -> A),
+    Inj (=) (=) g /\
+    Inj (=) (=) ginv /\ Cancel eq g ginv /\ Cancel eq ginv g.
+Proof.
+  exists (countably_infinite_bijection ∘ countably_infinite_bijection_inv),
+    (countably_infinite_bijection ∘ countably_infinite_bijection_inv).
+  split_and!.
+  - apply _.
+  - apply _.
+  - intros i.
+    cbn.
+    now rewrite 2 (cancel _ _ _).
+  - intros i.
+    cbn.
+    now rewrite 2 (cancel _ _ _).
+Qed.
+
+Lemma and_from_l {P Q} :
+  P /\ (P -> Q) -> P /\ Q.
+Proof.
+  tauto.
+Qed.
+
+Lemma partial_bijection_extension `{Countable A, Infinite A,
+  Countable B, Infinite B}
+  (l : list A) (f : A -> B) :
+    ForallPairs (λ i j, f i = f j → i = j) l ->
+    exists (g : A -> B) (ginv : B -> A), Inj (=) (=) g /\
+    Inj (=) (=) ginv /\ Cancel eq g ginv /\ Cancel eq ginv g /\
+    Forall (fun a => g a = f a) l.
+Proof.
+  intros Hlinj.
+  assert (Hcount1 : Countable (dsig (λ a, a ∉ l))) by apply _.
+  assert (Hinf1 : Infinite (dsig (λ a, a ∉ l))). 1:{
+    unshelve refine {|infinite_fresh l' :=
+      dexist (infinite_fresh (l ++ (proj1_sig <$> l'))) _|}; try typeclasses eauto.
+    - intros Hin.
+      apply (infinite_is_fresh (l ++ (proj1_sig <$> l'))).
+      apply elem_of_app; left; apply Hin.
+    - intros l'.
+      unfold fresh.
+      intros Hin%(elem_of_list_fmap_1 proj1_sig).
+      cbn in Hin.
+      apply (infinite_is_fresh (l ++ (proj1_sig <$> l'))).
+      apply elem_of_app; right; apply Hin.
+    - intros l' l'' Hl'.
+      unfold fresh.
+      apply dsig_eq.
+      cbn.
+      f_equiv.
+      f_equiv.
+      now apply fmap_Permutation.
+  }
+  assert (Hcount2 : Countable (dsig (λ a, a ∉ f <$> l))) by apply _.
+  assert (Hinf2 : Infinite (dsig (λ a, a ∉ f <$> l))). 1:{
+    unshelve refine {|infinite_fresh l' :=
+      dexist (infinite_fresh ((f <$> l) ++ (proj1_sig <$> l'))) _|}; try typeclasses eauto.
+    - intros Hin.
+      apply (infinite_is_fresh ((f <$> l) ++ (proj1_sig <$> l'))).
+      apply elem_of_app; left; apply Hin.
+    - intros l'.
+      unfold fresh.
+      intros Hin%(elem_of_list_fmap_1 proj1_sig).
+      cbn in Hin.
+      apply (infinite_is_fresh ((f <$> l) ++ (proj1_sig <$> l'))).
+      apply elem_of_app; right; apply Hin.
+    - intros l' l'' Hl'.
+      unfold fresh.
+      apply dsig_eq.
+      cbn.
+      f_equiv.
+      f_equiv.
+      now apply fmap_Permutation.
+  }
+  assert (Hinhab : Inhabited (B -> A)) by
+    now enough (Inhabited A) by apply _; apply (populate (fresh [])).
+  destruct (countably_infinite_exists_bijection (A:=dsig (.∉ l))
+    (B:=dsig (.∉ f <$> l))) as (h & hinv & Hh & Hhinv & Hh_hinv & Hhinv_h).
+  exists (fun a => match decide (a ∈ l) with
+    | left Ha => f a
+    | right Hna => ` (h (dexist a Hna))
+    end),
+    (fun a => match decide (a ∈ f <$> l) with
+    | left Ha => invfun f l a
+    | right Hna => ` (hinv (dexist a Hna))
+    end).
+  apply and_comm, and_assoc, and_comm, and_assoc.
+  apply and_from_l, conj; [|intros (?&?&?); split; apply cancel_inj].
+  split_and!.
+  - intros fi.
+    destruct_decide (decide (fi ∈ f <$> l)) as Hfi.
+    + apply elem_of_list_fmap in Hfi as (i & -> & Hi).
+      rewrite invfun_linv by done.
+      case_decide; done.
+    + case_decide as Hin; [contradict Hin; refine (proj2_dsig (P:=(.∉ l)) _)|].
+      rewrite dexists_proj1.
+      rewrite (cancel _ _ _).
+      done.
+  - intros i.
+    destruct_decide (decide (i ∈ l)) as Hi.
+    + apply (elem_of_list_fmap_1 f) in Hi as Hfi.
+      case_decide; [|done].
+      now apply invfun_linv.
+    + case_decide as Hin; [contradict Hin; refine (proj2_dsig (P:=(.∉ f <$> l)) _)|].
+      rewrite dexists_proj1.
+      rewrite (cancel _ _ _).
+      done.
+  - rewrite Forall_forall.
+    intros i Hi.
+    case_decide; done.
+Qed.
+
+
+
+Lemma partial_bijection_extension' `{Countable A, Infinite A,
+  Countable B, Infinite B, FinSet A SA} (X : SA) (f : A -> B) :
+  set_Forall2 (λ i j, f i = f j → i = j) X ->
+    exists (g : A -> B) (ginv : B -> A), Inj (=) (=) g /\
+    Inj (=) (=) ginv /\ Cancel eq g ginv /\ Cancel eq ginv g /\
+    set_Forall (fun a => g a = f a) X.
+Proof.
+  rewrite set_Forall2_elements.
+  intros Hg%partial_bijection_extension.
+  setoid_rewrite set_Forall_elements.
+  exact Hg.
+Qed.
+
+
 
 Lemma kmap_ext `{FinMap K1 M1, FinMap K2 M2} {A}
   (f g : K1 -> K2) (m : M1 A) :
@@ -3982,13 +4647,13 @@ Proof.
 Qed.
 
 
-Lemma fold_right_map {A B C} (f : A -> B) (g : B -> C -> C) c l : 
-  fold_right g c (map f l) = fold_right (fun a c => g (f a) c) c l. 
+Lemma fold_right_map {A B C} (f : A -> B) (g : B -> C -> C) c l :
+  fold_right g c (map f l) = fold_right (fun a c => g (f a) c) c l.
 Proof.
   induction l; cbn; congruence.
 Qed.
-Local Instance fold_right_mor `{R : relation A} f 
-  (HProp : Morphisms.Proper (R ==> R ==> R) f) : 
+Local Instance fold_right_mor `{R : relation A} f
+  (HProp : Morphisms.Proper (R ==> R ==> R) f) :
   Morphisms.Proper (R ==> eqlistA R ==> R) (fold_right f).
 Proof.
   intros a a' Ha l l' Hl.
@@ -3999,10 +4664,10 @@ Proof.
   - simpl.
     apply HProp; auto.
 Qed.
-Lemma fold_right_concat `{R : relation A} `{!Equivalence R} (f : A -> A -> A) 
+Lemma fold_right_concat `{R : relation A} `{!Equivalence R} (f : A -> A -> A)
   {HfR : Proper (R ==> R ==> R)%signature f} (d : A)
-  (Hd : forall a, R (f d a) a) 
-  (Hf : forall a b c, R (f (f a b) c) (f a (f b c))) ls : 
+  (Hd : forall a, R (f d a) a)
+  (Hf : forall a b c, R (f (f a b) c) (f a (f b c))) ls :
   R (fold_right f d (concat ls))
   (fold_right f d (map (fun l => fold_right f d l) ls)).
 Proof.

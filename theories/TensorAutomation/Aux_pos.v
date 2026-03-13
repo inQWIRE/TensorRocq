@@ -1658,11 +1658,6 @@ Proof.
 Qed.
 
 (* FIXME: Move *)
-Lemma and_from_l {P Q} :
-  P /\ (P -> Q) -> P /\ Q.
-Proof.
-  tauto.
-Qed.
 Lemma pos_to_nat_pred_of_nat (i : nat) :
   pos_to_nat_pred (Pos.of_succ_nat i) = i.
 Proof.
