@@ -1959,7 +1959,7 @@ Proof.
   induction l; cbn; congruence.
 Qed.
 
-Lemma sum_list_with_eq_of_fmap {A} {f g : A -> nat} {l l' : list A} :
+Lemma sum_list_with_eq_of_fmap {A B} {f : A -> nat} {g : B -> nat} {l : list A} {l' : list B} :
   f <$> l = g <$> l' -> sum_list_with f l = sum_list_with g l'.
 Proof.
   intros Heq%(f_equal sum_list).
@@ -2254,8 +2254,8 @@ Proof.
 Admitted.
 
 
-Lemma sum_list_with_ext {A} (f g : A -> nat) l : 
-  (forall a, a ∈ l -> f a = g a) -> 
+Lemma sum_list_with_ext {A} (f g : A -> nat) l :
+  (forall a, a ∈ l -> f a = g a) ->
   sum_list_with f l = sum_list_with g l.
 Proof.
   rewrite <- Forall_forall.
@@ -2274,7 +2274,7 @@ Proof.
   apply exists_by_forall.
   1:{
     cbn.
-    rewrite 2 vec_to_list_app, 
+    rewrite 2 vec_to_list_app,
       4 vec_to_list_map, 2 sum_list_with_app, 4 sum_list_with_fmap.
     do 2 f_equal; apply sum_list_with_ext; intros a _;
     cbn -[bcons];
@@ -2286,6 +2286,693 @@ Proof.
   intros H.
 Admitted.
 
+Require Import IsomorphismTestingAux.
+
+Lemma isomorphic_id_graph_of_empty_NoDup {T n}
+  (cohg : CospanHyperGraph T n n) :
+  hedges cohg = ∅ ->
+  inputs cohg = outputs cohg ->
+  NoDup (inputs cohg) ->
+  isomorphic cohg (id_graph _).
+Proof.
+  intros Hhedges Hio Hdup.
+  symmetry.
+  apply (isomorphic_of_partial_inj' _ _
+    (Pmap_injmap (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p)) (inputs cohg)))) id).
+  - intros ? ? _ _.
+    apply Pmap_injmap_inj.
+    apply map_inj_list_to_map.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_seq_0.
+      apply (NoDup_fmap _), NoDup_seq.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_to_fmap.
+      now rewrite list_fmap_id.
+  - easy.
+  - enough (Hen : _) by
+    (apply cohg_ext; [apply Hhedges| |rewrite <- Hio];
+    exact Hen).
+    cbn.
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    symmetry.
+    apply Pmap_injmap_correct.
+    rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+    rewrite pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    done.
+Qed.
+
+
+Lemma isomorphic_cap_graph_of_empty_NoDup {T n}
+  (cohg : CospanHyperGraph T (n + n) 0) :
+  hedges cohg = ∅ ->
+  vsplitl (inputs cohg) = vsplitr (inputs cohg) ->
+  NoDup (vsplitl (inputs cohg)) ->
+  isomorphic cohg (cap_graph _).
+Proof.
+  intros Hhedges Hio Hdup.
+  symmetry.
+  apply (isomorphic_of_partial_inj' _ _
+    (Pmap_injmap (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p)) (vsplitl (inputs cohg))))) id).
+  - intros ? ? _ _.
+    apply Pmap_injmap_inj.
+    apply map_inj_list_to_map.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_seq_0.
+      apply (NoDup_fmap _), NoDup_seq.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_to_fmap.
+      now rewrite list_fmap_id.
+  - easy.
+  - apply cohg_ext; [apply Hhedges| |apply vec_eq, fin_0_inv].
+    cbn.
+    rewrite 2 Vector.map_append.
+    rewrite <- (app_vsplit (inputs cohg)), <- Hio.
+    refine ((fun H => f_equal2 vapp H H) _).
+
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    symmetry.
+    apply Pmap_injmap_correct.
+    rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+    rewrite pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    rewrite vsplitl_app.
+    done.
+Qed.
+
+Lemma isomorphic_cup_graph_of_empty_NoDup {T n}
+  (cohg : CospanHyperGraph T 0 (n + n)) :
+  hedges cohg = ∅ ->
+  vsplitl (outputs cohg) = vsplitr (outputs cohg) ->
+  NoDup (vsplitl (outputs cohg)) ->
+  isomorphic cohg (cup_graph _).
+Proof.
+  intros Hhedges Hio Hdup.
+  symmetry.
+  apply (isomorphic_of_partial_inj' _ _
+    (Pmap_injmap (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p)) (vsplitl (outputs cohg))))) id).
+  - intros ? ? _ _.
+    apply Pmap_injmap_inj.
+    apply map_inj_list_to_map.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_seq_0.
+      apply (NoDup_fmap _), NoDup_seq.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_to_fmap.
+      now rewrite list_fmap_id.
+  - easy.
+  - apply cohg_ext; [apply Hhedges| apply vec_eq, fin_0_inv|].
+    cbn.
+    rewrite 2 Vector.map_append.
+    rewrite <- (app_vsplit (outputs cohg)), <- Hio.
+    refine ((fun H => f_equal2 vapp H H) _).
+
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    symmetry.
+    apply Pmap_injmap_correct.
+    rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+    rewrite pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    rewrite vsplitl_app.
+    done.
+Qed.
+
+Lemma isomorphic_swap_graph_of_empty_NoDup {T n m}
+  (cohg : CospanHyperGraph T (n + m) (m + n)) :
+  hedges cohg = ∅ ->
+  inputs cohg = vsplitr (outputs cohg) +++ vsplitl (outputs cohg) ->
+  NoDup (inputs cohg) ->
+  isomorphic cohg (swap_graph _ _).
+Proof.
+  intros Hhedges Hio Hdup.
+  symmetry.
+  apply (isomorphic_of_partial_inj' _ _
+    (Pmap_injmap (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p)) (inputs cohg)))) id).
+  - intros ? ? _ _.
+    apply Pmap_injmap_inj.
+    apply map_inj_list_to_map.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_seq_0.
+      apply (NoDup_fmap _), NoDup_seq.
+    + rewrite fmap_imap; unfold compose; cbn.
+      rewrite imap_to_fmap.
+      now rewrite list_fmap_id.
+  - easy.
+  - eenough (Hen : _); [
+    apply cohg_ext; [apply Hhedges|exact Hen|refine (_ Hen)]|].
+    + cbn.
+      rewrite Hio at 1.
+      rewrite 4 Vector.map_append.
+      intros Heq.
+      rewrite <- (app_vsplit (outputs cohg)).
+      f_equal.
+      * apply (f_equal vsplitr) in Heq.
+        now rewrite 2 vsplitr_app in Heq.
+      * apply (f_equal vsplitl) in Heq.
+        now rewrite 2 vsplitl_app in Heq.
+    + cbn.
+      apply vec_eq.
+      intros i.
+      rewrite <- vseq_app, 2 vlookup_map, vlookup_seq.
+      cbn.
+      symmetry.
+      apply Pmap_injmap_correct.
+      rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+      rewrite pos_to_nat_pred_of_nat.
+      rewrite lookup_vec_to_list_fin.
+      done.
+Qed.
+
+Require Import GraphRewriting stdpp.list.
+
+(* TODO: *)
+
+Lemma map_inj_iff_NoDup_snd_map_to_list `{FinMap K M} {A}
+  (m : M A) : map_inj m <-> NoDup (map_to_list m).*2.
+Proof.
+  split.
+  - intros Hinj.
+    apply NoDup_fmap_2_strong, NoDup_map_to_list.
+    intros [k a] [k' a'].
+    cbn.
+    rewrite 2 elem_of_map_to_list.
+    intros ? ? <-.
+    f_equal.
+    now apply (Hinj _ _ a).
+  - intros Hdup.
+    intros j k a Hj Hk.
+    specialize (NoDup_fmap_1_strong _ _ Hdup) as Hinj.
+    specialize (Hinj (j, a) (k, a)).
+    rewrite 2 elem_of_map_to_list in Hinj.
+    enough ((j, a) = (k, a)) by congruence.
+    now apply Hinj.
+Qed.
+
+(* Lemma map_inj_kmap_1 `{FinMap K1 M1, FinMap K2 M2} {A}
+  (f : K1 -> K2) (m : M1 A) :
+  map_inj (kmap f m :> M2 A) -> map_inj m.
+Proof.
+  rewrite 2 map_inj_iff_NoDup_snd_map_to_list.
+
+  map_to_list_kmap.
+
+  intros Hinj k k' a.
+  split.
+  -  *)
+
+Lemma map_inj_kmap `{FinMap K1 M1, FinMap K2 M2} {A}
+  (f : K1 -> K2) `{Hf : !Inj eq eq f} (m : M1 A) :
+  map_inj (kmap f m :> M2 A) <-> map_inj m.
+Proof.
+  rewrite map_inj_iff_NoDup_snd_map_to_list.
+  rewrite (map_to_list_kmap _).
+  rewrite snds_prod_map, list_fmap_id.
+  now rewrite map_inj_iff_NoDup_snd_map_to_list.
+Qed.
+
+Lemma isomorphic_graph_of_tensor_of_singleton_NoDup {T n m}
+  (cohg : CospanHyperGraph T n m) k tio :
+  hedges cohg = mk_hg {[k := tio]} ∅ ->
+  vec_to_list (inputs cohg) = tio.1.2 ->
+  vec_to_list (outputs cohg) = tio.2 ->
+  NoDup (inputs cohg ++ outputs cohg) ->
+  isomorphic cohg (graph_of_tensor tio.1.1 n m).
+Proof.
+  intros Hhedges Hi Ho Hdup.
+  symmetry.
+  apply (isomorphic_of_partial_inj' _ _
+    (Pmap_injmap
+      ((kmap (bcons false) (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p))
+        (inputs cohg)))) ∪ (kmap (bcons true)
+        (list_to_map (imap (λ i p, (Pos.of_succ_nat i, p)) (outputs cohg))))))
+    (λ _, k)).
+  - refine (fun _ _ _ _ => Pmap_injmap_inj _ _ _ _).
+    apply NoDup_app in Hdup.
+    apply map_inj_disj_union; [now apply (kmap_inj2_disjoint bcons)|..].
+    + apply (map_inj_kmap _).
+      apply map_inj_list_to_map.
+      * rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_seq_0.
+        apply (NoDup_fmap _), NoDup_seq.
+      * rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_to_fmap.
+        now rewrite list_fmap_id.
+    + apply (map_inj_kmap _).
+      apply map_inj_list_to_map.
+      * rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_seq_0.
+        apply (NoDup_fmap _), NoDup_seq.
+      * rewrite fmap_imap; unfold compose; cbn.
+        rewrite imap_to_fmap.
+        now rewrite list_fmap_id.
+    + clear -Hdup.
+      intros i j a b.
+      intros Ha%(elem_of_map_img_2 (SA:=Pset)).
+      intros Hb%(elem_of_map_img_2 (SA:=Pset)).
+      rewrite (map_img_kmap _) in Ha.
+      rewrite (map_img_kmap _) in Hb.
+      rewrite map_img_list_to_map in Ha, Hb by
+        now rewrite fmap_imap; unfold compose; cbn;
+        rewrite imap_seq_0; apply (NoDup_fmap _), NoDup_seq.
+      rewrite fmap_imap in Ha, Hb.
+      unfold compose in Ha, Hb.
+      cbn in Ha, Hb.
+      rewrite imap_to_fmap, list_fmap_id, elem_of_list_to_set in Ha, Hb.
+      intros ->; eapply Hdup.2.1; eauto.
+  - intros i j tabs tabs'.
+    cbn -[singletonM].
+    rewrite hyperedges_singleton.
+    rewrite 2 lookup_singleton_Some.
+    now intros [<- _] [<- _].
+  - refine ((fun Hig Hog =>
+    cohg_ext _ _ (_ Hig Hog) Hig Hog) _ _).
+    + intros His Hos.
+      rewrite Hhedges.
+      apply hg_ext; [|done].
+      cbn -[singletonM].
+      rewrite hyperedges_singleton.
+      rewrite kmap_singleton, map_fmap_singleton.
+      f_equal.
+      rewrite (surjective_pairing tio),
+        (surjective_pairing tio.1) at 1.
+      cbn.
+      f_equal; [f_equal|].
+      cbn in His, Hos.
+      * rewrite <- Hi.
+        rewrite Hig at 1.
+        cbn.
+        rewrite 2 vec_to_list_map, vec_to_list_seq.
+        done.
+      * rewrite <- Ho.
+        rewrite Hog at 1.
+        cbn.
+        rewrite 2 vec_to_list_map, vec_to_list_seq.
+        done.
+    + cbn.
+      apply vec_eq.
+      intros i.
+      rewrite 2 vlookup_map, vlookup_seq.
+      cbn -[bcons].
+      symmetry.
+      apply Pmap_injmap_correct.
+      rewrite lookup_union, (lookup_kmap _), (lookup_kmap_None _ _ _).2 by lia.
+      rewrite (right_id_L None _).
+      rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+      rewrite pos_to_nat_pred_of_nat.
+      rewrite lookup_vec_to_list_fin.
+      done.
+    + cbn.
+      apply vec_eq.
+      intros i.
+      rewrite 2 vlookup_map, vlookup_seq.
+      cbn -[bcons].
+      symmetry.
+      apply Pmap_injmap_correct.
+      rewrite lookup_union, (lookup_kmap _), (lookup_kmap_None _ _ _).2 by lia.
+      rewrite (left_id_L None _).
+      rewrite lookup_list_to_map_imap_to_pos, option_fmap_id.
+      rewrite pos_to_nat_pred_of_nat.
+      rewrite lookup_vec_to_list_fin.
+      done.
+Qed.
+
+Lemma isomorphic_graph_of_tensor_of_singleton_NoDup' {T n m}
+  (cohg : CospanHyperGraph T n m) k t :
+  hedges cohg = mk_hg {[k := (t, vec_to_list (inputs cohg), vec_to_list (outputs cohg))]} ∅ ->
+  NoDup (inputs cohg ++ outputs cohg) ->
+  isomorphic cohg (graph_of_tensor t n m).
+Proof.
+  intros Hcohg Hdup.
+  eapply (isomorphic_graph_of_tensor_of_singleton_NoDup cohg k (t, _, _)); cbn; eauto.
+Qed.
+
+
+
+
+
+Lemma sized_graph_to_graph_id_sized_graph {N T} (f : N -> nat)
+  {n} (v : vec N n) :
+  isomorphic (sized_graph_to_graph f (@id_sized_graph N T n v))
+  (id_graph _)%cohg.
+Proof.
+  apply isomorphic_id_graph_of_empty_NoDup.
+  - done.
+  - done.
+  - cbn.
+    rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+    apply NoDup_bind, (NoDup_fmap _), NoDup_seq.
+    + intros x0 x1 y.
+      intros (p & -> & Hp)%elem_of_list_fmap
+        (q & -> & Hq)%elem_of_list_fmap.
+      rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+      set_solver +.
+    + intros p Hp.
+      rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+      apply (NoDup_fmap _), NoDup_seq.
+Qed.
+
+Lemma cast_pair_to_cast_graph {T nm nm'}
+  (cohg : CospanHyperGraph T nm.1 nm.2) (H : nm = nm') :
+  eq_rect nm (λ nm, CospanHyperGraph T nm.1 nm.2) cohg nm' H =
+  cast_graph (f_equal fst H) (f_equal snd H) cohg.
+Proof.
+  now subst.
+Qed.
+
+Lemma vec_to_list_vsplitl {A n m} (v : vec A (n + m)) :
+  vec_to_list (vsplitl v) = take n v.
+Proof.
+  rewrite <- (app_vsplit v) at 2.
+  rewrite vec_to_list_app.
+  rewrite <- (length_vec_to_list (vsplitl v)) at 3.
+  now rewrite take_app_length.
+Qed.
+
+Lemma vec_to_list_vsplitr {A n m} (v : vec A (n + m)) :
+  vec_to_list (vsplitr v) = drop n v.
+Proof.
+  rewrite <- (app_vsplit v) at 2.
+  rewrite vec_to_list_app.
+  rewrite <- (length_vec_to_list (vsplitl v)) at 2.
+  now rewrite drop_app_length.
+Qed.
+
+Lemma cast_cast {A n n' n''} (v : vec A n) (H : n = n') (H' : n' = n'') :
+  Vector.cast (Vector.cast v H) H' =
+  Vector.cast v (eq_trans H H').
+Proof.
+  subst.
+  now rewrite cast_id.
+Qed.
+
+Lemma vbind_app {A B} {nf : A -> nat} (f : forall a, vec B (nf a))
+  {n m} (v : vec A n) (w : vec A m) :
+  vbind f (v +++ w) = Vector.cast (vbind f v +++ vbind f w)
+    (eq_sym (eq_trans (f_equal _ (vec_to_list_app v w)) (sum_list_with_app nf v w))).
+Proof.
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_cast, vec_to_list_bind, 2 vec_to_list_app, bind_app,
+    2 vec_to_list_bind.
+  done.
+Qed.
+
+Lemma cast_app {A n m n' m'} (Hn : n = n') (Hm : m = m')
+  (v : vec A n) (w : vec A m) H :
+  Vector.cast (v +++ w) H = Vector.cast v Hn +++ Vector.cast w Hm.
+Proof.
+  subst; now rewrite !cast_id.
+Qed.
+
+Lemma sized_graph_to_graph_cup_sized_graph {N T} (f : N -> nat)
+  {n} (v : vec N n) :
+  sigT2_relation (@isomorphic T)
+    (graph_to_pair_bundled (sized_graph_to_graph f (@cup_sized_graph N T n v)))
+    (graph_to_pair_bundled (cup_graph (sum_list_with f v))).
+Proof.
+  symmetry.
+  apply sigT2_relation_alt.
+  cbn.
+  assert (Hsizeeq : sum_list_with f v = sum_list_with ((λ p,
+      default 0 (f <$> list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) v)
+         !! p))) (vmap Pos.of_succ_nat (vseq 0 n))). 1:{
+    rewrite vec_to_list_map, sum_list_with_fmap.
+    apply sum_list_with_eq_of_fmap.
+    rewrite <- 2 vec_to_list_map.
+    f_equal.
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    done.
+  }
+  apply exists_by_forall.
+  - f_equal.
+    rewrite Vector.map_append.
+    rewrite vec_to_list_app, vec_to_list_map.
+    rewrite <- fmap_app.
+    rewrite sum_list_with_fmap.
+    rewrite sum_list_with_app.
+    refine ((fun H => f_equal2 Nat.add H H) _).
+    rewrite Hsizeeq.
+    now rewrite vec_to_list_map, sum_list_with_fmap.
+  - intros H.
+    symmetry.
+    apply isomorphic_cup_graph_of_empty_NoDup.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite hedges_cast_graph.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite outputs_cast_graph.
+      cbn.
+      revert H.
+      rewrite (Vector.map_append), vbind_app; intros H.
+      rewrite cast_cast.
+      rewrite (cast_app (eq_sym Hsizeeq) (eq_sym Hsizeeq)).
+      rewrite vsplitl_app, vsplitr_app.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite outputs_cast_graph.
+      cbn.
+      revert H.
+      rewrite (Vector.map_append), vbind_app; intros H.
+      rewrite cast_cast.
+      rewrite (cast_app (eq_sym Hsizeeq) (eq_sym Hsizeeq)).
+      rewrite vsplitl_app.
+      rewrite vec_to_list_cast.
+      rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+      apply NoDup_bind, (NoDup_fmap _), NoDup_seq.
+      * intros x0 x1 y.
+        intros (p & -> & Hp)%elem_of_list_fmap
+          (q & -> & Hq)%elem_of_list_fmap.
+        rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        set_solver +.
+      * intros p Hp.
+        rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        apply (NoDup_fmap _), NoDup_seq.
+Qed.
+
+Lemma sized_graph_to_graph_cap_sized_graph {N T} (f : N -> nat)
+  {n} (v : vec N n) :
+  sigT2_relation (@isomorphic T)
+    (graph_to_pair_bundled (sized_graph_to_graph f (@cap_sized_graph N T n v)))
+    (graph_to_pair_bundled (cap_graph (sum_list_with f v))).
+Proof.
+  symmetry.
+  apply sigT2_relation_alt.
+  cbn.
+  assert (Hsizeeq : sum_list_with f v = sum_list_with ((λ p,
+      default 0 (f <$> list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) v)
+         !! p))) (vmap Pos.of_succ_nat (vseq 0 n))). 1:{
+    rewrite vec_to_list_map, sum_list_with_fmap.
+    apply sum_list_with_eq_of_fmap.
+    rewrite <- 2 vec_to_list_map.
+    f_equal.
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    done.
+  }
+  apply exists_by_forall.
+  - f_equal.
+    rewrite Vector.map_append.
+    rewrite vec_to_list_app, vec_to_list_map.
+    rewrite <- fmap_app.
+    rewrite sum_list_with_fmap.
+    rewrite sum_list_with_app.
+    refine ((fun H => f_equal2 Nat.add H H) _).
+    rewrite Hsizeeq.
+    now rewrite vec_to_list_map, sum_list_with_fmap.
+  - intros H.
+    symmetry.
+    apply isomorphic_cap_graph_of_empty_NoDup.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite hedges_cast_graph.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite inputs_cast_graph.
+      cbn.
+      revert H.
+      rewrite (Vector.map_append), vbind_app; intros H.
+      rewrite cast_cast.
+      rewrite (cast_app (eq_sym Hsizeeq) (eq_sym Hsizeeq)).
+      rewrite vsplitl_app, vsplitr_app.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite inputs_cast_graph.
+      cbn.
+      revert H.
+      rewrite (Vector.map_append), vbind_app; intros H.
+      rewrite cast_cast.
+      rewrite (cast_app (eq_sym Hsizeeq) (eq_sym Hsizeeq)).
+      rewrite vsplitl_app.
+      rewrite vec_to_list_cast.
+      rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+      apply NoDup_bind, (NoDup_fmap _), NoDup_seq.
+      * intros x0 x1 y.
+        intros (p & -> & Hp)%elem_of_list_fmap
+          (q & -> & Hq)%elem_of_list_fmap.
+        rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        set_solver +.
+      * intros p Hp.
+        rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        apply (NoDup_fmap _), NoDup_seq.
+Qed.
+
+
+Lemma sized_graph_to_graph_swap_sized_graph {N T} (f : N -> nat)
+  {n m} (v : vec N n) (w : vec N m) :
+  sigT2_relation (@isomorphic T)
+    (graph_to_pair_bundled (sized_graph_to_graph f (@swap_sized_graph N T n m v w)))
+    (graph_to_pair_bundled (swap_graph (sum_list_with f v) (sum_list_with f w))).
+Proof.
+  symmetry.
+  apply sigT2_relation_alt.
+  cbn.
+  assert (Hvw : forall n (v : vec N n), sum_list_with f v = sum_list_with ((λ p,
+      default 0 (f <$> list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) v)
+         !! p))) (vmap Pos.of_succ_nat (vseq 0 n))). 1:{
+    intros n' v'.
+    rewrite vec_to_list_map, sum_list_with_fmap.
+    apply sum_list_with_eq_of_fmap.
+    rewrite <- 2 vec_to_list_map.
+    f_equal.
+    apply vec_eq.
+    intros i.
+    rewrite 2 vlookup_map, vlookup_seq.
+    cbn.
+    rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
+    rewrite lookup_vec_to_list_fin.
+    done.
+  }
+  assert (Hv : sum_list_with (λ p, default 0 (f <$>
+    list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) (v ++ w)) !! p))
+      (vmap Pos.of_succ_nat (vseq 0 n)) = sum_list_with f v). 1:{
+    rewrite Hvw.
+    apply sum_list_with_ext.
+    intros a.
+    rewrite vec_to_list_map, vec_to_list_seq.
+    intros (i & -> & Hi%elem_of_seq)%elem_of_list_fmap.
+    rewrite 2 lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat, 2 option_fmap_id.
+    rewrite lookup_app_l by now rewrite length_vec_to_list.
+    done.
+  }
+  assert (Hw : sum_list_with (λ p, default 0 (f <$>
+    list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) (v ++ w)) !! p))
+      (vmap Pos.of_succ_nat (vseq n m)) = sum_list_with f w). 1:{
+    specialize (Hvw _ (v +++ w)).
+    revert Hvw.
+    rewrite vseq_app, Vector.map_append, 2 vec_to_list_app, 2 sum_list_with_app.
+    cbn.
+    lia.
+  }
+  apply exists_by_forall.
+  - rewrite Nat.add_comm.
+    symmetry.
+    rewrite 2 Vector.map_append, 2 vec_to_list_app, 2 sum_list_with_app.
+    rewrite Nat.add_comm.
+    apply (f_equal (λ a, (a, a))).
+    rewrite Nat.add_comm.
+    rewrite <- sum_list_with_app, <- 2 vec_to_list_app, <- Vector.map_append.
+    rewrite <- vseq_app.
+    rewrite <- Hvw.
+    rewrite vec_to_list_app, sum_list_with_app.
+    apply Nat.add_comm.
+  - intros H.
+    symmetry.
+    apply isomorphic_swap_graph_of_empty_NoDup.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite hedges_cast_graph.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite inputs_cast_graph, outputs_cast_graph.
+      cbn.
+      revert H.
+      rewrite 2 (Vector.map_append), 2 vbind_app; intros H.
+      rewrite 2 cast_cast.
+      rewrite (cast_app Hv Hw).
+      rewrite (cast_app Hw Hv).
+      clear.
+      rewrite vsplitl_app, vsplitr_app.
+      done.
+    + unfold eq_rect_r.
+      rewrite cast_pair_to_cast_graph.
+      rewrite inputs_cast_graph.
+      rewrite vec_to_list_cast.
+      cbn.
+      rewrite <- vseq_app.
+      rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+      apply NoDup_bind, (NoDup_fmap _), NoDup_seq.
+      * intros x0 x1 y.
+        intros (p & -> & Hp)%elem_of_list_fmap
+          (q & -> & Hq)%elem_of_list_fmap.
+        rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        set_solver +.
+      * intros p Hp.
+        rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        apply (NoDup_fmap _), NoDup_seq.
+Qed.
+
+
+Lemma sized_graph_to_graph_sized_graph_of_tensor {N T} (f : N -> nat)
+  {n m} (v : vec N n) (w : vec N m) t :
+  isomorphic
+    (sized_graph_to_graph f (@sized_graph_of_tensor N T t n m v w))
+    (graph_of_tensor t _ _).
+Proof.
+  eapply (isomorphic_graph_of_tensor_of_singleton_NoDup' _ 1 t).
+  - apply hg_ext; [|done].
+    cbn -[singletonM].
+    rewrite hyperedges_singleton.
+    rewrite map_fmap_singleton.
+    cbn.
+    f_equal.
+    f_equal; [f_equal|].
+    + rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+      done.
+    + rewrite vec_to_list_bind, vec_to_list_map, vec_to_list_seq.
+      done.
+  - cbn.
+    rewrite 2 vec_to_list_bind, <- bind_app.
+    rewrite 2 vec_to_list_map, 2 vec_to_list_seq. 
+    apply NoDup_bind.
+    + intros x0 x1 y.
+      rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+      intros _ _.
+      (* intros [Hx0|Hx0]%elem_of_app
+      [Hx1|Hx1]%elem_of_app;
+      apply elem_of_list_fmap in Hx0 as (p & -> & Hp);
+      apply elem_of_list_fmap in Hx1 as (q & -> & Hq). *)
+      (* rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))). *)
+      set_solver +.
+    + intros p Hp.
+      rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+      apply (NoDup_fmap _), NoDup_seq.
+    + apply NoDup_app.
+      split_and!; cycle 1; [|apply (NoDup_fmap _), NoDup_seq..].
+      set_solver.
+Qed.
 
 
 
