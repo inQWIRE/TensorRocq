@@ -1927,6 +1927,18 @@ Proof.
 Qed.
 
 
+#[export] Instance sized_cospan_struct_isomorphic {N T} {n m} :
+  Proper (struct_sized_isomorphic (N:=N) ==> @struct_isomorphic T n m) sized_cospan.
+Proof.
+  intros cohg cohg' (fv & fe & Hfv & Hfe & Heq)%sized_isomorphic_exists.
+  apply (f_equal sized_cospan) in Heq.
+  cbn in Heq.
+  unfold struct_isomorphic.
+  rewrite Heq.
+  now constructor.
+Qed.
+
+
 Lemma sigT2_relation_f_equiv {A B} {P Q : A -> B -> Type}
   (R : forall a b, relation (P a b))
   (R' : forall a b, relation (Q a b)) (f : forall a b, P a b -> Q a b)
@@ -1939,7 +1951,36 @@ Proof.
   constructor.
   now f_equiv.
 Qed.
+Lemma sigT2_relation_f_equiv_2 {A B} {P1 P2 P3 : A -> B -> Type}
+  (R1 : forall a b, relation (P1 a b))
+  (R2 : forall a b, relation (P2 a b))
+  (R3 : forall a b, relation (P3 a b))
+  {fa : A -> A -> A} {fb : B -> B -> B}
+  (f : forall a b a' b', P1 a b -> P2 a' b' -> P3 (fa a a') (fb b b'))
+  `{Hf : forall a b a' b', Proper (R1 a b ==> R2 a' b' ==> R3 _ _) (f a b a' b')} :
+  Proper (sigT2_relation R1 ==> sigT2_relation R2
+   ==> sigT2_relation R3) (λ x y, existT (_, _) (f _ _ _ _ (projT2 x) (projT2 y))).
+Proof.
+  intros x x' Heq y y' Heq'.
+  induction Heq.
+  induction Heq'.
+  cbn.
+  constructor.
+  now f_equiv.
+Qed.
 
+
+Lemma sized_graph_to_graph_struct_sized_isomorphic 
+  {N T} {n m}
+  (f : N -> nat) (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  scohg ≡ᵢ scohg' ->
+  (sized_graph_to_graph f scohg [≡ᵢ]ₛ sized_graph_to_graph f scohg')%cohg.
+Proof.
+  unfold sized_graph_to_graph.
+  intros Heq%(map_vec_sized_graph_struct_sized_isomorphic (nf:=f) (λ k, fun_to_vec (λ _, ()))).
+  refine (sigT2_relation_f_equiv _ _ (fun _ _ => sized_cospan)
+    (Hf:=fun _ _ => sized_cospan_struct_isomorphic) _ _ Heq).
+Qed.
 
 Lemma sized_graph_to_graph_cohg_syntactic_eq {N} `{Equiv T, Equivalence T equiv} {n m}
   (f : N -> nat) (scohg scohg' : SizedCospanHyperGraph N T n m) :
@@ -1966,15 +2007,42 @@ Proof.
   now rewrite 2 sum_list_with_fmap in Heq.
 Qed.
 
-Notation "'cast_graph' Hn Hm cohg" :=
+(* Notation "'cast_graph' Hn Hm cohg" :=
   (eq_rect _ (λ k, CospanHyperGraph _ k _)
     (eq_rect _ (CospanHyperGraph _ _) cohg%cohg _ Hm) _ Hn)
-  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : cohg_scope.
+  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : cohg_scope. *)
 
-Notation "'cast_sized_graph' Hn Hm cohg" :=
+
+Definition cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) : CospanHyperGraph T n' m' :=
+  mk_cohg cohg (Vector.cast (inputs cohg) Hn)
+    (Vector.cast (outputs cohg) Hm).
+
+#[global] Arguments cast_graph {_ _ _ _ _} _ _ !_ /.
+
+Lemma cast_graph_id {T n m} Hn Hm (cohg : CospanHyperGraph T n m) :
+  cast_graph Hn Hm cohg = cohg.
+Proof.
+  now destruct cohg; cbn; rewrite 2 cast_id.
+Qed.
+
+(* Notation "'cast_sized_graph' Hn Hm cohg" :=
   (eq_rect _ (λ k, SizedCospanHyperGraph _ _ k _)
     (eq_rect _ (SizedCospanHyperGraph _ _ _) cohg%scohg _ Hm) _ Hn)
-  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : scohg_scope.
+  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : scohg_scope. *)
+
+Definition cast_sized_graph {N T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : SizedCospanHyperGraph N T n m) : SizedCospanHyperGraph N T n' m' :=
+  mk_scohg (cast_graph Hn Hm cohg) cohg.(sized_map).
+
+#[global] Arguments cast_sized_graph {_ _ _ _ _ _} _ _ !_ /.
+
+
+Lemma cast_sized_graph_id {N T n m} Hn Hm (cohg : SizedCospanHyperGraph N T n m) :
+  cast_sized_graph Hn Hm cohg = cohg.
+Proof.
+  now destruct cohg; cbn; rewrite cast_graph_id.
+Qed.
 
 Lemma hedges_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
   (cohg : CospanHyperGraph T n m) :
@@ -1988,7 +2056,7 @@ Lemma inputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
   inputs (cast_graph Hn Hm cohg) = Vector.cast (inputs cohg) Hn.
 Proof.
   subst.
-  now rewrite cast_id.
+  now rewrite cast_graph_id, cast_id.
 Qed.
 
 Lemma outputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
@@ -1996,7 +2064,7 @@ Lemma outputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
   outputs (cast_graph Hn Hm cohg) = Vector.cast (outputs cohg) Hm.
 Proof.
   subst.
-  now rewrite cast_id.
+  now rewrite cast_graph_id, cast_id.
 Qed.
 
 Lemma subst_by_vec_ext_to_list {n m}
@@ -2640,12 +2708,50 @@ Proof.
       apply (NoDup_fmap _), NoDup_seq.
 Qed.
 
+Lemma helper_sized_graph_sum_eq {N} (f : N -> nat) :
+  forall n (v : vec N n), sum_list_with f v = sum_list_with ((λ p,
+      default 0 (f <$> list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) v)
+         !! p))) (vmap Pos.of_succ_nat (vseq 0 n)).
+Proof.
+  intros n' v'.
+  rewrite vec_to_list_map, sum_list_with_fmap.
+  apply sum_list_with_eq_of_fmap.
+  rewrite <- 2 vec_to_list_map.
+  f_equal.
+  apply vec_eq.
+  intros i.
+  rewrite 2 vlookup_map, vlookup_seq.
+  cbn.
+  rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
+  rewrite lookup_vec_to_list_fin.
+  done.
+Qed.
+
+
+Lemma sized_graph_to_graph_id_sized_graph' {N T} (f : N -> nat)
+  {n} (v : vec N n) :
+  ((sized_graph_to_graph f (@id_sized_graph N T n v)) [≡ᵢ]ₛ
+  (id_graph (sum_list_with f v)))%cohg.
+Proof.
+  etransitivity; [instantiate (1:=graph_to_pair_bundled _);
+    constructor; apply (subrel (sized_graph_to_graph_id_sized_graph _ _))|].
+  apply sigT2_relation_alt.
+  apply exists_by_forall.
+  - cbn.
+    now rewrite <- (helper_sized_graph_sum_eq f).
+  - cbn.
+    rewrite <- (helper_sized_graph_sum_eq f).
+    intros H.
+    rewrite (proof_irrel H eq_refl).
+    done.
+Qed.
+
 Lemma cast_pair_to_cast_graph {T nm nm'}
   (cohg : CospanHyperGraph T nm.1 nm.2) (H : nm = nm') :
   eq_rect nm (λ nm, CospanHyperGraph T nm.1 nm.2) cohg nm' H =
   cast_graph (f_equal fst H) (f_equal snd H) cohg.
 Proof.
-  now subst.
+  now subst; rewrite cast_graph_id.
 Qed.
 
 Lemma vec_to_list_vsplitl {A n m} (v : vec A (n + m)) :
@@ -2848,22 +2954,7 @@ Proof.
   symmetry.
   apply sigT2_relation_alt.
   cbn.
-  assert (Hvw : forall n (v : vec N n), sum_list_with f v = sum_list_with ((λ p,
-      default 0 (f <$> list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) v)
-         !! p))) (vmap Pos.of_succ_nat (vseq 0 n))). 1:{
-    intros n' v'.
-    rewrite vec_to_list_map, sum_list_with_fmap.
-    apply sum_list_with_eq_of_fmap.
-    rewrite <- 2 vec_to_list_map.
-    f_equal.
-    apply vec_eq.
-    intros i.
-    rewrite 2 vlookup_map, vlookup_seq.
-    cbn.
-    rewrite lookup_list_to_map_imap_to_pos, pos_to_nat_pred_of_nat.
-    rewrite lookup_vec_to_list_fin.
-    done.
-  }
+  pose proof (helper_sized_graph_sum_eq f) as Hvw.
   assert (Hv : sum_list_with (λ p, default 0 (f <$>
     list_to_map (M:=Pmap _) (imap (λ i k, (Pos.of_succ_nat i, k)) (v ++ w)) !! p))
       (vmap Pos.of_succ_nat (vseq 0 n)) = sum_list_with f v). 1:{
@@ -2955,7 +3046,7 @@ Proof.
       done.
   - cbn.
     rewrite 2 vec_to_list_bind, <- bind_app.
-    rewrite 2 vec_to_list_map, 2 vec_to_list_seq. 
+    rewrite 2 vec_to_list_map, 2 vec_to_list_seq.
     apply NoDup_bind.
     + intros x0 x1 y.
       rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
@@ -2975,4 +3066,40 @@ Proof.
 Qed.
 
 
-
+Lemma sized_graph_to_graph_sized_graph_of_tensor' {N T} (f : N -> nat)
+  {n m} (v : vec N n) (w : vec N m) t :
+  sigT2_relation (@isomorphic T)
+    (graph_to_pair_bundled
+      (sized_graph_to_graph f (@sized_graph_of_tensor N T t n m v w)))
+    (graph_to_pair_bundled
+      (graph_of_tensor t (sum_list_with f v) (sum_list_with f w))).
+Proof.
+  etransitivity; [instantiate (1:=graph_to_pair_bundled _);
+    constructor; apply (subrel (sized_graph_to_graph_sized_graph_of_tensor _ _ _ _))|].
+  replace (sum_list_with _ _) with (sum_list_with f v);
+  [replace (sum_list_with _ (outputs _)) with (sum_list_with f w); [done|]|].
+  - cbn.
+    rewrite (helper_sized_graph_sum_eq f _ w).
+    rewrite 2 vec_to_list_map, 2 sum_list_with_fmap.
+    apply sum_list_with_ext.
+    intros i _.
+    cbn.
+    rewrite lookup_union, lookup_list_to_map_imap_to_pos.
+    rewrite (lookup_list_to_map_imap (λ i, (Pos.of_succ_nat i)~1)).
+    rewrite (not_elem_of_dom_1 (list_to_map _)) by now rewrite dom_list_to_map,
+      fmap_imap; unfold compose; cbn; rewrite imap_seq_0; set_solver.
+    rewrite (left_id_L None _).
+    now rewrite pos_to_nat_pred_of_nat.
+  - cbn.
+    rewrite (helper_sized_graph_sum_eq f _ v).
+    rewrite 2 vec_to_list_map, 2 sum_list_with_fmap.
+    apply sum_list_with_ext.
+    intros i _.
+    cbn.
+    rewrite lookup_union, lookup_list_to_map_imap_to_pos.
+    rewrite (lookup_list_to_map_imap (λ i, (Pos.of_succ_nat i)~0)).
+    rewrite (not_elem_of_dom_1 (list_to_map _)) by now rewrite dom_list_to_map,
+      fmap_imap; unfold compose; cbn; rewrite imap_seq_0; set_solver.
+    rewrite (right_id_L None _).
+    now rewrite pos_to_nat_pred_of_nat.
+Qed.

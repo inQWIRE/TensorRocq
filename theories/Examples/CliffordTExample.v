@@ -182,7 +182,7 @@ Qed.
 (* ... and finally to prove that you have an instantiation of your theory! *)
 #[export] Instance fin_to_gate_correct : Instantiation CliffordT fin_to_gate.
 Proof.
-  split.
+  split; [|apply _].
   apply rules_of_rule_list_instantiation_helper.
   repeat first [apply Forall_cons|apply Forall_nil].
   apply H_H.

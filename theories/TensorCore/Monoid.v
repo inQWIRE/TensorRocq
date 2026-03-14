@@ -65,3 +65,33 @@ Class MonoidSize `{MD : Monoid M mO madd meq} (f : M -> nat) := {
 Proof.
   split; [apply _|done..].
 Qed.
+
+(* A class expressing that M is the free (non-commutative) 
+  monoid over some set X of generators *)
+Class FreeMonoid (M : Type) `{MD : Monoid M mO madd meq} (X : Type) := {
+  mdecomp : M -> list X;
+  mdecomp_proper :: Proper (meq ==> eq) mdecomp;
+  mdecomp_inj :: Inj meq eq mdecomp;
+  mdecomp_madd m n : mdecomp (madd m n) = mdecomp m ++ mdecomp n;
+}.
+
+Lemma mdecomp_mO `{FreeMonoid M mO madd meq X} : 
+  mdecomp mO = [].
+Proof.
+  specialize (mdecomp_proper (madd mO mO) mO (madd_0_l mO)).
+  rewrite mdecomp_madd.
+  intros Hlen%(f_equal length).
+  apply length_zero_iff_nil.
+  rewrite length_app in Hlen.
+  lia.
+Qed.
+
+#[refine] Instance nat_FreeMonoid : FreeMonoid nat unit := {
+  mdecomp n := replicate n ();
+}.
+Proof.
+  - intros n m Heq%(f_equal length).
+    now rewrite 2 length_replicate in Heq.
+  - intros n m. 
+    now rewrite replicate_add.
+Qed.
