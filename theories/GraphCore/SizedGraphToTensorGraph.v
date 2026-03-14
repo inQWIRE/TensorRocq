@@ -1219,8 +1219,8 @@ Notation "sg '[≡ₛ]ₛ'  sg'" :=
     (graph_to_pair_bundled sg%cohg)
     (graph_to_pair_bundled sg'%cohg)) (at level 70) : cohg_scope.
 
-Lemma mk_cohg_bundled_eq {T n m n' m'} 
-  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') : 
+Lemma mk_cohg_bundled_eq {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
   inputs cohg =@{list _} inputs cohg' ->
   outputs cohg =@{list _} outputs cohg' ->
   hedges cohg = hedges cohg' ->
@@ -1928,9 +1928,9 @@ Qed.
 
 
 Lemma sigT2_relation_f_equiv {A B} {P Q : A -> B -> Type}
-  (R : forall a b, relation (P a b)) 
+  (R : forall a b, relation (P a b))
   (R' : forall a b, relation (Q a b)) (f : forall a b, P a b -> Q a b)
-  `{Hf : forall a b, Proper (R a b ==> R' a b) (f a b)} : 
+  `{Hf : forall a b, Proper (R a b ==> R' a b) (f a b)} :
   Proper (sigT2_relation R ==> sigT2_relation R') (λ x, existT (_, _) (f _ _ (projT2 x))).
 Proof.
   intros x y Heq.
@@ -1942,7 +1942,7 @@ Qed.
 
 
 Lemma sized_graph_to_graph_cohg_syntactic_eq {N} `{Equiv T, Equivalence T equiv} {n m}
-  (f : N -> nat) (scohg scohg' : SizedCospanHyperGraph N T n m) : 
+  (f : N -> nat) (scohg scohg' : SizedCospanHyperGraph N T n m) :
   scohg ≡ₛ scohg' ->
   (sized_graph_to_graph f scohg [≡ₛ]ₛ sized_graph_to_graph f scohg')%cohg.
 Proof.
@@ -1951,5 +1951,341 @@ Proof.
   refine (sigT2_relation_f_equiv _ _ (fun _ _ => sized_cospan)
     (Hf:=fun _ _ => sized_cospan_cohg_syntactic_eq) _ _ Heq).
 Qed.
+
+
+Lemma sum_list_with_fmap {A B} (f : B -> nat) (g : A -> B) (l : list A) :
+  sum_list_with f (g <$> l) = sum_list_with (f ∘ g) l.
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma sum_list_with_eq_of_fmap {A} {f g : A -> nat} {l l' : list A} :
+  f <$> l = g <$> l' -> sum_list_with f l = sum_list_with g l'.
+Proof.
+  intros Heq%(f_equal sum_list).
+  now rewrite 2 sum_list_with_fmap in Heq.
+Qed.
+
+Notation "'cast_graph' Hn Hm cohg" :=
+  (eq_rect _ (λ k, CospanHyperGraph _ k _)
+    (eq_rect _ (CospanHyperGraph _ _) cohg%cohg _ Hm) _ Hn)
+  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : cohg_scope.
+
+Notation "'cast_sized_graph' Hn Hm cohg" :=
+  (eq_rect _ (λ k, SizedCospanHyperGraph _ _ k _)
+    (eq_rect _ (SizedCospanHyperGraph _ _ _) cohg%scohg _ Hm) _ Hn)
+  (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : scohg_scope.
+
+Lemma hedges_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  hedges (cast_graph Hn Hm cohg) = hedges cohg.
+Proof.
+  now subst.
+Qed.
+
+Lemma inputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  inputs (cast_graph Hn Hm cohg) = Vector.cast (inputs cohg) Hn.
+Proof.
+  subst.
+  now rewrite cast_id.
+Qed.
+
+Lemma outputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  outputs (cast_graph Hn Hm cohg) = Vector.cast (outputs cohg) Hm.
+Proof.
+  subst.
+  now rewrite cast_id.
+Qed.
+
+Lemma subst_by_vec_ext_to_list {n m}
+  (v : vec _ n) (w : vec _ m) :
+  v =@{list _} w ->
+  subst_by_vec v = subst_by_vec w.
+Proof.
+  intros Heq.
+  apply vec_to_list_inj1 in Heq as Hnm.
+  subst m.
+  apply vec_to_list_inj2 in Heq.
+  now subst.
+Qed.
+
+Lemma propogate_subst_ext_to_list {n m}
+  (v : vec _ n) (w : vec _ m) :
+  v =@{list _} w ->
+  propogate_subst v =@{list _} propogate_subst w.
+Proof.
+  intros Heq.
+  apply vec_to_list_inj1 in Heq as Hnm.
+  subst m.
+  apply vec_to_list_inj2 in Heq.
+  now subst.
+Qed.
+
+
+(* Lemma vzip_vbind_cast_l {A B} {nf : A -> nat} (f : forall a, vec B (nf a))
+  {n} (v w : vec A n) H K :
+  nf <$> (v :> list A) = nf <$> (w :> list A) ->
+  vzip (Vector.cast (vbind f v) H) (vbind f w) =
+  K. *)
+
+Lemma zip_with_bind {A B C D E} (f : A -> list C) (g : B -> list D) (h : C -> D -> E)
+  (l : list A) (l' : list B) :
+  Forall2 (λ a b, length (f a) = length (g b)) l l' ->
+  zip_with h (l ≫= f) (l' ≫= g) =
+  zip l l' ≫= λ ab, zip_with h (f ab.1) (g ab.2).
+Proof.
+  intros Hl.
+  induction Hl; [done|].
+  cbn.
+  rewrite zip_with_app by done.
+  congruence.
+Qed.
+(*
+Lemma venlarge_graph_compose_graphs_aux {T n m o} {nf : positive -> nat}
+  (f : forall p, vec positive (nf p))
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o)
+  (Hoi : nf <$> (outputs cohg :> list _) = nf <$> (inputs cohg' :> list _)) :
+  (venlarge_graph f (compose_graphs_aux cohg cohg') =ₛ
+  compose_graphs_aux (
+    cast_graph eq_refl (sum_list_with_eq_of_fmap Hoi)
+    (venlarge_graph f cohg)) (venlarge_graph f cohg'))%cohg.
+Proof.
+  unfold compose_graphs_aux.
+  rewrite venlarge_graph_relabel_graph.
+  apply mk_cohg_bundled_eq.
+  - cbn -[eq_rect].
+    rewrite vec_to_list_bind, vec_to_list_map.
+    rewrite outputs_cast_graph, inputs_cast_graph.
+    rewrite cast_id.
+    cbn.
+    symmetry.
+    assert (f = (λ p, fun_to_vec (λ i, encode (p, fin_to_nat i)))) by admit.
+    subst f.
+
+    erewrite subst_by_vec_ext_to_list. 2:{
+      apply propogate_subst_ext_to_list.
+      rewrite vec_to_list_zip_with.
+      rewrite vec_to_list_cast.
+      rewrite 2 vec_to_list_bind.
+      rewrite zip_with_bind. 2:{
+        apply list_eq_Forall2 in Hoi.
+        rewrite Forall2_fmap in Hoi.
+        apply (Forall2_impl _ _ _ _ Hoi).
+        now intros; rewrite 2 length_vec_to_list.
+      }
+      etransitivity. 1:{
+        apply list_bind_ext_strong.
+        intros ab Hab.
+        apply elem_of_list_lookup in Hab as (i & Hi).
+        rewrite (surjective_pairing ab) in Hi.
+        apply lookup_zip_Some in Hi as [Hia Hib].
+        apply (f_equal (.!! i)) in Hoi.
+        rewrite 2 list_lookup_fmap, Hia, Hib in Hoi.
+        cbn in Hoi.
+        pose proof Hoi as [= Hnf].
+        rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+        rewrite zip_fmap_l, zip_fmap_r.
+        cbn.
+        rewrite <- Hnf.
+        rewrite zip_with_diag.
+        rewrite <- 2 list_fmap_compose.
+        unfold compose; cbn.
+        reflexivity.
+      }
+      etransitivity; [symmetry; apply vec_to_list_to_vec|].
+      reflexivity.
+    }
+    rewrite vec_to_list_bind.
+    rewrite list_bind_fmap.
+    apply list_bind_ext, reflexivity.
+    intros p.
+    rewrite 2 (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+    rewrite <- list_fmap_compose.
+    unfold compose.
+    rewrite
+    rewrite (vec_to_list_fun_to_vec (λ i, encode (_, i))).
+    subst f.
+    cbn.
+    rewrite <- list_fmap_compose.
+    unfold compose.
+
+
+Lemma venlarge_graph_compose_graphs_aux {T n m o} {nf : positive -> nat}
+  (f : forall p, vec positive (nf p))
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o)
+  (Hoi : nf <$> (outputs cohg :> list _) = nf <$> (inputs cohg' :> list _)) :
+  (venlarge_graph f (compose_graphs_aux cohg cohg') =ₛ
+  compose_graphs_aux (
+    cast_graph eq_refl (sum_list_with_eq_of_fmap Hoi)
+    (venlarge_graph f cohg)) (venlarge_graph f cohg'))%cohg.
+Proof.
+  unfold compose_graphs_aux.
+  rewrite venlarge_graph_relabel_graph.
+  apply mk_cohg_bundled_eq.
+  - cbn -[eq_rect].
+    rewrite vec_to_list_bind, vec_to_list_map.
+    rewrite outputs_cast_graph, inputs_cast_graph.
+    rewrite cast_id.
+    cbn.
+    symmetry.
+    erewrite subst_by_vec_ext_to_list. 2:{
+      apply propogate_subst_ext_to_list.
+      rewrite vec_to_list_zip_with.
+      rewrite vec_to_list_cast.
+      rewrite 2 vec_to_list_bind.
+      rewrite zip_with_bind. 2:{
+        apply list_eq_Forall2 in Hoi.
+        rewrite Forall2_fmap in Hoi.
+        apply (Forall2_impl _ _ _ _ Hoi).
+        now intros; rewrite 2 length_vec_to_list.
+      }
+      etransitivity; [symmetry; apply vec_to_list_to_vec|].
+      reflexivity.
+    }
+    rewrite vec_to_list_bind.
+    rewrite list_bind_fmap.
+    apply list_bind_ext, reflexivity.
+    intros p.
+    assert (f = (λ p, fun_to_vec (λ i, encode (p, fin_to_nat i)))) by admit.
+    subst f.
+    cbn.
+    rewrite (vec_to_list_fun_to_vec (λ i, encode (p, i))).
+    rewrite <- list_fmap_compose.
+    unfold compose. *)
+
+Lemma exists_by_forall {A} (P : A -> Prop) :
+  A -> (forall a, P a) -> exists a, P a.
+Proof.
+  unshelve eauto; done.
+Qed.
+
+Lemma sized_graph_to_graph_compose_graphs {N T n m o}
+  (f : N -> nat) (scohg : SizedCospanHyperGraph N T n m)
+  (scohg' : SizedCospanHyperGraph N T m o) :
+  (scohg.(sized_map) !!.) <$> (outputs scohg :> list _) =
+  (scohg'.(sized_map) !!.) <$> (inputs scohg' :> list _) ->
+  exists H,
+  (sized_graph_to_graph f (compose_sized_graphs scohg scohg') [≡ᵢ]ₛ
+  compose_graphs (cast_graph eq_refl H (sized_graph_to_graph f scohg))
+    (sized_graph_to_graph f scohg'))%cohg.
+Proof.
+  intros Heq.
+  apply exists_by_forall.
+  1:{
+    apply sum_list_with_eq_of_fmap.
+    apply (f_equal (fmap (fmap f))) in Heq.
+    apply (f_equal (fmap (default 0))) in Heq.
+    rewrite <- 4 list_fmap_compose in Heq.
+    apply Heq.
+  }
+  intros H.
+Admitted.
+
+Lemma enlarge_hypergraph_union {T} f (hg hg' : HyperGraph T) :
+  enlarge_hypergraph f (hg ∪ hg') =
+  enlarge_hypergraph f hg ∪ enlarge_hypergraph f hg'.
+Proof.
+  apply hg_ext.
+  - apply map_fmap_union.
+  - cbn.
+    apply set_bind_union_L.
+Qed.
+
+Lemma venlarge_graph_stack_graphs_aux {T n m n' m'} {nf : positive -> nat}
+  (f : forall p, vec positive (nf p))
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  (* hyperedges cohg ##ₘ hyperedges cohg' -> *)
+  (venlarge_graph f (stack_graphs_aux cohg cohg') =ₛ
+  stack_graphs_aux (venlarge_graph f cohg) (venlarge_graph f cohg'))%cohg.
+Proof.
+  (* intros Hdisj. *)
+  apply mk_cohg_bundled_eq.
+  - cbn.
+    rewrite vec_to_list_bind, 2 vec_to_list_app,
+      bind_app, 2 vec_to_list_bind.
+    done.
+  - cbn.
+    rewrite vec_to_list_bind, 2 vec_to_list_app,
+      bind_app, 2 vec_to_list_bind.
+    done.
+  - cbn.
+    apply enlarge_hypergraph_union.
+Qed.
+
+Lemma graph_to_pair_bundled_apply2 {T T' T''}
+  {fn : nat -> nat -> nat} {fm : nat -> nat -> nat}
+  (f : forall n m n' m',
+    CospanHyperGraph T n m -> CospanHyperGraph T' n' m' ->
+    CospanHyperGraph T'' (fn n n') (fm m m'))
+  {n m n' m'} (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T' n' m') :
+  (f n m n' m' cohg cohg' =ₛ
+  (λ x y, f _ _ _ _ (projT2 x) (projT2 y)) (graph_to_pair_bundled cohg)
+    (graph_to_pair_bundled cohg'))%cohg.
+Proof.
+  done.
+Qed.
+
+
+
+Lemma venlarge_graph_reindex_graph {T n m} {nf : positive -> nat}
+  (f : forall p, vec positive (nf p)) (g : positive -> positive)
+  (cohg : CospanHyperGraph T n m) :
+  venlarge_graph f (reindex_graph g cohg) =
+  reindex_graph g (venlarge_graph f cohg).
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  apply enlarge_hypergraph_reindex_hg.
+Qed.
+
+Lemma venlarge_graph_stack_graphs {T n m n' m'} {nf : positive -> nat}
+  (f : forall p, vec positive (nf p))
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  (venlarge_graph f (stack_graphs cohg cohg') [≡ᵢ]ₛ
+  stack_graphs (venlarge_graph f cohg) (venlarge_graph f cohg'))%cohg.
+Proof.
+  unfold stack_graphs.
+  rewrite venlarge_graph_stack_graphs_aux.
+  rewrite graph_to_pair_bundled_apply2.
+  rewrite 2 venlarge_graph_relabel_graph, 2 venlarge_graph_reindex_graph.
+  cbn.
+Admitted.
+
+
+Lemma sum_list_with_ext {A} (f g : A -> nat) l : 
+  (forall a, a ∈ l -> f a = g a) -> 
+  sum_list_with f l = sum_list_with g l.
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; cbn; congruence.
+Qed.
+
+Lemma sized_graph_to_graph_stack_graphs {N T n m n' m'}
+  (f : N -> nat) (scohg : SizedCospanHyperGraph N T n m)
+  (scohg' : SizedCospanHyperGraph N T n' m') :
+  (sized_graph_to_graph f (stack_sized_graphs scohg scohg') [≡ᵢ]ₛ
+  stack_graphs (sized_graph_to_graph f scohg)
+    (sized_graph_to_graph f scohg'))%cohg.
+Proof.
+  apply sigT2_relation_alt.
+  apply exists_by_forall.
+  1:{
+    cbn.
+    rewrite 2 vec_to_list_app, 
+      4 vec_to_list_map, 2 sum_list_with_app, 4 sum_list_with_fmap.
+    do 2 f_equal; apply sum_list_with_ext; intros a _;
+    cbn -[bcons];
+    rewrite lookup_union;
+    rewrite (lookup_kmap _); rewrite (lookup_kmap_None _ _ _).2 by lia;
+    rewrite 1?(left_id_L None _), 1?(right_id_L None _);
+    done.
+  }
+  intros H.
+Admitted.
+
+
 
 
