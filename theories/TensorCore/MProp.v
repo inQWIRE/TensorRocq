@@ -1,4 +1,5 @@
-Require Import Monoid AProp.
+Require Export Monoid AProp.
+Require Export SizedGraphToTensorGraph.
 
 (* FIXME: Move *)
 #[export] Instance sum_decomp_MonoidSize `{MD : Monoid M mO madd meq,
@@ -23,7 +24,8 @@ Inductive MProp `{MD : Monoid M mO madd meq}
   | Mcompose {n m o} (mp1 : MProp n m) (mp2 : MProp m o) : MProp n o
   | Mstack {n1 m1 n2 m2}
     (mp1 : MProp n1 m1) (mp2 : MProp n2 m2) : MProp (madd n1 n2) (madd m1 m2)
-  | Massoc n m : meq n m -> MProp n m.
+  | Massoc n m : meq n m -> MProp n m
+  | Mgen (t : T) n m : MProp n m.
 
 #[global] Arguments MProp _ {_ _ _ _} _ _ _ : assert.
 
@@ -45,36 +47,11 @@ Fixpoint MProp_to_AProp `{MD : Monoid M mO madd meq, f : M -> nat,
       cast_aprop' (msize_add (_ :> M) _) (msize_add (_ :> M) _) (Astack
         (MProp_to_AProp mp1) (MProp_to_AProp mp2))
   | Massoc n m Hnm => cast_aprop eq_refl (msize_proper n m Hnm) (Aid _)
+  | Mgen t n m => Agen t _ _
   end.
 
 
-Class MProp_of_AProp `{MD : Monoid M mO madd meq, f : M -> nat, MS : !MonoidSize f}
-  {T} {a b : M} (mp : MProp M T a b) {n m : nat} (ap : AProp T n m) := {
-  mprop_of_aprop : exists Hn Hm, cast_aprop Hn Hm (MProp_to_AProp mp) = ap;
-}.
 
-#[export] Instance mprop_of_aprop_mprop_to_aprop `{MD : Monoid M mO madd meq, f : M -> nat, MS : !MonoidSize f}
-  {T} {a b : M} (mp : MProp M T a b) :
-  MProp_of_AProp mp (MProp_to_AProp mp).
-Proof.
-  constructor.
-  exists eq_refl, eq_refl.
-  apply cast_aprop_id.
-Qed.
-
-
-#[export] Instance mprop_of_aprop_cast `{MD : Monoid M mO madd meq, f : M -> nat, MS : !MonoidSize f}
-  {T} {a b : M} (mp : MProp M T a b) {n m n' m'} (ap : AProp T n m)
-    (Hn : n = n') (Hm : m = m') :
-  MProp_of_AProp mp ap -> MProp_of_AProp mp (cast_aprop Hn Hm ap).
-Proof.
-  intros [(Ha & Hb & <-)].
-  subst.
-  rewrite 2 cast_aprop_id.
-  apply _.
-Qed.
-
-Require Import SizedGraphToTensorGraph.
 
 Fixpoint MProp_sized_graph_semantics `{MD : Monoid M mO madd meq, FMD : !FreeMonoid M X}
   {T} {a b : M} (mp : MProp M T a b) : SizedCospanHyperGraph X T (length (mdecomp a)) (length (mdecomp b)) :=
@@ -109,6 +86,8 @@ Fixpoint MProp_sized_graph_semantics `{MD : Monoid M mO madd meq, FMD : !FreeMon
         (MProp_sized_graph_semantics mp2))
   | Massoc n m Hnm => cast_sized_graph eq_refl
     (f_equal length (mdecomp_proper n m Hnm)) (id_sized_graph (list_to_vec (mdecomp n)))
+  | Mgen t n m =>
+    sized_graph_of_tensor t (list_to_vec (mdecomp n)) (list_to_vec (mdecomp m))
   end.
 
 (* FIXME: Move *)
@@ -674,7 +653,7 @@ Proof.
     split; [apply well_sized_stack_sized_graphs; assumption|].
     split_and!; [rewrite mdecomp_madd, fmap_app; f_equal; done..|].
     rewrite sized_graph_to_graph_stack_graphs.
-    refine (sigT2_relation_f_equiv_2 _ _ _ 
+    refine (sigT2_relation_f_equiv_2 _ _ _
       (@stack_graphs T) _ _ Hiso1 _ _ Hiso2).
   - rewrite sized_graph_to_graph_cast, AProp_graph_semantics_cast,
       2 graph_to_pair_bundled_cast,
@@ -685,6 +664,12 @@ Proof.
       rewrite vec_to_list_to_vec; f_equal; now apply mdecomp_proper|].
     rewrite sized_graph_to_graph_id_sized_graph'.
     now rewrite vec_to_list_to_vec.
+  - split; [apply well_sized_sized_graph_of_tensor|].
+    rewrite sized_inputs_sized_graph_of_tensor,
+      sized_outputs_sized_graph_of_tensor.
+    split_and!; [now rewrite vec_to_list_to_vec..|].
+    rewrite sized_graph_to_graph_sized_graph_of_tensor'.
+    now rewrite 2 vec_to_list_to_vec.
 Qed.
 
 
@@ -700,8 +685,8 @@ Qed.
 
 Lemma by_sigT2_relation {A B} `{forall ab : A * B, ProofIrrel (ab = ab)}
   {P : A -> B -> Type}
-  (R : forall a b, relation (P a b)) 
-  {a b} (x y : P a b) : 
+  (R : forall a b, relation (P a b))
+  {a b} (x y : P a b) :
   sigT2_relation R (existT (a, b) x) (existT (a, b) y) ->
   R a b x y.
 Proof.
@@ -711,46 +696,6 @@ Proof.
   now rewrite (proof_irrel Hab eq_refl) in HR.
 Qed.
 
-Lemma AProp_iso_by_MProp_iso_correct `{MD : Monoid M mO madd meq, FMD : !FreeMonoid M X}
-  {T} (f : X -> nat) {n m} (ap ap' : AProp T n m)
-  {a b : M} (mp mp' : MProp M T a b) 
-  (Hmp : MProp_of_AProp (MS:=sum_decomp_MonoidSize f) mp ap)
-  (Hmp' : MProp_of_AProp (MS:=sum_decomp_MonoidSize f) mp' ap') : 
-  MProp_sized_graph_semantics mp ≡ᵢ MProp_sized_graph_semantics mp' ->
-  (AProp_graph_semantics ap ≡ᵢ AProp_graph_semantics ap')%cohg.
-Proof.
-  intros Hiso.
-  destruct Hmp as [(Hn & Hm & Hap)].
-  destruct Hmp' as [(Hn' & Hm' & Hap')].
-  apply by_sigT2_relation.
-  fold (graph_to_pair_bundled (AProp_graph_semantics ap)).
-  fold (graph_to_pair_bundled (AProp_graph_semantics ap')).
-  rewrite <- Hap, <- Hap'.
-  rewrite 2 AProp_graph_semantics_cast, 2 graph_to_pair_bundled_cast.
-  rewrite <- 2 MProp_sized_graph_semantics_correct.
-  now apply sized_graph_to_graph_struct_sized_isomorphic.
-Qed.
-
-
-Lemma AProp_sem_eq_by_MProp_sem_eq_correct `{MD : Monoid M mO madd meq, FMD : !FreeMonoid M X}
-  `{Equiv T, Equivalence T equiv} (f : X -> nat) {n m} (ap ap' : AProp T n m)
-  {a b : M} (mp mp' : MProp M T a b) 
-  (Hmp : MProp_of_AProp (MS:=sum_decomp_MonoidSize f) mp ap)
-  (Hmp' : MProp_of_AProp (MS:=sum_decomp_MonoidSize f) mp' ap') : 
-  MProp_sized_graph_semantics mp ≡ₛ MProp_sized_graph_semantics mp' ->
-  (AProp_graph_semantics ap ≡ₛ AProp_graph_semantics ap')%cohg.
-Proof.
-  intros Hiso.
-  destruct Hmp as [(Hn & Hm & Hap)].
-  destruct Hmp' as [(Hn' & Hm' & Hap')].
-  apply by_sigT2_relation.
-  fold (graph_to_pair_bundled (AProp_graph_semantics ap)).
-  fold (graph_to_pair_bundled (AProp_graph_semantics ap')).
-  rewrite <- Hap, <- Hap'.
-  rewrite 2 AProp_graph_semantics_cast, 2 graph_to_pair_bundled_cast.
-  rewrite <- 2 MProp_sized_graph_semantics_correct.
-  now apply sized_graph_to_graph_cohg_syntactic_eq.
-Qed.
 
 
 

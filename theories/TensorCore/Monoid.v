@@ -90,8 +90,8 @@ Qed.
   mdecomp n := replicate n ();
 }.
 Proof.
-  - intros n m Heq%(f_equal length).
-    now rewrite 2 length_replicate in Heq.
-  - intros n m. 
-    now rewrite replicate_add.
-Qed.
+  - abstract (intros n m Heq%(f_equal length);
+    now rewrite 2 length_replicate in Heq).
+  - abstract (intros n m;
+    now rewrite replicate_add).
+Defined.
