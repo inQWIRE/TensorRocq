@@ -19,7 +19,7 @@ Class DiagramQuote `{APROPlikeD : APROPlike R rO rI radd rmul req A D}
 }.
 
 #[global] Hint Mode DiagramQuote + - - - - - - - - - - - - -
-  - - - - + + - + : typeclass_instances.
+  - - - - + + + - : typeclass_instances.
 
 Class DiagramDenote `{APROPlikeD : APROPlike R rO rI radd rmul req A D}
   `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
@@ -28,7 +28,7 @@ Class DiagramDenote `{APROPlikeD : APROPlike R rO rI radd rmul req A D}
 }.
 
 #[global] Hint Mode DiagramDenote + - - - - - - - - - - - - -
-  - - - - + + + - : typeclass_instances.
+  - - - - + + - + : typeclass_instances.
 
 
 
@@ -42,4 +42,21 @@ Proof.
   intros [<-] [<-].
   apply interpretDiagram_correct.
 Qed.
+
+
+
+
+Lemma APROPlike_equiv `{APROPlikeD : APROPlike R rO rI radd rmul req A D}
+  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
+  {n m} (d d' : D n m) (a a' : AProp T n m) : 
+  DiagramQuote d a -> DiagramQuote d' a' ->
+  AProp_semantics (TensT:=TensT) a ≡ AProp_semantics a' ->
+  d ≡ d'.
+Proof.
+  intros [<-] [<-].
+  apply interpretDiagram_correct.
+Qed.
+
+
+
 

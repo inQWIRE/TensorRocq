@@ -1,5 +1,6 @@
 Require Export MProp.
 Require Import AbstractTensorQuote. (* FIXME: Factor IsNth stuff out of here *)
+Require Export FreeAProp SizedGraphIsomorphismTesting.
 
 (* FIXME: Move *)
 

@@ -464,12 +464,11 @@ End quote.
 (* #[global] Hint Mode TensorLike - - - - - - - - - - + - - : typeclass_instances. *)
 (* #[global] Hint Mode SemiRing - - - - - - : typeclass_instances. *)
 
-Lemma APropQuote_correct_isomorphic `{SR : SemiRing R rO rI radd rmul req}
+Lemma APropQuote_correct_equiv `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
-  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
+  `{Equiv T}
   `{Equiv T', Equivalence T' equiv} `{TensT' : !TensorLike R A T'}
   {Ctx} (f : Ctx -> T -> T') (ctx : Ctx) `{Hfprop : !Proper (equiv ==> equiv) (f ctx)}
-  `{Hf : !TensorLikeHom R A (f ctx)}
   {n m} (ape ape' : AProp T n m) (apv apv' : AProp T' n m) :
   APropQuote f ctx ape apv -> APropQuote f ctx ape' apv' ->
   norm_verts (AProp_graph_semantics ape) ≡
@@ -484,6 +483,24 @@ Proof.
   intros Heq.
   apply (graph_apply_hom_proper_Proper (f ctx) _) in Heq.
   now apply graph_semantics_equiv.
+Qed.
+
+Lemma APropQuote_correct_syntactic_eq `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  `{Equiv T}
+  `{Equiv T', Equivalence T' equiv} `{TensT' : !TensorLike R A T'}
+  {Ctx} (f : Ctx -> T -> T') (ctx : Ctx) `{Hfprop : !Proper (equiv ==> equiv) (f ctx)}
+  {n m} (ape ape' : AProp T n m) (apv apv' : AProp T' n m) :
+  APropQuote f ctx ape apv -> APropQuote f ctx ape' apv' ->
+  AProp_graph_semantics ape ≡ₛ AProp_graph_semantics ape' ->
+  AProp_semantics (TensT:=TensT') apv ≡ AProp_semantics apv'.
+Proof.
+  intros [Hape] [Hape'].
+  rewrite <- Hape, <- Hape'.
+  rewrite <- 2 AProp_graph_semantics_correct, 2 AProp_graph_semantics_map_aprop.
+  intros Heq.
+  apply (graph_apply_hom_cohg_syntactic_eq_mor_Proper (f ctx) _) in Heq.
+  now apply graph_semantics_syntactic_eq.
 Qed.
 
 
