@@ -15,21 +15,20 @@ Notation v := (Agen (3%fin :> fin 4) 1 0) (only parsing).
 Definition Frob : Signature bool := {|
   gens := fin 4;
   gens_equiv := eq;
-  (* gen_arity := ([# (2,1); (0,1); (1,2); (1,0)] !!!.); *)
   rules := rules_of_rule_list [
 
 (* (m, u) forms a monoid *)
-(* rule assoc : *) m * Aid 1 ;' m === Aid 1 * m ;' m ;
-(* rule unitL : *) u * Aid 1 ;' m === Aid 1 ;
-(* rule unitR : *) Aid 1 * u ;' m === Aid 1 ;
+(* rule assoc : *) m * id ;' m === id * m ;' m ;
+(* rule unitL : *) u * id ;' m === id ;
+(* rule unitR : *) id * u ;' m === id ;
 
 (* (n, v) forms a comonoid *)
-(* rule coassoc : *) n ;' n * Aid 1 === n ;' Aid 1 * n ;
-(* rule counitL : *) n ;' v * Aid 1 === Aid 1 ;
-(* rule counitR : *) n ;' Aid 1 * v === Aid 1 ;
+(* rule coassoc : *) n ;' n * id === n ;' id * n ;
+(* rule counitL : *) n ;' v * id === id ;
+(* rule counitR : *) n ;' id * v === id ;
 
 (* there are many equivalent formulations of the Frobenius condition. Here's one: *)
-(* rule frob : *) n * Aid 1 ;' Aid 1 * m === Aid 1 * n ;' m * Aid 1
+(* rule frob : *) n * id ;' id * m === id * n ;' m * id
 
      ];
 |}.
@@ -45,23 +44,22 @@ Notation "x == y" :=
   (at level 70).
 
 (* (m, u) forms a monoid *)
-Lemma assoc : m * Aid 1 ;' m == Aid 1 * m ;' m.
+Lemma assoc : m * id ;' m == id * m ;' m.
 Proof. apply rules_hold. repeat constructor. Qed.
-Lemma unitL : u * Aid 1 ;' m == Aid 1.
+Lemma unitL : u * id ;' m == id.
 Proof. apply rules_hold. repeat constructor. Qed.
-Lemma unitR : Aid 1 * u ;' m == Aid 1.
+Lemma unitR : id * u ;' m == id.
 Proof. apply rules_hold. repeat constructor. Qed.
 
 (* (n, v) forms a comonoid *)
-Lemma coassoc : n ;' n * Aid 1 == n ;' Aid 1 * n.
+Lemma coassoc : n ;' n * id == n ;' id * n.
 Proof. apply rules_hold. repeat constructor. Qed.
-Lemma counitL : n ;' v * Aid 1 == Aid 1.
+Lemma counitL : n ;' v * id == id.
 Proof. apply rules_hold. repeat constructor. Qed.
-Lemma counitR : n ;' Aid 1 * v == Aid 1.
+Lemma counitR : n ;' id * v == id.
 Proof. apply rules_hold. repeat constructor. Qed.
 
-(* there are many equivalent formulations of the Frobenius condition. Here's one: *)
-Lemma frob : n * Aid 1 ;' Aid 1 * m == Aid 1 * n ;' m * Aid 1.
+Lemma frob : n * id ;' id * m == id * n ;' m * id.
 Proof. apply rules_hold. repeat constructor. Qed.
 
 (* The rule above is equivalent to the slightly more familiar pair of rules:
@@ -71,21 +69,29 @@ If m and n were both commutative, one of these would imply the other, and either
 would imply "frob". However, for non-commutative Frobenius algebras, we need them
 both. *)
 
-Lemma frobL : n * Aid 1 ;' Aid 1 * m == m ;' n.
+Lemma frobL : n * id ;' id * m == m ;' n.
 Proof.
-  transitivity (u * n * Aid 1 ;' m * m)%aprop;
+  transitivity (u * n * id ;' m * m)%aprop; 
   [srw unitL; smcat|].
+  (* u * n * [[ id ]];' m * m == m;' n *)
   srw <- frob.
+  (* u * [[ id 2 ]];' Aswap 2 1;' [[ id ]] * (n * [[ id ]];' [[ id ]] * m);' (Aswap 2 1;' m * [[ id ]];' sw) == m;' n *)
   srw assoc.
+  (* u * [[ id 2 ]];' n * [[ id 2 ]];' [[ id ]] * ([[ id ]] * m;' m) ==
+m;' n *)
   srw frob.
+  (* m * u;' sw;' ([[ id ]] * n;' m * [[ id ]]) == m;' n *)
   srw unitL.
+  (* m;' (n;' sw);' sw == m;' n *)
   smcat.
 Qed.
 
 Lemma frobR : Aid 1 * n ;' m * Aid 1 == m ;' n.
 Proof.
   srw <- frob.
+  (* n * [[ id ]];' [[ id ]] * m == m;' n *)
   srw frobL.
+  (* m;' n == m;' n *)
   smcat.
 Qed.
 
@@ -95,24 +101,32 @@ Definition cap : AProp _ _ _ := m ;' v.
 Lemma cap_assoc : m * Aid 1 ;' cap == Aid 1 * m ;' cap.
 Proof.
   unfold cap.
+  (* m * [[ id ]];' (m;' v) == [[ id ]] * m;' (m;' v) *)
   srw assoc.
+  (* [[ id ]] * m;' m;' v == [[ id ]] * m;' (m;' v) *)
   smcat.
 Qed.
 
 
 Lemma cup_assoc : cup ;' n * Aid 1 == cup ;' Aid 1 * n.
 Proof.
-  unfold cup.
-  srw coassoc.
+  unfold cup. 
+  (* u;' n;' n * [[ id ]] == u;' n;' [[ id ]] * n *)
+  srw coassoc. 
+  (* u;' (n;' [[ id ]] * n) == u;' n;' [[ id ]] * n *)
   smcat.
 Qed.
 
 Lemma yankL : cup * Aid 1 ;' Aid 1 * cap == Aid 1.
 Proof.
   unfold cup, cap.
+  (* (u;' n) * [[ id ]];' [[ id ]] * (m;' v) == [[ id ]] *)
   srw frobL.
+  (* u * [[ id ]];' (m;' n);' (sw;' v * [[ id ]]) == [[ id ]] *)
   srw unitL.
+  (* n;' (sw;' v * [[ id ]]) == [[ id ]] *)
   srw counitR.
+  (* [[ id ]] == [[ id ]] *)
   smcat.
 Qed.
 
