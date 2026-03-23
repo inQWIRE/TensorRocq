@@ -1,4 +1,4 @@
-Require Export FreeAProp.
+From TensorRocq Require Export FreeAProp.
 
 Notation "x === y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) : {n & {m & (AProp (fin 6) n m * AProp (fin 6) n m)%type}})
@@ -32,12 +32,12 @@ Definition BOOL : Signature bool := {|
      ];
 |}.
 
-Notation "'T'" := (Agen _ 0%fin 0 1) (only printing).
-Notation "'F'" := (Agen _ 1%fin 0 1) (only printing).
-Notation "'AND'" := (Agen _ 2%fin 2 1) (only printing).
-Notation "'OR'" := (Agen _ 3%fin 2 1) (only printing).
-Notation "'NEG'" := (Agen _ 4%fin 1 1) (only printing).
-Notation "'disc'" := (Agen _ 5%fin 1 0) (only printing).
+Notation "'T'" := ( @Agen _ 0%fin 0 1) (only printing).
+Notation "'F'" := ( @Agen _ 1%fin 0 1) (only printing).
+Notation "'AND'" := ( @Agen _ 2%fin 2 1) (only printing).
+Notation "'OR'" := ( @Agen _ 3%fin 2 1) (only printing).
+Notation "'NEG'" := ( @Agen _ 4%fin 1 1) (only printing).
+Notation "'disc'" := ( @Agen _ 5%fin 1 0) (only printing).
 
 
 Open Scope aprop_scope.

@@ -749,10 +749,10 @@ Local Open Scope aprop_scope.
 (* Print Grammar term. *)
 
 Notation "x * y" := (Astack x%aprop y%aprop)
-  (  at level 40, left associativity) : aprop_scope.
+  (  at level 40, left associativity, only parsing) : aprop_scope.
 
 Notation "x ;' y" := (Acompose x%aprop y%aprop)
-  (at level 50, left associativity) : aprop_scope.
+  (at level 50, left associativity, only parsing) : aprop_scope.
 
 
 Declare Custom Entry aprop_sw_args.
