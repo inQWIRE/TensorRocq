@@ -1,12 +1,10 @@
-Require Import Summable.
 (* Require StringCustomNotation. *)
 
 From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.
 
-Require Import Aux_stdpp Aux_pos.
-
-Require Export TESyntax.
+From TensorRocq Require Import Aux_stdpp Aux_pos Summable.
+From TensorRocq Require Export TESyntax.
 
 
 

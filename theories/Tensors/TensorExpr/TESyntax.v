@@ -4,8 +4,8 @@ Require Import Summable.
 From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.
 
-Require Import Aux_stdpp Aux_pos.
-Require Import Aux_relset.
+From TensorRocq Require Import Aux_stdpp Aux_pos.
+From TensorRocq Require Import Aux_relset.
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.

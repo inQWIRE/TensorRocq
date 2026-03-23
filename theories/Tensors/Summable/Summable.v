@@ -7,7 +7,7 @@ Require Export Algebra.
 Require Import Ring.
 From stdpp Require Import vector fin.
 From stdpp Require Export base list.
-Require Import Aux_stdpp.
+From TensorRocq Require Import Aux_stdpp.
 
 (* FIXME: Move to Algebra when it has stdpp*)
 Lemma Rlist_sum_bind `{SR : SemiRing R rO rI radd rmul req} {A} (f : A -> list R) l :

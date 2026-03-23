@@ -11,5 +11,5 @@
 
 (package
  (name rocq-tensors)
- (synopsis "Rocq library for tensors")
+ (synopsis "Rocq library providing hypergraph rewriting using tensor semantics")
  )
