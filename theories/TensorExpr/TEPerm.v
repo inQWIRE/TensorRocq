@@ -1,5 +1,5 @@
 Require Import Summable.
-Require StringCustomNotation.
+(* Require StringCustomNotation. *)
 
 Require Import SetoidList SetoidPermutation.
 

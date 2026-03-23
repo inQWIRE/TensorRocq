@@ -1,5 +1,5 @@
 Require Import Summable.
-Require StringCustomNotation.
+(* Require StringCustomNotation. *)
 
 From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.

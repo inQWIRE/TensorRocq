@@ -783,7 +783,6 @@ Proof.
   apply prop_by_iff_zx_scale.
   split; [|intros ?%(f_equal fst); cbn in *; lra].
   rewrite zx_scale_defn.
-  Search (zx_of_const (/ C2)).
   (* Faster, semantic proof:
 
   prop_exists_nonzero (/2).
