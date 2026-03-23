@@ -348,7 +348,8 @@ Qed.
 
 
 
-Require Import TensorGraphQuote TensorGraphSP.
+Require Import TensorGraphQuote. 
+(* Require Import TensorGraphSP. *)
 
 
 Add Parametric Morphism `{Equiv T, Equivalence T equiv} {n m} :
