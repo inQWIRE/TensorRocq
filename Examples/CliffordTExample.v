@@ -1,7 +1,21 @@
 From TensorRocq Require Export FreeAProp.
 From QuantumLib Require Export Complex Modulus.
-(* From TensorRocq Require Import ZXCore. For C_SemiRing instance *)
-(* From stdpp Require Import base. *)
+
+#[global] 
+Program Instance C_SemiRing : SemiRing C C0 C1 Cplus Cmult eq.
+Next Obligation.
+  split; intros; lca.
+Qed.
+Next Obligation.
+  split; apply _.
+Qed.
+Next Obligation.
+  change (@RelationClasses.Equivalence C eq).
+  apply _.
+Qed.
+
+Definition h (bl : bool) (br : bool) : C :=
+  1/sqrt(2) * (if bl && br then -1 else 1).
 
 Inductive CliffordTGates :=
   | GateH
@@ -45,7 +59,7 @@ Definition T_semantics : @Tensor C 1 1 bool :=
 #[global] Arguments CNOT_semantics !_ !_ /.
 #[global] Arguments T_semantics_aux _ _ /.
 #[global] Arguments T_semantics !_ !_ /.
-(* #[global] Arguments ZXCore.h _ _ /. *)
+#[global] Arguments h _ _ /.
 
 
 Definition CliffordTGates_semantics (g : CliffordTGates) : 
