@@ -1,5 +1,5 @@
 Require Import Algebra SetoidList SetoidPermutation Homomorphism.
-Require Import Aux_relset Aux_stdpp.
+Require Import Aux Aux_relset Aux_stdpp.
 From stdpp Require Import gmap gmultiset list.
 
 

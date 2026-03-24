@@ -1,4 +1,4 @@
-From TensorRocq Require Export Aux_stdpp Summable.Definitions.
+From TensorRocq Require Import Aux Aux_stdpp Summable.Definitions Algebra.
 From stdpp Require Import vector fin fin_maps.
 From stdpp Require Export list.
 
@@ -193,7 +193,7 @@ Proof.
 Qed.
 
 Section SummableWF_theory.
-
+Print SemiRing.
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
 Notation "0" := rO.

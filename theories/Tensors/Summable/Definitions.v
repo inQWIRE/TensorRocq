@@ -6,8 +6,9 @@ Require Import SetoidList SetoidPermutation.
 Require Import Ring.
 From stdpp Require Import vector fin.
 From stdpp Require Export base list.
-From TensorRocq Require Import Aux_stdpp.
+From TensorRocq Require Import Aux_stdpp Aux. 
 From TensorRocq Require Export Algebra.Definitions.
+(* From TensorRocq Require Export  *)
 
 (* FIXME: Move to Algebra when it has stdpp*)
 Lemma Rlist_sum_bind `{SR : SemiRing R rO rI radd rmul req} {A} (f : A -> list R) l :

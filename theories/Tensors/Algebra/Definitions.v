@@ -8,7 +8,7 @@
 #[global]
 Generalizable All Variables.
 
-From TensorRocq Require Export Aux.
+From TensorRocq Require Import Aux.
 Require Ring_theory.
 Require Integral_domain.
 Require List.
