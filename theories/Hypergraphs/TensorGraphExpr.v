@@ -1,6 +1,6 @@
 Require Export TensorGraph IsomorphismTesting Aux_pos.
 
-Require Export TESyntax TECospan.
+Require Export Syntax.Definitions Syntax.Cospans.
 
 (* FIXME: Move: *)
 Require Combinators.

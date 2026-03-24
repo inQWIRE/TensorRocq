@@ -1,5 +1,4 @@
-Require Export TensorGraphExpr.
-Require Export TESemantics.
+Require Export Syntax TensorGraph TensorGraphExpr.
 
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
 

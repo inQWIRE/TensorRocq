@@ -1,7 +1,7 @@
 Require Import Summable.
 (* Require StringCustomNotation. *)
 
-Require Import TESyntax.
+Require Import Syntax.Definitions.
 Require Tensor.
 
 Require Import Aux_pos Aux_stdpp.

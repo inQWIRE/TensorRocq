@@ -5,7 +5,7 @@ From stdpp Require vector.
 Import vector.
 
 From TensorRocq Require Import Auxillary.Aux_stdpp Tensor.Definitions.
-From TensorRocq Require Export Summable.SummableWF.
+From TensorRocq Require Export Summable.WF.
 
 (* NB : We require a semiring (even though we use only equality)
   so typeclass inference is better-behaved *)

@@ -1,4 +1,4 @@
-Require Import Summable.
+From TensorRocq Require Import Summable Syntax.Cospans.
 (* Require StringCustomNotation. *)
 
 Require Import SetoidList SetoidPermutation.
@@ -6,7 +6,7 @@ Require Import SetoidList SetoidPermutation.
 From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.
 
-Require Import Aux_stdpp Aux_pos.
+From TensorRocq Require Import Aux_stdpp Aux_pos.
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
 #[local] Coercion N.of_nat : nat >-> N.
@@ -14,7 +14,7 @@ Require Import Aux_stdpp Aux_pos.
 Local Open Scope positive_scope.
 Local Open Scope list_scope.
 
-Require Export TESyntax TESemantics TECospan.
+From TensorRocq Require Export Syntax.Definitions.
 
 Section abs_strongperm_eq.
 

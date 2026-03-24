@@ -5,7 +5,7 @@ From stdpp Require vector.
 Import vector.
 
 From TensorRocq Require Import Auxillary.Aux_stdpp.
-From TensorRocq Require Export SummableWF.
+From TensorRocq Require Export Summable.WF.
 
 Definition Tensor {R} (n m : nat) (A : Type) :=
   Vector.t A n -> Vector.t A m -> R.

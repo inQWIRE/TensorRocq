@@ -1,4 +1,4 @@
-Require Import SetoidList Algebra.
+Require Import SetoidList Algebra.Definitions.
 From stdpp Require Import base list.
 
 Class Monoid (M : Type) (mO : M) (madd : M -> M -> M) (meq : relation M) := {

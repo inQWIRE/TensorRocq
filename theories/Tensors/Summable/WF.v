@@ -1,4 +1,4 @@
-From TensorRocq Require Export Summable Aux_stdpp.
+From TensorRocq Require Export Aux_stdpp Summable.Definitions.
 From stdpp Require Import vector fin fin_maps.
 From stdpp Require Export list.
 

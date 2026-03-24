@@ -5,7 +5,7 @@ From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
 (* Require Import ZXCore. *)
 Require ZifyBool.
-Require Import TECospan TEPerm.
+Require Import Syntax.Cospans Syntax.Permutations.
 
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.

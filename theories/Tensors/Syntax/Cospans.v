@@ -4,9 +4,7 @@ From stdpp Require Import strings fin_maps pmap gmap.
 From stdpp Require Import pretty.
 
 From TensorRocq Require Import Aux_stdpp Aux_pos Summable.
-From TensorRocq Require Export TESyntax.
-
-
+From TensorRocq Require Export Syntax.Definitions.
 
 
 
@@ -810,7 +808,7 @@ Qed.
 
 
 
-Require Export Tensor TESemantics.
+Require Export Tensor Syntax.Semantics.
 
 
 

@@ -1,7 +1,7 @@
 From stdpp Require Export pmap gmap decidable.
 Require Import TensorGraph TensorGraphSemantics TensorGraphFacts.
 Require Import HyperGraph.
-Require Import TESyntax.
+Require Import Syntax.
 Require Import Aux_pos.
 
 

@@ -1,9 +1,8 @@
-Require Export Tensor.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
 Require Export Aux_stdpp Aux_pos.
-Require Export HyperGraph.
-Require Import TESyntax.
+From TensorRocq Require Export Tensor HyperGraph.
+From TensorRocq Require Import Syntax.
 
 
 (* Basic definitions and structural operations on TensorGraphs *)

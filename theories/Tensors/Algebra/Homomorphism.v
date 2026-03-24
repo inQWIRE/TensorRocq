@@ -1,4 +1,4 @@
-Require Export Aux_stdpp Basics Setoid Morphisms Algebra Summable.
+Require Export Aux_stdpp Basics Setoid Morphisms Algebra.Definitions Summable.Definitions.
 
 (* FIXME: Move *)
 #[export] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.

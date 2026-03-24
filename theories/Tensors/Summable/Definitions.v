@@ -3,11 +3,11 @@ Require Import Relation_Definitions.
 Require Import Classes.Morphisms.
 Set Warnings "-stdlib-vector".
 Require Import SetoidList SetoidPermutation.
-Require Export Algebra.
 Require Import Ring.
 From stdpp Require Import vector fin.
 From stdpp Require Export base list.
 From TensorRocq Require Import Aux_stdpp.
+From TensorRocq Require Export Algebra.Definitions.
 
 (* FIXME: Move to Algebra when it has stdpp*)
 Lemma Rlist_sum_bind `{SR : SemiRing R rO rI radd rmul req} {A} (f : A -> list R) l :
@@ -20,6 +20,7 @@ Proof.
   apply SR; [apply SR|].
   apply IHl.
 Qed.
+
 Lemma Rlist_prod_bind `{SR : SemiRing R rO rI radd rmul req} {A} (f : A -> list R) l :
   req (Rlist_prod (l ≫= f)) (Rlist_prod ((λ x, Rlist_prod (f x)) <$> l)).
 Proof.
