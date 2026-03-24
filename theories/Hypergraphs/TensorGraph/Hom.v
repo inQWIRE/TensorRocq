@@ -1,7 +1,5 @@
-Require Export TensorGraph GraphRewriting TensorGraphExpr
-  TensorGraphSemantics.
-
-
+Require Export TensorGraph.Definitions TensorGraph.Expr
+  TensorGraph.Semantics.
 
 
 

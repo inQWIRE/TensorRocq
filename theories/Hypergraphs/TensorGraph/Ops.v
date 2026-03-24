@@ -1,4 +1,4 @@
-Require Import TensorGraphFacts.
+Require Import TensorGraph.Facts.
 
 
 

@@ -1,4 +1,4 @@
-Require Export Syntax TensorGraph TensorGraphExpr.
+Require Export Syntax TensorGraph.Definitions TensorGraph.Expr.
 
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
 

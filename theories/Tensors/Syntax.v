@@ -1,1 +1,1 @@
-Require Export Syntax.Cospans Syntax.Definitions Syntax.Permutations Syntax.Semantics.
+From TensorRocq Require Export Syntax.Cospans Syntax.Definitions Syntax.Permutations Syntax.Semantics.

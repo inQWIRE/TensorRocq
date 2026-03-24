@@ -1,4 +1,4 @@
-Require Export FreeAPropAux.
+From TensorRocq Require Export FreeAPropAux Summable.
 
 
 Structure Signature {A : Type} `{SA : Summable A, EqA : EqDecision A} := {

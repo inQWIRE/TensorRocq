@@ -1,1 +1,1 @@
-Require Export Summable.Definitions Summable.WF.
+From TensorRocq Require Export Summable.Definitions Tensors.Summable.WF.

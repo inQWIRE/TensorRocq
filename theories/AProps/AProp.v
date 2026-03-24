@@ -1,7 +1,5 @@
 Require Export Setoid. 
-From TensorRocq Require Export Tensor.
-From TensorRocq Require Export TensorGraph GraphRewriting 
-  TensorGraphSemantics TensorGraphFacts TensorGraphHom.
+From TensorRocq Require Export Tensor TensorGraph GraphRewriting.
 
 
 #[universes(template)]

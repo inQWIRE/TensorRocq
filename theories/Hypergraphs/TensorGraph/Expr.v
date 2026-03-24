@@ -1,4 +1,4 @@
-Require Export TensorGraph IsomorphismTesting Aux_pos.
+Require Export TensorGraph.Definitions IsomorphismTesting Aux_pos.
 
 Require Export Syntax.Definitions Syntax.Cospans.
 

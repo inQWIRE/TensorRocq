@@ -1,13 +1,5 @@
-Require Export TensorGraphHom.
-Require Export AbstractTensorQuote.
-
-
-
-
-
-
-
-
+From TensorRocq Require Import GraphRewriting.
+From TensorRocq Require Import AbstractTensorQuote HyperGraph TensorGraph.
 
 Class CospanHyperGraphQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanHyperGraph T n m) (val : CospanHyperGraph T' n m) := {
@@ -628,8 +620,3 @@ Proof.
   revert Heq.
   now apply graph_syntactic_equiv_of_positive_inhab with ctx.
 Qed.
-
-
-
-
-

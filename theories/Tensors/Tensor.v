@@ -1,1 +1,1 @@
-Require Export Tensors.Tensor.Definitions Tensors.Tensor.Facts.
+From TensorRocq Require Export Tensor.Definitions Tensor.Facts.
