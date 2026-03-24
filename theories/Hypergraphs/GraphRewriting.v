@@ -2686,16 +2686,14 @@ Qed.
     }
 
     simpl.
-  Admitted.
-    (* PROOF REPAIR NEEDED
-    rewrite 2 compose_graphs_unsafe'_to_compose_graphs,
-      (fun H1 H2 => subrel (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
+    rewrite 2 compose_graphs_unsafe'_to_compose_graphs, 
+      (fun H1 H2 => subrel (R2:=struct_isomorphic) 
+      (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
     - done.
     - cbn.
       solve_map_disjoint.
     - rewrite 2 vertices_vertices_hg_decomp.
       cbn.
-      rewrite hg_empty_union.
       rewrite vertices_hg_empty.
       rewrite 3 vec_to_list_to_vec.
       rewrite 2 list_to_set_app_L, (union_idemp_L _).
@@ -2794,7 +2792,7 @@ Qed.
       split.
       + done.
       + subst; apply decompose_C1_C2_disjoint_gen.
-  Qed. *)
+  Qed.
 
 
 
@@ -2979,10 +2977,9 @@ Qed.
       + subst; apply HxC2.
     }
 
-    simpl.
-    (* PROOF REPAIR NEEDED
     rewrite 2 compose_graphs_unsafe'_to_compose_graphs,
-      (fun H1 H2 => subrel (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
+      (fun H1 H2 => subrel (R2:=struct_isomorphic)
+        (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
     - done.
     - cbn.
       solve_map_disjoint.
@@ -3089,8 +3086,7 @@ Qed.
       split.
       + done.
       + subst; apply decompose_C1_C2_disjoint_gen.
-  Qed. *)
-  Admitted.
+  Qed.
 
   Lemma compose_graphs_unsafe'_boundary_indep {T n m m' o}
     (H G : HyperGraph T) (i : vec _ n) (jH j : vec _ m) (jH' j' : vec _ m') (k : vec _ o) : 
