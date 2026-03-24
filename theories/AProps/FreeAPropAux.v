@@ -1,4 +1,4 @@
-Require Export Homomorphism AProp FreeSemiRing GraphTerm.
+Require Export Homomorphism AProp FreeSemiRing GraphTerm Isomorphism.IsoAux.
 
 
 (* FIXME: Move *)

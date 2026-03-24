@@ -1,4 +1,5 @@
-Require Export TensorGraph.Definitions IsomorphismTestingAux.
+Require Import TensorGraph.Definitions.
+Require Import Isomorphism.IsoAux.
 
 
 Lemma isomorphic_of_map_to_list_perm {T} {n m}

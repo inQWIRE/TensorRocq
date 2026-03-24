@@ -1,6 +1,5 @@
 From stdpp Require Export pmap.
-Require Export Aux_pos Aux_relset.
-
+Require Import Aux_pos Aux_relset.
 
 Lemma list_filter_bind {A B} {P : B -> Prop} `{forall b, Decision (P b)}
   (f : A -> list B) (l : list A) :
