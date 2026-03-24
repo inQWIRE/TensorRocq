@@ -193,7 +193,7 @@ Proof.
 Qed.
 
 Section SummableWF_theory.
-Print SemiRing.
+
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
 Notation "0" := rO.

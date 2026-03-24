@@ -1,1 +1,1 @@
-From TensorRocq Require Export Tensor.Definitions Tensor.Facts.
+From TensorRocq Require Export Tensor.Definitions Tensor.Facts Summable.
