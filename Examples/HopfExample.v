@@ -1,6 +1,4 @@
-Require Export FreeAProp.
-
-
+From TensorRocq Require Export FreeAProp.
 
 Local Open Scope aprop_scope.
 

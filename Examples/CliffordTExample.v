@@ -1,7 +1,7 @@
-Require Export FreeAProp.
+From TensorRocq Require Export FreeAProp.
 From QuantumLib Require Export Complex Modulus.
-Require ZXCore. (* For C_SemiRing instance *)
-From stdpp Require Import base.
+(* From TensorRocq Require Import ZXCore. For C_SemiRing instance *)
+(* From stdpp Require Import base. *)
 
 Inductive CliffordTGates :=
   | GateH
@@ -45,7 +45,7 @@ Definition T_semantics : @Tensor C 1 1 bool :=
 #[global] Arguments CNOT_semantics !_ !_ /.
 #[global] Arguments T_semantics_aux _ _ /.
 #[global] Arguments T_semantics !_ !_ /.
-#[global] Arguments ZXCore.h _ _ /.
+(* #[global] Arguments ZXCore.h _ _ /. *)
 
 
 Definition CliffordTGates_semantics (g : CliffordTGates) : 

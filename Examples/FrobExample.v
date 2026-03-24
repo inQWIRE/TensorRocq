@@ -1,5 +1,4 @@
-Require Export FreeAProp.
-
+From TensorRocq Require Export FreeAProp.
 
 Notation "x === y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) :
@@ -10,7 +9,6 @@ Notation m := (Agen (0%fin :> fin 4) 2 1) (only parsing).
 Notation u := (Agen (1%fin :> fin 4) 0 1) (only parsing).
 Notation n := (Agen (2%fin :> fin 4) 1 2) (only parsing).
 Notation v := (Agen (3%fin :> fin 4) 1 0) (only parsing).
-
 
 Definition Frob : Signature bool := {|
   gens := fin 4;

@@ -1,4 +1,4 @@
-From TensorRocq Require Export FreeAProp.
+From TensorRocq Require Import FreeAProp.
 
 Notation "x === y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) : {n & {m & (AProp (fin 6) n m * AProp (fin 6) n m)%type}})
@@ -15,12 +15,12 @@ Definition BOOL : Signature bool := {|
   gens := fin 6;
   gens_equiv := eq;
   rules := rules_of_rule_list [
-      T * id ;' AND === id ;
-      F * id ;' AND === disc ;' F ;
-      AND === sw ;' AND ;
+      [[ T * id ; AND ]] === [[ id ]] ;
+      [[ F * id ; AND ]] === [[ disc ; F ]] ;
+      [[ AND ]] === [[ sw ; AND ]] ;
       
-      T * id ;' OR === disc ;' T ;
-      F * id ;' OR === id ;
+      [[ T * id ; OR ]] === [[ disc ; T ]] ;
+      [[ F * id ; OR ]] === [[ id ]] ;
       OR === sw ;' OR ;
 
       T ;' disc === Aid 0 ; 
@@ -105,7 +105,7 @@ Proof.
 Qed.
 
 
-Lemma test_rw' : (T * T ;' AND) ≡ᵣ@{BOOL} T.
+Lemma test_rw' : [[ T * T ; AND ]] == [[ T ]].
 Proof.
   srw T_AND.
   done.
