@@ -63,7 +63,8 @@ End nat2SR.
 
 
 
-
+(* A semiring homomorphism is a function preserving additive and multiplicative
+  structure. *)
 Class SemiRingHomomorphism `{SR : SemiRing R rO rI radd rmul req,
   SR' : SemiRing R' rO' rI' radd' rmul' req'} (f : R -> R') := {
   SRH_Proper : Proper (req ==> req') f;
