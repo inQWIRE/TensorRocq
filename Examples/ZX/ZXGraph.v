@@ -1,7 +1,6 @@
-Require Import Tensor ZXCore.
+From TensorRocq Require Import Tensor TensorGraph.
 From QuantumLib Require Export Complex.
-Require Import Rmodeq. 
-Require Import TensorGraphSemantics.
+From TensorRocqEx Require Import Rmodeq ZXCore. 
 Open Scope nat_scope.
 
 (* FIXME: Move somewhere else *)
@@ -249,7 +248,7 @@ Qed.
 
 #[global] Program Instance ZXCALC_SP : StronglyPermutativeTensorLike ZXCALC.
 Next Obligation.
-  intros [[[] r]|]; cbn; 
+  destruct x as [[[] r]|]; cbn; 
   [apply xsp_strongly_permutative|apply zsp_strongly_permutative|
   apply h_stack1'_strong_perm].
 Qed.

@@ -1,4 +1,6 @@
-Require Export Tensor ZXCore.
+From TensorRocq Require Export Tensor.
+From TensorRocq Require Import Aux_stdpp. 
+From TensorRocqEx Require Export ZXCore.
 From VyZX Require Export CoreData.
 Require Export QlibInterface.
 From stdpp Require Import vector. 

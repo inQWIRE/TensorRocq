@@ -1,5 +1,4 @@
 From TensorRocq Require Export FreeAProp.
-(* Require Import SizedGraphIsomorphismTesting MPropAutomation. *)
 Require Import QArith Qcanon.
 
 

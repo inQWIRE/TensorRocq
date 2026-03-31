@@ -1,6 +1,6 @@
 From VyZX Require Export ZXRules ZXpermFacts CoreRules DiagramRules GateRules.
-Require Export AbstractTensorQuote FreeAProp
-  VyZXTensor VyZXInterface APropLike.
+From TensorRocq Require Export AbstractTensorQuote FreeAProp APropLike.
+From TensorRocqEx Require Export VyZXTensor VyZXInterface.
 
 
 Lemma APropQuote_inhab_convert_graph_restricted {R}

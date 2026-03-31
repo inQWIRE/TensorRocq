@@ -1,7 +1,6 @@
-Require Import TensorCore.Summable.
+From TensorRocq Require Import Tensor.
 Require Import Bool.
 Require Import Btauto.
-Require Import TensorCore.Tensor.
 Require Import QuantumLib.Complex.
 Set Warnings "-stdlib-vector".
 Require Import Vector.

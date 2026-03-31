@@ -1,8 +1,8 @@
 From QuantumLib Require Import Modulus Quantum.
 Require Import QuantumLib.Bits.
-Require Import Tensor ZXCore.
+From TensorRocq Require Import Tensor Aux_stdpp.
+From TensorRocqEx Require Import ZXCore.
 
-Require Import Aux_stdpp.
 Import vector.
 
 Lemma vmap_fun_to_vec {A B} {n} (f : fin n -> A) (g : A -> B) :
