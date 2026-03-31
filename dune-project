@@ -14,3 +14,10 @@
  (synopsis "Rocq library providing hypergraph rewriting using tensor semantics")
  )
 
+(package
+  (name rocq-tensors-examples)
+  (synopsis "Examples of rewriting PROPs using rocq-tensors")
+  (depends 
+    (rocq-tensors (>= 0.1.0))
+    )
+  )
