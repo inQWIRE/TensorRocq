@@ -16,7 +16,7 @@
  (name rocq-tensors)
  (synopsis "Rocq library providing hypergraph rewriting using tensor semantics")
  (homepage https://github.com/inQWIRE/tensor-rocq/)
- `(bug_reports https://github.com/inQWIRE/tensor-rocq/issues)
+ (bug_reports https://github.com/inQWIRE/tensor-rocq/issues)
 )
 
 (package
