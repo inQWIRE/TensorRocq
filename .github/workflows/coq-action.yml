@@ -1,0 +1,36 @@
+name: Coq Build
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['**'] # for all submitted Pull Requests
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        coq_version:
+          - '8.16'
+          - '8.17'
+          - '8.18'
+          - '8.19'
+          - '8.20'
+        ocaml_version:
+          - 'default'
+      fail-fast: false # don't stop jobs if one fails
+    steps:
+      - uses: actions/checkout@v3
+      - uses: coq-community/docker-coq-action@v1
+        with:
+          opam_file: 'rocq-tensors.opam'
+          before_install: |
+            startGroup "Print opam config"
+              opam update -y;
+              opam install -y coq-stdpp;
+              opam config list; opam repo list; opam list
+            endGroup
+          coq_version: ${{ matrix.coq_version }}
+          ocaml_version: ${{ matrix.ocaml_version }}
+
