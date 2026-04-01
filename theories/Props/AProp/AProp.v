@@ -1,7 +1,10 @@
 Require Export Setoid. 
 From TensorRocq Require Export Tensor TensorGraph GraphRewriting.
 
-
+(* The [AProp] with generators [T] is the PROP with generators [T]
+  (of all sizes), along with cups and caps.
+  These can be interpreted as hypergraphs or as tensors 
+  (as long as [T] is [TensorLike]). *)
 #[universes(template)]
 Inductive AProp {T : Type} : nat -> nat -> Type :=
   | Aid n : AProp n n
