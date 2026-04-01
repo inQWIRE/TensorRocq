@@ -546,20 +546,20 @@ Proof.
   rewrite (X_wrap_under_bot_right 1 1 0 eq_refl eq_refl).
   rewrite cap_Z, cup_Z.
 
-  zxrw (to_gadget bi_algebra_rule_X_Z) O.
+  zxrw (to_gadget bi_algebra_rule_X_Z).
   assert (Hrw1 : X 1 2 0 ∝= — ↕ ⊂ ⟷ (— ↕ X 1 2 0 ↕ —) ⟷ (⊃ ↕ n_wire 2)). 1:{
     rewrite cup_X, cap_X.
-    zxrw (dominated_X_spider_fusion_top_left 2 0 1 0 0 0) O.
+    zxrw (dominated_X_spider_fusion_top_left 2 0 1 0 0 0).
     rewrite Rplus_0_l.
-    zxrw (X_spider_fusion_bot_left_top_right 1 0 2 0 0 0 0 eq_refl eq_refl) O.
+    zxrw (X_spider_fusion_bot_left_top_right 1 0 2 0 0 0 0 eq_refl eq_refl).
     now rewrite Rplus_0_l.
   }
   (* rewrite <- cap_Z, <- cup_Z. *)
   assert (Hrw2 : Z 2 1 0 ∝= (n_wire 2 ↕ ⊂) ⟷ (— ↕ Z 2 1 0 ↕ —) ⟷ (⊃ ↕ —)). 1:{
     rewrite cup_Z, cap_Z.
-    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 0 1 0 0 eq_refl eq_refl) O.
+    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 0 1 0 0 eq_refl eq_refl).
     rewrite Rplus_0_l.
-    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl) O.
+    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl).
     now rewrite Rplus_0_l.
   }
   rewrite Hrw1 at 1.
@@ -626,14 +626,14 @@ Proof.
   
   rewrite cnot_is_swapp_notc at 2.
   rewrite notc_is_notc_r.
-  zxrw (to_gadget bi_algebra_rule_X_over_Z) O.
+  zxrw (to_gadget bi_algebra_rule_X_over_Z).
   
-  zxrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0) O.
+  zxrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
   rewrite Rplus_0_l.
-  zxrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0) O.
+  zxrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).
   rewrite Rplus_0_l.
-  zxrw (to_gadget hopf_rule_Z_X_vert 1 1 1 1 0 0 eq_refl) O.
-  zxrw (symmetry (zx_of_const_mult (/ C2) (/ √ 2))) O.
+  zxrw (to_gadget hopf_rule_Z_X_vert 1 1 1 1 0 0 eq_refl).
+  zxrw (symmetry (zx_of_const_mult (/ C2) (/ √ 2))).
   rewrite Cinv_mult_distr.
   rewrite Z_is_wire, X_0_is_wire.
   zxcat.
