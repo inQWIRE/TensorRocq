@@ -2760,58 +2760,6 @@ Qed. *)
 
 
 (*
-Lemma abstract_semantics'_abstracts_perm_eq_permutative_tensor
-  (mabst : Pmap BTensor) mg ml mr
-  abs abs' :
-  abst_WT' (snd ∘ projT1 <$> mabst) abs ->
-  (forall t : BTensor, mabst !! abs.1.1 = Some t ->
-    permutative_tensor (projT2 t)) ->
-  abstracts_perm_eq abs abs' ->
-  abstract_semantics' (mabs_of_tensor_map mabst) mg ml mr abs ==
-  abstract_semantics' (mabs_of_tensor_map mabst) mg ml mr abs'.
-Proof.
-  intros HWT Hpermtens Habs.
-  pose proof HWT as HWT'.
-  rewrite Habs in HWT'.
-  rewrite 2 abstract_semantics_mabs_of_tensor_map by
-    now rewrite <- lookup_fmap.
-  destruct abs as ((f, low), up), abs' as ((f', low'), up').
-  cbn in *.
-  destruct Habs as ([= <-] & Hlow & Hup).
-  cbn in Hlow, Hup.
-  destruct (mabst !! f) as [[[k nm] t]|] eqn:Ht in |- *; [cbn|reflexivity].
-  specialize (Hpermtens _ Ht).
-  cbn in Hpermtens.
-
-  (* pose proof (join_list_is_Some (mbind (A_get k) <$> (get_var mg ml mr <$> low)))
-    as Hjoinlow.
-  rewrite Hlow in Hjoinlow at 2.
-  rewrite <- join_list_is_Some in Hjoinlow.
-  rewrite 2 is_Some_alt in Hjoinlow. *)
-  pose proof (join_list_Permutation
-    (mbind (A_get k) <$> (get_var mg ml mr <$> low))
-    (mbind (A_get k) <$> (get_var mg ml mr <$> low'))
-    ltac:(now rewrite Hlow)) as Hlperm%option_Forall2_alt.
-  pose proof (join_list_Permutation
-    (mbind (A_get k) <$> (get_var mg ml mr <$> up))
-    (mbind (A_get k) <$> (get_var mg ml mr <$> up'))
-    ltac:(now rewrite Hup)) as Huperm%option_Forall2_alt.
-  destruct (join_list (_ <$> (_ <$> low))) as [largs|] eqn:Hlargs;
-  destruct (join_list (_ <$> (_ <$> low'))) as [largs'|] eqn:Hlargs';
-  [cbn|easy..|reflexivity].
-  pose proof (list2vec_Permutation nm.1 _ _ Hlperm) as Hlvperm%option_Forall2_alt.
-  destruct (list2vec _ largs) as [lvargs|] eqn:Hlvargs;
-  destruct (list2vec _ largs') as [lvargs'|] eqn:Hlvargs';
-  [cbn|easy..|reflexivity].
-  destruct (join_list (_ <$> (_ <$> up))) as [uargs|] eqn:Huargs;
-  destruct (join_list (_ <$> (_ <$> up'))) as [uargs'|] eqn:Huargs';
-  [cbn|easy..|reflexivity].
-  pose proof (list2vec_Permutation nm.2 _ _ Huperm) as Huvperm%option_Forall2_alt.
-  destruct (list2vec _ uargs) as [uvargs|] eqn:Huvargs;
-  destruct (list2vec _ uargs') as [uvargs'|] eqn:Huvargs';
-  [cbn|easy..|reflexivity].
-  now apply Hpermtens.
-Qed.
 
 
 Import SetoidList SetoidPermutation list.
@@ -2822,59 +2770,6 @@ Lemma tl_total_semantics_aux_base_eq mabs mg ml mr abs :
 Proof.
   cbn; f_equal.
   apply list_fmap_ext; now intros _ [[]] _.
-Qed.
-
-Lemma tl_perm_eq_correct_permutative_aux
-  (mabst : Pmap BTensor) mg ml mr sums abs abs' :
-  PermutationA abstracts_perm_eq abs abs' ->
-  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) abs ->
-  (forall (f : Idx), f ∈ abstracts_indices abs -> forall (t : BTensor),
-    mabst !! f = Some t ->
-    permutative_tensor (projT2 t)) ->
-  tl_total_semantics_aux (mabs_of_tensor_map mabst) mg ml mr sums abs ==
-  tl_total_semantics_aux (mabs_of_tensor_map mabst) mg ml mr sums abs'.
-Proof.
-  intros Habs HWT Hperm.
-  revert mr; induction sums as [|ty sums IHsums]; intros mr;
-  [|now cbn; apply sum_of_ext; intros; apply IHsums].
-  rewrite 2 tl_total_semantics_aux_base_eq.
-  apply Rlist_prod_perm_mor.
-  apply PermutationA_decompose in Habs as (abs'' & Habs_abs'' & Habs''_abs'); [|apply _].
-  etransitivity;
-  [apply Permutation_PermutationA, fmap_Permutation, Habs_abs''; apply _|].
-  unfold abstracts_indices in Hperm.
-  setoid_rewrite Habs_abs'' in Hperm.
-  rewrite Habs_abs'' in HWT.
-  clear abs Habs_abs''.
-  apply eqlistA_PermutationA.
-  induction Habs''_abs'; [reflexivity|].
-  cbn.
-  constructor.
-  - apply abstract_semantics'_abstracts_perm_eq_permutative_tensor;
-    [now apply Forall_cons in HWT | | easy].
-    apply Hperm.
-    set_solver +.
-  - apply IHHabs''_abs'; [now apply Forall_cons in HWT|].
-    intros f Hf.
-    apply Hperm; set_solver +Hf.
-Qed.
-
-
-
-Lemma tl_perm_eq_correct_permutative (mabst : Pmap BTensor) mg ml tl tl' :
-  tl ≡tl≡ₚ tl' ->
-  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) tl.(tl_abstracts) ->
-  (forall (f : Idx), f ∈ abstracts_indices tl.(tl_abstracts) ->
-    forall (t : BTensor), mabst !! f = Some t ->
-    permutative_tensor (projT2 t)) ->
-  tl_total_semantics (mabs_of_tensor_map mabst) mg ml tl ==
-  tl_total_semantics (mabs_of_tensor_map mabst) mg ml tl'.
-Proof.
-  destruct tl as [sums abs], tl' as [sums' abs'].
-  intros [[= <-] Habs].
-  cbn -[abstracts_indices] in *.
-  intros HWT Hperm.
-  now apply tl_perm_eq_correct_permutative_aux.
 Qed. *)
 
 
@@ -3036,23 +2931,7 @@ Proof.
   reflexivity.
 Qed.
 
-(*
-Lemma ntl_perm_eq_correct_permutative mabst mg ml ntl ntl' :
-  ntl ≡ntl≡ₚ ntl' ->
-  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
-  (forall (f : Idx), f ∈ abstracts_indices ntl.(ntl_abstracts) ->
-    forall (t : BTensor), mabst !! f = Some t ->
-    permutative_tensor (projT2 t)) ->
-  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl ==
-  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl'.
-Proof.
-  intros Heq Hall Hperm.
-  apply ntl2tl_perm_eq in Heq as Heq'.
-  unfold ntl_total_semantics.
-  apply tl_perm_eq_correct_permutative; [easy|..|now rewrite abstracts_indices_ntl2tl].
-  now specialize (ntl2tl_abst_WT'_all2 (snd ∘ projT1 <$> mabst) ntl)
-    as Hiff%Forall2_iff_pred; apply Hiff.
-Qed. *)
+
 
 Lemma ntl_aeq_correct mabs ml ntl ntl' :
   WF_ntl ntl ->
@@ -4122,32 +4001,6 @@ Qed.
 
 
 
-(*
-Lemma ntl_perm_eq'_correct_permutative mabst mg ml ntl ntl' :
-  WF_ntl ntl -> WF_ntl ntl' ->
-  ntl ≡ntl'≡ₚ ntl' ->
-  Forall (abst_WT' (snd ∘ projT1 <$> mabst)) ntl.(ntl_abstracts) ->
-  (forall (f : Idx), f ∈ abstracts_indices ntl.(ntl_abstracts) ->
-    forall (t : BTensor), mabst !! f = Some t ->
-    permutative_tensor (projT2 t)) ->
-  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl ==
-  ntl_total_semantics (mabs_of_tensor_map mabst) mg ml ntl'.
-Proof.
-  (* ntl_total_semantics_alt *)
-  intros Hntl Hntl' Hpeq'.
-  pose proof Hpeq' as (Heq & Hperm)%(ntl_perm_eq'_NoDup _ _ Hntl.1 Hntl'.1).
-  intros HWT Hpermut.
-  etransitivity;
-  [generalize Heq; apply ntl_aeq_correct; try done|].
-  - split; [apply Hntl'|].
-    etransitivity; [apply Hntl|].
-    pose proof Hpeq' as [Hdom _].
-    apply (f_equal dom) in Hdom.
-    rewrite 2 dom_list_to_map_L in Hdom.
-    rewrite Hdom.
-    done.
-  - now apply ntl_perm_eq_correct_permutative.
-Qed. *)
 
 
 

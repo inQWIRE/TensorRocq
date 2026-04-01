@@ -7,16 +7,23 @@ Import vector.
 From TensorRocq Require Import Auxillary.Aux_stdpp.
 From TensorRocq Require Export Summable.
 
+(* A tensor with dimensions [n] and [m] taking arguments in [A] and
+  values in [R] *)
 Definition Tensor {R} (n m : nat) (A : Type) :=
   Vector.t A n -> Vector.t A m -> R.
 
-Definition PackedTensor {R} (A : Type) :=
-  {n : nat & {m : nat & Tensor (R:=R) n m A}}.
-
+(* A tensor with arguments in [A] and values in [R] parametric over 
+  its dimensions *)
 Definition DimensionlessTensor {R} (A : Type) :=
   forall n m,
     Tensor (R:=R) n m A.
 
+(* The default equivalence relation on tensors with arguments in a
+  [Summable] type [A] and values in a [SemiRing], [R]. Two tensors
+  are equivalent if they agree (up to the semiring equality [req] 
+  of [R]) on all arguments whose elements are [SummedElement]s, i.e.
+  appear in the list of summed elements of [A]. 
+  This is registered as the [Equiv] ([(≡)]) instance for tensors. *)
 Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A} {n m} : relation (@Tensor R n m A) :=
   fun t t' => forall v w, SummedElement v -> SummedElement w ->
@@ -25,6 +32,9 @@ Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
 #[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
   `{Summable A} {n m} : Equiv (@Tensor R n m A) := tensoreq.
 
+(* The default equivalence relation on dimensionless tensors, 
+  lifting that of tensors by quantifying over all possible dimensions.
+  This is registered as the [Equiv] ([(≡)]) instance for dimensionless tensors. *)
 Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A} : relation (@DimensionlessTensor R A) :=
   fun t t' => forall n m, t n m ≡@{@Tensor R n m A} t' n m.
@@ -32,7 +42,9 @@ Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
 #[global] Instance DimensionlessTensor_equiv `{SemiRing R rO rI radd rmul req}
   `{Summable A} : Equiv (@DimensionlessTensor R A) := dimensionlesstensoreq.
 
-
+(* A class registering that elements [T] can be interpreted as
+  dimensionless tensors with arguments in [A] and values in [R].
+  This interpretation should respect the [Equiv] instance of [T]. *)
 Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} 
   (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : Type) `{Equiv T}
     `{Equivalence T equiv} := {
@@ -42,31 +54,6 @@ Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req}
 
 #[global] Hint Mode TensorLike - - - - - - -   - - -   + - - : typeclass_instances.
 
-Definition permutative_tensor `{SemiRing R rO rI radd rmul req} {n m} {A}
-  (t : Tensor n m A) :=
-  forall v v' w w', Permutation (vec_to_list v) (vec_to_list v') ->
-    Permutation (vec_to_list w) (vec_to_list w') ->
-    req (t v w) (t v' w').
-
-(* TODO: Reason about *)
-Definition strongly_permutative_tensor `{SemiRing R rO rI radd rmul req} {A}
-  (t : DimensionlessTensor A) : Prop :=
-  forall n m n' m' v w v' w',
-    Permutation (vec_to_list v ++ vec_to_list w)
-      (vec_to_list v' ++ vec_to_list w') ->
-    req (t n m v w) (t n' m' v' w').
-
-Class PermutativeTensorLike
-  `(TensT : TensorLike R rO rI radd rmul req A T) := {
-  interpretTensorPermutative (x : T) n m :
-    permutative_tensor (interpretTensor x n m);
-}.
-
-Class StronglyPermutativeTensorLike
-  `(TensT : TensorLike R rO rI radd rmul req A T) := {
-  interpretTensorStronglyPermutative (x : T) :
-    strongly_permutative_tensor (interpretTensor x);
-}.
 
 Section TensorOps.
 

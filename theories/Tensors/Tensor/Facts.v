@@ -11,26 +11,8 @@ From TensorRocq Require Export Summable.
   so typeclass inference is better-behaved *)
 
 
-Lemma strongly_permutative_tensor_permutative_tensor
-  `{SemiRing R rO rI radd rmul req} {A} (t : @DimensionlessTensor R A) :
-  strongly_permutative_tensor t -> forall n m,
-  permutative_tensor (t n m).
-Proof.
-  intros Hperm n m v v' w w' Hv Hw.
-  apply Hperm.
-  now apply Permutation_app.
-Qed.
-
-
-
-#[global] Instance StronglyPermutativeTensorLike_PermutativeTensorLike
-  `{SR : SemiRing R rO rI radd rmul req} `(TensT : TensorLike R A T)
-  (SP : StronglyPermutativeTensorLike TensT) : PermutativeTensorLike TensT.
-Proof.
-  constructor; intros; apply strongly_permutative_tensor_permutative_tensor,
-    interpretTensorStronglyPermutative.
-Qed.
-
+(* A typeclass recording that a functions preserves the interpretation of 
+  tensors between two [TensorLike] types [T] and [T']. *)
 Class TensorLikeHom (R : Type) `{SR : SemiRing R rO rI radd rmul req} 
   (A : Type) `{SA : Summable A, EQA : EqDecision A} `{Equiv T, Equiv T'} 
   `{Equivalence T equiv, Equivalence T' equiv}

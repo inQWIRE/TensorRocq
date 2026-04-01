@@ -366,48 +366,6 @@ Proof.
    etransitivity; [|apply drop_app_length]]; now f_equal.
 Qed.
 
-
-Lemma abs_strongperm_eq_correct_sem mabs ml mr
-  (abs abs' : positive * list var * list var) :
-  abs_strongperm_eq abs abs' ->
-  (forall dt, mabs !! abs.1.1 = Some dt -> strongly_permutative_tensor (A:=A) dt) ->
-  abstract_semantics_alt (rO:=rO) mabs ml mr abs.1.1 abs.1.2 abs.2 ==
-  abstract_semantics_alt (rO:=rO) mabs ml mr abs'.1.1 abs'.1.2 abs'.2.
-Proof.
-  intros [<- Hperm] Hsp.
-  rewrite 2 abstract_semantics_alt_to_app.
-  destruct (mabs !! abs.1.1) as [ma|] eqn:Hma; [|cbn; now rewrite !option_bind_None_r].
-  specialize (Hsp _ eq_refl).
-  apply (fmap_Permutation (get_var_alt ml mr)) in Hperm as Hperm'%join_list_Permutation.
-  induction Hperm as [lrargs lrargs' Hlrargs|]; [|done].
-  cbn.
-  apply Hsp.
-  rewrite 4 vec_to_list_to_vec.
-  now rewrite 2 take_drop.
-Qed.
-
-Lemma abstracts_semantics_alt_permA mabs ml mr 
-  (abs abs' : list (positive * list var * list var)) :
-  PermutationA abs_strongperm_eq abs abs' ->
-  (forall i dt, i ∈ abstracts_indices abs -> mabs !! i = Some dt ->
-    strongly_permutative_tensor (A:=A) dt) ->
-  abstracts_semantics_alt mabs ml mr abs == 
-  abstracts_semantics_alt mabs ml mr abs'.
-Proof.
-  intros Hperm Hsp.
-  pose proof (fun l1 l2 H => (eq_reflexivity _ _
-    (eq_sym (abstracts_indices_permA_mor (A:=var) l1 l2 H))) : _ ⊆ _) as Hsub.
-  unfold subseteq, set_subseteq_instance in Hsub.
-  induction Hperm as [|x y delt delt' Hx Hdelt| |];
-    [reflexivity| |rewrite 4 abstracts_semantics_alt_cons; ring|etransitivity; eauto].
-  rewrite 2 abstracts_semantics_alt_cons.
-  f_equiv; [|apply IHHdelt; intros ? ? Hin; apply Hsp; set_solver + Hin].
-  apply abs_strongperm_eq_correct_sem; [done|].
-  intros ?; apply Hsp.
-  cbn -[union].
-  now apply union_subseteq_l, elem_of_singleton.
-Qed.
-
 Lemma deltas_semantics_alt_permA ml mr (delt delt' : list (var * var)) : 
   PermutationA prod_swap_eq delt delt' ->
   deltas_semantics_alt ml mr delt == deltas_semantics_alt (A:=A) ml mr delt'.
@@ -426,26 +384,6 @@ Proof.
   - apply (Permutation_PermutationA _).
     solve_Permutation.
   - now etransitivity; eassumption.
-Qed.
-
-Lemma ntl_strongperm_eq_correct mabs ml (ntl ntl' : namedtensorlist) :
-  WF_ntl ntl ->
-  ntl_strongperm_eq ntl ntl' ->
-  (forall i dt, i ∈ abstracts_indices ntl.(ntl_abstracts) -> mabs !! i = Some dt ->
-    strongly_permutative_tensor dt) ->
-  ntl_total_semantics mabs ml ntl ==
-  ntl_total_semantics mabs ml ntl'.
-Proof.
-  intros Hwf Heq Hperm.
-  pose proof Hwf as Hwf'.
-  erewrite ntl_strongperm_eq_WF in Hwf' by eassumption.
-  rewrite 2 ntl_total_semantics_alt by done.
-  erewrite <- (sum_of_Vmap_perm _ _ _ Heq.1).
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
-  f_equiv.
-  - apply abstracts_semantics_alt_permA, Hperm.
-    apply Heq.
-  - apply deltas_semantics_alt_permA, Heq.
 Qed.
 
 End ntl_strongperm_eq_corr.

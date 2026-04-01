@@ -103,33 +103,6 @@ Proof.
   now rewrite lookup_vec_to_list_fin.
 Qed.
 
-Lemma h_stack1'_strong_perm : strongly_permutative_tensor h_stack1'.
-Proof.
-  intros n m n' m' v w v' w' Hperm.
-  apply Permutation_length in Hperm as Hlen.
-  rewrite 2 length_app, 4 length_vec_to_list in Hlen.
-  destruct_decide (decide (n + m = 2)) as Hnm; 
-    [|now rewrite 2 h_stack1'_ne_gen by lia].
-  rewrite (h_stack1'_spec Hnm).
-  assert (Hnm' : n' + m' = 2) by lia.
-  rewrite (h_stack1'_spec Hnm').
-  revert Hperm.
-  rewrite <- 2 vec_to_list_app.
-  rewrite 4 vlookup_lookup_total.
-  generalize (v +++ w) as vw, (v' +++ w') as vw'.
-  rewrite Hnm, Hnm'.
-  cbn.
-  clear.
-  intros vw vw' Hperm.
-  induction vw as [v vw] using vec_S_inv.
-  induction vw as [w vw] using vec_S_inv.
-  induction vw using vec_0_inv.
-  cbn in Hperm.
-  apply Permutation_length_2_inv in Hperm as [-> | ->]; [done|].
-  cbn.
-  unfold h.
-  now rewrite andb_comm.
-Qed.
 
 
 
@@ -202,20 +175,6 @@ Proof.
   - now rewrite <- 2 vec_to_list_to_list.
 Qed.
 
-Lemma zsp_permutative n m r : permutative_tensor (@zsp n m r).
-Proof.
-  intros v v' w w' Hv Hw.
-  apply zsp_allb; rewrite 2 allb_forallb; now first [rewrite Hv|rewrite Hw].
-Qed.
-
-Lemma xsp_permutative n m r : permutative_tensor (@xsp n m r).
-Proof.
-  intros v v' w w' Hv Hw.
-  unfold xsp.
-  do 3 f_equal.
-  erewrite parity_perm; [reflexivity|].
-  rewrite 2 vec_to_list_app; now f_equiv.
-Qed.
 
 Lemma zsp_allb_app {n m n' m'} r v w v' w' :
   allb false (v +++ w) = allb false (v' +++ w') ->
@@ -229,29 +188,6 @@ Proof.
   now rewrite Hfalse, Htrue.
 Qed.
 
-Lemma zsp_strongly_permutative r : strongly_permutative_tensor (fun n m => @zsp n m r).
-Proof.
-  intros n n' m m' v w v' w' Hvw.
-  now apply zsp_allb_app; rewrite 2 allb_forallb, 2 vec_to_list_app, Hvw.
-Qed.
-
-Lemma xsp_strongly_permutative r : strongly_permutative_tensor (fun n m => @xsp n m r).
-Proof.
-  intros n n' m m' v w v' w' Hvw.
-  unfold xsp.
-  apply Permutation_length in Hvw as Hlen.
-  rewrite 2 length_app, 4 length_vec_to_list in Hlen.
-  f_equal; [now rewrite Hlen|].
-  erewrite parity_perm; [reflexivity|].
-  now rewrite 2 vec_to_list_app.
-Qed.
-
-#[global] Program Instance ZXCALC_SP : StronglyPermutativeTensorLike ZXCALC.
-Next Obligation.
-  destruct x as [[[] r]|]; cbn; 
-  [apply xsp_strongly_permutative|apply zsp_strongly_permutative|
-  apply h_stack1'_strong_perm].
-Qed.
 
 
 
