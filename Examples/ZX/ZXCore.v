@@ -6,6 +6,9 @@ Set Warnings "-stdlib-vector".
 Require Import Vector.
 Import VectorNotations.
 
+(* This file establishes a purely tensor-theoretic definition of the 
+  Z and X spiders of the ZX-calculus. *)
+
 #[global] 
 Program Instance C_SemiRing : SemiRing C C0 C1 Cplus Cmult eq.
 Next Obligation.
@@ -396,3 +399,104 @@ Proof.
 Qed.
 
 (* End ZX. *)
+
+From TensorRocqEx Require Import Rmodeq.
+
+
+(* FIXME: Move somewhere else *)
+Add Parametric Morphism : Cexp with signature
+  Rmodeq (2 * PI) ==> eq as Cexp_modeq_2PI.
+Proof.
+  unfold Cexp.
+  intros ? ? Heq.
+  f_equal;
+  now rewrite Heq.
+Qed.
+
+Add Parametric Morphism n m : (@zsp n m) with signature
+  Rmodeq (2 * PI) ==> equiv as zsp_modeq_2PI.
+Proof.
+  intros r r' Heq v w Hv Hw.
+  unfold zsp.
+  erewrite Cexp_modeq_2PI by apply Heq.
+  done.
+Qed.
+
+Add Parametric Morphism n m : (@xsp n m) with signature
+  Rmodeq (2 * PI) ==> equiv as xsp_modeq_2PI.
+Proof.
+  intros r r' Heq v w Hv Hw.
+  unfold xsp.
+  f_equal.
+  f_equal.
+  apply Cexp_modeq_2PI; case_match; now rewrite Heq.
+Qed.
+
+From TensorRocq Require Import Aux_stdpp.
+From stdpp Require Import vector.
+
+Definition h_stack' : @DimensionlessTensor C bool :=
+  fun n m v w =>
+  default C0 (uncurry h_stack ∘ Vector.splitat ((n+m)/2) <$>
+  vec_cast_opt (v +++ w) ((n + m)/2 + (n+m)/2)).
+
+Lemma h_stack'_refl n : h_stack' n n ≡ h_stack.
+Proof.
+  intros v w Hv Hw.
+  unfold h_stack'.
+  replace ((n + n) / 2) with n by (symmetry;
+    etransitivity; [|apply (Nat.div_mul _ 2); lia];
+    f_equal; lia).
+  rewrite vec_cast_opt_refl.
+  cbn.
+  now rewrite Vector.splitat_append.
+Qed.
+
+Definition h_stack1' : @DimensionlessTensor C bool :=
+  fun n m v w =>
+  default C0 (uncurry h_stack ∘ Vector.splitat 1 <$>
+  vec_cast_opt (v +++ w) (1 + 1)).
+
+Lemma h_stack1'_11 : h_stack1' 1 1 ≡ h_stack.
+Proof.
+  exact (h_stack'_refl 1).
+Qed.
+
+Lemma h_stack1'_ne n m : n + m <> 2 ->
+  h_stack1' n m ≡ const_tensor C0.
+Proof.
+  intros Hnm v w Hv Hw.
+  unfold h_stack1'.
+  now rewrite vec_cast_opt_ne by done.
+Qed.
+
+Lemma h_stack1'_ne_gen n m v w : n + m <> 2 ->
+  h_stack1' n m v w = C0.
+Proof.
+  intros Hnm.
+  unfold h_stack1'.
+  now rewrite vec_cast_opt_ne by done.
+Qed.
+
+Lemma h_stack1'_spec {n m} (H : n + m = 2) (v : vec bool n) (w : vec bool m) : 
+  h_stack1' n m v w =
+  h ((v+++w)!!!Fin.cast 0 (eq_sym H))
+    ((v+++w)!!!Fin.cast 1 (eq_sym H)).
+Proof.
+  unfold h_stack1'.
+  generalize (v +++ w) as vw.
+  clear v w.
+  rewrite H.
+  cbn.
+  intros vw.
+  induction vw as [v w'] using vec_S_inv.
+  induction w' as [w ?] using vec_S_inv.
+  apply Cmult_1_r.
+Qed.
+
+Lemma vlookup_lookup_total `{Inhabited A} {n} (v : vec A n) (i : fin n) :
+  v !!! i = vec_to_list v !!! (i:>nat).
+Proof.
+  rewrite list_lookup_total_alt.
+  now rewrite lookup_vec_to_list_fin.
+Qed.

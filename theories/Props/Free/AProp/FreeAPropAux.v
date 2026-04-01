@@ -1,4 +1,5 @@
-Require Export Homomorphism AProp FreeSemiRing GraphTerm Isomorphism.IsoAux.
+From TensorRocq Require Export Homomorphism AProp APropLike FreeSemiRing 
+  GraphTerm Isomorphism.IsoAux AbstractTensorQuote.
 
 
 (* FIXME: Move *)

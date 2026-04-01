@@ -3,7 +3,6 @@ Require Import Aux_pos.
 Require Import Tensor.
 From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
-(* Require Import ZXCore. *)
 Require ZifyBool.
 Require Import Syntax.Cospans Syntax.Permutations.
 

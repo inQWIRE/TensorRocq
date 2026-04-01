@@ -1,4 +1,4 @@
-Require Export AProp.
+From TensorRocq Require Export AProp AbstractTensorQuote.
 
 (* The class [APROPlike] encodes how the dependent type [D] behaves like
   an [AProp]. Specifically, we require [D] to have horizontal composition

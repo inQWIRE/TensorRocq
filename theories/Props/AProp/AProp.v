@@ -793,6 +793,46 @@ Definition Asw_inv {T} (l : list nat) : AProp T (length l) (length l) :=
   aprop_of_sw_inv (length l) l.
 
 
+
+Lemma APropQuote_inhab_convert_graph_restricted {R}
+  `{TensT : TensorLike R rO rI radd rmul req A T'} `{!WFSummable A}
+  `{Inhabited T'} (ctx : list T')
+  {n m} (ape ape' : AProp _ n m) (apv apv' : AProp T' n m):
+  APropQuote interp_discrete_hg_inhab ctx ape apv ->
+  AProp_graph_semantics ape ≡ₛ AProp_graph_semantics ape' ->
+  apv' = map_aprop (interp_discrete_hg_inhab ctx) ape' ->
+  AProp_semantics (TensT:=TensT) apv ≡ AProp_semantics apv'.
+Proof.
+  intros [Hapv] Hequiv ->.
+  rewrite <- Hapv.
+  rewrite <- 2 AProp_graph_semantics_correct.
+  rewrite 2 AProp_graph_semantics_map_aprop.
+  erewrite graph_semantics_syntactic_eq. 2:{
+    apply (graph_apply_hom_cohg_syntactic_eq_mor_Proper _ _), Hequiv.
+  }
+  done.
+Qed.
+
+Lemma sem_equiv_by_quote_inhab {R}
+  `{TensT : TensorLike R rO rI radd rmul req A T'} `{!WFSummable A}
+  `{Inhabited T'} (ctx : list T')
+  {n m} (ape ape' : AProp _ n m) (apv apv' : AProp T' n m)
+  ape_vm ape_vm' :
+  APropQuote interp_discrete_hg_inhab ctx ape apv ->
+  APropQuote interp_discrete_hg_inhab ctx ape' apv' ->
+  ape_vm = (AProp_graph_semantics ape) -> ape_vm' = (AProp_graph_semantics ape') ->
+  graph_iso_partial_test ape_vm ape_vm' = true ->
+  AProp_semantics (TensT:=TensT) apv ≡
+  AProp_semantics (TensT:=TensT) apv'.
+Proof.
+  intros Hap Hap' -> -> Heq%graph_iso_partial_test_correct.
+  pose (eq : Equiv positive).
+  now apply (APropQuote_correct_syntactic_eq interp_discrete_hg_inhab ctx (T':=T')
+    _ _ _ _ Hap Hap').
+Qed.
+
+
+
 Section Example.
 
 
