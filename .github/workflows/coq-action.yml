@@ -15,7 +15,6 @@ jobs:
           - '8.20'
           - '9.0'
           - '9.1'
-          - '9.2'
         ocaml_version:
           - 'default'
       fail-fast: false # don't stop jobs if one fails
@@ -27,7 +26,7 @@ jobs:
           before_install: |
             startGroup "Print opam config"
               opam update -y;
-              opam install -y rocq-stdpp;
+              opam install -y coq-stdpp;
               opam config list; opam repo list; opam list
             endGroup
           coq_version: ${{ matrix.coq_version }}
