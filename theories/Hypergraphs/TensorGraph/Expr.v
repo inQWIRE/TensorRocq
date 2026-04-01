@@ -60,7 +60,8 @@ Definition tg_list_to_deltas (is_output : bool)
   imap (λ idx input, (free $ bcons is_output (Pos.of_succ_nat idx), bound input))
     idxs.
 
-
+(* The interpretation of a cospan of a hypergraph as a syntactic 
+  [namedtensorlist]. *)
 Definition graph_namedtensorlist_semantics {n m} (tg : TensorGraph n m) : namedtensorlist := {|
   ntl_sums := elements (vertices tg);
   ntl_abstracts := tg_abstracts tg.(hedges);
@@ -69,6 +70,8 @@ Definition graph_namedtensorlist_semantics {n m} (tg : TensorGraph n m) : namedt
 |}.
 
 
+(* The interpretation of a cospan of a hypergraph as a syntactic cospan of
+  [namedtensorlist], representing a tensor. *)
 Definition graph_contl_semantics {n m} (tg : TensorGraph n m) :
   CospanNamedTensorList n m :=
   mk_contl (graph_namedtensorlist_semantics tg)

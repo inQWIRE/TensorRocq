@@ -28,7 +28,8 @@ Definition graph_map_semantics
     (graph_namedtensorlist_semantics tg).
 
 
-
+(* The semantic interpretation of a graph as a tensor, defined via
+  [namedtensorlist]s. *)
 Definition graph_semantics
   {n m} (tg : TensorGraph n m) : @Tensor R n m A :=
   namedtensorlist_to_tensor (SR:=SR) (graph_mabs tg.(hedges))

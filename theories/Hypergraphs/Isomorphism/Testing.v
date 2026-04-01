@@ -1,6 +1,8 @@
 Require Import TensorGraph.Definitions.
 Require Import Isomorphism.IsoAux.
 
+(* In this file, we define an efficient graph isomorphism testing function
+  which we verify to be correct [graph_iso_partial_test]. *)
 
 Lemma isomorphic_of_map_to_list_perm {T} {n m}
   (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :

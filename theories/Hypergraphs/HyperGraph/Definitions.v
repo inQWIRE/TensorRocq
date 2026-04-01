@@ -6,12 +6,15 @@ Require Import HyperGraph.Facts.
 
 (* A hyper edge is an indicator for the edge type and the source and target vertices *)
 Notation HyperEdge T := (T * list positive * list positive)%type.
-(* A HyperGraph representation where edges have a type T and the graph is represented as a map of positives to (edge_data, input_vertices, output_vertices) *)
+
 #[export] Instance HyperEdge_equiv `{Equiv T} : Equiv (HyperEdge T) :=
   prod_relation (prod_relation (≡) (=)) (=).
 
 Notation "x → t ← y" := (t, x, y). 
 
+(* A [HyperGraph] representation where edges have a type [T] and the
+  graph is represented as a map of positives to [HyperEdge]s
+  (edge_data, input_vertices, output_vertices) *)
 Record HyperGraph {T} := mk_hg {
   (* The edges of the hypergraph *)
   hyperedges : Pmap (T * list positive * list positive);

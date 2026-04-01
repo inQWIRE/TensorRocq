@@ -8,7 +8,10 @@ From TensorRocq Require Import Syntax.
 (* Basic definitions and structural operations on TensorGraphs *)
 
 
-(* A graph with h(yper)edges labeled by elements of [T] *)
+(* A hypergraph with interfaces, recorded as a cospan. 
+  Specifically, contains a [HyperGraph] along with the inputs
+  and outputs of the diagram. We record these as vectors to store
+  sizes and thereby ensure well-typing of composition. *)
 Record CospanHyperGraph {T : Type} {n m : nat} := mk_cohg {
   hedges : HyperGraph T;
   inputs : vec positive n;
@@ -227,13 +230,16 @@ Proof.
   tauto.
 Qed.
 
-
+(* Relabel the vertices of a graph *)
 Definition relabel_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
   mk_cohg (relabel_hg f tg.(hedges)) (vmap f tg.(inputs)) (vmap f tg.(outputs)).
 
+(* Reindex the edges of a graph *)
 Definition reindex_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
   mk_cohg (reindex_hg f tg.(hedges)) tg.(inputs) tg.(outputs).
 
+(* Two graphs are isomorphic if one can be simultaneously
+  relabeled and reindexed, by injective functions, to become the other. *)
 Inductive isomorphic : relation CoHyGraph :=
   | iso_relabel_reindex tg fedge fvert
     `{Hfe : !Inj eq eq fedge} `{Hfv : !Inj eq eq fvert} :
@@ -574,6 +580,9 @@ Proof.
     now rewrite invfun_linv by first [intros ????;apply Hf|easy].
 Qed.
 
+(* If the type of edge indices has an stdpp [Equiv] instance, 
+  we have an induced notion of graph equivalence up to this equiv,
+  which we call [cohg_eq], later notated [≡ₕ] *)
 Definition cohg_eq `{Equiv T} : relation CoHyGraph :=
   fun cohg cohg' =>
   cohg.(inputs) = cohg'.(inputs) /\
@@ -639,6 +648,10 @@ Definition stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
   cohg.(inputs) +++ cohg'.(inputs) -> cohg.(hedges) ∪ cohg'.(hedges) <-
     cohg.(outputs) +++ cohg'.(outputs).
 
+(* The vertical composition of hypergraphs with interfaces. We define this 
+  via an auxiliary function which requires the two graphs to be disjoint
+  (in both vertices and edge indices), ensuring that by relabeling and 
+  reindexing each graph. *)
 Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T n' m') : CospanHyperGraph T (n + n') (m + m') :=
   stack_graphs_aux
@@ -648,7 +661,6 @@ Definition stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
 
 
 
-(* TODO: Rewrite with a new Vector.remove function returning a [vec A (pred n)] *)
 Definition add_top_loop {T n m} (cohg : CospanHyperGraph T (S n) (S m)) : CospanHyperGraph T n m :=
   relabel_graph {[Vector.hd cohg.(outputs) := Vector.hd cohg.(inputs)]} (
   Vector.tl cohg.(inputs) ->
@@ -690,6 +702,9 @@ Definition swapped_stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
     (relabel_graph (bcons false) (reindex_graph (bcons false) cohg))
     (relabel_graph (bcons true) (reindex_graph (bcons true) cohg')).
 
+(* An alternate definition of horizontal composition that sews graphs
+  together one connection at a time, rather than all at once.
+  This is used to prove the semantic correctness of hypergraph composition. *)
 Definition compose_graphs_alt {T n m o} (cohg : CospanHyperGraph T n m)
   (cohg' : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
   add_top_loops (swapped_stack_graphs cohg cohg').
@@ -706,20 +721,25 @@ Bind Scope graph_scope with CospanHyperGraph. *)
 (* Open Scope graph_scope.
 Open Scope nat. *)
 
-
+(* The identity graph of size [n] *)
 Definition id_graph {T} (n : nat) : CospanHyperGraph T n n :=
   vmap (Pos.of_succ_nat) (vseq 0 n) -> ∅ <- vmap (Pos.of_succ_nat) (vseq 0 n).
 
+(* The graph swapping its first [n] inputs with the last [m] *)
 Definition swap_graph {T} n m : CospanHyperGraph T (n + m) (m + n) :=
   vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq n m) -> ∅
     <- vmap (Pos.of_succ_nat) (vseq n m +++ vseq 0 n).
 
+(* The cup graph of size [n] *)
 Definition cup_graph {T} n : CospanHyperGraph T 0 (n + n) :=
   [#] -> ∅ <- vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq 0 n).
 
+(* The cap graph of size [n] *)
 Definition cap_graph {T} n : CospanHyperGraph T (n + n) 0 :=
   vmap (Pos.of_succ_nat) (vseq 0 n +++ vseq 0 n) -> ∅ <- [#].
 
+(* The graph encoding a single tensor, represented by an element [t : T],
+  with [n] inputs and [m] outputs. *)
 Definition graph_of_tensor {T} (t : T) (n m : nat) : CospanHyperGraph T n m :=
   vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ->
     {[xH := (t, (bcons false ∘ Pos.of_succ_nat) <$> (seq 0 n),
@@ -958,6 +978,8 @@ Proof.
 Qed.
 
 
+(* Two graphs are [cohg_vert_eq], notated [≡ᵥ] if they have the 
+  same edges and their vertex sets are identical. *)
 Definition cohg_vert_eq {T} {n m} (cohg cohg' : CospanHyperGraph T n m) :=
   norm_verts cohg = norm_verts cohg'.
 
@@ -1031,7 +1053,12 @@ Proof.
   reflexivity.
 Qed.
 
-
+(* We define the [Equiv] relation on cospans of hypergraphs to be the
+  reflexive, transitive closure of the union of [cohg_eq] and [cohg_vert_eq]. 
+  (This is equivalent to their composition as relations.) 
+  This encodes that graphs differ only up to edge labels which are [≡] to 
+  each other and inclusion or exclusion from [hypervertices] of vertices
+  which appear in the rest of the graph. *)
 #[export] Instance CospanHyperGraph_equiv `{Equiv T} {n m} :
   Equiv (CospanHyperGraph T n m) :=
   rtc (cohg_eq ∪ cohg_vert_eq).
@@ -1121,7 +1148,9 @@ Proof.
     done.
 Qed.
 
-
+(* The weak extension of [isomorphic] to vare only about vertex set,
+  rather than [hypervertices] directly. Equivalent to the (reflexive, 
+  transitive closure of) the union of [isomorphic] and [cohg_vert_eq]. *)
 Definition struct_isomorphic {T n m} (cohg cohg' : CospanHyperGraph T n m) :=
   isomorphic (norm_verts cohg) (norm_verts cohg').
 
@@ -1241,6 +1270,9 @@ Proof.
     destruct Hab as [Hab|Hab]; now rewrite Hab.
 Qed.
 
+(* Two graphs are syntactically equivalent if they are isomorphic up to [≡]. 
+  This is equivalent to the transitive closure of the union of [isomorphic],
+  [cohg_eq], and [cohg_vert_eq]. This is denoted [≡ₛ]. *)
 Inductive cohg_syntactic_eq `{Equiv T} {n m} : relation (CospanHyperGraph T n m) :=
   | cohg_syntactic_eq_relabel_reindex cohg cohg' fv fe : Inj eq eq fv -> Inj eq eq fe ->
     cohg_eq (norm_verts cohg) (norm_verts cohg') ->
@@ -1938,7 +1970,8 @@ Section Compose.
         hg_add_vertices (tgl.(hedges) ∪ tgr.(hedges)) (list_to_set tgr.(inputs) ∖ (vertices_hg tgl ∪ vertices_hg tgr))
           <- tgr.(outputs)).
 
-  (* Reserved Notation "tgl ; tgr" (at level 50). *)
+  (* The horizontal composition of graphs. We must relabel the vertices to 
+    account for duplicate outputs and inputs. *)
   Definition compose_graphs {n m o} (tgl : CospanHyperGraph T n m) (tgr : CospanHyperGraph T m o) : CospanHyperGraph T n o :=
     let connected_substs :=
         propogate_subst (vzip (vmap (bcons false) tgl.(outputs)) (vmap (bcons true) tgr.(inputs))) in
