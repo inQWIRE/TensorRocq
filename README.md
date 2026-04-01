@@ -10,7 +10,7 @@ For an example of abstract reasoning, see [FrobExample.v](Examples/FrobExample.v
 
 ## Setup
 
-To compile TensorRocq, you will need [Rocq](https://rocq-prover.org/) (formerly known as Coq) and [stdpp](https://gitlab.mpi-sws.org/iris/stdpp/). In order to build the examples, you will also need the [QuantumLib](https://github.com/inQWIRE/QuantumLib) and [VyZX](https://github.com/inQWIRE/VyZX) libraries. We strongly recommend using [opam](https://opam.ocaml.org/doc/Install.html) to install Rocq and `opam switch` to manage Rocq versions. We currently support Rocq **version 8.20**. If you run into errors when compiling our proofs, first check your version of Rocq (`coqc -v`).
+To compile TensorRocq, you will need [Rocq](https://rocq-prover.org/) (formerly known as Coq) and [stdpp](https://gitlab.mpi-sws.org/iris/stdpp/). In order to build the examples, you will also need the [QuantumLib](https://github.com/inQWIRE/QuantumLib) and [VyZX](https://github.com/inQWIRE/VyZX) libraries. We strongly recommend using [opam](https://opam.ocaml.org/doc/Install.html) to install Rocq and `opam switch` to manage Rocq versions. We currently support Rocq **versions 8.20–9.2** for TensorRocq, and version 8.20 for the examples. If you run into errors when compiling our proofs, first check your version of Rocq (`coqc -v`).
 
 Assuming you have opam and Rocq installed (following the instructions in the link above), follow the steps below to set up your environment to use TensorRocq.
 
@@ -21,7 +21,7 @@ First, install [stdpp](https://gitlab.mpi-sws.org/iris/stdpp/) through opam.
 ```bash
 opam repo add coq-released https://coq.inria.fr/opam/released
 opam update
-opam install coq-stdpp
+opam install rocq-stdpp
 ```
 
 Then, TensorRocq can be installed through opam.
@@ -64,7 +64,7 @@ Finally, run `make examples`.
 
 
 *Notes*:
-* We require Coq version 8.20.
+* We require Coq versions 8.20–9.2, and version 8.20 for the examples
 
 
 <!-- TODO: ## Directory Contents -->
