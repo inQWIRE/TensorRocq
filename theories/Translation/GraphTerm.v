@@ -1,4 +1,4 @@
-Require Export TensorGraph AProp.
+Require Export CospanHyperGraph AProp.
 
 
 (* FIXME: Move *)

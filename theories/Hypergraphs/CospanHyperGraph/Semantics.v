@@ -1,4 +1,4 @@
-Require Export Syntax TensorGraph.Definitions TensorGraph.Expr.
+Require Export Syntax CospanHyperGraph.Definitions CospanHyperGraph.Expr.
 
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
 

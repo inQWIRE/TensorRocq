@@ -1,4 +1,4 @@
-Require Import TensorGraph.Definitions.
+Require Import CospanHyperGraph.Definitions.
 Require Import Isomorphism.IsoAux.
 
 (* In this file, we define an efficient graph isomorphism testing function

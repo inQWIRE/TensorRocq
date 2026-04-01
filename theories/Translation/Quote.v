@@ -1,5 +1,5 @@
 From TensorRocq Require Import GraphRewriting.
-From TensorRocq Require Import AbstractTensorQuote HyperGraph TensorGraph.
+From TensorRocq Require Import AbstractTensorQuote HyperGraph CospanHyperGraph.
 
 Class CospanHyperGraphQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T')
   (ctx : Ctx) {n m} (expr : CospanHyperGraph T n m) (val : CospanHyperGraph T' n m) := {

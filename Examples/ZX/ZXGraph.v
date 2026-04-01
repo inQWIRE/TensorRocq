@@ -1,4 +1,4 @@
-From TensorRocq Require Import Tensor TensorGraph.
+From TensorRocq Require Import Tensor CospanHyperGraph.
 From QuantumLib Require Export Complex.
 From TensorRocqEx Require Import Rmodeq ZXCore. 
 Open Scope nat_scope.

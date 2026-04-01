@@ -1,5 +1,5 @@
 From stdpp Require Export pmap gmap decidable.
-From TensorRocq Require Import TensorGraph HyperGraph Aux_pos Syntax Aux_stdpp.
+From TensorRocq Require Import CospanHyperGraph HyperGraph Aux_pos Syntax Aux_stdpp.
 
 Local Open Scope nat_scope.
 

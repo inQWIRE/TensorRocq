@@ -1,5 +1,5 @@
 Require Export Setoid. 
-From TensorRocq Require Export Tensor TensorGraph GraphRewriting.
+From TensorRocq Require Export Tensor CospanHyperGraph GraphRewriting.
 
 (* The [AProp] with generators [T] is the PROP with generators [T]
   (of all sizes), along with cups and caps.

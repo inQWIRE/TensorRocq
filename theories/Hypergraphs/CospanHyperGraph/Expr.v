@@ -1,4 +1,4 @@
-Require Export TensorGraph.Definitions Isomorphism.Testing Aux_pos.
+Require Export CospanHyperGraph.Definitions Isomorphism.Testing Aux_pos.
 
 Require Export Syntax.Definitions Syntax.Cospans.
 
@@ -46,7 +46,7 @@ Context {T : Type}.
 
 Let TensorGraph := (CospanHyperGraph T).
 
-(* Implicit Types tg : TensorGraph. *)
+(* Implicit Types tg : CospanHyperGraph. *)
 
 
 Definition tg_abstracts (tm : Pmap (T * list positive * list positive)) :

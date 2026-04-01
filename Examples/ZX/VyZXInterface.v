@@ -1,2 +1,2 @@
 From TensorRocqEx Require Export ZXGraph VyZXTensor.
-From TensorRocq Require Export TensorGraph.Semantics.
+From TensorRocq Require Export CospanHyperGraph.Semantics.

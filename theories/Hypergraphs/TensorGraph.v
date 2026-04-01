@@ -1,1 +1,0 @@
-From TensorRocq Require Export TensorGraph.Definitions TensorGraph.Expr TensorGraph.Facts TensorGraph.Hom TensorGraph.Ops TensorGraph.Semantics.

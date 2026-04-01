@@ -1,4 +1,4 @@
-Require Import TensorGraph.Facts.
+Require Import CospanHyperGraph.Facts.
 
 
 

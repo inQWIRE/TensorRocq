@@ -1,5 +1,5 @@
-Require Export TensorGraph.Definitions TensorGraph.Expr
-  TensorGraph.Semantics.
+Require Export CospanHyperGraph.Definitions CospanHyperGraph.Expr
+  CospanHyperGraph.Semantics.
 
 
 

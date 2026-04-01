@@ -1,4 +1,4 @@
-Require Export TensorGraph.Expr TensorGraph.Semantics.
+Require Export CospanHyperGraph.Expr CospanHyperGraph.Semantics.
 Require Import Aux_pos.
 Require Import Tensor.
 From stdpp Require Import list fin_maps.
