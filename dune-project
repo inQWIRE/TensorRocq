@@ -17,7 +17,7 @@
  (synopsis "Rocq library providing hypergraph rewriting using tensor semantics")
  (homepage https://github.com/inQWIRE/tensor-rocq/)
  (bug_reports https://github.com/inQWIRE/tensor-rocq/issues)
- (depends (coq-stdpp (>= 8.20.0)))
+ (depends (coq-stdpp (>= 0)))
 )
 
 (package
