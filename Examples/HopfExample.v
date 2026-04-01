@@ -1,4 +1,4 @@
-From TensorRocq Require Export FreeAProp.
+From TensorRocq Require Export AbstractReasoning.
 
 Local Open Scope aprop_scope.
 

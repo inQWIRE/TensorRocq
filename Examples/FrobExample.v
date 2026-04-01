@@ -1,9 +1,9 @@
-From TensorRocq Require Export FreeAProp.
+From TensorRocq Require Export AbstractReasoning.
 
-(** To support reasoning about abstract theories in the style of CHyP,
+(** To support reasoning about abstract theories in the style of chyp,
   we use a system that involves some boilerplate code. To demonstrate
   how this is done, we provide the following direct translation of the 
-  Frobenius algebra example from CHyP
+  Frobenius algebra example from chyp
   (frobenius.chyp)[https://github.com/akissinger/chyp/blob/master/examples/frobenius.chyp].
   (The original comments are included inline, as appropriate.)
   *)
@@ -99,7 +99,7 @@ would imply "frob". However, for non-commutative Frobenius algebras, we need the
 both. *)
 
 
-(** Now, we can prove lemmas in the same way as CHyP *)
+(** Now, we can prove lemmas in the same way as chyp *)
 Lemma frobL_chyp : n * id ;' id * m == m ;' n.
 Proof.
   (** The original proof is as follows:
@@ -154,8 +154,8 @@ Proof.
   smcat.
 Qed.
 
-(** As with CHyP, we can define derived morphisms. 
-  This is the final element to translate CHyP files; 
+(** As with chyp, we can define derived morphisms. 
+  This is the final element to translate chyp files; 
   we include the rest for reference. *)
 Definition cup : AProp _ _ _ := u ;' n.
 Definition cap : AProp _ _ _ := m ;' v.

@@ -1,4 +1,4 @@
-From TensorRocq Require Import FreeAProp.
+From TensorRocq Require Import AbstractReasoning.
 
 Notation "x === y" :=
   (existT _ (existT _ (x%aprop, y%aprop)) : {n & {m & (AProp (fin 6) n m * AProp (fin 6) n m)%type}})
