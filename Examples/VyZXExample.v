@@ -26,7 +26,7 @@ From TensorRocqEx Require Import Rmodeq.
   [Some (inr c)] being a constant gadget with value [c]. *)
 Definition ZXCVERT := option (bool * R + C).
 
-(* As a technical detail, we must show the type of generators is nonempty *)
+(* We must show the type of generators is nonempty *)
 #[export] Instance ZXCVERT_inhab : Inhabited ZXCVERT := populate None.
 
 (* We define the natural equivalence relation on [ZXCVERT], with phases
@@ -55,7 +55,6 @@ Definition ZXCCALC_tensor (x : ZXCVERT) : DimensionlessTensor bool :=
   Proper ((≡) ==> (≡)) ZXCCALC_tensor.
 Proof.
   intros x x' Heq.
-
   induction Heq as [x y Heq|]; [|done..].
   induction Heq as [ [ [] x] [c y] [ [= <-] Heq]|? ? <-]; [..|done];
   cbn;
@@ -68,7 +67,6 @@ Qed.
 #[export] Instance ZXCCALC : TensorLike C bool ZXCVERT := {
   interpretTensor := ZXCCALC_tensor;
 }.
-
 
 
 (* We declare the equivalence relation assocaited to ZX-diagrams *)
@@ -90,7 +88,6 @@ Defined.
 
 (* With this definition in place, we must declare the typeclass instances
   defining how to convert between ZX-diagrams and AProp diagrams. *)
-
 
 Section ZXquote.
 
@@ -448,9 +445,6 @@ End ZXdenote.
   notypeclasses refine (zx_denote_stack _ _ ap ap' _ _) : typeclass_instances.
 
 
-
-
-
 (* Then, we can instantiate the generic rewriting tactics with our instances. *)
 
 (* Prove that ZX terms corresponding to isomorphic hypergraphs are \propto= *)
@@ -515,6 +509,7 @@ Proof.
   unshelve (rewrite (X_wrap_under_bot_right 1)); [lia..|].
   zxclean_lhs.
   rewrite cup_Z.
+  
   zxrw (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
   
   rewrite <- Z_0_is_wire at 1.
