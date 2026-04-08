@@ -61,6 +61,10 @@ Definition cast_aprop {T n m n' m'}
   | right HFn => False_rect _ (HFn Hn)
   end.
 
+
+Notation cast_aprop' Hn Hm ap :=
+  (cast_aprop (eq_sym Hn) (eq_sym Hm) ap) (only parsing).
+
 Lemma cast_aprop_id {T n m} (ap : AProp T n m) Hn Hm : cast_aprop Hn Hm ap = ap.
 Proof.
   unfold cast_aprop.
@@ -332,6 +336,15 @@ Proof.
     now apply stack_tensor_mor.
   - cbn.
     apply graph_semantics_graph_of_tensor.
+Qed.
+
+Lemma AProp_graph_semantics_cast {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (ap : AProp T n m) :
+  AProp_graph_semantics (cast_aprop Hn Hm ap) =
+  cast_graph Hn Hm (AProp_graph_semantics ap).
+Proof.
+  subst.
+  now rewrite cast_aprop_id, cast_graph_id.
 Qed.
 
 Lemma AProp_graph_semantics_map_aprop {T T'} (f : T -> T')

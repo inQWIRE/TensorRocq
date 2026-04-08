@@ -831,11 +831,6 @@ Proof.
   split_and!; [apply _..|done].
 Qed.
 
-Lemma vertices_vertices_hg_decomp {n m} (cohg : CospanHyperGraph T n m) :
-  vertices cohg = vertices_hg cohg ∪ list_to_set (inputs cohg ++ outputs cohg).
-Proof.
-  done.
-Qed.
 
 Lemma subst_by_vec_notin {n} (v : vec _ n) p :
   p ∉ v.*1 ->

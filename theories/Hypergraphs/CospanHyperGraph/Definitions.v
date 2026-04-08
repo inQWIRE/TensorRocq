@@ -1,6 +1,6 @@
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
-Require Export Aux_stdpp Aux_pos.
+From TensorRocq Require Export Aux_stdpp Aux_pos.
 From TensorRocq Require Export Tensor HyperGraph.
 From TensorRocq Require Import Syntax.
 
@@ -2388,3 +2388,101 @@ Proof.
 Qed.
 
 End Compose.
+
+Lemma vertices_vertices_hg_decomp {T n m} (cohg : CospanHyperGraph T n m) :
+  vertices cohg = vertices_hg cohg ∪ list_to_set (inputs cohg ++ outputs cohg).
+Proof.
+  done.
+Qed.
+
+
+Definition cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) : CospanHyperGraph T n' m' :=
+  mk_cohg cohg (Vector.cast (inputs cohg) Hn)
+    (Vector.cast (outputs cohg) Hm).
+
+#[global] Arguments cast_graph {_ _ _ _ _} _ _ !_ /.
+
+Lemma cast_graph_id {T n m} Hn Hm (cohg : CospanHyperGraph T n m) :
+  cast_graph Hn Hm cohg = cohg.
+Proof.
+  now destruct cohg; cbn; rewrite 2 cast_id.
+Qed.
+
+
+Lemma hedges_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  hedges (cast_graph Hn Hm cohg) = hedges cohg.
+Proof.
+  now subst.
+Qed.
+
+Lemma inputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  inputs (cast_graph Hn Hm cohg) = Vector.cast (inputs cohg) Hn.
+Proof.
+  subst.
+  now rewrite cast_graph_id, cast_id.
+Qed.
+
+Lemma outputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  outputs (cast_graph Hn Hm cohg) = Vector.cast (outputs cohg) Hm.
+Proof.
+  subst.
+  now rewrite cast_graph_id, cast_id.
+Qed.
+
+Lemma vertices_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  vertices (cast_graph Hn Hm cohg) = vertices cohg.
+Proof.
+  rewrite 2 vertices_vertices_hg_decomp.
+  simpl.
+  now rewrite 2 vec_to_list_cast.
+Qed.
+
+
+Lemma cast_graph_add_top_loop {T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T (S n) (S m)) :
+  cast_graph Hn Hm (add_top_loop cohg) =
+  add_top_loop (cast_graph (f_equal S Hn) (f_equal S Hm) cohg).
+Proof.
+  subst; now rewrite 2 cast_graph_id.
+Qed.
+
+Lemma cast_graph_add_top_loops {T o n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T (o + n) (o + m)) :
+  cast_graph Hn Hm (add_top_loops cohg) =
+  add_top_loops (cast_graph (f_equal (Nat.add o) Hn) (f_equal (Nat.add o) Hm) cohg).
+Proof.
+  subst; now rewrite 2 cast_graph_id.
+Qed.
+
+Lemma cast_pair_to_cast_graph {T nm nm'}
+  (cohg : CospanHyperGraph T nm.1 nm.2) (H : nm = nm') :
+  eq_rect nm (λ nm, CospanHyperGraph T nm.1 nm.2) cohg nm' H =
+  cast_graph (f_equal fst H) (f_equal snd H) cohg.
+Proof.
+  now subst; rewrite cast_graph_id.
+Qed.
+
+Lemma eq_rect_r_to_cast_graph {T nm nm'}
+  (cohg : CospanHyperGraph T nm.1 nm.2) (Heq : nm' = nm) :
+  eq_rect_r (λ ab : nat * nat, CospanHyperGraph T ab.1 ab.2)
+    cohg Heq =
+  cast_graph (eq_sym (f_equal fst Heq)) (eq_sym (f_equal snd Heq)) cohg.
+Proof.
+  subst.
+  cbn.
+  now rewrite cast_graph_id.
+Qed.
+
+Lemma cast_graph_cast_graph {T n m n' m' n'' m''}
+  (Hn : n = n') (Hm : m = m') (Hn' : n' = n'') (Hm' : m' = m'')
+  (cohg : CospanHyperGraph T n m) :
+  cast_graph Hn' Hm' (cast_graph Hn Hm cohg) =
+  cast_graph (eq_trans Hn Hn') (eq_trans Hm Hm') cohg.
+Proof.
+  subst; now rewrite 3 cast_graph_id.
+Qed.

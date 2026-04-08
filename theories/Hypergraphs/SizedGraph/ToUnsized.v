@@ -2057,19 +2057,6 @@ Qed.
   (at level 10, Hn at level 9, Hm at level 9, cohg at level 9) : cohg_scope. *)
 
 
-Definition cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T n m) : CospanHyperGraph T n' m' :=
-  mk_cohg cohg (Vector.cast (inputs cohg) Hn)
-    (Vector.cast (outputs cohg) Hm).
-
-#[global] Arguments cast_graph {_ _ _ _ _} _ _ !_ /.
-
-Lemma cast_graph_id {T n m} Hn Hm (cohg : CospanHyperGraph T n m) :
-  cast_graph Hn Hm cohg = cohg.
-Proof.
-  now destruct cohg; cbn; rewrite 2 cast_id.
-Qed.
-
 (* Notation "'cast_sized_graph' Hn Hm cohg" :=
   (eq_rect _ (λ k, SizedCospanHyperGraph _ _ k _)
     (eq_rect _ (SizedCospanHyperGraph _ _ _) cohg%scohg _ Hm) _ Hn)
@@ -2088,28 +2075,6 @@ Proof.
   now destruct cohg; cbn; rewrite cast_graph_id.
 Qed.
 
-Lemma hedges_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T n m) :
-  hedges (cast_graph Hn Hm cohg) = hedges cohg.
-Proof.
-  now subst.
-Qed.
-
-Lemma inputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T n m) :
-  inputs (cast_graph Hn Hm cohg) = Vector.cast (inputs cohg) Hn.
-Proof.
-  subst.
-  now rewrite cast_graph_id, cast_id.
-Qed.
-
-Lemma outputs_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T n m) :
-  outputs (cast_graph Hn Hm cohg) = Vector.cast (outputs cohg) Hm.
-Proof.
-  subst.
-  now rewrite cast_graph_id, cast_id.
-Qed.
 
 Lemma subst_by_vec_ext_to_list {n m}
   (v : vec _ n) (w : vec _ m) :
@@ -2684,14 +2649,6 @@ Proof.
   done.
 Qed.
 
-Lemma vertices_cast_graph {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T n m) :
-  vertices (cast_graph Hn Hm cohg) = vertices cohg.
-Proof.
-  rewrite 2 vertices_vertices_hg_decomp.
-  simpl.
-  now rewrite 2 vec_to_list_cast.
-Qed.
 
 Lemma sized_graph_to_graph_add_top_loop {N T n m}
   (f : N -> nat) (scohg : SizedCospanHyperGraph N T (S n) (S m)) :
@@ -2924,21 +2881,6 @@ Proof.
   intros; now rewrite 2 cast_graph_id.
 Qed.
 
-Lemma cast_graph_add_top_loop {T n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T (S n) (S m)) :
-  cast_graph Hn Hm (add_top_loop cohg) =
-  add_top_loop (cast_graph (f_equal S Hn) (f_equal S Hm) cohg).
-Proof.
-  subst; now rewrite 2 cast_graph_id.
-Qed.
-
-Lemma cast_graph_add_top_loops {T o n m n' m'} (Hn : n = n') (Hm : m = m')
-  (cohg : CospanHyperGraph T (o + n) (o + m)) :
-  cast_graph Hn Hm (add_top_loops cohg) =
-  add_top_loops (cast_graph (f_equal (Nat.add o) Hn) (f_equal (Nat.add o) Hm) cohg).
-Proof.
-  subst; now rewrite 2 cast_graph_id.
-Qed.
 
 Lemma add_top_loops_assoc {T n m o p}
   (cohg : CospanHyperGraph T (n + (m + o)) (n + (m + p))) :
@@ -2954,25 +2896,6 @@ Proof.
     do 4 f_equal; apply proof_irrel.
 Qed.
 
-Lemma eq_rect_r_to_cast_graph {T nm nm'}
-  (cohg : CospanHyperGraph T nm.1 nm.2) (Heq : nm' = nm) :
-  eq_rect_r (λ ab : nat * nat, CospanHyperGraph T ab.1 ab.2)
-    cohg Heq =
-  cast_graph (eq_sym (f_equal fst Heq)) (eq_sym (f_equal snd Heq)) cohg.
-Proof.
-  subst.
-  cbn.
-  now rewrite cast_graph_id.
-Qed.
-
-Lemma cast_graph_cast_graph {T n m n' m' n'' m''}
-  (Hn : n = n') (Hm : m = m') (Hn' : n' = n'') (Hm' : m' = m'')
-  (cohg : CospanHyperGraph T n m) :
-  cast_graph Hn' Hm' (cast_graph Hn Hm cohg) =
-  cast_graph (eq_trans Hn Hn') (eq_trans Hm Hm') cohg.
-Proof.
-  subst; now rewrite 3 cast_graph_id.
-Qed.
 
 Lemma bundled_cohg_vert_eq_iff_cast {T n m n' m'}
   (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
@@ -4354,13 +4277,6 @@ Proof.
     done.
 Qed.
 
-Lemma cast_pair_to_cast_graph {T nm nm'}
-  (cohg : CospanHyperGraph T nm.1 nm.2) (H : nm = nm') :
-  eq_rect nm (λ nm, CospanHyperGraph T nm.1 nm.2) cohg nm' H =
-  cast_graph (f_equal fst H) (f_equal snd H) cohg.
-Proof.
-  now subst; rewrite cast_graph_id.
-Qed.
 
 
 Lemma sized_graph_to_graph_cup_sized_graph {N T} (f : N -> nat)
