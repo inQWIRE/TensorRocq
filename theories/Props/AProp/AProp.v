@@ -521,7 +521,46 @@ Proof.
   now apply graph_semantics_syntactic_eq.
 Qed.
 
+Lemma APropQuote_correct_syntactic_eq' `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  `{Equiv T}
+  `{Equiv T', Equivalence T' equiv} `{TensT' : !TensorLike R A T'}
+  {Ctx} (f : Ctx -> T -> T') (ctx : Ctx) `{Hfprop : !Proper (equiv ==> equiv) (f ctx)}
+  {n m} (ape ape' : AProp T n m) (apv apv' : AProp T' n m) :
+  APropQuote f ctx ape apv -> APropQuote f ctx ape' apv' ->
+  AProp_graph_semantics ape ≡ₛ AProp_graph_semantics ape' ->
+  AProp_graph_semantics apv ≡ₛ AProp_graph_semantics apv'.
+Proof.
+  intros [Hape%AProp_graph_semantics_equiv_Proper] [Hape'%AProp_graph_semantics_equiv_Proper].
+  intros Heq.
+  rewrite <- Hape, <- Hape'.
+  rewrite 2 AProp_graph_semantics_map_aprop.
+  (* rewrite <- 2 (graph_semantics_norm_verts (graph_apply_hom _ _)). *)
+  (* rewrite <- 2 graph_apply_hom_norm_verts. *)
+  apply (graph_apply_hom_cohg_syntactic_eq_mor_Proper (f ctx) _) in Heq.
+  done.
+Qed.
 
+
+Ltac quote_AP :=
+  lazymatch goal with
+  | |- APropQuote ?f ?ctx _ ?apv =>
+    lazymatch apv with
+    | Agen ?t ?n ?m =>
+      notypeclasses refine (aprop_quote_gen f ctx _ t n m _);
+      first [quote_discrete|typeclasses eauto|idtac]
+    | Acompose ?apv1 ?apv2 =>
+      notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _);
+      quote_AP
+    | Astack ?apv1 ?apv2 =>
+      notypeclasses refine (aprop_quote_stack f ctx _ _ apv1 apv2 _ _);
+      quote_AP
+    | Aid ?n => notypeclasses refine (aprop_quote_id f ctx n)
+    | Acup ?n => notypeclasses refine (aprop_quote_cup f ctx n)
+    | Acap ?n => notypeclasses refine (aprop_quote_cap f ctx n)
+    | Aswap ?n ?m => notypeclasses refine (aprop_quote_swap f ctx n m)
+    end
+  end.
 
 (* Definition graph_of_tensor_at {T} (k : positive) t n m : CospanHyperGraph T n m :=
   vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n) ->

@@ -1,4 +1,7 @@
 From TensorRocq Require Export AbstractReasoning.
+
+From TensorRocq Require Import MProp.Automation.
+
 Require Import QArith Qcanon.
 
 
@@ -26,10 +29,10 @@ Notation Z n m q := (Agen (0%fin :> fin 3, q%Qc) n m) (only parsing).
 Notation X n m q := (Agen (1%fin :> fin 3, q%Qc) n m) (only parsing).
 Notation H n     := (Agen (2%fin :> fin 3, 0)    n n) (only parsing).
 
-Notation "'Z' n m q" := (Agen (0%fin, q) n m) (only printing, 
+Notation "'Z' n m q" := (Agen (0%fin, q) n m) (only printing,
   n at level 9, m at level 9,
   q custom print_qc, at level 10).
-Notation "'X' n m q" := (Agen (1%fin, q) n m) (only printing, 
+Notation "'X' n m q" := (Agen (1%fin, q) n m) (only printing,
   n at level 9, m at level 9,
   q custom print_qc, at level 10).
 Notation "'H' n"     := (Agen (2%fin, _) n n) (only printing,
@@ -44,9 +47,9 @@ Inductive ZXEq : forall {n m}, relation (ZX n m) :=
     ZXEq (Z 1 1 0) (id)
   | ZXEq_X_0_id :
     ZXEq (X 1 1 0) (id)
-  | ZXEq_fuseZ n m o q q' : 
+  | ZXEq_fuseZ n m o q q' :
     ZXEq (Z n m q ;' Z m o q') (Z n o (q + q'))
-  | ZXEq_fuseX n m o q q' : 
+  | ZXEq_fuseX n m o q q' :
     ZXEq (X n m q ;' X m o q') (X n o (q + q'))
   | ZXEq_Z_colorswap n m q :
     ZXEq (Z n m q) (H n ;' X n m q ;' H m)
@@ -97,23 +100,23 @@ Proof. apply rules_hold; constructor. Qed.
 Lemma fuseX n m o q q' : X n m q ;' X m o q' == X n o (q + q').
 Proof. apply rules_hold; constructor. Qed.
 
-Lemma Z_add_r n m m' q q' q'' : 
+Lemma Z_add_r n m m' q q' q'' :
   Z n (m + m') (q + q' + q'') == Z n 2 q ;' Z 1 m q' * Z 1 m' q''.
 Proof. apply rules_hold; constructor. Qed.
 
-Lemma Z_add_l n n' m q q' q'' : 
+Lemma Z_add_l n n' m q q' q'' :
   Z (n + n') m (q + q' + q'') == Z n 1 q * Z n' 1 q' ;' Z 2 m q''.
 Proof. apply rules_hold; constructor. Qed.
 
-Lemma X_add_r n m m' q q' q'' : 
+Lemma X_add_r n m m' q q' q'' :
   X n (m + m') (q + q' + q'') == X n 2 q ;' X 1 m q' * X 1 m' q''.
 Proof. apply rules_hold; constructor. Qed.
 
-Lemma X_add_l n n' m q q' q'' : 
+Lemma X_add_l n n' m q q' q'' :
   X (n + n') m (q + q' + q'') == X n 1 q * X n' 1 q' ;' X 2 m q''.
 Proof. apply rules_hold; constructor. Qed.
 
-Example test_fuse : Z 1 2 0 * X 2 1 0 ;' Z 2 1 1 * id == 
+Example test_fuse : Z 1 2 0 * X 2 1 0 ;' Z 2 1 1 * id ==
   Z 1 1 1 * X 2 1 0.
 Proof.
   srw_lhs (fuseZ 1 2 1 0 1).
@@ -143,7 +146,7 @@ Proof.
     now srw Z_id.
   - srw (Z_add_r 1 1 1 0 0 0).
     srw (fuseZ 1 1 0 0 0).
-    srw <- (Z_add_r 1 0 1 0 0 0). 
+    srw <- (Z_add_r 1 0 1 0 0 0).
     srw (X_add_l 1 1 1 0 0 0).
     srw (fuseX 0 1 1 0 0).
     srw <- (X_add_l 1 0 1 0 0 0).
@@ -151,3 +154,9 @@ Proof.
     now repeat srw Z_id.
 Qed.
 
+Lemma test n m o α :
+   X n m α * Aid m ;' Aid m * Z m o 2 ==
+  Aid n * Z m o 2 ;' X n m α * Aid o.
+Proof.
+  psmcat.
+Qed.

@@ -537,13 +537,22 @@ Qed.
 
 Ltac psmcat :=
   apply SigTens_graph_semantics_syntactic_eq;
+  unshelve (eapply (APropQuote_correct_syntactic_eq'
+    interp_discrete_hg_inhab _);
+  [quote_AP..|]); [exact nil|];
+  unshelve (eapply (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw _);
+  [apply _..|];
+  apply sized_graph_iso_partial_test_correct;
+  vm_compute; exact (eq_refl true)); exact (@nil nat).
+  (* apply SigTens_graph_semantics_syntactic_eq;
   let l := fresh in 
   unshelve (evar (l : list nat);
   let l := eval unfold l in l in 
   eapply (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw l);
   [apply _..|];
   apply sized_graph_iso_partial_test_correct;
-  vm_compute; exact (eq_refl true)); exact (@nil nat).
+  vm_compute; exact (eq_refl true)); exact (@nil nat). *)
+
 
 
 

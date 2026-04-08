@@ -180,3 +180,14 @@ Proof.
   rewrite Hn.
   done.
 Qed.
+
+
+Ltac quote_discrete :=
+  lazymatch goal with
+  | |- AbstractTensorQuote interp_discrete_hg_inhab ?ctx _ ?t =>
+    notypeclasses refine (abstens_quote_discrete_inhab ctx _ t _);
+    get_nth
+  | |- AbstractTensorQuote interp_discrete_hg ?ctx _ ?t =>
+    notypeclasses refine (abstens_quote_discrete ctx _ t _);
+    get_nth
+  end.
