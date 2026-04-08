@@ -1,8 +1,9 @@
-Require Export Aux_relset Aux_pos Syntax.
+From TensorRocq Require Import Aux_relset.
+From TensorRocq Require Export Aux_pos Syntax.
 Require Import SetoidList.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
-Require Import HyperGraph.Facts.
+From TensorRocq Require Import HyperGraph.Facts.
 
 (* A hyper edge is an indicator for the edge type and the source and target vertices *)
 Notation HyperEdge T := (T * list positive * list positive)%type.
