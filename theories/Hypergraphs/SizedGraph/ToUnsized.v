@@ -3962,7 +3962,7 @@ Proof.
 Qed.
 
 
-Require Import IsomorphismTestingAux.
+From TensorRocq Require Import IsoAux.
 
 Lemma isomorphic_id_graph_of_empty_NoDup {T n}
   (cohg : CospanHyperGraph T n n) :
@@ -4128,7 +4128,7 @@ Proof.
       done.
 Qed.
 
-Require Import GraphRewriting stdpp.list.
+(* Require Import GraphRewriting stdpp.list. *)
 
 (* TODO: *)
 
