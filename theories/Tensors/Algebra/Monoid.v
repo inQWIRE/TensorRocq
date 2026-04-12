@@ -1,4 +1,5 @@
-Require Import SetoidList Algebra.Definitions.
+Require Import SetoidList.
+From TensorRocq Require Import Algebra.Definitions.
 From stdpp Require Import base list.
 
 Class Monoid (M : Type) (mO : M) (madd : M -> M -> M) (meq : relation M) := {
@@ -21,6 +22,14 @@ Fixpoint Mlist_sum `{MD : Monoid M mO madd meq} (l : list M) :=
   | [] => mO
   | a :: l => madd a (Mlist_sum l)
   end.
+
+Fixpoint Mlist_sum' `{MD : Monoid M mO madd meq} (l : list M) : M :=
+  match l with 
+  | [] => mO
+  | [x] => x
+  | x :: l => madd x (Mlist_sum' l)
+  end.
+
 
 Section Monoid.
 
@@ -48,6 +57,23 @@ Proof.
     now f_equiv.
 Qed.
 
+Lemma Mlist_sum_app (l l' : list M) :
+  Mlist_sum (l ++ l') == Mlist_sum l + Mlist_sum l'.
+Proof.
+  induction l; [cbn; now rewrite madd_0_l|].
+  cbn.
+  rewrite IHl.
+  now rewrite madd_assoc.
+Qed.
+
+Lemma Mlist_sum'_correct (l : list M) : 
+  meq (Mlist_sum' l) (Mlist_sum l).
+Proof.
+  induction l; [done|].
+  destruct l; [|cbn; f_equiv; apply IHl].
+  cbn.
+  now rewrite madd_0_r.
+Qed.
 
 End Monoid.
 
@@ -66,16 +92,20 @@ Proof.
   split; [apply _|done..].
 Qed.
 
-(* A class expressing that M is the free (non-commutative) 
+(* A class expressing that M is the free (non-commutative)
   monoid over some set X of generators *)
 Class FreeMonoid (M : Type) `{MD : Monoid M mO madd meq} (X : Type) := {
   mdecomp : M -> list X;
+  mdecomp_inv : X -> M;
   mdecomp_proper :: Proper (meq ==> eq) mdecomp;
   mdecomp_inj :: Inj meq eq mdecomp;
   mdecomp_madd m n : mdecomp (madd m n) = mdecomp m ++ mdecomp n;
+  mdecomp_rinv : forall x, mdecomp (mdecomp_inv x) = [x];
 }.
 
-Lemma mdecomp_mO `{FreeMonoid M mO madd meq X} : 
+#[global] Hint Mode FreeMonoid ! - - - - - : typeclass_instances.
+
+Lemma mdecomp_mO `{FreeMonoid M mO madd meq X} :
   mdecomp mO = [].
 Proof.
   specialize (mdecomp_proper (madd mO mO) mO (madd_0_l mO)).
@@ -88,10 +118,12 @@ Qed.
 
 #[refine] Instance nat_FreeMonoid : FreeMonoid nat unit := {
   mdecomp n := replicate n ();
+  mdecomp_inv _ := 1;
 }.
 Proof.
   - abstract (intros n m Heq%(f_equal length);
     now rewrite 2 length_replicate in Heq).
   - abstract (intros n m;
     now rewrite replicate_add).
+  - abstract (intros (); reflexivity).
 Defined.

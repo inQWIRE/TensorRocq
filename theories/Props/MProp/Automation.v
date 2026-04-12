@@ -112,8 +112,10 @@ Qed.
 #[refine] Instance btree_free_monoid A :
   FreeMonoid (btree A) A := {
   mdecomp b := b;
+  mdecomp_inv a := bleaf a;
 }.
 Proof.
+  - abstract easy.
   - abstract easy.
   - abstract easy.
   - abstract easy.
@@ -553,7 +555,97 @@ Ltac psmcat :=
   apply sized_graph_iso_partial_test_correct;
   vm_compute; exact (eq_refl true)); exact (@nil nat). *)
 
+(* Definition sized_graph_rewrite_helper {N}
+  `{EqDecision N}
+  `{Inhabited T} `{Equiv T, !RelDecision (≡@{T})}
+  {n m} (GTarg : SizedCospanHyperGraph N T n m)
+  {i j} (GLHS : SizedCospanHyperGraph N T i j) (match_number : nat) :
+  option {k & (SizedCospanHyperGraph N T n (k + i) *
+    SizedCospanHyperGraph N T (k + j) m)%type} :=
+  match prod_map Piso_map Piso_map <$> (sized_graph_monos GLHS GTarg !! match_number) with
+  | None => None
+  | Some mhe_mv =>
+    Some $
+    let GLHS_L := (relabel_sized_graph (Pmap_injmap mhe_mv.2) $
+      reindex_sized_graph (Pmap_injmap mhe_mv.1) GLHS) in
+    let L := (map_to_list mhe_mv.1).*2 in
+    let ins := list_to_set (inputs GTarg) in
+    let outs := list_to_set (outputs GTarg) in
+    let isolated := isolated_vertices GTarg in
+    let L1 := decompose_L1 GTarg L in
+    let C1 := decompose_C1 GTarg L ins in
+    let C2 := decompose_C2 GTarg L C1 isolated outs in
+    let klist := elements (decompose_kset GTarg
+      (map_to_list mhe_mv.1).*2 C1 isolated ins outs) in
+
+    let smap := GTarg.(sized_map) in 
+    (* let k := list_to_vec klist in *)
+    existT (length (klist)) (
+    mk_scohg (inputs GTarg -> C1 <- list_to_vec klist +++ inputs GLHS_L) smap,
+    mk_scohg (list_to_vec klist +++ outputs GLHS_L -> C2 <- outputs GTarg) smap)
+  end.
+
+graph_to_term
+
+Definition sized_term_rewrite_helper 
+  `{MD : Monoid M mO madd meq, FMD : !FreeMonoid M X}
+  `{Equiv T, !RelDecision (≡@{T})} 
+  {n m} (Targ : MProp M T n m) 
+  {i j} (LHS : MProp M T i j) (match_number : nat) :
+  option {k & (AProp T n (k + i) * AProp T (k + j) m)%type} :=
+  match graph_rewrite_helper (AProp_graph_semantics Targ)
+    (AProp_graph_semantics LHS) match_number with
+  | Some (existT k (C1, C2)) =>
+
+    Some $ existT k (graph_to_term' C1, graph_to_term' C2)
+  | None => None
+  end.
+
+Definition mk_aprop_surrounds {T n m i j k}
+  (C1 : AProp T n (k + i)) (L : AProp T i j) (C2 : AProp T (k + j) m) : AProp T n m :=
+  C1 ;' Aid k * L ;' C2.
+
+Lemma term_rewrite_helper_correctness
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : WFSummable A}
+  `{Equiv T, Equivalence T equiv, RelDecision T T equiv,
+    Inhabited T} `{TensT : !TensorLike R A T}
+  {n m} (Targ : AProp T n m) {i j} (LHS RHS : AProp T i j) (match_number : nat) :
+  AProp_semantics (TensT:=TensT) LHS ≡ AProp_semantics (TensT:=TensT) RHS ->
+  (match term_rewrite_helper Targ LHS match_number with
+   | None => True
+   | Some (existT k (C1, C2)) =>
+    (Targ ≡ₐ mk_aprop_surrounds C1 LHS C2)%aprop ->
+    AProp_semantics (TensT:=TensT) Targ ≡ AProp_semantics (TensT:=TensT)
+    (mk_aprop_surrounds C1 RHS C2)
+  end).
+Proof.
+  remember (term_rewrite_helper _ _ _) as x.
+  clear Heqx.
+  intros Heq.
+  destruct x as [ [k [C1 C2] ]|]; [|done].
+  intros Hiso.
+  rewrite <- AProp_graph_semantics_correct.
+  unfold AProp_graph_eq in Hiso.
+  erewrite (graph_semantics_syntactic_eq _ _ Hiso).
+  rewrite AProp_graph_semantics_correct.
+  cbn.
+  apply compose_tensor_mor; [|done].
+  apply compose_tensor_mor; [done|].
+  apply stack_tensor_mor; [done|].
+  done.
+Qed.
+
+(* 
+Ltac smc_rw_lhs_l2r lem n :=
+  match goal with
+  |- ?R ?LHS _ =>
+    let TensT := get_goal_TensT in
+    specialize (Sig_rewrite_helper_correctness_semantic _ (TensT:=TensT)
+      _ _ LHS _ _ n lem);
+    vm_eval (term_rewrite_helper _ _ _);
+    refine (left_transitivity' _ _); [smcat|smc_clean_lhs]
+  end. *)
 
 
-
-
+ *)

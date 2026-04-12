@@ -5,7 +5,7 @@ From TensorRocq Require Import SizedGraph.ToUnsized.
 (* FIXME: Move *)
 #[export] Instance sum_decomp_MonoidSize `{MD : Monoid M mO madd meq,
   FMD : !FreeMonoid M X} (f : X -> nat) :
-  MonoidSize (λ m, sum_list_with f (mdecomp m)).
+  MonoidSize (λ m : M, sum_list_with f (mdecomp m)).
 Proof.
   split.
   - change (Proper ?R _) with (Proper R (sum_list_with f ∘ mdecomp)).
@@ -1017,4 +1017,289 @@ Proof.
 Qed.
 
 
+Declare Scope mprop_scope.
+Bind Scope mprop_scope with MProp.
+Delimit Scope mprop_scope with mprop.
 
+
+Notation "x * y" := (Mstack x%mprop y%mprop)
+  (at level 40, left associativity) : mprop_scope.
+
+Notation "x ;' y" := (Mcompose x%mprop y%mprop)
+  (at level 50, left associativity) : mprop_scope.
+
+Notation Massoc' H := (Massoc _ _ H) (only parsing).
+
+Close Scope aprop_scope.
+Open Scope mprop_scope.
+
+
+
+Section perms.
+
+Context `{MD : Monoid M mO madd meq}.
+
+Notation "0" := mO.
+Notation "x '==' y" := (meq x y) (at level 70).
+Infix "+" := madd.
+
+(* We use [Let] and [Local Existing Instance] to avoid creating extra
+  definitions *)
+Let Meq_equivalence : Equivalence meq := meq_equivalence.
+Local Existing Instance Meq_equivalence.
+
+Let Madd_proper : Proper (meq ==> meq ==> meq) madd := madd_proper.
+Local Existing Instance Madd_proper.
+
+Open Scope mprop_scope.
+
+Definition cast_mprop {T} {n m n' m' : M}
+  (Hn : n == n') (Hm : m == m') (mp : MProp M T n m) : MProp M T n' m' :=
+  Mcompose (Massoc' (symmetry Hn)) $ Mcompose mp $ Massoc' Hm.
+
+Notation cast_mprop' Hn Hm mp :=
+  (cast_mprop (meq_equivalence.(Equivalence_Symmetric) _ _ Hn)
+    (meq_equivalence.(Equivalence_Symmetric) _ _ Hm) mp) (only parsing).
+
+
+Definition mtop_to_bottom {T} (ls : list M) :
+  MProp M T (Mlist_sum ls) (Mlist_sum (tail ls) + Mlist_sum (option_list (head ls))) :=
+  match ls with
+  | [] => Massoc' (symmetry (madd_0_l 0))
+  | a :: ls =>
+    Mcompose (Mswap a (Mlist_sum ls))
+      (Massoc (Mlist_sum ls + a) (Mlist_sum ls + (a + 0))
+      (madd_proper (Mlist_sum ls) (Mlist_sum ls) (reflexivity (Mlist_sum ls))
+      a (a + 0) (symmetry (MD.(madd_0_r) a))))
+  end.
+
+(*
+Definition abottom_to_top {T} (n : nat) : MProp M T n n :=
+  match n with
+  | 0 => Aid 0
+  | S n =>
+    cast_aprop (Nat.add_comm n 1) eq_refl (Aswap n 1)
+  end.
+
+Definition aprop_aswap {T} (n : nat) : MProp M T n n :=
+  match n with
+  | 0 => Aid 0
+  | 1 => Aid _
+  | 2 => Aswap 1 1
+  | S n =>
+    cast_aprop (Nat.add_comm n 1) eq_refl
+      (Acompose (Aswap n 1) (Astack (Aid 1) (atop_to_bottom n)))
+  end.
+
+
+
+
+
+Lemma Apad_prf {a n} (H : a < n) : a + (n - a) = n.
+Proof. lia. Qed.
+
+Definition Apad {T a} (ap : MProp M T a a) n : MProp M T n n :=
+  match decide (a = n) with
+  | left Han => cast_aprop Han Han ap
+  | right _ =>
+    match Nat.lt_dec a n with
+    | left Han => cast_aprop (Apad_prf Han) (Apad_prf Han) (Astack ap (Aid (n - a)))
+    | right _ => Aid _
+    end
+  end.
+
+
+Definition ocast_aprop {T n m n' m'} (ap : MProp M T n m) : option (MProp M T n' m') :=
+  match decide (n = n' /\ m = m') with
+  | left Hnm => Some (cast_aprop Hnm.1 Hnm.2 ap)
+  | right _ => None
+  end.
+
+Definition Apad_nonsquare {T a b} (ap : MProp M T a b) n m :
+  option (MProp M T n m) :=
+  match decide (a = n /\ b = m) with
+  | left Heq => Some (cast_aprop Heq.1 Heq.2 ap)
+  | right _ =>
+    ocast_aprop (Astack ap (Aid (n - a)))
+  end.
+
+Lemma Apad_nonsquare_l_prf1 {a b n} (Han : a = n) : b = n + b - a.
+Proof.
+  lia.
+Qed.
+
+Lemma Apad_nonsquare_l_prf2 {a b n} (Han : a < n) : b + (n - a) = n + b - a.
+Proof.
+  lia.
+Qed.
+
+Definition Apad_nonsquare_l {T a b} (ap : MProp M T a b) n :
+  option (MProp M T n (n + b - a)) :=
+  match decide (a = n) with
+  | left Han => Some $ cast_aprop Han (Apad_nonsquare_l_prf1 Han) ap
+  | right _ =>
+    match decide (a < n) with
+    | left Han => Some $ cast_aprop (Apad_prf Han)
+      (Apad_nonsquare_l_prf2 Han) (Astack ap (Aid (n - a)))
+    | right _ => None
+    end
+  end.
+
+Definition aprop_to_top {T} (a n : nat) : MProp M T n n :=
+  Apad (abottom_to_top (S a `min` n)) n. *)
+
+
+(* FIXME: Move *)
+Lemma lookup_list_decomps_aux {A} (pre l : list A) k :
+  list_decomps_aux pre l !! k =
+  (λ a, (pre ++ take k l, a, drop (S k) l)) <$> l !! k.
+Proof.
+  revert k pre; induction l; intros k pre; [now destruct k|].
+  cbn.
+  destruct k as [|k]; [cbn; now rewrite app_nil_r, drop_0|].
+  cbn.
+  rewrite IHl.
+  destruct (l !! k); [|done].
+  cbn.
+  now rewrite <- app_assoc.
+Qed.
+Lemma lookup_list_decomps {A} (l : list A) k :
+  list_decomps l !! k =
+  (λ a, (take k l, a, drop (S k) l)) <$> l !! k.
+Proof.
+  unfold list_decomps.
+  rewrite lookup_list_decomps_aux.
+  done.
+Qed.
+Lemma lookup_list_removals {A} (l : list A) k :
+  list_removals l !! k =
+  (., take k l ++ drop (S k) l) <$> l !! k.
+Proof.
+  unfold list_removals.
+  rewrite list_lookup_fmap, lookup_list_decomps.
+  rewrite <- option_fmap_compose.
+  done.
+Qed.
+
+
+
+(* Definition list_to_front {A} (ns : list A) (a : nat) : list ns :=
+  match list_removals ns !! a with
+  | None => ns
+  | Some  *)
+
+(* Lemma false : False.
+Proof. admit. Admitted. *)
+
+Definition Mswapa {T} (a b c : M) : MProp M T (a + (b + c)) (b + (a + c)) :=
+  (cast_mprop' ((MD.(madd_assoc) a b c))
+    ((MD.(madd_assoc) b a c)) (Mstack (Mswap a b) (Mid c))).
+
+Definition mprop_to_top {T n} (i : fin n) : forall (v : vec M n), MProp M T (Mlist_sum v)
+  (Mlist_sum (v !!! i ::: vremove i v)) :=
+  Fin.t_rect (fun n i => forall v : vec M n,
+  MProp M T (Mlist_sum v) (Mlist_sum (v !!! i ::: vremove i v)))
+  (λ n, vec_S_inv (λ v, MProp M T (Mlist_sum v)
+    (Mlist_sum (v !!! (0%fin :> fin (S n)) ::: vremove 0%fin v)))
+     (λ x v, (Mid (x + Mlist_sum v) :>
+     MProp M T (Mlist_sum (x ::: v))
+    (Mlist_sum ((x ::: v) !!! 0%fin ::: vremove 0 (x ::: v))))))
+  (fun n i => match i with
+    | 0%fin => fun _ => vec_S_inv _ (λ a : M, vec_S_inv _ (λ b v,
+      Mswapa a b (Mlist_sum v)))
+    | FS i' => fun IH =>
+      vec_S_inv _ (λ a v,
+      Mcompose (Mstack (Mid a) (IH v))
+        (Mswapa _ _ _))
+    end) n i.
+
+
+Definition mprop_to_top' {T n} (i : fin n) (v : vec M n) : MProp M T (Mlist_sum' v)
+  (Mlist_sum' (v !!! i ::: vremove i v)) :=
+  cast_mprop' (Mlist_sum'_correct _) (Mlist_sum'_correct _)
+  (mprop_to_top i v).
+
+
+
+Fixpoint apply_sw {A n} (ns : vec A n) (l : list nat) {struct n} : vec A n :=
+  match n with
+  | 0 => fun ns => ns
+  | S n => fun ns =>
+    if decide (n <= 1) then
+      match n as n return vec A (S n) -> vec A (S n) with
+      | 1 => fun ns => if decide (head l = Some 1) then [# vhd (vtl ns) ; vhd ns] else ns
+      | _ => fun ns => ns
+      end ns
+    else
+      match l with
+      | [] => ns
+      | a :: l =>
+        match decide (a < S n) with
+        | right _ => ns
+        | left Ha => ns !!! (nat_to_fin Ha) :::
+          apply_sw (vremove (nat_to_fin Ha) ns)
+          ((λ k, if decide (a < k) then Nat.pred k else k) <$> l)
+        end
+      end
+  end ns.
+
+
+Fixpoint mprop_of_sw {T n} (ns : vec M n) (l : list nat) :
+  MProp M T (Mlist_sum ns) (Mlist_sum (apply_sw ns l)).
+  refine (
+    match n as n return forall ns : vec M n, MProp M T (Mlist_sum ns) (Mlist_sum (apply_sw ns l)) with
+    | 0 => fun ns => Mid (Mlist_sum ns)
+    | S n => fun ns => _
+    end ns).
+  cbn.
+  case_decide as Hn.
+  - refine (match n with
+    | 1 => _
+    | _ => _
+    end ns).
+    + intros; apply Mid.
+    + case_decide; [|intros; apply Mid].
+      refine (vec_S_inv _ _).
+      intros a.
+      refine (vec_S_inv _ _).
+      intros b.
+      refine (vec_0_inv _ _).
+      cbn.
+      apply Mswapa.
+    + intros; apply Mid.
+  - destruct l as [|a l]; [apply Mid|].
+    case_decide as Ha; [|apply Mid].
+    refine (Mcompose (mprop_to_top (nat_to_fin Ha) ns) _).
+    cbn [vec_to_list Mlist_sum].
+    refine (Mstack (Mid _) _).
+    apply mprop_of_sw.
+Defined.
+
+
+Definition Mocompose `{!RelDecision meq} {T n m m' o} 
+  (mp1 : MProp M T n m) (mp2 : MProp M T m' o) : 
+  option (MProp M T n o) :=
+  match decide (m == m') with 
+  | right _ => None
+  | left Heq => Some (Mcompose mp1 (Mcompose (Massoc' Heq) mp2))
+  end.
+
+Definition ocast_mprop_r `{!RelDecision meq} {T n m} m' 
+  (mp : MProp M T n m) : option (MProp M T n m') :=
+  match decide (m == m') with 
+  | right _ => None
+  | left Heq => Some (Mcompose mp (Massoc' Heq))
+  end.
+
+Definition ocast_mprop_l `{!RelDecision meq} {T n m} n' 
+  (mp : MProp M T n m) : option (MProp M T n' m) :=
+  match decide (n' == n) with 
+  | right _ => None
+  | left Heq => Some (Mcompose (Massoc' Heq) mp)
+  end.
+
+Definition ocast_mprop `{!RelDecision meq} {T n m} n' m'
+  (mp : MProp M T n m) : option (MProp M T n' m') :=
+  ocast_mprop_r m' mp ≫= ocast_mprop_l n'.
+
+End perms.
