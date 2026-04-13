@@ -83,18 +83,8 @@ Fixpoint Mstacks {T A} {n : A -> M} {m : A -> M}
   | a :: l => Mstack (f a) (Mstacks f l)
   end.
 
-Let size (smap : Pmap X) := (λ i, default mO (mdecomp_inv <$> (smap !! i))).
+Definition sizeX (smap : Pmap X) := (λ i, default mO (mdecomp_inv <$> (smap !! i))).
 
-
-(* Definition sized_layer_to_stack {T n} smap (es : list (HyperEdge T))
-  (inputs : vec positive n) : option
-    (MProp M T (Mlist_sum (size smap <$> vec_to_list inputs))
-      (Mlist_sum (size smap <$>
-        (list_mdifference inputs (flat_map (snd ∘ fst) es))))
-      n (n + sum_list_with (length ∘ snd) es -
-    sum_list_with (length ∘ snd ∘ fst) es)) :=
-    (AProp.Apad_nonsquare_l (Astacks (fun tio => Agen tio.1.1 (length tio.1.2) (length tio.2))
-    es) n). *)
 
 (* FIXME: Move *)
 Lemma fmap_concat `(f : A -> B) (ls : list (list A)) : 
@@ -119,11 +109,11 @@ Lemma layer_to_aprop_prf {T n} {smap} {es : list (HyperEdge T)}
   apply_sw inputs ((λ k, default (pos_to_nat_pred k) (list_index k inputs)) <$>
      es_inputs ++ unused_inputs) =@{list _}
   flat_map (λ tio, tio.1.2) es ++ unused_inputs ->
-  Mlist_sum (apply_sw (vmap (size smap) inputs)
+  Mlist_sum (apply_sw (vmap (sizeX smap) inputs)
      ((λ k, default (pos_to_nat_pred k) (list_index k inputs)) <$>
       es_inputs ++ unused_inputs)) ==
-  Mlist_sum ((λ tio, Mlist_sum (size smap <$> tio.1.2)) <$> es) +
-  Mlist_sum (size smap <$> unused_inputs).
+  Mlist_sum ((λ tio, Mlist_sum (sizeX smap <$> tio.1.2)) <$> es) +
+  Mlist_sum (sizeX smap <$> unused_inputs).
 Proof.
   intros Heq.
   rewrite <- Mlist_sum_app.
@@ -141,23 +131,23 @@ Qed.
 
 Definition layer_to_mprop {T n} smap (es : list (HyperEdge T))
   (inputs : vec positive n) : option (MProp M T
-    (Mlist_sum (MD:=MD)(vec_to_list (vmap (size smap) inputs)))
-    (Mlist_sum (MD:=MD) (((λ tio, Mlist_sum (size smap <$> tio.2)) <$> es))
-    + Mlist_sum (MD:=MD) (size smap <$> (filter (.∉ foldr app [] es.*1.*2) (vec_to_list inputs))))
+    (Mlist_sum (MD:=MD)(vec_to_list (vmap (sizeX smap) inputs)))
+    (Mlist_sum (MD:=MD) (((λ tio, Mlist_sum (sizeX smap <$> tio.2)) <$> es))
+    + Mlist_sum (MD:=MD) (sizeX smap <$> (filter (.∉ foldr app [] es.*1.*2) (vec_to_list inputs))))
      * list positive) :=
   (let es_inputs := foldr app [] es.*1.*2 in
   let es_outputs := foldr app [] es.*2 in
   let unused_inputs := filter (.∉ es_inputs) (vec_to_list inputs) in
   let estack := Mstacks (fun tio =>
-    Mgen tio.1.1 (Mlist_sum (size smap <$> tio.1.2))
-      (Mlist_sum (size smap <$> tio.2))) es in
-  let perm := (mprop_of_sw (vmap (size smap) inputs)
+    Mgen tio.1.1 (Mlist_sum (sizeX smap <$> tio.1.2))
+      (Mlist_sum (sizeX smap <$> tio.2))) es in
+  let perm := (mprop_of_sw (vmap (sizeX smap) inputs)
     ((λ k, default (pos_to_nat_pred k) $ list_index k inputs)
     <$> (es_inputs ++ unused_inputs))) in
   Heq ← guard (apply_sw inputs ((λ k, default (pos_to_nat_pred k) $ list_index k inputs)
     <$> (es_inputs ++ unused_inputs)) =@{list _}
     flat_map (λ tio, tio.1.2) es ++ unused_inputs);
-  let t := Mcompose_cast perm (Mstack estack (Mid (Mlist_sum (size smap <$> unused_inputs)))) 
+  let t := Mcompose_cast perm (Mstack estack (Mid (Mlist_sum (sizeX smap <$> unused_inputs)))) 
   (layer_to_aprop_prf Heq) in
   Some (t, es_outputs ++ unused_inputs)).
 
@@ -167,12 +157,12 @@ Lemma mprop_perm_of_empty_sized_graph_prf {n m} {smap}
     ((λ k, default (pos_to_nat_pred k) (list_index k inputs)) <$>
      (vec_to_list outputs)) =@{list _} vmap (smap !!.) outputs ->
   Mlist_sum
-    (apply_sw (vmap (size smap) inputs)
+    (apply_sw (vmap (sizeX smap) inputs)
      ((λ k, default (pos_to_nat_pred k) (list_index k inputs)) <$>
-      (vec_to_list outputs))) == Mlist_sum (vmap (size smap) outputs).
+      (vec_to_list outputs))) == Mlist_sum (vmap (sizeX smap) outputs).
 Proof.
   intros Heq.
-  unfold size.
+  unfold sizeX.
   (* change (size smap) with (default mO ∘ (fmap mdecomp_inv) ∘ (smap !!.)). *)
   setoid_rewrite <- (Vector.map_map _ _ _ (smap !!.) (default mO ∘ (fmap mdecomp_inv))).
   rewrite vec_to_list_map, <- Heq.
@@ -183,12 +173,12 @@ Qed.
 
 Definition mprop_perm_of_empty_sized_graph {T n m} smap
   (inputs : vec positive n) (outputs : vec positive m) :
-    option (MProp M T (Mlist_sum (vmap (size smap) inputs))
-      (Mlist_sum (vmap (size smap) outputs))) :=
+    option (MProp M T (Mlist_sum (vmap (sizeX smap) inputs))
+      (Mlist_sum (vmap (sizeX smap) outputs))) :=
     Heq ← guard (apply_sw (vmap (smap !!.) inputs) 
       ((λ k, default (pos_to_nat_pred k) (list_index k inputs))
         <$> vec_to_list outputs) =@{list _} vmap (smap !!.) outputs);
-    Some (((mprop_of_sw (vmap (size smap) inputs)
+    Some (((mprop_of_sw (vmap (sizeX smap) inputs)
       ((λ k, default (pos_to_nat_pred k) (list_index k inputs))
         <$> vec_to_list outputs))) ;' Massoc' 
         (mprop_perm_of_empty_sized_graph_prf Heq)).
@@ -199,17 +189,17 @@ Lemma sized_graph_to_term_aux_prf {T n smap}
   (λ i : positive, smap !! i) <$> flat_map (λ tio : positive * HyperEdge T, tio.2.2) es ++
   filter (λ x : positive, x ∉ foldr app [] es.*2.*1.*2) (vec_to_list inputs) =
   (λ i : positive, smap !! i) <$> inputs' ->
-  Mlist_sum ((λ tio : HyperEdge T, Mlist_sum (size smap <$> tio.2)) <$> es.*2) +
-  Mlist_sum (size smap <$> filter (λ x : positive, x ∉ foldr app [] es.*2.*1.*2) (vec_to_list inputs)) ==
-  Mlist_sum (vmap (size smap) (list_to_vec inputs')).
+  Mlist_sum ((λ tio : HyperEdge T, Mlist_sum (sizeX smap <$> tio.2)) <$> es.*2) +
+  Mlist_sum (sizeX smap <$> filter (λ x : positive, x ∉ foldr app [] es.*2.*1.*2) (vec_to_list inputs)) ==
+  Mlist_sum (vmap (sizeX smap) (list_to_vec inputs')).
 Proof.
   intros Heq.
-  unfold size.
+  unfold sizeX.
   setoid_rewrite <- (Vector.map_map _ _ _ (smap !!.) (default mO ∘ (fmap mdecomp_inv))).
   rewrite 2 vec_to_list_map, vec_to_list_to_vec, <- Heq.
   rewrite <- (list_fmap_compose _ (default 0 ∘ _)).
   unfold compose.
-  fold (size smap).
+  fold (sizeX smap).
   rewrite fmap_app, Mlist_sum_app.
   f_equiv.
   rewrite flat_map_concat_map.
@@ -224,8 +214,8 @@ Qed.
 Fixpoint sized_graph_to_term_aux {T n m} (depth : nat)
   smap
   (hg : Pmap (HyperEdge T)) (inputs : vec positive n) (outputs : vec positive m) :
-    option (MProp M T (Mlist_sum (vmap (size smap) inputs))
-      (Mlist_sum (vmap (size smap) outputs))) :=
+    option (MProp M T (Mlist_sum (vmap (sizeX smap) inputs))
+      (Mlist_sum (vmap (sizeX smap) outputs))) :=
 
   match hg with
   | PEmpty =>
@@ -251,9 +241,9 @@ Fixpoint sized_graph_to_term_aux {T n m} (depth : nat)
 
 
 Definition sized_graph_to_term {T n m} (scohg : SizedCospanHyperGraph X T n m) :
-  option (MProp M T (Mlist_sum (vmap (size scohg.(sized_map)) scohg.(inputs)))
-      (Mlist_sum (vmap (size scohg.(sized_map)) scohg.(outputs)))) :=
-  sized_graph_to_term_aux (base.size (hyperedges scohg)) (scohg.(sized_map))
+  option (MProp M T (Mlist_sum (vmap (sizeX scohg.(sized_map)) scohg.(inputs)))
+      (Mlist_sum (vmap (sizeX scohg.(sized_map)) scohg.(outputs)))) :=
+  sized_graph_to_term_aux (size (hyperedges scohg)) (scohg.(sized_map))
     (hyperedges scohg) (inputs scohg) (outputs scohg).
 
 
@@ -267,7 +257,7 @@ Definition MProp_graph_eq `{FMD : !FreeMonoid M X}
 
 End Helpers.
 
-From TensorRocq Require Import MProp.Automation.
+From TensorRocq Require Import BW.
 (* FIXME: MOve *)
 #[export] Instance btree_equiv_dec `{EqDecision A} : RelDecision (≡@{btree A}) :=
   rel_preimage_dec _ _ _.
@@ -390,7 +380,7 @@ Proof.
   done.
 
   (* unfold graph_to_term.
-  vm_compute (size _).
+  vm_compute (sizeX _).
   unfold graph_to_term_aux.
   vm_eval (hyperedges _).
   vm_eval (get_simultaneously_extractable_edges _ _).

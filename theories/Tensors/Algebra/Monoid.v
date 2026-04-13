@@ -10,7 +10,7 @@ Class Monoid (M : Type) (mO : M) (madd : M -> M -> M) (meq : relation M) := {
   madd_0_r : forall x, meq (madd x mO) x;
 }.
 
-#[global] Hint Mode Monoid + - - - : typeclass_instances.
+#[global] Hint Mode Monoid ! - - - : typeclass_instances.
 
 #[export] Instance Monoid_nat : Monoid nat 0 Nat.add eq.
 Proof.
@@ -85,7 +85,7 @@ Class MonoidSize `{MD : Monoid M mO madd meq} (f : M -> nat) := {
   msize_add x y : f (madd x y) = f x + f y;
 }.
 
-#[global] Hint Mode MonoidSize + - - - - - : typeclass_instances.
+#[global] Hint Mode MonoidSize ! - - - - - : typeclass_instances.
 
 #[export] Instance nat_MonoidSize : MonoidSize id.
 Proof.

@@ -41,7 +41,7 @@ Class DiagramQuote `{APROPlikeD : APROPlike R rO rI radd rmul req A D compD stac
 }.
 
 #[global] Hint Mode DiagramQuote + - - - - - - - - - - - - - - - - -
-  - - - - + + + - : typeclass_instances.
+  - - - - ! ! ! - : typeclass_instances.
 
 (* A typeclass recording that the diagram [d] is a 'denotation'
   (evaluation) of the [AProp] term [a]. In particular, [a] should be 
@@ -54,7 +54,7 @@ Class DiagramDenote `{APROPlikeD : APROPlike R rO rI radd rmul req A D compD sta
 }.
 
 #[global] Hint Mode DiagramDenote + - - - - - - - - - - - - - - - - -
-  - - - - + + - + : typeclass_instances.
+  - - - - ! ! - ! : typeclass_instances.
 
 
 

@@ -160,3 +160,221 @@ Lemma test n m o α :
 Proof.
   psmcat.
 Qed.
+
+  #[global] Arguments free_monoid_meq_dec_subproof {_ _ _ _ _ _ _ _ _ _} : assert.
+  #[global] Arguments free_monoid_meq_dec_subproof0 {_ _ _ _ _ _ _ _ _ _ _} : assert.
+
+Notation "[≈]" := (Massoc _ _ _) (only printing) : mprop_scope.
+
+Lemma SigTensAProp_eq_AProp_semantic_eq
+  {A : Type} `{SA : Summable A, EqA : EqDecision A} {Sig : Signature A}
+  {n m} {ap ap' : AProp Sig.(gens) n m} :
+  SigTensAProp_eq Sig ap ap' ->
+  AProp_semantic_eq (TensT:=SignatureTensorLike Sig) ap ap'.
+Proof.
+  intros Heq.
+  unfold SigTensAProp_eq in Heq.
+  rewrite 2 SignatureTensorLike_base_correct in Heq.
+  apply Heq.
+Qed.
+
+Lemma AProp_semantic_eq_SigTensAProp_eq
+  {A : Type} `{SA : Summable A, EqA : EqDecision A} {Sig : Signature A}
+  {n m} {ap ap' : AProp Sig.(gens) n m} :
+  AProp_semantic_eq (TensT:=SignatureTensorLike Sig) ap ap' ->
+  SigTensAProp_eq Sig ap ap'.
+Proof.
+  unfold SigTensAProp_eq.
+  rewrite 2 SignatureTensorLike_base_correct.
+  easy.
+Qed.
+
+Lemma map_aprop_cast {T T'} (f : T -> T')
+  {n m n' m'} (Hn : n = n') (Hm : m = m') (ap : AProp T n m) :
+  map_aprop f (cast_aprop Hn Hm ap) = cast_aprop Hn Hm (map_aprop f ap).
+Proof.
+  now subst; rewrite 2 cast_aprop_id.
+Qed.
+
+Lemma mprop_of_aprop_cast
+
+Ltac quote_msize :=
+  try typeclasses eauto.
+
+Ltac quote_MP :=
+  lazymatch goal with
+  | |- MProp_of_AProp _ ?apv =>
+    lazymatch apv with
+    | Agen ?t ?n ?m =>
+      notypeclasses refine (mprop_of_aprop_gen _ _ _ _ _ _);
+      quote_msize
+      (* first [quote_discrete|typeclasses eauto|idtac] *)
+    | Acompose ?apv1 ?apv2 =>
+      notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
+      (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
+      quote_MP
+    | Astack ?apv1 ?apv2 =>
+      notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
+      quote_MP
+    | Aid ?n =>
+      notypeclasses refine (mprop_of_aprop_id _ n _);
+      quote_msize
+    | Acup ?n =>
+      notypeclasses refine (mprop_of_aprop_cup _ n _);
+      quote_msize
+    | Acap ?n =>
+      notypeclasses refine (mprop_of_aprop_cap _ n _);
+      quote_msize
+    | Aswap ?n ?m =>
+      notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
+      quote_msize
+    | cast_aprop ?Hn ?Hm ?ap =>
+      notypeclasses refine (mprop_of_aprop_cast _ ap Hn Hm _);
+      quote_MP
+    end
+  end.
+
+
+Ltac quote_MP_step :=
+  lazymatch goal with
+  | |- MProp_of_AProp _ ?apv =>
+    lazymatch apv with
+    | Agen ?t ?n ?m =>
+      notypeclasses refine (mprop_of_aprop_gen _ _ _ _ _ _);
+      quote_msize
+      (* first [quote_discrete|typeclasses eauto|idtac] *)
+    | Acompose ?apv1 ?apv2 =>
+      notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
+      (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
+      idtac (* quote_MP *)
+    | Astack ?apv1 ?apv2 =>
+      notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
+      idtac (* quote_MP *)
+    | Aid ?n =>
+      notypeclasses refine (mprop_of_aprop_id _ n _);
+      quote_msize
+    | Acup ?n =>
+      notypeclasses refine (mprop_of_aprop_cup _ n _);
+      quote_msize
+    | Acap ?n =>
+      notypeclasses refine (mprop_of_aprop_cap _ n _);
+      quote_msize
+    | Aswap ?n ?m =>
+      notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
+      quote_msize
+    | cast_aprop ?Hn ?Hm ?ap =>
+      notypeclasses refine (mprop_of_aprop_cast _ ap Hn Hm _);
+      idtac (* quote_MP *)
+    end
+  end.
+
+Lemma test' n m o α β :
+  Z n m α * Aid m ;' Aswap m m ;' Aid m * Z m o β ==
+  Z n o (α + β) * Aid m ;' Aswap o m.
+Proof.
+  pose proof (fuseZ n m o α β) as Hrw.
+  unshelve (
+  epose proof (APROPlike_para_rewrite_helper_correctness
+    (TensT:=SignatureTensorLike ZX_sig)
+    (APROPlikeD:=(APROPlike_AProp (TensT:=SignatureTensorLike ZX_sig))) 0 ?[ctx] ?[l] _ _
+
+    (Z n m α * Aid m ;' Aswap m m ;' Aid m * Z m o β) (* Targ *)
+
+    (SigTensAProp_eq_AProp_semantic_eq Hrw) (* lem *)
+
+    _ _ _ _ _ _ _
+
+    ) as Hrew;
+  do 3 tspecialize Hrew by typeclasses eauto; (* DiagramQuote *)
+  do 2 tspecialize Hrew by typeclasses eauto; (* APropQuote *)
+  do 2 tspecialize Hrew by typeclasses eauto);
+  [exact nil|exact nil|]. (* MProp_of_AProp *)
+  vm_eval (sized_term_rewrite_helper _ _ _).
+  vm_eval (sized_graph_iso_partial_test _ _).
+  specialize (Hrew _ _ _ _ _ _).
+  specialize (Hrew eq_refl eq_refl eq_refl eq_refl).
+  rewrite 2? cast2_id in Hrew.
+  etransitivity; [apply (AProp_semantic_eq_SigTensAProp_eq Hrew)|].
+  cbn.
+  rewrite ?cast_aprop_id, ?map_aprop_cast.
+  cbn.
+
+  (* psmcat. *)
+  apply SigTens_graph_semantics_syntactic_eq.
+  unshelve (eapply (APropQuote_correct_syntactic_eq'
+    interp_discrete_hg_inhab _);
+  [quote_AP..|]); [exact nil|].
+
+
+  eapply (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw _).
+  repeat try quote_MP_step.
+  Print Instances QuoteMonoidSize.
+  typeclasses eauto.
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP_step.
+
+
+  [quote_MP..|].
+  [try apply _..|]).
+  3:{
+    eapply mprop_of_aprop_compose.
+  }
+  apply sized_graph_iso_partial_test_correct;
+  vm_compute; exact (eq_refl true)); exact (@nil nat).
+  psmcat.
+
+  cbn.
+  psmcat.
+  clear Hrew.
+
+
+  free_monoid_meq_dec
+
+  (* unfold SigTensAProp_eq. *)
+  assert ({P : Type & P}).
+  econstructor.
+  (* FSR_eqg *)
+  refine .
+  5:{
+
+    (* refine Hrw. *)
+    unfold SigTensAProp_eq in Hrw.
+    rewrite 2 SignatureTensorLike_base_correct in Hrw.
+    refine Hrw.
+  }.
+
+    unfold base.equiv in *.
+    unfold AProp_semantic_eq.
+    refine Hrw.
+
+    refine Hrw.
+    SigTens SignatureTensorLike_base
+    refine Hrw.
+  }
+    Hrw). as Hrew.
+
+    _ _ _ _ _ _ _ ) as Hrew.
+
+  MProp_of_AProp
+  (* apply SigTens_graph_semantics_syntactic_eq.
+  unshelve (eapply (APropQuote_correct_syntactic_eq'
+    interp_discrete_hg_inhab _);
+  [quote_AP..|]); [exact nil|];
+  unshelve (eapply (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw _);
+  [apply _..|];
+  apply sized_graph_iso_partial_test_correct;
+  vm_compute; exact (eq_refl true)); exact (@nil nat). *)
+  psmcat.
+Qed.
+
+  apply SigTens_graph_semantics_syntactic_eq;
+  unshelve (eapply (APropQuote_correct_syntactic_eq'
+    interp_discrete_hg_inhab _);
+  [quote_AP..|]); [exact nil|];
+  unshelve (eapply (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw _);
+  [apply _..|];
+  apply sized_graph_iso_partial_test_correct;
+  vm_compute; exact (eq_refl true)); exact (@nil nat).

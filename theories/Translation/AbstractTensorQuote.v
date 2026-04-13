@@ -6,14 +6,14 @@ Class AbstractTensorQuote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> 
   abs_quote : f ctx t ≡ t'
 }.
 
-#[global] Hint Mode AbstractTensorQuote + + + - - + - - + : typeclass_instances.
+#[global] Hint Mode AbstractTensorQuote + + + - - ! - - ! : typeclass_instances.
 
 Class AbstractTensorDenote {Ctx T} `{Equiv T', Equivalence T' equiv} (f : Ctx -> T -> T') (ctx : Ctx)
   (t : T) (t' : T') := {
   abs_denote : f ctx t ≡ t'
 }.
 
-#[global] Hint Mode AbstractTensorDenote + + + - - + - + - : typeclass_instances.
+#[global] Hint Mode AbstractTensorDenote + + + - - ! - ! - : typeclass_instances.
 
 #[export] Instance abstens_denote_default {Ctx T} `{Equiv T', Equivalence T' equiv}
   (f : Ctx -> T -> T') (ctx : Ctx) (t : T) :

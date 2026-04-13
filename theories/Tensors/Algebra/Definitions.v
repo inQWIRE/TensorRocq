@@ -33,7 +33,7 @@ Class SemiRing (R : Type) (rO : R) (rI : R)
   Req_ext : Ring_theory.sring_eq_ext radd rmul req;
   Req_equiv : Setoid.Setoid_Theory R req;
 }.
-Global Hint Mode SemiRing + - - - - - : typeclass_instances.
+Global Hint Mode SemiRing ! - - - - - : typeclass_instances.
 
 (* The development is parametric over domain, which we require to be
   a semiring. *)

@@ -559,6 +559,8 @@ Ltac quote_AP :=
     | Acup ?n => notypeclasses refine (aprop_quote_cup f ctx n)
     | Acap ?n => notypeclasses refine (aprop_quote_cap f ctx n)
     | Aswap ?n ?m => notypeclasses refine (aprop_quote_swap f ctx n m)
+    | cast_aprop ?Hn ?Hm ?ap => notypeclasses refine (aprop_quote_cast f ctx Hn Hm _ ap _);
+      quote_AP
     end
   end.
 
@@ -884,6 +886,15 @@ Proof.
 Qed.
 
 
+Lemma cast_aprop_cast_aprop {T n m n' m' n'' m''}
+  (Hn : n = n') (Hm : m = m') (Hn' : n' = n'') (Hm' : m' = m'')
+  (ap : AProp T n m) :
+  cast_aprop Hn' Hm' (cast_aprop Hn Hm ap) =
+  cast_aprop (eq_trans Hn Hn') (eq_trans Hm Hm') ap.
+Proof.
+  subst.
+  now rewrite 3!cast_aprop_id.
+Qed.
 
 Section Example.
 

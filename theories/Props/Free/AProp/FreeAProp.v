@@ -476,7 +476,7 @@ Class Instantiation {A : Type} `{SA : Summable A, EqA : EqDecision A}
   instantiation_Proper : Proper (equiv ==> equiv) f;
 }.
 
-#[global] Hint Mode Instantiation - - - -  - - - - - - -  - - - + - : typeclass_instances.
+#[global] Hint Mode Instantiation - - - -  - - - - - - -  - - - ! - : typeclass_instances.
 
 (* #[export] Instance Instantiation_id {A : Type} `{SA : Summable A,
   EqA : EqDecision A, WFA : !WFSummable A}
