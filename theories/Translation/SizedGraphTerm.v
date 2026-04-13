@@ -18,7 +18,8 @@ Fixpoint list_mdifference `{EqDecision A} (n m : list A) : list A :=
 Definition Mcompose_cast `{MD : Monoid M mO madd meq} {T n m m' o}
   (mp1 : MProp M T n m) (mp2 : MProp M T m' o) (Hm : meq m m') :
   MProp M T n o :=
-  Mcompose mp1 (Mcompose (Massoc' Hm) mp2).
+  Mcompose (cast_mprop (MD.(meq_equivalence).(Equivalence_Reflexive) _) Hm mp1) mp2.
+
 Lemma vremove_vmap `(f : A -> B) {n} (i : fin n) (v : vec A n) :
   vremove i (vmap f v) = vmap f (vremove i v).
 Proof.

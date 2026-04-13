@@ -25,10 +25,13 @@ Inductive MProp `{MD : Monoid M mO madd meq}
   | Mcompose {n m o} (mp1 : MProp n m) (mp2 : MProp m o) : MProp n o
   | Mstack {n1 m1 n2 m2}
     (mp1 : MProp n1 m1) (mp2 : MProp n2 m2) : MProp (madd n1 n2) (madd m1 m2)
-  | Massoc n m : meq n m -> MProp n m
+  | Mcast n m n' m' : meq n n' -> meq m m' -> MProp n m -> MProp n' m'
   | Mgen (t : T) n m : MProp n m.
 
 #[global] Arguments MProp _ {_ _ _ _} _ _ _ : assert.
+
+Definition Massoc `{MD : Monoid M mO madd meq} {T} n m (Hnm : meq n m) : MProp M T n m :=
+  Mcast n n n m (MD.(meq_equivalence).(Equivalence_Reflexive) _) Hnm (Mid n).
 
 Fixpoint MProp_to_AProp `{MD : Monoid M mO madd meq, f : M -> nat,
   MS : !MonoidSize f} {T} {n m : M}
@@ -43,7 +46,8 @@ Fixpoint MProp_to_AProp `{MD : Monoid M mO madd meq, f : M -> nat,
   | Mstack mp1 mp2 =>
       cast_aprop' (msize_add (_ :> M) _) (msize_add (_ :> M) _) (Astack
         (MProp_to_AProp mp1) (MProp_to_AProp mp2))
-  | Massoc n m Hnm => cast_aprop eq_refl (msize_proper n m Hnm) (Aid _)
+  | Mcast n m n' m' Hn Hm mp =>
+    cast_aprop (msize_proper n n' Hn) (msize_proper m m' Hm) (MProp_to_AProp mp)
   | Mgen t n m => Agen t _ _
   end.
 
@@ -81,8 +85,8 @@ Fixpoint MProp_sized_graph_semantics `{MD : Monoid M mO madd meq, FMD : !FreeMon
 
       (stack_sized_graphs (MProp_sized_graph_semantics mp1)
         (MProp_sized_graph_semantics mp2))
-  | Massoc n m Hnm => cast_sized_graph eq_refl
-    (f_equal length (mdecomp_proper n m Hnm)) (id_sized_graph (list_to_vec (mdecomp n)))
+  | Mcast n m n' m' Hn Hm mp => cast_sized_graph (f_equal length (mdecomp_proper n n' Hn))
+    (f_equal length (mdecomp_proper m m' Hm)) (MProp_sized_graph_semantics mp)
   | Mgen t n m =>
     sized_graph_of_tensor t (list_to_vec (mdecomp n)) (list_to_vec (mdecomp m))
   end.
@@ -975,15 +979,15 @@ Proof.
     rewrite sized_graph_to_graph_stack_graphs.
     refine (sigT2_relation_f_equiv_2 _ _ _
       (@stack_graphs T) _ _ Hiso1 _ _ Hiso2).
-  - rewrite sized_graph_to_graph_cast, AProp_graph_semantics_cast,
+  -
+    rewrite sized_graph_to_graph_cast, AProp_graph_semantics_cast,
       2 graph_to_pair_bundled_cast,
         well_sized_cast, sized_inputs_cast, sized_outputs_cast.
     cbn [MProp_sized_graph_semantics AProp_graph_semantics MProp_to_AProp].
-    rewrite sized_inputs_id_sized_graph, sized_outputs_id_sized_graph.
-    split_and!; [apply well_sized_id_sized_graph|try now rewrite vec_to_list_to_vec|
-      rewrite vec_to_list_to_vec; f_equal; now apply mdecomp_proper|].
-    rewrite sized_graph_to_graph_id_sized_graph'.
-    now rewrite vec_to_list_to_vec.
+    split; [apply IHmp.1|].
+    split; [rewrite IHmp.2.1; f_equal; now apply mdecomp_proper|].
+    split; [rewrite IHmp.2.2.1; f_equal; now apply mdecomp_proper|].
+    easy.
   - split; [apply well_sized_sized_graph_of_tensor|].
     rewrite sized_inputs_sized_graph_of_tensor,
       sized_outputs_sized_graph_of_tensor.
@@ -1048,6 +1052,9 @@ Infix "+" := madd.
 Let Meq_equivalence : Equivalence meq := meq_equivalence.
 Local Existing Instance Meq_equivalence.
 
+Let Meq_refl : Reflexive meq := meq_equivalence.(Equivalence_Reflexive).
+Local Existing Instance Meq_refl.
+
 Let Madd_proper : Proper (meq ==> meq ==> meq) madd := madd_proper.
 Local Existing Instance Madd_proper.
 
@@ -1055,7 +1062,7 @@ Open Scope mprop_scope.
 
 Definition cast_mprop {T} {n m n' m' : M}
   (Hn : n == n') (Hm : m == m') (mp : MProp M T n m) : MProp M T n' m' :=
-  Mcompose (Massoc' (symmetry Hn)) $ Mcompose mp $ Massoc' Hm.
+  Mcast _ _ _ _ Hn Hm mp.
 
 Notation cast_mprop' Hn Hm mp :=
   (cast_mprop (meq_equivalence.(Equivalence_Symmetric) _ _ Hn)
@@ -1067,10 +1074,10 @@ Definition mtop_to_bottom {T} (ls : list M) :
   match ls with
   | [] => Massoc' (symmetry (madd_0_l 0))
   | a :: ls =>
-    Mcompose (Mswap a (Mlist_sum ls))
-      (Massoc (Mlist_sum ls + a) (Mlist_sum ls + (a + 0))
-      (madd_proper (Mlist_sum ls) (Mlist_sum ls) (reflexivity (Mlist_sum ls))
-      a (a + 0) (symmetry (MD.(madd_0_r) a))))
+    cast_mprop (reflexivity _) ((madd_proper (Mlist_sum ls) (Mlist_sum ls) (reflexivity (Mlist_sum ls))
+      a (a + 0) (symmetry (MD.(madd_0_r) a)))) (Mswap a (Mlist_sum ls))
+      (* (Massoc (Mlist_sum ls + a) (Mlist_sum ls + (a + 0))
+      ) *)
   end.
 
 (*
@@ -1276,30 +1283,31 @@ Fixpoint mprop_of_sw {T n} (ns : vec M n) (l : list nat) :
 Defined.
 
 
-Definition Mocompose `{!RelDecision meq} {T n m m' o} 
-  (mp1 : MProp M T n m) (mp2 : MProp M T m' o) : 
+Definition Mocompose `{!RelDecision meq} {T n m m' o}
+  (mp1 : MProp M T n m) (mp2 : MProp M T m' o) :
   option (MProp M T n o) :=
-  match decide (m == m') with 
+  match decide (m == m') with
   | right _ => None
-  | left Heq => Some (Mcompose mp1 (Mcompose (Massoc' Heq) mp2))
+  | left Heq => Some (Mcompose (cast_mprop (reflexivity _) Heq mp1) mp2)
   end.
 
-Definition ocast_mprop_r `{!RelDecision meq} {T n m} m' 
+Definition ocast_mprop_r `{!RelDecision meq} {T n m} m'
   (mp : MProp M T n m) : option (MProp M T n m') :=
-  match decide (m == m') with 
+  match decide (m == m') with
   | right _ => None
-  | left Heq => Some (Mcompose mp (Massoc' Heq))
+  | left Heq => Some (cast_mprop (reflexivity _) Heq mp)
   end.
 
-Definition ocast_mprop_l `{!RelDecision meq} {T n m} n' 
+Definition ocast_mprop_l `{!RelDecision meq} {T n m} n'
   (mp : MProp M T n m) : option (MProp M T n' m) :=
-  match decide (n' == n) with 
+  match decide (n == n') with
   | right _ => None
-  | left Heq => Some (Mcompose (Massoc' Heq) mp)
+  | left Heq => Some (cast_mprop Heq (reflexivity _) mp)
   end.
 
 Definition ocast_mprop `{!RelDecision meq} {T n m} n' m'
   (mp : MProp M T n m) : option (MProp M T n' m') :=
-  ocast_mprop_r m' mp ≫= ocast_mprop_l n'.
+  Hn ← guard (n == n'); Hm ← guard (m == m');
+  Some (cast_mprop Hn Hm mp).
 
 End perms.
