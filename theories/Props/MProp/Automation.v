@@ -879,7 +879,8 @@ Ltac wild_prw_lhs TensT APROPlikeD
     (* idtac *)
     etransitivity; [apply (of_equiv Hrew)|];
     cbn;
-    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn)
+    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn);
+    clear Hrew
   end.
 
 
