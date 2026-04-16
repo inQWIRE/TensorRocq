@@ -1,5 +1,13 @@
+.DEFAULT_GOAL := tensors
+
 all:
 	@dune build
+
+tensors: 
+	@dune build theories
+
+examples:
+	@dune build Examples
 
 clean:
 	@dune clean

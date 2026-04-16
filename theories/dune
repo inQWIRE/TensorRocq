@@ -1,7 +1,5 @@
 (include_subdirs qualified)
 (coq.theory
-  (name TensRocq)
+  (name TensorRocq)
   (package rocq-tensors)
-  (libraries rocq-tensors.hypercaml_interface 
-  ; hypercaml yojson
-  ))
+)

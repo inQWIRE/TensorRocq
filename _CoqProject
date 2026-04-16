@@ -1,10 +1,3 @@
-src/META.hyperocm
+-Q _build/default/theories TensorRocq
 
--I _build/default/src
-
--R _build/default/theories TensRocq
-
-
-src/hypercaml_interface.ml
-src/hypercaml_interface.mli
-src/hypercaml_interface.mlpack
+-Q _build/default/Examples TensorRocqEx
