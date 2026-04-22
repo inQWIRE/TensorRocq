@@ -11,6 +11,14 @@ Tactic Notation "vm_eval" uconstr(pat) :=
   vm_compute in Hx;
   subst x.
 
+Tactic Notation "vm_eval" uconstr(pat) "in" 
+  ne_hyp_list_sep(H, ",") :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in H;
+  vm_compute in Hx;
+  subst x.
+
 
 (* FIXME: Move *)
 Definition rel_preimage_dec {A B} (f : A -> B) (R : relation B) :

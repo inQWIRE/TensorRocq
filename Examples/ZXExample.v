@@ -160,7 +160,7 @@ Lemma test n m o α :
 Proof.
   psmcat.
 Qed.
-(* 
+(*
 #[global] Arguments free_monoid_meq_dec_subproof {_ _ _ _ _ _ _ _ _ _} : assert.
 #[global] Arguments free_monoid_meq_dec_subproof0 {_ _ _ _ _ _ _ _ _ _ _} : assert. *)
 
@@ -172,10 +172,27 @@ Ltac zx_prw_lhs lem match_number :=
     open_constr:(AProp_semantic_eq_SigTensAProp_eq (Sig:=ZX_sig))
     lem match_number.
 
+
+Ltac zx_prw_lhs' lem match_number :=
+  wild_prw_lhs' constr:(SignatureTensorLike ZX_sig)
+    constr:(APROPlike_AProp (TensT:=SignatureTensorLike ZX_sig))
+    open_constr:(SigTensAProp_eq_AProp_semantic_eq)
+    open_constr:(AProp_semantic_eq_SigTensAProp_eq (Sig:=ZX_sig))
+    lem match_number.
+
 Lemma test' n m o α β :
   Z n m α * Aid m ;' Aswap m m ;' Aid m * Z m o β ==
   Z n o (α + β) * Aid m ;' Aswap o m.
 Proof.
-  zx_prw_lhs (fuseZ n m o α β) O.
+  zx_prw_lhs' (fuseZ n m o α β) O.
+    
+    quote_MP_step.
+    quote_MP_step.
+    quote_MP_step.
+    do 2 (tspecialize Hrew; [quote_MP|]).
+unshelve    quote_MP.
+    tspecialize Hrew.
+    quote_MP.
+  }
   psmcat.
 Qed.

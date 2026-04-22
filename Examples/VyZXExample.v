@@ -3,7 +3,7 @@ From TensorRocq Require Export SemanticRewriting.
 From TensorRocqEx Require Export VyZXTensor.
 
 (** In this file, we demonstrate the usage of our rewriting tactics
-  with an existing project, VyZX. 
+  with an existing project, VyZX.
   Prior to this, in the folder ZX we have established the necessary
   background, namely a small theory of the tensor definitions of the
   Z and X spiders in [ZXCore.v], a relationship between QuantumLib's
@@ -11,17 +11,17 @@ From TensorRocqEx Require Export VyZXTensor.
   between the semantics of VyZX's ZX diagrams as QuantumLib's [Matrix]
   and a tensor semantics [ZX_tensor_semantics], in [VyZXTensor.v].
   The key lemma is [ZX_tensor_semantics_correct], establishing that the
-  matrix semantics of a diagram is equal to the matrix of the tensor 
-  semantics. 
+  matrix semantics of a diagram is equal to the matrix of the tensor
+  semantics.
   *)
 
 (* The file [Rmodeq] contains a small theory of [R] modulo some positive value,
   in our case [2*PI]. *)
 From TensorRocqEx Require Import Rmodeq.
 
-(* First, we must define the data assocated to generators. In our case, 
+(* First, we must define the data assocated to generators. In our case,
   we use [option (bool * R + C)] with [None] being the hadamard box,
-  [Some (inl (false, α))] being a Z spider with phase [α], 
+  [Some (inl (false, α))] being a Z spider with phase [α],
   [Some (inl (true, α))] being a X spider with phase [α], and
   [Some (inr c)] being a constant gadget with value [c]. *)
 Definition ZXCVERT := option (bool * R + C).
@@ -274,6 +274,9 @@ End ZXquote.
 #[export] Hint Extern 10 (DiagramQuote (?val) _) =>
   progress first [unfold val|simpl] : typeclass_instances.
 
+#[export] Hint Extern 0 (DiagramQuote (zx_comm ?n ?m) _) =>
+  exact (zx_quote_zx_comm n m) : typeclass_instances.
+
 
 Section ZXdenote.
 
@@ -497,7 +500,7 @@ Proof.
   apply prop_by_iff_zx_scale.
   split; [|intros ?%(f_equal fst); cbn in *; lra].
 
- 
+
   rewrite <- (@nwire_removal_r 2).
   cbv delta [n_wire]; simpl.
   rewrite stack_empty_r_fwd.
@@ -516,7 +519,7 @@ Proof.
   zxclean_lhs.
   rewrite cup_Z.
   zxrw (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
-  
+
   rewrite <- Z_0_is_wire at 1.
   zxrw (symmetry (@Z_add_l 0 1 0 0 0 0)).
   rewrite 2 Rplus_0_r.
@@ -568,7 +571,7 @@ Proof.
   zxcat.
 Qed.
 
-Lemma cnot_is_swapp_notc : _CNOT_ ∝= ⨉ ⟷ _NOTC_ ⟷ ⨉. 
+Lemma cnot_is_swapp_notc : _CNOT_ ∝= ⨉ ⟷ _NOTC_ ⟷ ⨉.
 Proof.
   rewrite notc_is_swapp_cnot.
   zxcat.
@@ -576,9 +579,9 @@ Qed.
 
 Import CastRules ComposeRules.
 
-Theorem hopf_rule_Z_X_vert n m top bot α β prf : 
+Theorem hopf_rule_Z_X_vert n m top bot α β prf :
   Z n (top + 2) α ↕ n_wire bot ⟷
-  cast _ _ prf eq_refl 
+  cast _ _ prf eq_refl
     (n_wire top ↕ X (2 + bot) m β) ∝[/ C2] Z n top α ↕ X bot m β.
 Proof.
   rewrite <- (Rplus_0_l α), <- (dominated_Z_spider_fusion_bot_left _ 0).
@@ -608,6 +611,271 @@ Proof.
   all: lia.
 Qed.
 
+From TensorRocq Require Import MProp.Automation.
+
+
+Ltac wild_prw_lhs' TensT APROPlikeD
+  to_equiv of_equiv
+  lem match_number :=
+  match goal with
+  |- ?R ?Targ _ =>
+    let Hrew := fresh "Hrew" in
+    unshelve (
+    epose proof (APROPlike_para_rewrite_helper'_correctness'
+      (TensT:=TensT)
+      (APROPlikeD:=APROPlikeD) match_number _ _ _ _
+
+      Targ (* Targ *)
+
+      (to_equiv lem) (* lem *)
+
+      _ _ _ _ _ _ _
+
+      ) as Hrew;
+    do 3 tspecialize Hrew by typeclasses eauto; (* DiagramQuote *)
+    do 2 tspecialize Hrew by typeclasses eauto; (* APropQuote *)
+    do 2 (tspecialize Hrew; [solve [quote_MP]|])
+    (* do 2 tspecialize Hrew by typeclasses eauto *)
+    );
+    [exact nil|exact nil|]; (* MProp_of_AProp *)
+    vm_eval (sized_term_rewrite_helper' _ _ _);
+    vm_eval (sized_graph_iso_partial_test _ _);
+    specialize (Hrew _ _ _ _ _ _);
+    specialize (Hrew eq_refl eq_refl eq_refl eq_refl);
+    rewrite 2? cast2_id in Hrew;
+    (* idtac *)
+    etransitivity; [apply (of_equiv Hrew)|];
+    cbn;
+    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn);
+    clear Hrew
+  end.
+
+Ltac vyzx_prw_lhs' lem match_number :=
+  wild_prw_lhs' constr:(ZXCCALC)
+    constr:(ZX_APROPlike)
+    open_constr:(id)
+    open_constr:(id)
+    lem match_number.
+
+(* FIXME: Move*)
+
+(* 
+Theorem hopf_rule_Z_X_vert' n m top bot α β prf :
+  Z n (top + 2) α ↕ n_wire bot ⟷
+  cast _ _ prf eq_refl
+    (n_wire top ↕ X (2 + bot) m β) ∝[/ C2] Z n top α ↕ X bot m β.
+Proof.
+
+  rewrite <- (Rplus_0_l α), <- (dominated_Z_spider_fusion_bot_left _ 0).
+  rewrite <- (Rplus_0_l β), <- (dominated_X_spider_fusion_top_right _ 0).
+  apply prop_by_iff_zx_scale.
+  split; [|apply nonzero_div_nonzero; nonzero].
+  (* rewrite stack_nwire_distribute_l.
+  rewrite cast_compose_distribute, CastRules.cast_id. *)
+  Timeout 10 vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
+  (* Check (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α). *)
+  vyzx_prw_lhs' (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α) O.
+  vyzx_prw_lhs' (dominated_X_spider_fusion_top_right 0 0 bot m 0 β) O.
+  idtac.
+  notypeclasses refine (APROPlike_equiv (APROPlikeD:=ZX_APROPlike) _ _ _ _ _ _ _);
+  [typeclasses eauto..|].
+  
+  AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw
+  psmcat.
+  
+  
+  wild_psmcat.
+Timeout 20
+  let TensT := constr:(ZXCCALC) in
+  let APROPlikeD := ZX_APROPlike in
+  let to_equiv := open_constr:(id) in
+  let of_equiv := open_constr:(id) in
+
+  let lem := constr:(dominated_Z_spider_fusion_bot_left 0 0 top n 0 α) in
+  let match_number := constr:(O) in
+  (* lem match_number := *)
+  match goal with
+  |- ?R ?Targ _ =>
+    (* idtac Targ *)
+
+
+    let Hrew := fresh "Hrew" in
+    (* unshelve  *)
+    (
+    epose proof (APROPlike_para_rewrite_helper'_correctness'
+      (TensT:=TensT)
+      (APROPlikeD:=APROPlikeD) match_number _ _ _ _
+
+      Targ (* Targ *)
+
+      (to_equiv lem) (* lem *)
+
+      _ _ _ _ _ _ _
+
+      ) as Hrew;
+    do 3 tspecialize Hrew by typeclasses eauto; (* DiagramQuote *)
+    do 2 tspecialize Hrew by typeclasses eauto; (* APropQuote *)
+    do 2 (tspecialize Hrew; [solve [quote_MP]|]) (* MProp_to_AProp *)
+    );
+    [exact nil|exact nil|]
+
+
+    (* idtac *)
+    end.
+    tspecialize Hrew.
+    quote_MP.
+    tspecialize Hrew.
+    quote_MP.
+    (* typeclasses eauto. *)
+    quote_MP_step.
+    (* quote_MP. *)
+    (* 2:quote_MP. *)
+    quote_MP_step.
+    quote_MP.
+    quote_MP_step.
+    quote_MP.
+    
+Ltac quote_MP :=
+  match goal with
+  | |- MProp_of_AProp _ ?apv =>
+    idtac "quoting" apv;
+    let step n := 
+      lazymatch apv with
+      | Agen ?t ?n ?m =>
+        (* idtac "  gen" t; *)
+        notypeclasses refine (mprop_of_aprop_gen _ _ n m _ _ _);
+        quote_msize(*  || fail 2 "couldn't quote size!" *)
+        (* first [quote_discrete|typeclasses eauto|idtac] *)
+      | Acompose ?apv1 ?apv2 =>
+        (* idtac "  compose" apv1 apv2; *)
+        notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
+        (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
+        quote_MP
+      | Astack ?apv1 ?apv2 =>
+        (* idtac "  stack" apv1 apv2; *)
+        notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
+        quote_MP
+      | Aid ?n =>
+        (* idtac "  id"; *)
+        notypeclasses refine (mprop_of_aprop_id _ n _);
+        quote_msize
+      | Acup ?n =>
+        notypeclasses refine (mprop_of_aprop_cup _ n _);
+        quote_msize
+      | Acap ?n =>
+        notypeclasses refine (mprop_of_aprop_cap _ n _);
+        quote_msize
+      | Aswap ?n ?m =>
+        notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
+        quote_msize
+      | cast_aprop ?Hn ?Hm ?ap =>
+        (* idtac "  cast" ap; *)
+        unshelve (notypeclasses refine (mprop_of_aprop_cast' _ ap Hn Hm _ _ _ _ _);
+        [quote_msize|quote_msize|quote_MP|..]);
+        lazymatch goal with 
+        | |- equiv ?a ?b => msolve
+        | |- _ => shelve
+        end
+        (* [..|
+        compute_done || fail "NOT DONE" |
+        compute_done || fail "NOT DONE" ] *)
+
+      | ?ap =>
+        idtac "(quote_MP) TERM NOT FOUND!!!" ap;
+        fail 2
+        (* quote_MP *)
+      end in 
+    first [step 0 | 
+    idtac "changing!";
+      unshelve (notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _);
+      step 0);
+      msolve
+    ]
+  | |- ?G =>
+    idtac "(quote_MP) Goal not recognized!" G;
+    fail 2
+  end.
+  quote_MP.
+    quote_MP.
+    quote_MP.
+    quote_MP_step.
+    quote_MP.
+    2:{
+      quote_MP.
+    }
+    quote_MP.
+    quote_MP.
+      quote_MP_step.
+      quote_MP.
+      quote_MP_step.
+      quote_MP.
+    try try quote_MP.
+    do 3 tspecialize Hrew by typeclasses eauto.
+    tspecialize Hrew.
+    apply zx_quote_compose.
+    apply zx_quote_compose.
+    apply zx_quote_cast.
+    apply zx_quote_compose.
+    Timeout 15 typeclasses eauto.
+    apply zx_quote_cast.
+    apply zx_quote_compose.
+    2: typeclasses eauto.
+    apply zx_quote_cast.
+    apply zx_quote_compose.
+    #[global] Typeclasses Opaque zx_comm.
+    zx_quote_zx_comm
+    Set Typeclasses Debug.
+    Timeout 15 typeclasses eauto.
+
+    apply zx_quote_cast.
+
+    Timeout 15 typeclasses eauto.
+    Timeout 15 tspecialize Hrew by typeclasses eauto.
+
+    Timeout 5 vm_eval (sized_term_rewrite_helper' _ _ _) in Hrew.
+    Timeout 5 vm_eval (sized_graph_iso_partial_test _ _) in Hrew.
+    cbn [MProp_to_AProp map_mprop] in Hrew.
+    vm_compute interp_discrete_hg_inhab in Hrew.
+    cbn [denote_nat_bw btree_fold from_option compose
+      list_lookup lookup Datatypes.id] in Hrew.
+
+    
+
+    (* Timeout 5 vm_compute [denote_nat_bw _ _] in Hrew. *)
+    Timeout 1 specialize (Hrew _ _ _ _ _ _).
+    specialize (Hrew eq_refl eq_refl eq_refl eq_refl).
+    rewrite 2? cast2_id in Hrew.
+    (* idtac *)
+    etransitivity; [apply (id Hrew)|].
+    cbn;
+    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn);
+    clear Hrew.
+  end.
+  vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
+  rewrite stack_nwire_distribute_l.
+  rewrite stack_assoc_back_fwd, cast_compose_l, cast_contract_eq'.
+  rewrite cast_compose_distribute, CastRules.cast_id.
+  rewrite <- ComposeRules.compose_assoc.
+  rewrite <- stack_nwire_distribute_r.
+  rewrite ComposeRules.compose_assoc, <- stack_nwire_distribute_l.
+  zxrewrite hopf_rule_Z_X.
+  rewrite stack_nwire_distribute_l, <- compose_assoc.
+  rewrite stack_nwire_distribute_r.
+  rewrite compose_assoc.
+  rewrite stack_assoc_fwd, cast_contract_eq'.
+  rewrite cast_compose_eq_mid_join.
+  rewrite <- stack_nwire_distribute_l.
+  rewrite dominated_Z_spider_fusion_bot_left,
+    dominated_X_spider_fusion_top_right.
+  cbn.
+  rewrite cast_stack_distribute, cast_id.
+  rewrite <- stack_compose_distr.
+  rewrite cast_Z_contract_r, nwire_removal_r, cast_Z.
+  rewrite nwire_removal_l.
+  zxrefl.
+  Unshelve.
+  all: lia.
+Qed. *)
 Lemma zx_of_const_mult (c d : C) : zx_of_const (c * d) ∝=
   zx_of_const c ↕ zx_of_const d.
 Proof.
@@ -623,11 +891,11 @@ Proof.
   split. 2:{
     apply nonzero_div_nonzero, Cmult_neq_0; nonzero.
   }
-  
+
   rewrite cnot_is_swapp_notc at 2.
   rewrite notc_is_notc_r.
   zxrw (to_gadget bi_algebra_rule_X_over_Z).
-  
+
   zxrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
   rewrite Rplus_0_l.
   zxrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).

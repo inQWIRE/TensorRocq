@@ -1282,6 +1282,59 @@ Fixpoint mprop_of_sw {T n} (ns : vec M n) (l : list nat) :
     apply mprop_of_sw.
 Defined.
 
+Lemma Mlist_sum'_cons m (l : list M) : Mlist_sum' (m :: l) == m + Mlist_sum' l.
+Proof.
+  destruct l; [|done].
+  cbn.
+  now rewrite madd_0_r.
+Qed.
+
+Definition Mstack'_sums {T} {n m} {ns ms : list M} : forall
+  (mp : MProp M T n m) (mps : MProp M T (Mlist_sum' ns) (Mlist_sum' ms)),
+  MProp M T (Mlist_sum' (n :: ns)) (Mlist_sum' (m :: ms)) :=
+  match ns as ns, ms as ms return forall
+  (mp : MProp M T n m) (mps : MProp M T (Mlist_sum' ns) (Mlist_sum' ms)),
+    MProp M T (Mlist_sum' (n :: ns)) (Mlist_sum' (m :: ms)) with 
+  | [], [] => fun mp _ => mp
+  | n' :: ns, [] => fun mp mps =>
+    cast_mprop (Meq_refl _) (madd_0_r m) (Mstack mp mps)
+  | [], m' :: ms => fun mp mps =>
+    cast_mprop (madd_0_r n) (Meq_refl _) (Mstack mp mps)
+  | _, _ => fun mp mps => Mstack mp mps
+  end.
+
+Fixpoint mprop_of_sw' {T n} (ns : vec M n) (l : list nat) :
+  MProp M T (Mlist_sum' ns) (Mlist_sum' (apply_sw ns l)).
+  refine (
+    match n as n return forall ns : vec M n, 
+      MProp M T (Mlist_sum' ns) (Mlist_sum' (apply_sw ns l)) with
+    | 0 => fun ns => Mid (Mlist_sum' ns)
+    | S n => fun ns => _
+    end ns).
+  cbn.
+  case_decide as Hn.
+  - refine (match n with
+    | 1 => _
+    | _ => _
+    end ns).
+    + intros; apply Mid.
+    + case_decide; [|intros; apply Mid].
+      refine (vec_S_inv _ _).
+      intros a.
+      refine (vec_S_inv _ _).
+      intros b.
+      refine (vec_0_inv _ _).
+      cbn.
+      apply Mswap.
+    + intros; apply Mid.
+  - destruct l as [|a l]; [apply Mid|].
+    case_decide as Ha; [|apply Mid].
+    refine (Mcompose (mprop_to_top' (nat_to_fin Ha) ns) _).
+    cbn [vec_to_list Mlist_sum].
+    refine (Mstack'_sums (Mid _) _).
+    apply mprop_of_sw'.
+Defined.
+
 
 Definition Mocompose `{!RelDecision meq} {T n m m' o}
   (mp1 : MProp M T n m) (mp2 : MProp M T m' o) :
