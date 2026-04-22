@@ -19,21 +19,22 @@ Print strictInterpretTensor.
 
 (* Arguments StrictTensorLike : clear implicits. *)
 
+
+
 Fixpoint PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A, EqA : EqDecision A} 
-  `{Equiv T, Equivalence T equiv}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
    {Struct : nat -> nat -> Type}
     `{TensT : !TensorLike R A T}
-  {n m}
-    (* `{TensS : !StrictTensorLike R n m A Struct} *)
-  (ap : PRO Struct T n m) : Tensor (R:=R) n m A :=
+    `{TensS : !StrictTensorLike R A Struct}
+  {n m} (ap : PRO Struct T n m) : Tensor (R:=R) n m A :=
   match ap with
   | compose ap1 ap2 =>
       compose_tensor (PRO_semantics ap1) (PRO_semantics ap2)
   | stack ap1 ap2 =>
       stack_tensor (PRO_semantics ap1) (PRO_semantics ap2)
   | Pgen t n m    => interpretTensor t n m
-  (* | Pstruct n m s => strictInterpretTensor (StrictTensorLike:=TensS) n m s *)
+  | Pstruct n m s => strictInterpretTensor s
   end.
 
 Inductive Permutation : nat -> nat -> Type :=
@@ -56,14 +57,14 @@ Instance PermEquiv {n m} : Equiv (Permutation n m) := {
   equiv := eq
 }.
 
-Lemma permToTensorProper {n m} :
+(* Lemma permToTensorProper {n m} :
   Proper (equiv ==> equiv) (permToTensor n m).
-Proof. intros p0 p1 eq; by rewrite eq. Qed.
+Proof. intros p0 p1 eq; by rewrite eq. Qed. *)
 
-Instance TensorLikePerm {n m : nat} : StrictTensorLike (n:=n) (m:=m) R A Permutation :=
+Instance TensorLikePerm : StrictTensorLike R A Permutation :=
   {
-    sInterpretTensor := permToTensor;
-    sInterpretTensorProper := permToTensorProper
+    strictInterpretTensor := permToTensor;
+    (* strictInterpretTensorProper := permToTensorProper *)
   }.
   
 

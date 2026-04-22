@@ -54,12 +54,13 @@ Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req}
 
 #[global] Hint Mode TensorLike - - - - - - -   - - -   + - - : typeclass_instances.
 
-Class StrictTensorLike (R : Type) (n m : nat) `{SR : SemiRing R rO rI radd rmul req} (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : nat -> nat -> Type) `{Equiv (T n m)} `{Equivalence (T n m) equiv} := {
-  strictInterpretTensor (x : T n m) : Tensor (R:=R) n m A;
-  strictInterpretTensorProper :: Proper (equiv ==> equiv) strictInterpretTensor
+Class StrictTensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : nat -> nat -> Type) 
+  `{EqT : forall n m, Equiv (T n m)} `{EquivT : forall n m, @Equivalence (T n m) equiv} := {
+  strictInterpretTensor {n m} (x : T n m) : Tensor (R:=R) n m A;
+  strictInterpretTensorProper :: forall n m, Proper (equiv ==> equiv) (@strictInterpretTensor n m)
 }.
 
-#[global] Hint Mode StrictTensorLike - - - - - - -   - - -   + + + - - : typeclass_instances.
+#[global] Hint Mode StrictTensorLike - - - - -   - - -   - - + - - : typeclass_instances.
 
 Section TensorOps.
 
