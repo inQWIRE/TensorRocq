@@ -25,22 +25,22 @@ Definition DimensionlessTensor {R} (A : Type) :=
   appear in the list of summed elements of [A]. 
   This is registered as the [Equiv] ([(≡)]) instance for tensors. *)
 Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} {n m} : relation (@Tensor R n m A) :=
+  `{SA : Summable A} {n m} : relation (Tensor (R:=R) n m A) :=
   fun t t' => forall v w, SummedElement v -> SummedElement w ->
     req (t v w) (t' v w).
 
 #[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
-  `{Summable A} {n m} : Equiv (@Tensor R n m A) := tensoreq.
+  `{Summable A} {n m} : Equiv (Tensor (R:=R) n m A) := tensoreq.
 
 (* The default equivalence relation on dimensionless tensors, 
   lifting that of tensors by quantifying over all possible dimensions.
   This is registered as the [Equiv] ([(≡)]) instance for dimensionless tensors. *)
 Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} : relation (@DimensionlessTensor R A) :=
+  `{SA : Summable A} : relation (DimensionlessTensor (R:=R) A) :=
   fun t t' => forall n m, t n m ≡@{@Tensor R n m A} t' n m.
 
 #[global] Instance DimensionlessTensor_equiv `{SemiRing R rO rI radd rmul req}
-  `{Summable A} : Equiv (@DimensionlessTensor R A) := dimensionlesstensoreq.
+  `{Summable A} : Equiv (DimensionlessTensor (R:=R) A) := dimensionlesstensoreq.
 
 (* A class registering that elements [T] can be interpreted as
   dimensionless tensors with arguments in [A] and values in [R].
@@ -54,14 +54,20 @@ Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req}
 
 #[global] Hint Mode TensorLike - - - - - - -   - - -   + - - : typeclass_instances.
 
+Class StrictTensorLike (R : Type) (n m : nat) `{SR : SemiRing R rO rI radd rmul req} (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : nat -> nat -> Type) `{Equiv (T n m)} `{Equivalence (T n m) equiv} := {
+  strictInterpretTensor (x : T n m) : Tensor (R:=R) n m A;
+  strictInterpretTensorProper :: Proper (equiv ==> equiv) strictInterpretTensor
+}.
+
+#[global] Hint Mode StrictTensorLike - - - - - - -   - - -   + + + - - : typeclass_instances.
 
 Section TensorOps.
 
   Context {R : Type}.
 
-  Let Tensor := (@Tensor R).
+  Let Tensor := (Tensor (R:=R)).
 
-  Definition const_tensor {A} {n m} (r : R) : @Tensor n m A :=
+  Definition const_tensor {A} {n m} (r : R) : Tensor n m A :=
     fun _ _ => r.
 
   Definition delta_tensor `{SA : Summable A, EqA : EqDecision A,
