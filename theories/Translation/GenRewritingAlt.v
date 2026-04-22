@@ -142,15 +142,9 @@ Qed.
 Local Notation "ap '≡ᵣ' ap'" := (SigTensAProp_eq APL_Sig ap ap').
 
 End APROPlike_rel.
+
 (* 
 Lemma APL_Sig_correct {n m} (ap ap' : AProp T n m)
   (d d' : D n m) {Hd : DiagramDenote d ap} {Hd' : DiagramDenote d' ap'} : 
   ap ≡ᵣ ap' -> d ≡@{D n m} d'.
 Proof. *)
-
-
-
-
-
-
-
