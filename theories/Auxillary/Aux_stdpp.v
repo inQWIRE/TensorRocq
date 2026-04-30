@@ -2,13 +2,58 @@
 Require Combinators.
 Require Import SetoidList SetoidPermutation.
 From stdpp Require Import decidable.
-Require Import Aux.
+From TensorRocq Require Import Aux.
 
 From stdpp Require Import prelude functions.
 
+From stdpp Require Import sorting.
 
 From stdpp Require Import strings fin_maps gmultiset pmap gmap hlist.
 From stdpp Require Import pretty.
+
+
+
+(* FIXME: Move *)
+Lemma Sorted_eq_iff {A} (l : list A) : Sorted eq l <->
+  Forall (λ a, Some a = head l) l.
+Proof.
+  split.
+  - intros Hl.
+    induction Hl as [|a l Hl IHHl Ha]; [constructor|].
+    constructor; [done|].
+    revert IHHl.
+    apply List.Forall_impl.
+    intros b.
+    induction Ha; [done|].
+    subst.
+    done.
+  - intros Hl.
+    destruct l as [|a l]; [done|].
+    cbn in Hl.
+    apply Forall_cons_iff in Hl as [_ Hl].
+    induction Hl; [repeat constructor|].
+    replace x with a in * by congruence.
+    constructor; [done|].
+    now constructor.
+Qed.
+
+(* FIXME: Move *)
+Lemma Sorted_eq_iff_ForallPairs {A} (l : list A) : Sorted eq l <->
+  ForallPairs eq l.
+Proof.
+  rewrite Sorted_eq_iff.
+  destruct l; [easy|].
+  cbn.
+  rewrite List.Forall_forall.
+  split.
+  - intros Hall b c Hb Hc.
+    apply Hall in Hb, Hc.
+    congruence.
+  - intros Hal b Hb.
+    f_equal.
+    apply Hal; [done|].
+    now left.
+Qed.
 
 Lemma exists_dsig {A} {P Q : A -> Prop} `{forall x, Decision (P x)} :
   (exists x : dsig P, Q (`x)) <-> exists x, P x /\ Q x.

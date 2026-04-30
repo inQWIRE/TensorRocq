@@ -346,7 +346,7 @@ Ltac quote_MP :=
       end in 
     first [step 0 | 
       unshelve (notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _);
-      step 0);
+      [step 0|..]);
       msolve
     ]
   | |- ?G =>

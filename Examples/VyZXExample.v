@@ -654,7 +654,68 @@ Ltac vyzx_prw_lhs' lem match_number :=
 
 (* FIXME: Move*)
 
-(* 
+Ltac quote_MP :=
+  lazymatch goal with
+  | |- MProp_of_AProp _ ?apv =>
+    (* idtac "quoting" apv; *)
+    let step n := (* Placeholder argument to make this a function, to keep eval lazy *)
+      lazymatch apv with
+      | Agen ?t ?n ?m =>
+        (* idtac "  gen" t; *)
+        notypeclasses refine (mprop_of_aprop_gen _ _ n m _ _ _);
+        quote_msize(*  || fail 2 "couldn't quote size!" *)
+        (* first [quote_discrete|typeclasses eauto|idtac] *)
+      | Acompose ?apv1 ?apv2 =>
+        (* idtac "  compose" apv1 apv2; *)
+        notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
+        (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
+        quote_MP
+      | Astack ?apv1 ?apv2 =>
+        (* idtac "  stack" apv1 apv2; *)
+        notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
+        quote_MP
+      | Aid ?n =>
+        (* idtac "  id"; *)
+        notypeclasses refine (mprop_of_aprop_id _ n _);
+        quote_msize
+      | Acup ?n =>
+        notypeclasses refine (mprop_of_aprop_cup _ n _);
+        quote_msize
+      | Acap ?n =>
+        notypeclasses refine (mprop_of_aprop_cap _ n _);
+        quote_msize
+      | Aswap ?n ?m =>
+        notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
+        quote_msize
+      | cast_aprop ?Hn ?Hm ?ap =>
+        (* idtac "  cast" ap; *)
+        unshelve (notypeclasses refine (mprop_of_aprop_cast' _ ap Hn Hm _ _ _ _ _);
+        [quote_msize|quote_msize|quote_MP|..]);
+        lazymatch goal with 
+        | |- equiv ?a ?b => msolve
+        | |- _ => shelve
+        end
+        (* [..|
+        compute_done || fail "NOT DONE" |
+        compute_done || fail "NOT DONE" ] *)
+
+      | ?ap =>
+        idtac "(quote_MP) TERM NOT FOUND!!!" ap;
+        fail 3
+        (* quote_MP *)
+      end in 
+    first [step 0 | 
+      unshelve (notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _);
+      [step 0|..]);
+      msolve | lazymatch goal with |- ?G => idtac "FAILED" G; fail end
+    ]
+  | |- ?G =>
+    idtac "(quote_MP) Goal not recognized!" G;
+    fail 2
+  end.
+
+From TensorRocqEx Require Import PrintingExtra.
+
 Theorem hopf_rule_Z_X_vert' n m top bot α β prf :
   Z n (top + 2) α ↕ n_wire bot ⟷
   cast _ _ prf eq_refl
@@ -665,9 +726,126 @@ Proof.
   rewrite <- (Rplus_0_l β), <- (dominated_X_spider_fusion_top_right _ 0).
   apply prop_by_iff_zx_scale.
   split; [|apply nonzero_div_nonzero; nonzero].
+(* 
+
+
+  
+  Arguments cast_mprop' {_ _ _ _ _ _ _ _ _}.
+  notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _).
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP.
+  quote_MP.
+  quote_MP.
+  apply (subrel' struct_isomorphic).
+  (* Search AProp_semantics AProp_graph_eq. struct_isomorphic. *)
+  notypeclasses refine (AProp_iso_by_MProp_iso_correct_sum_decomp (FMD:=btree_free_monoid positive) 
+    (@interp_discrete_hg_inhab _ Nat.inhabited ?[l]) _ _ _ _ _ _ _).
+  apply mprop_of_aprop_change_sizes
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP_step.
+  quote_MP.
+  (* apply _. *)
+  quote_MP.
+  MProp_of_AProp
+  
+  Close Scope aprop_scope.
+  Bind Scope nat with AProp.
+  Disable Notation all  : aprop_scope.
+  idtac. *)
+
   (* rewrite stack_nwire_distribute_l.
   rewrite cast_compose_distribute, CastRules.cast_id. *)
-  Timeout 10 vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
+  Timeout 60 vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
+  eapply (APROPlike_equiv (APROPlikeD:=ZX_APROPlike) _ _ _ _).
+    typeclasses eauto.
+    typeclasses eauto.
+  rewrite <- 2 AProp_graph_semantics_correct.
+  apply graph_semantics_syntactic_eq.
+  evar (l : list nat);
+  let l := eval unfold l in l in 
+  notypeclasses refine (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw
+    l _ _ _ _ _ _ _).
+  apply _.
+  quote_MP.
+  quote_MP.
+
+Require Import Ltac2.Ltac2.
+  
+Ltac2 nat_of_constr (n : constr) : int :=
+  let rec go p :=
+  match! p with 
+  | O => 0
+  | S ?n => Int.add 1 (go n)
+  | _ =>
+    let n' := Std.eval_red n in 
+    if Constr.equal n' n then 
+      let n' := Std.eval_vm None n in 
+      if Constr.equal n' n then 
+      Control.throw_invalid_argument 
+        "nat_of_constr: argument is not reducible to a [nat] constant"
+      else go n'
+    else go n'
+  end in 
+  go n.
+
+Import Pp PpExtra.
+
+Ltac2 rec bw_to_tys (c : constr) : int list :=
+  match! c with 
+  | bempty => []
+  | bleaf None => [-1]
+  | bleaf (Some ?n) => [nat_of_constr n]
+  | bnode ?l ?r => List.append (bw_to_tys l) (bw_to_tys r)
+  | ?g => print (str "FAIL bw: " ++ of_constr g); Control.zero Match_failure
+  end.
+
+
+Ltac2 rec bw_to_code (c : constr) : message :=
+  let tys := bw_to_tys c in 
+  surround_braket (prlist_with_sep pr_comma of_int tys).
+  
+
+Ltac2 spider_to_box_code (gen : constr) (dom : constr) (cod : constr) : message :=
+  let dom := bw_to_code dom in 
+  let cod := bw_to_code cod in 
+  match! gen with
+  | None => str "Box('H', " ++ dom ++ str ", " ++ cod ++ str ")"
+  | Some (inr ?c) => 
+    str "gadget('" ++ of_constr c ++ str "')"
+  | Some (inl ?spi) => 
+    let is_X := match! spi with | (true, _) => str "True" | (false, _) => str "False" end in 
+    let phase := match! spi with | (_, ?phase) => of_constr phase end in 
+    str "spider('" ++ phase ++ str "', " ++ is_X ++ str ", " ++ dom ++ str ", " ++ cod ++ str ")"
+  | ?g => print (str "FAIL spi: " ++ of_constr g); Control.zero Match_failure
+  end.
+
+
+
+Ltac2 mprop_to_box_code (c : constr) : message :=
+  let rec go c := 
+    lazy_match! c with
+    | cast_mprop _ _ ?m => go m
+    | Mcast _ _ _ _ _ _ ?m => go m
+    | Mcompose ?l ?r =>
+      surround (go l) ++ str " >> " ++ surround (go r)
+    | Mstack ?l ?r =>
+      surround (go l) ++ str " @ " ++ surround (go r)
+    | Mid ?x => str "id(" ++ bw_to_code x ++ str ")"
+    | Mswap ?x ?y => str "swap(" ++ bw_to_code x ++ pr_comma() ++ bw_to_code y ++ str ")"
+    | Mgen ?gen ?dom ?cod => 
+      spider_to_box_code gen dom cod
+    | ?l => print (of_constr l); Control.zero Match_failure
+    end
+  in go c.
+  ltac2:(match! goal with
+  | [ |- ?r (MProp_sized_graph_semantics ?lhs) (MProp_sized_graph_semantics ?rhs)] =>
+    print (mprop_to_box_code lhs)
+  end).
+
+  set (cast_mprop' := @cast_mprop _ _ _ _ _ _ _ _ _ _).
+  set (cast_mprop'' := @cast_mprop _ _ _ _ _ _ _ _ _ _).
   (* Check (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α). *)
   vyzx_prw_lhs' (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α) O.
   vyzx_prw_lhs' (dominated_X_spider_fusion_top_right 0 0 bot m 0 β) O.

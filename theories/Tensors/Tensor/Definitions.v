@@ -146,6 +146,10 @@ Section TensorOps.
     Tensor (n + m) (m + n) A := fun v w =>
     delta_tensor v (vsplitr w +++ vsplitl w).
 
+  Definition delta_spider_tensor `{SA : Summable A, EqA : EqDecision A,
+    SR : SemiRing R rO rI radd rmul req} {n m} : Tensor n m A :=
+    fun v w => if decide (Sorted.Sorted eq (v +++ w)) then rI else rO.
+
   Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
     fun a b => t [# a] [# b].
 
@@ -233,3 +237,42 @@ Section TensorOps.
   #[global] Arguments strong_permute_tensor {_ _ _ _ _} _ _ _ _ / : assert.
 
 End TensorOps.
+
+
+Definition MorUnion {A B} (T T' : A -> B -> Type) : A -> B -> Type :=
+  λ a b, (T a b + T' a b)%type.
+
+
+#[export] Instance morunion_equiv {A B}
+  (T : A -> B -> Type) `{EqT : forall n m, Equiv (T n m)}
+  (T' : A -> B -> Type) `{EqT' : forall n m, Equiv (T' n m)} :
+  forall n m, Equiv (MorUnion T T' n m) := _.
+
+
+#[export] Instance morunion_equivalence {A B}
+  (T : A -> B -> Type) `{EqT : forall n m, Equiv (T n m)}
+  `{EquivT : forall n m, @Equivalence (T n m) equiv}
+  (T' : A -> B -> Type) `{EqT' : forall n m, Equiv (T' n m)}
+  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} :
+  forall n m, Equivalence (≡@{MorUnion T T' n m}) := λ n m, sum_relation_equiv _ _.
+
+#[local] Instance sum_rect_proper `{RA : relation A, RB : relation B, RC : relation C}
+  (f : A -> C) (g : B -> C) {Hf : Proper (RA ==> RC) f} {Hg : Proper (RB ==> RC) g} :
+  Proper (sum_relation RA RB ==> RC) (sum_rect (λ _, C) f g).
+Proof.
+  intros a b Hab.
+  induction Hab; cbn; now f_equiv.
+Qed.
+
+
+#[export] Instance strictTensorLike_MorUnion
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (T : nat -> nat -> Type) `{EqT : forall n m, Equiv (T n m)}
+  `{EquivT : forall n m, @Equivalence (T n m) equiv} {TensT : StrictTensorLike R A T}
+  (T' : nat -> nat -> Type) `{EqT' : forall n m, Equiv (T' n m)}
+  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} {TensT' : StrictTensorLike R A T'} :
+  StrictTensorLike R A (MorUnion T T')%type := {
+  strictInterpretTensor n m s := sum_rect (λ _, _) strictInterpretTensor strictInterpretTensor s;
+  strictInterpretTensorProper n m := sum_rect_proper _ _
+}.

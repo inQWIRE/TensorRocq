@@ -180,7 +180,7 @@ Ltac zx_prw_lhs' lem match_number :=
     open_constr:(AProp_semantic_eq_SigTensAProp_eq (Sig:=ZX_sig))
     lem match_number.
 
-Lemma test' n m o α β :
+(* Lemma test' n m o α β :
   Z n m α * Aid m ;' Aswap m m ;' Aid m * Z m o β ==
   Z n o (α + β) * Aid m ;' Aswap o m.
 Proof.
@@ -195,4 +195,4 @@ unshelve    quote_MP.
     quote_MP.
   }
   psmcat.
-Qed.
+Qed. *)

@@ -5,7 +5,7 @@ Class Quotable (A B Ctx : Type) (f : Ctx -> A -> B) := {}.
 #[global] Hint Mode Quotable - ! - - : typeclass_instances.
 
 
-
+(* 
 #[export] Instance option_quotable `{Quot : Quotable A B Ctx f} :
   Quotable (option A) (option B) Ctx (λ c, fmap (f c)) := {}.
 
@@ -20,5 +20,5 @@ Class Quotable (A B Ctx : Type) (f : Ctx -> A -> B) := {}.
    := {}.
 
 #[export] Instance list_quotable `{Quot : Quotable A B Ctx f} : 
-  Quotable (list A) (list B) Ctx (λ c, fmap (f c)).
+  Quotable (list A) (list B) Ctx (λ c, fmap (f c)). *)
 

@@ -1,8 +1,170 @@
-Require Import CospanHyperGraph.Definitions.
-Require Import Isomorphism.IsoAux.
+From TensorRocq Require Import CospanHyperGraph.Definitions.
+From TensorRocq Require Import Isomorphism.IsoAux.
 
 (* In this file, we define an efficient graph isomorphism testing function
   which we verify to be correct [graph_iso_partial_test]. *)
+
+(* Definition is _edge_iso {T} (mv : Pmap positive) (e e' : HyperEdge T) :=
+  (mv !!.) <$> e.1.2 = Some <$> e'.1.2 /\
+  (mv !!.) <$> e.2 = Some <$> e'.2. *)
+
+Definition is_edges_iso `{Equiv T, Equivalence T equiv} (me : Pmap positive) (mv : Pmap positive)
+  (es es' : list (positive * HyperEdge T)) :=
+  PermutationA (prod_relation eq (prod_relation (prod_relation equiv eq) eq))
+    (prod_map (me !!.) (prod_map (prod_map id (fmap (M:=list) (mv!!.))) (fmap (M:=list) (mv!!.))) <$> es)
+    (prod_map Some (prod_map (prod_map id (fmap (M:=list) Some)) (fmap (M:=list) Some)) <$> es').
+
+#[export] Instance is_edges_iso_perm `{Equiv T, Equivalence T equiv} me mv :
+  Proper (Permutation ==> Permutation ==> iff) (is_edges_iso (T:=T) me mv).
+Proof.
+  intros es1 es2 Hes es1' es2' Hes'.
+  unfold is_edges_iso.
+  f_equiv; apply (Permutation_PermutationA _);
+  [rewrite Hes|rewrite Hes'];
+  done.
+Qed.
+
+(* FIXME: Move *)
+Lemma PermutationA_eq {A} (l l' : list A) : PermutationA eq l l' <-> Permutation l l'.
+Proof.
+  split; [|apply (Permutation_PermutationA _)].
+  intros (l'' & Hll'' & Hl''l'%eqlistA_altdef%list_eq_Forall2)%(PermutationA_decompose _).
+  now subst.
+Qed.
+Lemma fmap_lookup_Some_dom `{FinMapDom K M SK} {A}
+  (m : M A) (ks : list K) (vs : list A) :
+  (m !!.) <$> ks ≡ Some <$> vs ->
+  list_to_set ks ⊆ dom m.
+Proof.
+  intros Hmks v Hv%elem_of_list_to_set%(elem_of_list_fmap_1 (m!!.)).
+  rewrite Hmks in Hv.
+  apply elem_of_dom.
+  set_solver + Hv.
+Qed.
+Lemma fmap_lookup_Some_dom_perm `{FinMapDom K M SK} {A}
+  (m : M A) (ks : list K) (vs : list A) :
+  (m !!.) <$> ks ≡ₚ Some <$> vs ->
+  list_to_set ks ⊆ dom m.
+Proof.
+  intros Hmks v Hv%elem_of_list_to_set%(elem_of_list_fmap_1 (m!!.)).
+  rewrite Hmks in Hv.
+  apply elem_of_dom.
+  set_solver + Hv.
+Qed.
+Lemma fmap_lookup_Some_dom_eq `{FinMapDom K M SK} {A}
+  (m : M A) (ks : list K) (vs : list A) :
+  (m !!.) <$> ks = Some <$> vs ->
+  list_to_set ks ⊆ dom m.
+Proof.
+  intros Hmks v Hv%elem_of_list_to_set%(elem_of_list_fmap_1 (m!!.)).
+  rewrite Hmks in Hv.
+  apply elem_of_dom.
+  set_solver + Hv.
+Qed.
+
+
+
+Lemma is_edges_iso_dom_me `{Equiv T, Equivalence T equiv} me mv es es' :
+  is_edges_iso (T:=T) me mv es es' ->
+  forall i_tio, i_tio ∈ es -> i_tio.1 ∈ dom me.
+Proof.
+  unfold is_edges_iso.
+  intros Hperm.
+  apply (fmap_PermutationA fst _) in Hperm as Hperm%(PermutationA_eq).
+  rewrite 2 fsts_prod_map in Hperm.
+  apply fmap_lookup_Some_dom_perm in Hperm.
+  set_solver + Hperm.
+Qed.
+
+
+Lemma is_edges_iso_dom_mv `{Equiv T, Equivalence T equiv} me mv es es' :
+  is_edges_iso (T:=T) me mv es es' ->
+  forall v, (exists i_tio, i_tio ∈ es /\ v ∈ i_tio.2.1.2 ++ i_tio.2.2)
+  -> v ∈ dom mv.
+Proof.
+  unfold is_edges_iso.
+  intros Hperm.
+  apply (fmap_PermutationA snd _) in Hperm as Hperm.
+  rewrite 2 snds_prod_map in Hperm.
+  apply (fun HP => fmap_PermutationA (RB:=eq) (prod_map snd id) HP) in Hperm as Hperm%PermutationA_eq.
+  2:{
+    intros [[t i] o] [[t' i'] o'].
+    unfold prod_relation.
+    simpl.
+    naive_solver.
+  }
+  rewrite <- 4 list_fmap_compose in Hperm.
+
+  pose proof (fun x Hx => (elem_of_Permutation_proper x _ _ Hperm).1 Hx) as Helem.
+  intros v (i_tio & Hi_tio & Hv).
+  specialize (Helem _ (elem_of_list_fmap_1 _ _ _ Hi_tio)).
+  (* apply (elem_of_list_fmap_1 snd) in Helem.
+  rewrite snds_prod_map, list_fmap_id in Helem.
+  rewrite snds_prod_map in Helem. *)
+  destruct i_tio as [i [[t ins] outs]].
+  simpl in Helem.
+  apply elem_of_list_fmap in Helem as ([ins' outs'] & [= Hins Houts] & _).
+  apply fmap_lookup_Some_dom_eq in Hins, Houts.
+  simpl in Hv.
+  apply elem_of_app in Hv as [Hv|Hv]; [apply Hins|apply Houts];
+  set_solver +Hv.
+Qed.
+
+
+Lemma is_edges_iso_submap `{Equiv T, Equivalence T equiv} me me' mv mv' (es es' : list (positive * HyperEdge T)) :
+  me ⊆ me' -> mv ⊆ mv' ->
+  is_edges_iso me mv es es' ->
+  is_edges_iso me' mv' es es'.
+Proof.
+  intros Hme Hmv Hiso.
+  pose proof Hiso as Hperm.
+  unfold is_edges_iso in Hperm |- *.
+  rewrite <- Hperm.
+  apply eq_reflexivity.
+  apply list_fmap_ext; intros _ (idx, tio) Htio%elem_of_list_lookup_2.
+  simpl.
+  f_equal.
+  - specialize (is_edges_iso_dom_me _ _ _ _ Hiso (idx, tio) Htio) as [v Hv]%elem_of_dom.
+    simpl in Hv.
+    rewrite Hv.
+    revert Hv Hme.
+    apply lookup_weaken.
+  - specialize (is_edges_iso_dom_mv _ _ _ _ Hiso) as Hdom.
+    destruct tio as [[t i] o].
+    simpl.
+    f_equal; [f_equal|]; apply list_fmap_ext;
+    intros _ v Hv%elem_of_list_lookup_2;
+    specialize (Hdom v);
+    tspecialize Hdom by set_solver +Htio Hv;
+    apply elem_of_dom in Hdom as [v' Hv'];
+    rewrite Hv';
+    revert Hv' Hmv; apply lookup_weaken.
+Qed.
+
+
+Lemma is_edges_iso_cons `{Equiv T, Equivalence T equiv} me mv
+  (es es' : list (positive * HyperEdge T)) idx idx' t t' i i' o o' :
+  is_edges_iso me mv es es' ->
+  me !! idx = Some idx' ->
+  t ≡ t' ->
+  (mv !!.) <$> i = Some <$> i' ->
+  (mv !!.) <$> o = Some <$> o' ->
+  is_edges_iso me mv ((idx, (t, i, o)) :: es) ((idx', (t', i', o')) :: es').
+Proof.
+  intros Hiso Hidx Ht Hi Ho.
+  unfold is_edges_iso.
+  cbn.
+  constructor; [|apply Hiso].
+  split; [done|].
+  simpl.
+  split; [|done].
+  split; done.
+Qed.
+
+
+
+
+
 
 Lemma isomorphic_of_map_to_list_perm {T} {n m}
   (mv : Pmap positive) (cohg cohg' : CospanHyperGraph T n m) :
@@ -1123,7 +1285,7 @@ Proof.
   eapply (subrel' isomorphic);
     refine (isomorphic_of_partial_inj_dom' _ _
     (Pmap_injmap (misol ∪ mv)) (Pmap_injmap mhe) _ _ eq_refl)|].
-  - intros i j Hi Hj. 
+  - intros i j Hi Hj.
     apply (inj _).
   - intros ? ? ? ?.
     apply (inj _).
@@ -1536,7 +1698,7 @@ Proof.
   now specialize (Hcorr (map_inverses_card_img _ _ (Piso_inverses mv))).
 Qed.
 
-Lemma graph_isos_test `{Equivalence T equiv} 
+Lemma graph_isos_test `{Equivalence T equiv}
   {n m} (cohg cohg' : CospanHyperGraph T n m) :
   match graph_isos cohg cohg' with
   | [] => False
@@ -1556,7 +1718,7 @@ Definition graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : 
   | _ :: _ => true
   end.
 
-Lemma graph_iso_partial_test_correct `{Equivalence T equiv} 
+Lemma graph_iso_partial_test_correct `{Equivalence T equiv}
   {n m} (cohg cohg' : CospanHyperGraph T n m) :
   graph_iso_partial_test cohg cohg' = true ->
   cohg ≡ₛ cohg'.
@@ -1606,7 +1768,7 @@ Definition graph_monos {i j n m} (subcohg : CospanHyperGraph T i j)
 
 
 (* Definition graph_matches {i j n m} (subcohg : CospanHyperGraph T i j)
-  (cohg : CospanHyperGraph T n m) : 
+  (cohg : CospanHyperGraph T n m) :
   list (list positive) *)
 
 

@@ -258,7 +258,7 @@ refine (
   let _ : EqDecision (btree A) := bnode_dec in
   match a, b with
   | bempty, bempty => left eq_refl
-  | bleaf a, bleaf b => match (decide (a = b)) with 
+  | bleaf a, bleaf b => match (decide (a = b)) with
     | left Hab => left (f_equal bleaf Hab)
     | right Hab => right (not_inj _ _ Hab)
     end
@@ -337,7 +337,7 @@ Fixpoint btree_of_list {A} (l : list A) : btree A :=
 Definition bnorm {A} (a : btree A) : btree A :=
   btree_of_list a.
 
-Fixpoint btree_app_path {A} (l l' : list A) : 
+Fixpoint btree_app_path {A} (l l' : list A) :
   btree_of_list l + btree_of_list l' ~> btree_of_list (l ++ l') :=
   match l with
   | [] => blunit
@@ -358,7 +358,7 @@ Proof.
   induction p; cbn; rewrite ?app_nil_r, ?app_assoc; congruence.
 Qed.
 
-Lemma bsize_bpath {A} (a b : btree A) (p : a ~> b) : 
+Lemma bsize_bpath {A} (a b : btree A) (p : a ~> b) :
   bsize a = bsize b.
 Proof.
   rewrite 2 bsize_lengthN.
@@ -366,61 +366,355 @@ Proof.
 Qed.
 
 Fixpoint btree_of_tree_list {A} (l : list (btree A)) : btree A :=
-  match l with 
+  match l with
   | [] => 0
   | a :: l => a + (btree_of_tree_list l)
   end.
 
+Definition brefl' {A} {a b : btree A} (Hab : a = b) : a ~> b :=
+  (eq_rect (a) (λ b, a ~> b) brefl
+    _ Hab).
+
 Definition bpath_of_eq {A} {a b : btree A} (Hab : a =@{list _} b) : a ~> b :=
-  btrans (bpath_to_norm a) (btrans
-  (eq_rect (a :> list _) (λ l, bnorm a ~> btree_of_list l) brefl
-    _ Hab)
+  btrans (bpath_to_norm a) (btrans (brefl' (f_equal btree_of_list Hab))
   (bsymm (bpath_to_norm b))).
 
+Definition bprop' {A} {a b c d : btree A} (p : a ~> c) (q : b ~> d) :
+  a + b ~> c + d :=
+  match p with
+  | brefl =>
+    match q with
+    | brefl => brefl
+    | q => bprop brefl q
+    end
+  | p => bprop p q
+  end.
 
 
+
+Definition btrans' {A} {a b c : btree A} (p : a ~> b) : forall (q : b ~> c), a ~> c :=
+  match p in a ~> b return b ~> c -> a ~> c with
+  | brefl => fun q => q
+  | blunit => fun q =>
+    match q in b ~> c return 0 + b ~> c with
+    | brefl => blunit
+    | bluniti => brefl
+    | q => btrans blunit q
+    end
+  | brunit => fun q =>
+    match q in b ~> c return b + 0 ~> c with
+    | brefl => brunit
+    | bruniti => brefl
+    | q => btrans brunit q
+    end
+  (* | @bassoc _ a b c => _ (@bassoc _ a b c) *)
+  (* | bassoc => fun q =>
+    match q in (bl + (brl + brr)) ~> c return (bl + brl) + brr ~> c with
+    | brefl => bassoc
+    | q => btrans p q
+    end *)
+  (* | _ => _ *)
+  | p => fun q =>
+    match q return _ ~> _ -> _ ~> _ with
+    | brefl => fun p => p
+    | q => fun p => btrans p q
+    end p
+    (* match q with
+    | brefl => p
+    | q => btrans p q
+    end *)
+  end.
+
+
+
+(*
+Definition btrans' {A} {a b c : btree A} (p : a ~> b) (q : b ~> c) : a ~> c :=
+  match p with
+  | brefl => fun q => q
+  | blunit => fun q =>
+    match q in b ~> c return 0 + b ~> c with
+    | brefl => blunit
+    | bluniti => brefl
+    | q => btrans blunit q
+    end
+  | brunit => fun q =>
+    match q in b ~> c return b + 0 ~> c with
+    | brefl => brunit
+    | bruniti => brefl
+    | q => btrans brunit q
+    end
+  | bassoc => fun q =>
+    match q in b ~> c return _ ~> c with
+    | brefl => bassoc
+    | bassoci => brefl
+    | q => btrans bassoc q
+    end
+
+  | p => fun q => btrans p q
+  end q. *)
+
+
+Fixpoint may_from_empty_path {A} (b : btree A) : option (bempty ~> b) :=
+  match b with
+  | bempty => Some brefl
+  | bleaf _ => None
+  | bnode bl br =>
+      p ← may_from_empty_path bl;
+      q ← may_from_empty_path br;
+      Some (btrans' bluniti (bprop' p q))
+  end.
+
+(* Compute (@may_from_empty_path bool (0 + (0 + 0))). *)
+
+
+Fixpoint may_to_empty_path {A} (a : btree A) : option (a ~> bempty) :=
+  match a with
+  | bempty => Some brefl
+  | bleaf _ => None
+  | bnode bl br =>
+      p ← may_to_empty_path bl;
+      q ← may_to_empty_path br;
+      Some (btrans' (bprop' p q) blunit)
+  end.
+
+
+Fixpoint may_from_singleton_path `{EqDecision A}
+  (a : A) (b : btree A) : option (! a ~> b) :=
+  match b with
+  | bempty => None
+  | bleaf b => Hab ← guard (a = b); Some (brefl' (f_equal bleaf Hab))
+  | bnode bl br =>
+    (pr ← may_from_empty_path br;
+     pl ← may_from_singleton_path a bl;
+     Some (btrans' bruniti (bprop' pl pr))
+     ) ∪
+     (pl ← may_from_empty_path bl;
+     pr ← may_from_singleton_path a br;
+     Some (btrans' bluniti (bprop' pl pr))
+     )
+  end.
+
+
+Fixpoint may_to_singleton_path `{EqDecision A}
+  (a : btree A) (b : A) : option (a ~> ! b) :=
+  match a with
+  | bempty => None
+  | bleaf a => Hab ← guard (a = b); Some (brefl' (f_equal bleaf Hab))
+  | bnode bl br =>
+    (pr ← may_to_empty_path br;
+     pl ← may_to_singleton_path bl b;
+     Some (btrans' (bprop' pl pr) brunit)
+     ) ∪
+     (pl ← may_to_empty_path bl;
+     pr ← may_to_singleton_path br b;
+     Some (btrans' (bprop' pl pr) blunit)
+     )
+  end.
+
+Fixpoint may_bpath_unit `{EqDecision A} (a b : btree A) : option (a ~> b) :=
+  match a, b with
+  | bempty, b => may_from_empty_path b
+  | a, bempty => may_to_empty_path a
+  | bleaf a, b => may_from_singleton_path a b
+  | a, bleaf b => may_to_singleton_path a b
+  | bnode al ar, bnode bl br =>
+    pl ← may_bpath_unit al bl;
+    pr ← may_bpath_unit ar br;
+    Some (bprop' pl pr)
+  end.
+
+Lemma may_bpath_unit_id `{EqDecision A} (a b : btree A) (Hab : a = b) :
+  may_bpath_unit a b = Some (brefl' Hab).
+Proof.
+  subst b.
+  cbn.
+  induction a.
+  - cbn.
+    now rewrite IHa1, IHa2.
+  - cbn.
+    case_guard; [|done].
+    cbn.
+    now rewrite (proof_irrel _ eq_refl).
+  - easy.
+Qed.
+
+
+Fixpoint from_threshold {A} (n : N) (bl br : btree A) :
+  {bl' : btree A & bool * {br' : btree A & bl' + br' ~> bl + br}}%type :=
+  match N.compare (bsize bl) n with
+  | Lt => existT bl (false, existT br brefl)
+  | Eq => existT bl (true, existT br brefl)
+  | Gt => 
+    match bl with
+    | bempty => (* Not possible *)
+      existT bempty (match n with | N0 => true | _ => false end,
+      existT br brefl)
+    | bleaf b => 
+      match n with
+      | N0 => existT bempty (true, existT (!b + br) blunit)
+      | Npos p => 
+        existT (!b) (match p with xH => true|_=>false end, existT br brefl)
+      end
+    | bnode bll blr => 
+      match from_threshold n bll (blr + br) with
+      | existT bl' (is_eq, existT br' p) =>
+        existT bl' (is_eq, existT br' (btrans' p bassoci))
+      end
+    end
+  end.
+
+
+Fixpoint to_threshold {A} (n : N) (bl br : btree A) :
+  {bl' : btree A & bool * {br' : btree A & bl + br ~> bl' + br'}}%type :=
+  match N.compare (bsize bl) n with
+  | Lt => existT bl (false, existT br brefl)
+  | Eq => existT bl (true, existT br brefl)
+  | Gt => 
+    match bl with
+    | bempty => (* Not possible *)
+      existT bempty (match n with | N0 => true | _ => false end,
+      existT br brefl)
+    | bleaf b => 
+      match n with
+      | N0 => existT bempty (true, existT (!b + br) bluniti)
+      | Npos p => 
+        existT (!b) (match p with xH => true|_=>false end, existT br brefl)
+      end
+    | bnode bll blr => 
+      match to_threshold n bll (blr + br) with
+      | existT bl' (is_eq, existT br' p) =>
+        existT bl' (is_eq, existT br' (btrans' bassoc p))
+      end
+    end
+  end.
+  
 (* 
+Fixpoint may_bpath_aux `{EqDecision A} (al ar b : btree A) : option (al + ar ~> b) :=
+  let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
+  
+
+  match a, b with
+  | bempty, b => may_from_empty_path b
+  | a, bempty => may_to_empty_path a
+  | bleaf a, b => may_from_singleton_path a b
+  | a, bleaf b => may_to_singleton_path a b
+  | bnode al ar, bnode bl br =>
+    let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
+
+    pl ← may_bpath_unit al bl;
+    pr ← may_bpath_unit ar br;
+    Some (bprop' pl pr)
+  end.
+
+Fixpoint may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
+  match a, b with
+  | bempty, b => may_from_empty_path b
+  | a, bempty => may_to_empty_path a
+  | bleaf a, b => may_from_singleton_path a b
+  | a, bleaf b => may_to_singleton_path a b
+  | bnode al ar, bnode bl br =>
+    let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
+
+    pl ← may_bpath_unit al bl;
+    pr ← may_bpath_unit ar br;
+    Some (bprop' pl pr)
+  end.
+
+Fixpoint de_empty_aux {A} (a : btree A) : option (btree A) :=
+  match a with
+  | bempty => None
+  | bleaf a => Some (bleaf a)
+  | bnode l r =>
+    union_with (λ l r, Some (bnode l r)) (de_empty_aux l) (de_empty_aux r)
+  end.
+
+
+Inductive lbtree (L A : Type) :=
+  | lbnode (lab : L) (l r : lbtree L A) : lbtree L A
+  | lbleaf (a : A) : lbtree L A
+  | lbempty : lbtree L A.
+
+
+
+Require Import Ltac2.Ltac2.
+
+Ltac2 Type rec ('a) btree := [
+  | Bnode ('a btree, 'a btree)
+  | Bleaf ('a)
+  | Bempty
+].
+
+Ltac2 Type rec ('b, 'a) lbtree := [
+  | LBnode ('b, ('b, 'a) lbtree, ('b, 'a) lbtree)
+  | LBleaf ('a)
+  | LBempty
+].
+
+Ltac2 rec btree_eq (eqa : 'a -> 'a -> bool) (b : 'a btree) c : bool :=
+  match b with
+  | Bnode l r =>
+    match c with
+    | Bnode l' r' => if btree_eq eqa l l' then btree_eq eqa r r' else false
+    | _ => false
+    end
+  | Bleaf a =>
+    match c with
+    | Bleaf a' => eqa a a'
+    | _ => false
+    end
+  | Bempty =>
+    match c with
+    | Bempty => true
+    | _ => false
+    end
+  end.
+
+Ltac2 Type rec ('a) bpath := [
+
+] *)
+
+(*
 
 (* #[bypass_check(guard)] *)
 Fixpoint may_bpath `{EqDecision A} (a b : btree A)
-  (la lb : list (btree A)) : 
+  (la lb : list (btree A)) :
   option (btree_of_tree_list a la ~> btree_of_tree_list b lb) :=
   match N.compare (bsize a) (bsize b) with
-  =| Eq => if decide (a = b) then 
+  =| Eq => if decide (a = b) then
 
 
   match a with
   | 0 + ar => btrans blunit <$> may_bpath ar b
-  | 
+  |
   | _ => None
   end%btree.
-  match a, b with 
-  | 
+  match a, b with
+  |
   match N.compare (bsize al) (bsize bl)
-  | Eq => 
+  | Eq =>
 
 
 Fixpoint btree_decomp {A} (a : btree A) : option (btree A * btree A) :=
   match a with
   | 0 + ar => btree_decomp ar
   | al + 0 => btree_decomp al
-  | 
+  |
 
 #[bypass_check(guard)]
-Fixpoint may_bpath `{EqDecision A} (a b : btree A) : 
+Fixpoint may_bpath `{EqDecision A} (a b : btree A) :
   option (a ~> b) :=
   match a with
   | 0 + ar => btrans blunit <$> may_bpath ar b
-  | 
+  |
   | _ => None
   end%btree.
-  match a, b with 
-  | 
+  match a, b with
+  |
   match N.compare (bsize al) (bsize bl)
-  | Eq => 
+  | Eq =>
 
 #[bypass_check(guard)]
-Fixpoint may_bpath `{EqDecision A} (al bl ar br : btree) : 
+Fixpoint may_bpath `{EqDecision A} (al bl ar br : btree) :
   option (al + ar ~> bl + br) :=
   match N.compare (bsize al) (bsize bl)
   | Eq =>  *)

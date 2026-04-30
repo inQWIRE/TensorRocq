@@ -463,4 +463,14 @@ Section TensorOpsFacts.
     now destruct (vec_cast_opt _ _).
   Qed.
 
+  Lemma delta_spider_tensor_alt {n m} :
+    delta_spider_tensor (n:=n) (m:=m) ≡ (fun v w =>
+    if decide (Forall (λ a, Some a = head (v +++ w)) (v +++ w)) then rI else rO).
+  Proof.
+    intros v w _ _.
+    apply eq_reflexivity.
+    apply decide_ext.
+    apply Sorted_eq_iff.
+  Qed.
+
 End TensorOpsFacts.
