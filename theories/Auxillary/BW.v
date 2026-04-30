@@ -274,41 +274,135 @@ all: abstract congruence.
 Defined.
 
 
+(* FIXME: Move *)
+Notation Mor A := (A -> A -> Type).
 
 
 
 
-Inductive bpath {A} : btree A -> btree A -> Type :=
-  | brefl {a} : bpath a a
-  | bassoc {a b c} : bpath ((a + b) + c) (a + (b + c))
-  | bassoci {a b c} : bpath (a + (b + c)) ((a + b) + c)
-  | blunit {a} : bpath (0 + a) a
-  | bluniti {a} : bpath a (0 + a)
-  | brunit {a} : bpath (a + 0) a
-  | bruniti {a} : bpath a (a + 0)
-  | bprop {a b c d} : bpath a c -> bpath b d -> bpath (a + b) (c + d)
-  | btrans {a b c} : bpath a b -> bpath b c -> bpath a c.
+Inductive gbpath {A} {gens : Mor (btree A)} : Mor (btree A) :=
+  | brefl {a} : gbpath a a
+  | bgen {a b} : gens a b -> gbpath a b
+  | bprop {a b c d} : gbpath a c -> gbpath b d -> gbpath (a + b) (c + d)
+  | btrans {a b c} : gbpath a b -> gbpath b c -> gbpath a c.
+
+#[global] Arguments gbpath {_} (_) (_%_btree _%_btree) : assert.
+
+Inductive bmonoidal {A} : Mor (btree A) :=
+  | bassoc {a b c} : bmonoidal ((a + b) + c) (a + (b + c))
+  | bassoci {a b c} : bmonoidal (a + (b + c)) ((a + b) + c)
+  | blunit {a} : bmonoidal (0 + a) a
+  | bluniti {a} : bmonoidal a (0 + a)
+  | brunit {a} : bmonoidal (a + 0) a
+  | bruniti {a} : bmonoidal a (a + 0).
+
+
+Definition bgen_monoidal {A} {a b} (p : @bmonoidal A a b) : gbpath bmonoidal a b := bgen p.
+
+Notation bpath := (gbpath bmonoidal).
+
+Coercion bgen_monoidal : bmonoidal >-> bpath.
+
+
+Notation "a ~>[ M ] b" := (gbpath M a%btree b%btree) (at level 60) : btree_scope.
 
 Notation "a ~> b" := (bpath a%btree b%btree) (at level 60) : btree_scope.
 
-Fixpoint bsymm {A} {a b : btree A} (p : a ~> b) : b ~> a :=
+
+
+
+Definition bprop' {A} {M : Mor (btree A)} {a b c d : btree A} (p : a ~>[M] c) (q : b ~>[M] d) :
+  a + b ~>[M] c + d :=
+  match p with
+  | brefl =>
+    match q with
+    | brefl => brefl
+    | q => bprop brefl q
+    end
+  | p => bprop p q
+  end.
+
+
+
+Definition btrans' {A M} {a b c : btree A} (p : a ~>[M] b) : forall (q : b ~>[M] c), a ~>[M] c :=
+  match p in a ~>[_] b return b ~>[M] c -> a ~>[M] c with
+  | brefl => fun q => q
+  | p => fun q =>
+    match q return _ ~>[M] _ -> _ ~>[M] _ with
+    | brefl => fun p => p
+    | q => fun p => btrans p q
+    end p
+  end.
+
+
+Definition btrans'' {A M} 
+  (Mcomp : forall {a b c}, M a b -> M b c -> a ~>[M] c) 
+  {a b c : btree A} (p : a ~>[M] b) : forall (q : b ~>[M] c), a ~>[M] c :=
+  match p in a ~>[_] b return b ~>[M] c -> a ~>[M] c with
+  | brefl => fun q => q
+  | bgen m => fun q => 
+    match q in a ~>[_] b return M _ a -> _ ~>[M] b with
+    | brefl => fun p => bgen p
+    | bgen n => fun m => Mcomp m n
+    | q => fun p => btrans (bgen p) q
+    end m
+  | p => fun q =>
+    match q return _ ~>[M] _ -> _ ~>[M] _ with
+    | brefl => fun p => p
+    | q => fun p => btrans p q
+    end p
+  end.
+
+Definition mbcomp {A} {a b c : btree A} (p : bmonoidal a b) : forall (q : bmonoidal b c), a ~> c :=
+  match p in bmonoidal a b return bmonoidal b c -> a ~> c with
+  | blunit => fun q =>
+    match q in bmonoidal b c return 0 + b ~> c with
+    | bluniti => brefl
+    | q => btrans blunit q
+    end
+  | brunit => fun q =>
+    match q in bmonoidal b c return b + 0 ~> c with
+    | bruniti => brefl
+    | q => btrans brunit q
+    end
+  | p => fun q =>
+    btrans p q
+    (* match q with
+    | brefl => p
+    | q => btrans p q
+    end *)
+  end.
+
+Definition mbtrans' {A} {a b c : btree A} (p : a ~> b) (q : b ~> c) : a ~> c :=
+  btrans'' (λ _ _ _, mbcomp) p q.
+
+Fixpoint gbsymm {A M} (minv : forall a b, M a b -> M b a) {a b : btree A}
+  (p : a ~>[M] b) : b ~>[M] a :=
   match p with
   | brefl => brefl
+  | bgen m => bgen (minv _ _ m)
+  | bprop p q => bprop (gbsymm minv p) (gbsymm minv q)
+  | btrans p q => btrans (gbsymm minv q) (gbsymm minv p)
+  end.
+
+Definition mbsymm {A} {a b : btree A} (p : bmonoidal a b) : bmonoidal b a :=
+  match p with
   | bassoc => bassoci
   | bassoci => bassoc
   | blunit => bluniti
   | bluniti => blunit
   | brunit => bruniti
   | bruniti => brunit
-  | bprop p q => bprop (bsymm p) (bsymm q)
-  | btrans p q => btrans (bsymm q) (bsymm p)
   end.
 
-Definition blprop {A} a {b c : btree A} (p : b ~> c) : a + b ~> a + c :=
-  bprop brefl p.
+Definition bsymm {A} {a b : btree A} (p : a ~> b) : b ~> a :=
+  gbsymm (@mbsymm A) p.
 
-Definition brprop {A} {a b : btree A} c (p : a ~> b) : a + c ~> b + c :=
-  bprop p brefl.
+Definition blprop {A M} a {b c : btree A} (p : b ~>[M] c) : a + b ~>[M] a + c :=
+  bprop' brefl p.
+
+Definition brprop {A M} {a b : btree A} c (p : a ~>[M] b) : a + c ~>[M] b + c :=
+  bprop' p brefl.
 
 
 
@@ -346,7 +440,7 @@ Fixpoint btree_app_path {A} (l l' : list A) :
 
 Fixpoint bpath_to_norm {A} (a : btree A) : a ~> bnorm a :=
   match a with
-  | bnode al ar => btrans (bprop (bpath_to_norm al) (bpath_to_norm ar)) (btree_app_path al ar)
+  | bnode al ar => btrans' (bprop' (bpath_to_norm al) (bpath_to_norm ar)) (btree_app_path al ar)
   | bleaf a => bruniti
   | bempty => brefl
   end.
@@ -355,7 +449,7 @@ Fixpoint bpath_to_norm {A} (a : btree A) : a ~> bnorm a :=
 Lemma btree_elems_bpath {A} {a b : btree A} (p : a ~> b) :
   a =@{list _} b.
 Proof.
-  induction p; cbn; rewrite ?app_nil_r, ?app_assoc; congruence.
+  induction p as [|? ? []| |]; cbn; rewrite ?app_nil_r, ?app_assoc; congruence.
 Qed.
 
 Lemma bsize_bpath {A} (a b : btree A) (p : a ~> b) :
@@ -376,82 +470,11 @@ Definition brefl' {A} {a b : btree A} (Hab : a = b) : a ~> b :=
     _ Hab).
 
 Definition bpath_of_eq {A} {a b : btree A} (Hab : a =@{list _} b) : a ~> b :=
-  btrans (bpath_to_norm a) (btrans (brefl' (f_equal btree_of_list Hab))
+  btrans' (bpath_to_norm a) (btrans' (brefl' (f_equal btree_of_list Hab))
   (bsymm (bpath_to_norm b))).
 
-Definition bprop' {A} {a b c d : btree A} (p : a ~> c) (q : b ~> d) :
-  a + b ~> c + d :=
-  match p with
-  | brefl =>
-    match q with
-    | brefl => brefl
-    | q => bprop brefl q
-    end
-  | p => bprop p q
-  end.
 
 
-
-Definition btrans' {A} {a b c : btree A} (p : a ~> b) : forall (q : b ~> c), a ~> c :=
-  match p in a ~> b return b ~> c -> a ~> c with
-  | brefl => fun q => q
-  | blunit => fun q =>
-    match q in b ~> c return 0 + b ~> c with
-    | brefl => blunit
-    | bluniti => brefl
-    | q => btrans blunit q
-    end
-  | brunit => fun q =>
-    match q in b ~> c return b + 0 ~> c with
-    | brefl => brunit
-    | bruniti => brefl
-    | q => btrans brunit q
-    end
-  (* | @bassoc _ a b c => _ (@bassoc _ a b c) *)
-  (* | bassoc => fun q =>
-    match q in (bl + (brl + brr)) ~> c return (bl + brl) + brr ~> c with
-    | brefl => bassoc
-    | q => btrans p q
-    end *)
-  (* | _ => _ *)
-  | p => fun q =>
-    match q return _ ~> _ -> _ ~> _ with
-    | brefl => fun p => p
-    | q => fun p => btrans p q
-    end p
-    (* match q with
-    | brefl => p
-    | q => btrans p q
-    end *)
-  end.
-
-
-
-(*
-Definition btrans' {A} {a b c : btree A} (p : a ~> b) (q : b ~> c) : a ~> c :=
-  match p with
-  | brefl => fun q => q
-  | blunit => fun q =>
-    match q in b ~> c return 0 + b ~> c with
-    | brefl => blunit
-    | bluniti => brefl
-    | q => btrans blunit q
-    end
-  | brunit => fun q =>
-    match q in b ~> c return b + 0 ~> c with
-    | brefl => brunit
-    | bruniti => brefl
-    | q => btrans brunit q
-    end
-  | bassoc => fun q =>
-    match q in b ~> c return _ ~> c with
-    | brefl => bassoc
-    | bassoci => brefl
-    | q => btrans bassoc q
-    end
-
-  | p => fun q => btrans p q
-  end q. *)
 
 
 Fixpoint may_from_empty_path {A} (b : btree A) : option (bempty ~> b) :=
@@ -551,7 +574,7 @@ Fixpoint from_threshold {A} (n : N) (bl br : btree A) :
       existT br brefl)
     | bleaf b => 
       match n with
-      | N0 => existT bempty (true, existT (!b + br) blunit)
+      | N0 => existT bempty (true, existT (!b + br) (bgen blunit))
       | Npos p => 
         existT (!b) (match p with xH => true|_=>false end, existT br brefl)
       end
@@ -576,7 +599,7 @@ Fixpoint to_threshold {A} (n : N) (bl br : btree A) :
       existT br brefl)
     | bleaf b => 
       match n with
-      | N0 => existT bempty (true, existT (!b + br) bluniti)
+      | N0 => existT bempty (true, existT (!b + br) (bgen bluniti))
       | Npos p => 
         existT (!b) (match p with xH => true|_=>false end, existT br brefl)
       end
@@ -587,9 +610,6 @@ Fixpoint to_threshold {A} (n : N) (bl br : btree A) :
       end
     end
   end.
-
-(* FIXME: Move *)
-Global Instance maybe_S : Maybe S := fun n => match n with | S n' => Some n' | _ => None end.
 
 Fixpoint may_bpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct depth} : option (a ~> b) :=
   may_bpath_unit a b ∪ 
@@ -657,4 +677,6 @@ Qed.
 
 Definition may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
   may_bpath_aux (N.to_nat (bsize (a + b))) a b.
+
+
 
