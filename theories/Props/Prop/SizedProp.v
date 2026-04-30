@@ -28,7 +28,7 @@ Inductive MPRO {A} {MStruct : btree A -> btree A -> Type} {Ty : Type} :
   (* Structural generators which can restrict sizes they operate over *)
   | Mstruct (n m : btree A) (s : MStruct n m) : MPRO n m
   (* Nonstructural generators which must be defined for all sizes *)
-  | Mgen (t : Ty) n m : MPRO n m.
+  | Mgen n m (t : Ty) : MPRO n m.
 
 #[global] Arguments MPRO {_} (_) (_) (_ _) : assert.
 
@@ -49,7 +49,7 @@ Fixpoint MPRO_to_PRO {A} (f : A -> nat)
   | Mstack mp1 mp2 => Pstack (MPRO_to_PRO f mp1)
     (MPRO_to_PRO f mp2)
   | Mstruct n m s => Pstruct _ _ (interpStruct f s)
-  | Mgen t n m => Pgen t _ _
+  | Mgen n m t => Pgen _ _ t
   end.
 
 
@@ -150,3 +150,160 @@ Coercion mscartesian_inr : MSCartesian >-> MCartesian.
 Notation MPROP := (MPRO MSymmetric).
 Notation MAPROP := (MPRO MAutonomous).
 Notation MCPROP := (MPRO MCartesian).
+
+(* FIXME: Move *) 
+
+
+Global Instance btree_ret: MRet btree := λ A x, bleaf x.
+Global Instance btree_fmap : FMap btree := λ A B f,
+  fix go (b : btree A) := match b with 
+  | l + r => go l + go r
+  | ! a => ! (f a)
+  | 0 => 0
+  end%btree.
+Global Instance btree_omap : OMap btree := λ A B f,
+  fix go (b : btree A) := match b with 
+  | l + r => go l + go r
+  | ! a => match (f a) with Some b => ! b | None => bempty end
+  | 0 => 0
+  end%btree.
+Global Instance btree_bind : MBind btree := λ A B f,
+  fix go (b : btree A) := match b with 
+  | l + r => go l + go r
+  | ! a => (f a)
+  | 0 => 0
+  end%btree.
+Global Instance btree_join: MJoin btree := λ A,
+  fix go (bs : btree (btree A)) : btree A :=
+  match bs with
+  | l + r => go l + go r
+  | ! a => a
+  | 0 => 0
+  end%btree.
+
+
+
+Declare Scope mpro_scope.
+Delimit Scope mpro_scope with mpro.
+Bind Scope mpro_scope with PRO.
+
+Notation "g ∘ f" := (Mcompose f%mpro g%mpro) : mpro_scope.
+Notation "f ;; g" := (Mcompose f%mpro g%mpro) : mpro_scope.
+Notation "f * g" := (Mstack f%mpro g%mpro) : mpro_scope.
+
+Notation "'[str' s ']'" := (Mstruct _ _ s) : mpro_scope.
+Notation "'[gen' t n m ']'" := (Mgen n%nat m%nat t) 
+  (t at level 9, n at level 9, m at level 9) : mpro_scope.
+
+Local Open Scope mpro_scope.
+
+
+
+Fixpoint dbind_MPRO {A B} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree B -> btree B -> Type}
+  {T T' : Type} 
+  (fb : A -> btree B)
+  (fs : forall n m, Struct n m -> MPRO Struct' T' (n ≫= fb) (m ≫= fb))
+  (ft : forall n m, T -> MPRO Struct' T' (n ≫= fb) (m ≫= fb)) 
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (n ≫= fb) (m ≫= fb) :=
+  match p with
+  | l ;; r => dbind_MPRO fb fs ft l ;; dbind_MPRO fb fs ft r
+  | l * r => dbind_MPRO fb fs ft l * dbind_MPRO fb fs ft r
+  | [str s ] => fs _ _ s
+  | [gen t n m] => ft n m t
+  end%mpro.
+
+Fixpoint dbind_MPRO' {A B} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree B -> btree B -> Type}
+  {T T' : Type} 
+  (fb : A -> B)
+  (fs : forall n m, Struct n m -> MPRO Struct' T' (fb <$> n) (fb <$> m))
+  (ft : forall n m, T -> MPRO Struct' T' (fb <$> n) (fb <$> m)) 
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (fb <$> n) (fb <$> m) :=
+  match p with
+  | l ;; r => dbind_MPRO' fb fs ft l ;; dbind_MPRO' fb fs ft r
+  | l * r => dbind_MPRO' fb fs ft l * dbind_MPRO' fb fs ft r
+  | [str s ] => fs _ _ s
+  | [gen t n m] => ft n m t
+  end%mpro.
+
+
+Fixpoint bind_MPRO {A} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree A -> btree A -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> MPRO Struct' T' n m)
+  (ft : forall n m, T -> MPRO Struct' T' n m) 
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' n m :=
+  match p with
+  | l ;; r => bind_MPRO fs ft l ;; bind_MPRO fs ft r
+  | l * r => bind_MPRO fs ft l * bind_MPRO fs ft r
+  | [str s ] => fs _ _ s
+  | [gen t n m] => ft n m t
+  end%mpro.
+
+
+
+
+Fixpoint dmap_MPRO {A B} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree B -> btree B -> Type}
+  {T T' : Type} 
+  (fb : A -> btree B)
+  (fs : forall n m, Struct n m -> Struct' (n ≫= fb) (m ≫= fb))
+  (ft : forall n m, T -> T')
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (n ≫= fb) (m ≫= fb) :=
+  match p with
+  | l ;; r => dmap_MPRO fb fs ft l ;; dmap_MPRO fb fs ft r
+  | l * r => dmap_MPRO fb fs ft l * dmap_MPRO fb fs ft r
+  | [str s ] => [str fs _ _ s]
+  | [gen t n m] => [gen (ft n m t) _ _]
+  end%mpro.
+
+Fixpoint dmap_MPRO' {A B} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree B -> btree B -> Type}
+  {T T' : Type} 
+  (fb : A -> B)
+  (fs : forall n m, Struct n m -> Struct' (fb <$> n) (fb <$> m))
+  (ft : forall n m, T -> T')
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (fb <$> n) (fb <$> m) :=
+  match p with
+  | l ;; r => dmap_MPRO' fb fs ft l ;; dmap_MPRO' fb fs ft r
+  | l * r => dmap_MPRO' fb fs ft l * dmap_MPRO' fb fs ft r
+  | [str s ] => [str fs _ _ s]
+  | [gen t n m] => [gen (ft n m t) _ _]
+  end%mpro.
+
+Fixpoint map_MPRO {A} {Struct : btree A -> btree A -> Type}
+  {Struct' : btree A -> btree A -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> Struct' n m)
+  (ft : T -> T')
+  {n m} (p : MPRO Struct T n m) : MPRO Struct' T' n m :=
+  match p with
+  | l ;; r => map_MPRO fs ft l ;; map_MPRO fs ft r
+  | l * r => map_MPRO fs ft l * map_MPRO fs ft r
+  | [str s ] => [str fs _ _ s]
+  | [gen t n m] => [gen (ft t) n m]
+  end%mpro.
+
+
+
+Lemma map_MPRO_to_bind_MPRO {A} {Struct Struct' : btree A -> btree A -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> Struct' n m)
+  (ft : T -> T') 
+  {n m} (p : MPRO Struct T n m) : 
+  map_MPRO fs ft p = 
+  bind_MPRO (λ n m s, [str (fs n m s)]) (λ n m t, [gen (ft t) n m]) p.
+Proof.
+  induction p; cbn; congruence.
+Qed.
+
+
+
+Notation SMPRO Struct := (MPRO Struct Empty_set).
+
+Definition Mstruct' {A Struct T n m} (s : SMPRO Struct n m) : @MPRO A Struct T n m :=
+  map_MPRO (λ n m, id) (Empty_set_rect _) s.
+
+
+

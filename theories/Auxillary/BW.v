@@ -587,135 +587,74 @@ Fixpoint to_threshold {A} (n : N) (bl br : btree A) :
       end
     end
   end.
-  
-(* 
-Fixpoint may_bpath_aux `{EqDecision A} (al ar b : btree A) : option (al + ar ~> b) :=
-  let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
-  
 
+(* FIXME: Move *)
+Global Instance maybe_S : Maybe S := fun n => match n with | S n' => Some n' | _ => None end.
+
+Fixpoint may_bpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct depth} : option (a ~> b) :=
+  may_bpath_unit a b ∪ 
   match a, b with
   | bempty, b => may_from_empty_path b
   | a, bempty => may_to_empty_path a
   | bleaf a, b => may_from_singleton_path a b
   | a, bleaf b => may_to_singleton_path a b
   | bnode al ar, bnode bl br =>
-    let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
-
-    pl ← may_bpath_unit al bl;
-    pr ← may_bpath_unit ar br;
-    Some (bprop' pl pr)
+    match depth with 
+    | O => None
+    | S depth' => 
+    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsize al) bl br in
+    if is_eq then
+      pl ← may_bpath_aux depth' al bl';
+      pr ← may_bpath_aux depth' ar br';
+      Some (btrans' (bprop' pl pr) pb)
+    else
+      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsize bl') al ar in 
+      if is_eq' then
+        pl ← may_bpath_aux depth' al' bl';
+        pr ← may_bpath_aux depth' ar' br';
+        Some (btrans' pa (btrans' (bprop' pl pr) pb))
+      else 
+        (λ p, (btrans' pa (btrans' p pb))) <$> may_bpath_aux depth' (al' + ar') (bl' + br')
+    end
   end.
 
-Fixpoint may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
+Lemma may_bpath_aux_unfold depth `{EqDecision A} (a b : btree A) : 
+  may_bpath_aux depth a b = may_bpath_unit a b ∪ 
   match a, b with
   | bempty, b => may_from_empty_path b
   | a, bempty => may_to_empty_path a
   | bleaf a, b => may_from_singleton_path a b
   | a, bleaf b => may_to_singleton_path a b
   | bnode al ar, bnode bl br =>
-    let '(existT bl' (is_eq, existT br' p)) := from_threshold (bsize al) bl br in
-
-    pl ← may_bpath_unit al bl;
-    pr ← may_bpath_unit ar br;
-    Some (bprop' pl pr)
-  end.
-
-Fixpoint de_empty_aux {A} (a : btree A) : option (btree A) :=
-  match a with
-  | bempty => None
-  | bleaf a => Some (bleaf a)
-  | bnode l r =>
-    union_with (λ l r, Some (bnode l r)) (de_empty_aux l) (de_empty_aux r)
-  end.
-
-
-Inductive lbtree (L A : Type) :=
-  | lbnode (lab : L) (l r : lbtree L A) : lbtree L A
-  | lbleaf (a : A) : lbtree L A
-  | lbempty : lbtree L A.
-
-
-
-Require Import Ltac2.Ltac2.
-
-Ltac2 Type rec ('a) btree := [
-  | Bnode ('a btree, 'a btree)
-  | Bleaf ('a)
-  | Bempty
-].
-
-Ltac2 Type rec ('b, 'a) lbtree := [
-  | LBnode ('b, ('b, 'a) lbtree, ('b, 'a) lbtree)
-  | LBleaf ('a)
-  | LBempty
-].
-
-Ltac2 rec btree_eq (eqa : 'a -> 'a -> bool) (b : 'a btree) c : bool :=
-  match b with
-  | Bnode l r =>
-    match c with
-    | Bnode l' r' => if btree_eq eqa l l' then btree_eq eqa r r' else false
-    | _ => false
-    end
-  | Bleaf a =>
-    match c with
-    | Bleaf a' => eqa a a'
-    | _ => false
-    end
-  | Bempty =>
-    match c with
-    | Bempty => true
-    | _ => false
+    match depth with 
+    | O => None
+    | S depth' => 
+    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsize al) bl br in
+    if is_eq then
+      pl ← may_bpath_aux depth' al bl';
+      pr ← may_bpath_aux depth' ar br';
+      Some (btrans' (bprop' pl pr) pb)
+    else
+      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsize bl') al ar in 
+      if is_eq' then
+        pl ← may_bpath_aux depth' al' bl';
+        pr ← may_bpath_aux depth' ar' br';
+        Some (btrans' pa (btrans' (bprop' pl pr) pb))
+      else 
+        (λ p, (btrans' pa (btrans' p pb))) <$> may_bpath_aux depth' (al' + ar') (bl' + br')
     end
   end.
+Proof.
+  destruct depth; reflexivity.
+Qed.
 
-Ltac2 Type rec ('a) bpath := [
+Lemma may_bpath_aux_id `{EqDecision A} depth (a b : btree A) (Hab : a = b) : 
+  may_bpath_aux depth a b = Some (brefl' Hab).
+Proof.
+  rewrite may_bpath_aux_unfold, (may_bpath_unit_id a b Hab).
+  now rewrite union_Some_l.
+Qed.
 
-] *)
-
-(*
-
-(* #[bypass_check(guard)] *)
-Fixpoint may_bpath `{EqDecision A} (a b : btree A)
-  (la lb : list (btree A)) :
-  option (btree_of_tree_list a la ~> btree_of_tree_list b lb) :=
-  match N.compare (bsize a) (bsize b) with
-  =| Eq => if decide (a = b) then
-
-
-  match a with
-  | 0 + ar => btrans blunit <$> may_bpath ar b
-  |
-  | _ => None
-  end%btree.
-  match a, b with
-  |
-  match N.compare (bsize al) (bsize bl)
-  | Eq =>
-
-
-Fixpoint btree_decomp {A} (a : btree A) : option (btree A * btree A) :=
-  match a with
-  | 0 + ar => btree_decomp ar
-  | al + 0 => btree_decomp al
-  |
-
-#[bypass_check(guard)]
-Fixpoint may_bpath `{EqDecision A} (a b : btree A) :
-  option (a ~> b) :=
-  match a with
-  | 0 + ar => btrans blunit <$> may_bpath ar b
-  |
-  | _ => None
-  end%btree.
-  match a, b with
-  |
-  match N.compare (bsize al) (bsize bl)
-  | Eq =>
-
-#[bypass_check(guard)]
-Fixpoint may_bpath `{EqDecision A} (al bl ar br : btree) :
-  option (al + ar ~> bl + br) :=
-  match N.compare (bsize al) (bsize bl)
-  | Eq =>  *)
+Definition may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
+  may_bpath_aux (N.to_nat (bsize (a + b))) a b.
 

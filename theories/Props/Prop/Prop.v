@@ -51,7 +51,7 @@ Inductive PRO  {Struct : nat -> nat -> Type} {Ty : Type} : nat -> nat -> Type :=
   (* Structural generators which can restrict sizes they operate over *)
   | Pstruct (n m : nat) (s : Struct n m) : PRO n m
   (* Nonstructural generators which must be defined for all sizes *)
-  | Pgen (t : Ty) n m : PRO n m.
+  | Pgen n m (t : Ty) : PRO n m.
 
 #[global] Arguments PRO : clear implicits.
 
@@ -75,7 +75,7 @@ Fixpoint PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
       compose_tensor (PRO_semantics ap1) (PRO_semantics ap2)
   | Pstack ap1 ap2 =>
       stack_tensor (PRO_semantics ap1) (PRO_semantics ap2)
-  | Pgen t n m    => interpretTensor t n m
+  | Pgen n m t    => interpretTensor t n m
   | Pstruct n m s => strictInterpretTensor s
   end.
 
@@ -221,4 +221,55 @@ Proof.
 Qed.
 
 #[global] Arguments cast_pro {_ _} {!_ !_ !_ !_} !_ !_ _ / : assert.
+
+Declare Scope pro_scope.
+Delimit Scope pro_scope with pro.
+Bind Scope pro_scope with PRO.
+
+Notation "g ∘ f" := (Pcompose f%pro g%pro) : pro_scope.
+Notation "f ;; g" := (Pcompose f%pro g%pro) : pro_scope.
+Notation "f * g" := (Pstack f%pro g%pro) : pro_scope.
+
+Notation "'[str' s ']'" := (Pstruct _ _ s) : pro_scope.
+Notation "'[gen' t n m ']'" := (Pgen n%nat m%nat t)
+  (t at level 9, n at level 9, m at level 9) : pro_scope.
+
+Local Open Scope pro_scope.
+
+Fixpoint bind_PRO {Struct Struct' : nat -> nat -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> PRO Struct' T' n m)
+  (ft : forall n m, T -> PRO Struct' T' n m) 
+  {n m} (p : PRO Struct T n m) : PRO Struct' T' n m :=
+  match p with
+  | l ;; r => bind_PRO fs ft l ;; bind_PRO fs ft r
+  | l * r => bind_PRO fs ft l * bind_PRO fs ft r
+  | [str s ] => fs _ _ s
+  | [gen t n m] => ft n m t
+  end%pro.
+
+Fixpoint map_PRO {Struct Struct' : nat -> nat -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> Struct' n m)
+  (ft : T -> T') 
+  {n m} (p : PRO Struct T n m) : PRO Struct' T' n m :=
+  match p with
+  | l ;; r => map_PRO fs ft l ;; map_PRO fs ft r
+  | l * r => map_PRO fs ft l * map_PRO fs ft r
+  | [str s ] => [str fs _ _ s ]
+  | [gen t n m] => [gen (ft t) n m ]
+  end%pro.
+
+Lemma map_PRO_to_bind_PRO {Struct Struct' : nat -> nat -> Type}
+  {T T' : Type} 
+  (fs : forall n m, Struct n m -> Struct' n m)
+  (ft : T -> T') 
+  {n m} (p : PRO Struct T n m) : 
+  map_PRO fs ft p = 
+  bind_PRO (λ n m s, [str (fs n m s)]) (λ n m t, [gen (ft t) n m]) p.
+Proof.
+  induction p; cbn; congruence.
+Qed.
+
+
 
