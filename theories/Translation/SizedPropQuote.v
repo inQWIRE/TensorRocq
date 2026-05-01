@@ -13,10 +13,10 @@ Ltac2 denote_opt_int_btree (b : int option btree) : constr :=
 Ltac2 quote_Monoidal (ns : constr list) (c : constr) : constr list * constr :=
   let rec go ns c :=
     match! c with
-    | @Id ?n => 
+    (* | @Id ?n => 
       let (ns, nt) := parse_nat_btree ns n in 
       let cnt := denote_opt_int_btree nt in
-      (ns, '(@MId _ $cnt))
+      (ns, '(@MId _ $cnt)) *)
     | @Associator ?n ?m ?o => 
       let (ns, nt) := parse_nat_btree ns n in 
       let (ns, mt) := parse_nat_btree ns m in 
@@ -231,3 +231,149 @@ Ltac2 quote_Cartesian (ns : constr list) (c : constr) : constr list * constr :=
       else go ns c'
     else go ns c'
   end.
+
+
+
+(* FIXME: Move *)
+Fixpoint gbpath_to_MPRO {A T} {M : Mor (btree A)} {a b} (p : gbpath M a b) : 
+  MPRO M T a b :=
+  match p with
+  | brefl => Mid _
+  | bgen m => Mstruct _ _ m
+  | bprop l r => gbpath_to_MPRO l * gbpath_to_MPRO r
+  | btrans l r => gbpath_to_MPRO l ;; gbpath_to_MPRO r
+  end%mpro.
+
+Class StructuralMMorphism {A} (M : Mor (btree A)) (a b : btree A) :=
+  structuralMMor : forall {T}, MPRO M T a b.
+
+Definition bmonoidal_MMonoidal {A} {a b : btree A} (p : bmonoidal a b) : MMonoidal a b :=
+  match p with
+  | bassoc => MAssociator
+  | bassoci => MInvAssociator
+  | blunit => MLUnit
+  | bluniti => MInvLUnit
+  | brunit => MRUnit
+  | bruniti => MInvRUnit
+  end.
+
+
+Definition bsymmetric_MSymmetric {A} {a b : btree A} (p : bsymmetric a b) : MSymmetric a b :=
+  match p with
+  | bmonoidal_bsymmetric p => bmonoidal_MMonoidal p
+  | bsymm => MSwap _ _
+  end.
+
+
+Definition bautonomous_MAutonomous {A} {a b : btree A} (p : bautonomous a b) : MAutonomous a b :=
+  match p with
+  | bsymmetric_bautonomous p => bsymmetric_MSymmetric p
+  | bcup => MCup _
+  | bcap => MCap _
+  end.
+
+
+Definition structuralMMorphism_monoidal `{EqDecision A} {a b : btree A} :
+  is_Some (may_bpath a b) -> StructuralMMorphism MMonoidal a b :=
+  fun Hab T => gbpath_to_MPRO (gbpath_map (@bmonoidal_MMonoidal A) (is_Some_proj Hab)).
+
+Definition structuralMMorphism_symmetric `{EqDecision A} {a b : btree A} :
+  is_Some (may_sbpath a b) -> StructuralMMorphism MSymmetric a b :=
+  fun Hab T => gbpath_to_MPRO (gbpath_map (@bsymmetric_MSymmetric A) (is_Some_proj Hab)).
+
+Definition structuralMMorphism_autonomous `{EqDecision A} {a b : btree A} :
+  is_Some (may_abpath a b) -> StructuralMMorphism MAutonomous a b :=
+  fun Hab T => gbpath_to_MPRO (gbpath_map (@bautonomous_MAutonomous A) (is_Some_proj Hab)).
+
+Class StructuralMorphism (M : Mor nat) (a b : nat) :=
+  structuralMor : forall {T}, PRO M T a b.
+
+Definition structuralMMorphism_structuralMorphism {A} 
+  (f : A -> nat) {M : Mor (btree A)} {M' : Mor nat}
+    {HM : InterpStruct M M'} (a b : btree A) :
+  StructuralMMorphism M a b ->
+  StructuralMorphism M' (btree_size f a) (btree_size f b) :=
+  fun p T => MPRO_to_PRO f (p T).
+
+
+#[export] Hint Extern 0 (StructuralMorphism Monoidal _ _) => 
+  ltac2:(
+    lazy_match! goal with
+  | [ |- StructuralMorphism Monoidal ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree ns a in 
+    let (ns, tb) := parse_nat_btree ns b in 
+    let cta := CC.to_btree (CC.to_option CC.to_nat) ta in 
+    let ctb := CC.to_btree (CC.to_option CC.to_nat) tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (λ k : option nat, from_option (default 0 ∘ (fun i =>
+        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructMonoidal)
+      $cta $ctb _);
+    refine '(@structuralMMorphism_monoidal _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
+    ltac1:(compute_done)
+  end
+  ) : typeclass_instances.
+
+Import Props.Prop.Prop.
+
+(* FIXME: Move *)
+Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric Symmetric := _.
+Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous Autonomous := _.
+
+#[export] Hint Extern 0 (StructuralMorphism Symmetric _ _) => 
+  ltac2:(
+    lazy_match! goal with
+  | [ |- StructuralMorphism Symmetric ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree ns a in 
+    let (ns, tb) := parse_nat_btree ns b in 
+    let cta := CC.to_btree (CC.to_option CC.to_nat) ta in 
+    let ctb := CC.to_btree (CC.to_option CC.to_nat) tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (λ k : option nat, from_option (default 0 ∘ (fun i =>
+        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructSymmetric)
+      $cta $ctb _);
+    refine '(@structuralMMorphism_symmetric _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
+    ltac1:(compute_done)
+  end
+  ) : typeclass_instances.
+
+
+#[export] Hint Extern 0 (StructuralMorphism Autonomous _ _) => 
+  ltac2:(
+    lazy_match! goal with
+  | [ |- StructuralMorphism Autonomous ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree ns a in 
+    let (ns, tb) := parse_nat_btree ns b in 
+    let cta := CC.to_btree (CC.to_option CC.to_nat) ta in 
+    let ctb := CC.to_btree (CC.to_option CC.to_nat) tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (λ k : option nat, from_option (default 0 ∘ (fun i =>
+        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructAutonomous)
+      $cta $ctb _);
+    refine '(@structuralMMorphism_autonomous _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
+    ltac1:(compute_done)
+  end
+  ) : typeclass_instances.
+
+(* 
+Goal forall n m o, StructuralMorphism Autonomous (n + 0 + 1 + m + o + 1) (n + (o + 0 + m)).
+Proof.
+  apply _.
+
+Goal forall n m o, StructuralMorphism Monoidal (n + 0 + m + o) (n + (m + 0 + o)).
+Proof.
+  Time apply _.
+  intros.
+  (* test_denote_nat_bw_parse_nat_btree_assert [] '(n + m + o). *)
+  (
+  ).
+  simpl in s. *)
+
+
+
+

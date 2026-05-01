@@ -20,6 +20,8 @@ Class InterpStruct {A} (MStruct : btree A -> btree A -> Type)
 #[universes(template)]
 Inductive MPRO {A} {MStruct : btree A -> btree A -> Type} {Ty : Type} : 
   btree A -> btree A -> Type :=
+  (* Identity process *)
+  | Mid n : MPRO n n
   (* Composition of processes *)
   | Mcompose {n m o} (ap1 : MPRO n m) (ap2 : MPRO m o) : MPRO n o
   (* Parallel products of processes *)
@@ -44,6 +46,7 @@ Fixpoint MPRO_to_PRO {A} (f : A -> nat)
   {T} {n m : btree A}
   (mp : MPRO MStruct T n m) : PRO Struct T (btree_size f n) (btree_size f m) :=
   match mp with
+  | Mid n => Pid (btree_size f n)
   | Mcompose mp1 mp2 => Pcompose (MPRO_to_PRO f mp1)
     (MPRO_to_PRO f mp2)
   | Mstack mp1 mp2 => Pstack (MPRO_to_PRO f mp1)
@@ -55,7 +58,6 @@ Fixpoint MPRO_to_PRO {A} (f : A -> nat)
 
 
 Inductive MMonoidal {A} : btree A -> btree A -> Type :=
-  | MId {n} : MMonoidal n n
   | MAssociator {n m o} : MMonoidal (n + m + o) (n + (m + o))
   | MInvAssociator {n m o} : MMonoidal (n + (m + o)) (n + m + o)
   | MLUnit {n} : MMonoidal (0 + n) n
@@ -88,7 +90,6 @@ Section TensorLikePermutations.
 Definition interpMMonoidal {A} (f : A -> nat) {n m} 
   (p : MMonoidal n m) : Monoidal (btree_size f n) (btree_size f m) :=
   match p with
-  | MId => Id
   | MAssociator => Associator
   | MInvAssociator => InvAssociator
   | MLUnit => LUnit
@@ -207,6 +208,7 @@ Fixpoint dbind_MPRO {A B} {Struct : btree A -> btree A -> Type}
   (ft : forall n m, T -> MPRO Struct' T' (n ≫= fb) (m ≫= fb)) 
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (n ≫= fb) (m ≫= fb) :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => dbind_MPRO fb fs ft l ;; dbind_MPRO fb fs ft r
   | l * r => dbind_MPRO fb fs ft l * dbind_MPRO fb fs ft r
   | [str s ] => fs _ _ s
@@ -221,6 +223,7 @@ Fixpoint dbind_MPRO' {A B} {Struct : btree A -> btree A -> Type}
   (ft : forall n m, T -> MPRO Struct' T' (fb <$> n) (fb <$> m)) 
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (fb <$> n) (fb <$> m) :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => dbind_MPRO' fb fs ft l ;; dbind_MPRO' fb fs ft r
   | l * r => dbind_MPRO' fb fs ft l * dbind_MPRO' fb fs ft r
   | [str s ] => fs _ _ s
@@ -235,6 +238,7 @@ Fixpoint bind_MPRO {A} {Struct : btree A -> btree A -> Type}
   (ft : forall n m, T -> MPRO Struct' T' n m) 
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' n m :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => bind_MPRO fs ft l ;; bind_MPRO fs ft r
   | l * r => bind_MPRO fs ft l * bind_MPRO fs ft r
   | [str s ] => fs _ _ s
@@ -252,6 +256,7 @@ Fixpoint dmap_MPRO {A B} {Struct : btree A -> btree A -> Type}
   (ft : forall n m, T -> T')
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (n ≫= fb) (m ≫= fb) :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => dmap_MPRO fb fs ft l ;; dmap_MPRO fb fs ft r
   | l * r => dmap_MPRO fb fs ft l * dmap_MPRO fb fs ft r
   | [str s ] => [str fs _ _ s]
@@ -266,6 +271,7 @@ Fixpoint dmap_MPRO' {A B} {Struct : btree A -> btree A -> Type}
   (ft : forall n m, T -> T')
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' (fb <$> n) (fb <$> m) :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => dmap_MPRO' fb fs ft l ;; dmap_MPRO' fb fs ft r
   | l * r => dmap_MPRO' fb fs ft l * dmap_MPRO' fb fs ft r
   | [str s ] => [str fs _ _ s]
@@ -279,6 +285,7 @@ Fixpoint map_MPRO {A} {Struct : btree A -> btree A -> Type}
   (ft : T -> T')
   {n m} (p : MPRO Struct T n m) : MPRO Struct' T' n m :=
   match p with
+  | Mid _ => Mid _
   | l ;; r => map_MPRO fs ft l ;; map_MPRO fs ft r
   | l * r => map_MPRO fs ft l * map_MPRO fs ft r
   | [str s ] => [str fs _ _ s]

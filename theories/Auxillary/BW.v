@@ -1002,6 +1002,8 @@ Definition may_abpath `{EqDecision A} (a b : btree A) : option (a ~>ₐ b) :=
   end.
 
 
+(* Search (option ?A -> is_Some _ -> ?A). *)
+
 (* Compute may_abpath (!1 + !1 + !2) (!2). *)
 
 
