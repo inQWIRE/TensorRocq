@@ -684,7 +684,12 @@ Proof.
 Qed.
 
 Definition may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
-  may_bpath_aux (N.to_nat (bsize (a + b))) a b.
+  match may_bpath_aux (N.to_nat (bsize (a + b))) a b with
+  | Some p => Some p
+  | None =>
+    Hab ← guard (a =@{list A} b);
+    Some (bpath_of_eq Hab)
+  end.
 
 
 
@@ -1000,7 +1005,32 @@ Definition may_abpath `{EqDecision A} (a b : btree A) : option (a ~>ₐ b) :=
     Some (btrans (bpath_to_norm a :> abpath _ _) 
       (btrans p (binv (bpath_to_norm b) :> abpath _ _)))
   end.
+  
 
+Lemma may_bpath_is_Some `{EqDecision A} (a b : btree A) : 
+  is_Some (may_bpath a b) <-> a =@{list A} b.
+Proof.
+  split.
+  - intros [p _].
+    now apply btree_elems_bpath in p.
+  - intros Hab.
+    unfold may_bpath.
+    case_match; [done|].
+    case_guard; done.
+Qed.
+
+
+
+Fixpoint bsize_nat {A} (b : btree A) : nat :=
+  match b with
+  | 0 => O
+  | bleaf _ => 1
+  | l + r => bsize_nat l + bsize_nat r
+  end.
+
+
+
+    
 
 (* Search (option ?A -> is_Some _ -> ?A). *)
 

@@ -1,8 +1,8 @@
 From TensorRocq Require Import BW BWQuote.
 From Ltac2 Require Import Ltac2.
 From TensorRocq Require Import Ltac2.ConstrExtra.
-From TensorRocq Require Import Props.Prop.Prop.
-From TensorRocq Require Import SizedProp.
+From TensorRocq Require Import Props.
+From TensorRocq Require Import SizedProps.
 
 From TensorRocq Require Import BWQuote.
 
@@ -315,16 +315,16 @@ Definition structuralMMorphism_structuralMorphism {A}
   end
   ) : typeclass_instances.
 
-Import Props.Prop.Prop.
+Import Props.
 
 (* FIXME: Move *)
-Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric Symmetric := _.
+Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric SymmetricG := _.
 Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous Autonomous := _.
 
-#[export] Hint Extern 0 (StructuralMorphism Symmetric _ _) => 
+#[export] Hint Extern 0 (StructuralMorphism SymmetricG _ _) => 
   ltac2:(
     lazy_match! goal with
-  | [ |- StructuralMorphism Symmetric ?a ?b ] => 
+  | [ |- StructuralMorphism SymmetricG ?a ?b ] => 
     let ns : constr list := [] in 
     let (ns, ta) := parse_nat_btree ns a in 
     let (ns, tb) := parse_nat_btree ns b in 
@@ -359,6 +359,29 @@ Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous Autonomous :
     ltac1:(compute_done)
   end
   ) : typeclass_instances.
+
+Definition Pcompose_join_Monoidal (* {Struct : Mor nat} *) {T}
+  {a b b' c : nat} (f : PRO Monoidal T a b) (g : PRO Monoidal T b' c)
+  (Hb : StructuralMorphism Monoidal b b') : PRO Monoidal T a c :=
+  f ;; Hb T ;; g.
+
+Notation " f  ;;ₘ g " := (Pcompose_join_Monoidal f%pro g%pro _) (at level 100) : pro_scope.
+
+
+Definition Pcompose_join {Struct : Mor nat} {T}
+  {a b b' c : nat} (f : PRO Struct T a b) (g : PRO Struct T b' c)
+  (Hb : StructuralMorphism Struct b b') : PRO Struct T a c :=
+  f ;; Hb T ;; g.
+
+Notation " f  ;;'@{ M } g " := (Pcompose_join (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
+Notation " f  ;;' g " := (Pcompose_join f%pro g%pro _) (at level 100) : pro_scope.
+
+
+Open Scope pro_scope.
+
+(* Goal forall n m o : nat, True.
+intros n m o.
+Check Pgen (n + m) (n + m + o) true ;;'@{Symmetric} Pgen (n + (o + m)) 0 false. *)
 
 (* 
 Goal forall n m o, StructuralMorphism Autonomous (n + 0 + 1 + m + o + 1) (n + (o + 0 + m)).

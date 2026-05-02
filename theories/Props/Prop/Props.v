@@ -102,9 +102,9 @@ Inductive SCartesian : nat -> nat -> Type :=
   | Delta n m : SCartesian n m.
 
 
-Definition Symmetric := MorUnion Monoidal Symmetry.
+Definition SymmetricG := MorUnion Monoidal Symmetry.
 
-Definition Autonomous := MorUnion Symmetric Autonomy.
+Definition Autonomous := MorUnion SymmetricG Autonomy.
 
 Definition Cartesian := MorUnion Autonomous SCartesian.
 
@@ -176,22 +176,22 @@ Definition cartesianToTensor (n m : nat) (p : SCartesian n m) : Tensor (R:=R) n 
 
 End TensorLikePermutations.
 
-Definition monoidal_inl {n m} (p : Monoidal n m) : Symmetric n m := inl p.
-Definition symmetry_inr {n m} (p : Symmetry n m) : Symmetric n m := inr p.
-Definition symmetric_inl {n m} (p : Symmetric n m) : Autonomous n m := inl p.
+Definition monoidal_inl {n m} (p : Monoidal n m) : SymmetricG n m := inl p.
+Definition symmetry_inr {n m} (p : Symmetry n m) : SymmetricG n m := inr p.
+Definition symmetric_inl {n m} (p : SymmetricG n m) : Autonomous n m := inl p.
 Definition autonomy_inr {n m} (p : Autonomy n m) : Autonomous n m := inr p.
 Definition autonomous_inl {n m} (p : Autonomous n m) : Cartesian n m := inl p.
 Definition scartesian_inr {n m} (p : SCartesian n m) : Cartesian n m := inr p.
 
 
-Coercion monoidal_inl : Monoidal >-> Symmetric.
-Coercion symmetry_inr : Symmetry >-> Symmetric.
-Coercion symmetric_inl : Symmetric >-> Autonomous.
+Coercion monoidal_inl : Monoidal >-> SymmetricG.
+Coercion symmetry_inr : Symmetry >-> SymmetricG.
+Coercion symmetric_inl : SymmetricG >-> Autonomous.
 Coercion autonomy_inr : Autonomy >-> Autonomous.
 Coercion autonomous_inl : Autonomous >-> Cartesian.
 Coercion scartesian_inr : SCartesian >-> Cartesian.
 
-Notation PROP := (PRO Symmetric).
+Notation PROP := (PRO SymmetricG).
 Notation APROP := (PRO Autonomous).
 Notation CPROP := (PRO Cartesian).
 
@@ -487,6 +487,17 @@ Proof.
       destruct (fin_sum_case i); done.
 Qed.
 
+Lemma lookup_vapp_L {A n m} (v : vec A n) (w : vec A m) (i : fin n) :
+  (v +++ w) !!! (Fin.L m i) = v !!! i.
+Proof.
+  now rewrite lookup_vapp, fin_sum_case_L.
+Qed.
+
+Lemma lookup_vapp_R {A n m} (v : vec A n) (w : vec A m) (i : fin m) :
+  (v +++ w) !!! (Fin.R n i) = w !!! i.
+Proof.
+  now rewrite lookup_vapp, fin_sum_case_R.
+Qed.
 
 
 
@@ -622,4 +633,124 @@ Proof.
   erewrite (proof_irrel (Monoidal_SPRO_eq _)); reflexivity.
 Qed.
 
+Lemma fun_to_vec_plus {A} {n m} (f : fin (n + m) -> A) :
+  fun_to_vec f = fun_to_vec (f ∘ Fin.L m) +++ fun_to_vec (f ∘ Fin.R n).
+Proof.
+  apply vec_eq; intros i.
+  induction i using fin_add_inv.
+  - now rewrite lookup_vapp_L, 2 lookup_fun_to_vec.
+  - now rewrite lookup_vapp_R, 2 lookup_fun_to_vec.
+Qed.
+
+Add Parametric Morphism {A} {n} : (@fun_to_vec A n) with signature
+  pointwise_relation (fin n) eq ==> eq as fun_to_vec_ext_mor.
+Proof.
+  intros f g Hfg.
+  apply vec_eq; intros i.
+  rewrite 2 lookup_fun_to_vec, Hfg.
+  done.
+Qed.
+
+Lemma swap_tensor_perm_tensor `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  {n m} :
+  swap_tensor (n:=n) (m:=m) ≡@{@Tensor R _ _ A}
+  perm_tensor (λ i, sum_rect (λ _, fin _) (Fin.R _) (Fin.L _) (fin_sum_case i)).
+Proof.
+  pose proof SR as [_ _ []].
+  intros v w Hv Hw.
+  cbn.
+  induction v as [vl vr] using vec_add_inv.
+  induction w as [wl wr] using vec_add_inv.
+  rewrite vsplitl_app, vsplitr_app.
+  rewrite fun_to_vec_plus.
+  apply Aux.eq_reflexivity.
+  apply decide_ext.
+  f_equiv.
+  f_equal; apply vec_eq; intros i;
+  rewrite lookup_fun_to_vec; cbn;
+  [rewrite fin_sum_case_L|rewrite fin_sum_case_R]; cbn;
+  [rewrite lookup_vapp_R|rewrite lookup_vapp_L]; done.
+Qed.
+
+
+
+
+Definition SymmetricG_perm {n m} (g : SymmetricG n m) : fin n -> fin m :=
+  match g with
+  | inl m => fun i => Fin.cast i (Monoidal_eq m)
+  | inr s => 
+    match s with
+    | Swap n m => fun i => sum_rect (λ _, fin (m + n)) (Fin.R m) (Fin.L n) (fin_sum_case i)
+    end
+  end.
+
+
+Fixpoint SymmetricG_SPRO_perm {n m} (g : SPRO SymmetricG n m) : fin n -> fin m :=
+  match g with
+  | Pid _ => id
+  | Pstruct _ _ s => SymmetricG_perm s
+  | Pgen _ _ m => match m with end
+  | Pcompose l r => SymmetricG_SPRO_perm r ∘ SymmetricG_SPRO_perm l
+  | Pstack l r => 
+    fun i => sum_rect (λ _, _) 
+      (Fin.L _ ∘ SymmetricG_SPRO_perm l)
+      (Fin.R _ ∘ SymmetricG_SPRO_perm r) (fin_sum_case i)
+  end.
+
+
+Lemma SymmetricG_semantics `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  {n m} (p : SymmetricG n m) :
+  strictInterpretTensor p ≡@{@Tensor R n m A} perm_tensor (SymmetricG_perm p).
+Proof.
+  destruct p as [p|p]; [apply Monoidal_semantics|].
+  induction p as [n m].
+  cbn.
+  apply swap_tensor_perm_tensor.
+Qed.
+
+
+
+Lemma SymmetricG_SPRO_semantics `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  {n m} (p : SPRO SymmetricG n m) :
+  PRO_semantics p ≡@{@Tensor R n m A} perm_tensor (SymmetricG_SPRO_perm p).
+Proof.
+  induction p.
+  - rewrite perm_tensor_id' by auto using fcast_id.
+    done.
+  - cbn.
+    erewrite compose_tensor_mor by eassumption.
+    rewrite perm_tensor_compose.
+    done.
+  - cbn.
+    erewrite stack_tensor_mor by eassumption.
+    rewrite perm_tensor_stack.
+    done.
+  - cbn.
+    apply SymmetricG_semantics.
+  - easy.
+Qed.
+
+
+Lemma fin_perm_eta {n m} (f : fin n -> fin m) : 
+  forall i, f i = (fun_to_vec f) !!! i.
+Proof.
+  intros; now rewrite lookup_fun_to_vec.
+Qed.
+
+
+Lemma SymmetricG_SPRO_irrel `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  {n m} (p p' : SPRO SymmetricG n m) :
+  fun_to_vec (SymmetricG_SPRO_perm p) = fun_to_vec (SymmetricG_SPRO_perm p') ->
+  PRO_semantics p ≡@{@Tensor R n m A} PRO_semantics p'.
+Proof.
+  rewrite 2 SymmetricG_SPRO_semantics.
+  intros Heq.
+  apply perm_tensor_ext.
+  intros i.
+  now rewrite fin_perm_eta, Heq, <- fin_perm_eta.
+Qed.
 
