@@ -411,15 +411,15 @@ Definition brprop {A M} {a b : btree A} c (p : a ~>[M] b) : a + c ~>[M] b + c :=
 
 
 
-Fixpoint bsize {A} (a : btree A) : N :=
+Fixpoint bsizeN {A} (a : btree A) : N :=
   match a with
-  | bnode l r => bsize l + bsize r
+  | bnode l r => bsizeN l + bsizeN r
   | bleaf _ => 1
   | bempty => 0
   end%N.
 
 
-Lemma bsize_lengthN {A} (a : btree A) : bsize a = lengthN a.
+Lemma bsizeN_lengthN {A} (a : btree A) : bsizeN a = lengthN a.
 Proof.
   induction a; [|done..].
   cbn.
@@ -457,10 +457,10 @@ Proof.
   induction p as [|? ? []| |]; cbn; rewrite ?app_nil_r, ?app_assoc; congruence.
 Qed.
 
-Lemma bsize_bpath {A} (a b : btree A) (p : a ~> b) :
-  bsize a = bsize b.
+Lemma bsizeN_bpath {A} (a b : btree A) (p : a ~> b) :
+  bsizeN a = bsizeN b.
 Proof.
-  rewrite 2 bsize_lengthN.
+  rewrite 2 bsizeN_lengthN.
   now rewrite (btree_elems_bpath p).
 Qed.
 
@@ -569,7 +569,7 @@ Qed.
 
 Fixpoint from_threshold {A} (n : N) (bl br : btree A) :
   {bl' : btree A & bool * {br' : btree A & bl' + br' ~> bl + br}}%type :=
-  match N.compare (bsize bl) n with
+  match N.compare (bsizeN bl) n with
   | Lt => existT bl (false, existT br brefl)
   | Eq => existT bl (true, existT br brefl)
   | Gt => 
@@ -594,7 +594,7 @@ Fixpoint from_threshold {A} (n : N) (bl br : btree A) :
 
 Fixpoint to_threshold {A} (n : N) (bl br : btree A) :
   {bl' : btree A & bool * {br' : btree A & bl + br ~> bl' + br'}}%type :=
-  match N.compare (bsize bl) n with
+  match N.compare (bsizeN bl) n with
   | Lt => existT bl (false, existT br brefl)
   | Eq => existT bl (true, existT br brefl)
   | Gt => 
@@ -629,13 +629,13 @@ Fixpoint may_bpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct dep
     match depth with 
     | O => None
     | S depth' => 
-    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsize al) bl br in
+    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsizeN al) bl br in
     if is_eq then
       pl ← may_bpath_aux depth' al bl';
       pr ← may_bpath_aux depth' ar br';
       Some (btrans' (bprop' pl pr) pb)
     else
-      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsize bl') al ar in 
+      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsizeN bl') al ar in 
       if is_eq' then
         pl ← may_bpath_aux depth' al' bl';
         pr ← may_bpath_aux depth' ar' br';
@@ -657,13 +657,13 @@ Lemma may_bpath_aux_unfold depth `{EqDecision A} (a b : btree A) :
     match depth with 
     | O => None
     | S depth' => 
-    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsize al) bl br in
+    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsizeN al) bl br in
     if is_eq then
       pl ← may_bpath_aux depth' al bl';
       pr ← may_bpath_aux depth' ar br';
       Some (btrans' (bprop' pl pr) pb)
     else
-      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsize bl') al ar in 
+      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsizeN bl') al ar in 
       if is_eq' then
         pl ← may_bpath_aux depth' al' bl';
         pr ← may_bpath_aux depth' ar' br';
@@ -684,7 +684,7 @@ Proof.
 Qed.
 
 Definition may_bpath `{EqDecision A} (a b : btree A) : option (a ~> b) :=
-  match may_bpath_aux (N.to_nat (bsize (a + b))) a b with
+  match may_bpath_aux (N.to_nat (bsizeN (a + b))) a b with
   | Some p => Some p
   | None =>
     Hab ← guard (a =@{list A} b);
@@ -758,13 +758,13 @@ Fixpoint may_sbpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct de
     end
     (*
 
-    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsize al) bl br in
+    let '(existT bl' (is_eq, existT br' pb)) := from_threshold (bsizeN al) bl br in
     if is_eq then
       pl ← may_bpath_aux depth' al bl';
       pr ← may_bpath_aux depth' ar br';
       Some (btrans' (bprop' pl pr) pb)
     else
-      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsize bl') al ar in 
+      let '(existT al' (is_eq', existT ar' pa)) := to_threshold (bsizeN bl') al ar in 
       if is_eq' then
         pl ← may_bpath_aux depth' al' bl';
         pr ← may_bpath_aux depth' ar' br';
@@ -811,7 +811,7 @@ Fixpoint may_sbpath_perm `{EqDecision A}
 
 
 Definition may_sbpath `{EqDecision A} (a b : btree A) : option (a ~>ₛ b) :=
-  match may_sbpath_aux (N.to_nat (bsize (a + b))) a b with
+  match may_sbpath_aux (N.to_nat (bsizeN (a + b))) a b with
   | Some p => Some p
   | None => 
     p ← may_sbpath_perm _ _;
@@ -933,7 +933,7 @@ Fixpoint may_abpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct de
       Some (btrans' bcup (blprop bl (pblr :> abpath _ _)))
     | None =>
       (λ p, btrans' p (binv (bpath_to_norm (bl + br)) :> abpath _ _)) <$> 
-        may_abpath_from_empty (N.to_nat (bsize (bl + br))) (bl + br)
+        may_abpath_from_empty (N.to_nat (bsizeN (bl + br))) (bl + br)
     end
   | ! a, b => 
     (λ p, btrans' p (binv (bpath_to_norm b) :> abpath _ _)) <$> may_abpath_from_singleton a b
@@ -943,7 +943,7 @@ Fixpoint may_abpath_aux `{EqDecision A} (depth : nat) (a b : btree A) {struct de
     | Some palr => 
       Some (btrans' (brprop ar (palr :> abpath _ _)) bcap)
     | None =>
-    (λ p, btrans' ((bpath_to_norm (al + ar)) :> abpath _ _) p) <$> may_abpath_to_empty (N.to_nat (bsize (al + ar))) (al + ar)
+    (λ p, btrans' ((bpath_to_norm (al + ar)) :> abpath _ _) p) <$> may_abpath_to_empty (N.to_nat (bsizeN (al + ar))) (al + ar)
     end
   | al + ar, !b =>
     (λ p, btrans' ((bpath_to_norm (al + ar)) :> abpath _ _) p) <$> may_abpath_to_singleton b (al + ar)
@@ -998,10 +998,10 @@ Fixpoint may_abpath_perm `{EqDecision A} (depth : nat)
 
 
 Definition may_abpath `{EqDecision A} (a b : btree A) : option (a ~>ₐ b) :=
-  match may_abpath_aux (N.to_nat (bsize (a + b))) a b with
+  match may_abpath_aux (N.to_nat (bsizeN (a + b))) a b with
   | Some p => Some p
   | None => 
-    p ← may_abpath_perm (N.to_nat (bsize (a + b))) a b;
+    p ← may_abpath_perm (N.to_nat (bsizeN (a + b))) a b;
     Some (btrans (bpath_to_norm a :> abpath _ _) 
       (btrans p (binv (bpath_to_norm b) :> abpath _ _)))
   end.
@@ -1021,14 +1021,43 @@ Qed.
 
 
 
-Fixpoint bsize_nat {A} (b : btree A) : nat :=
+Fixpoint bsize {A} (b : btree A) : nat :=
   match b with
   | 0 => O
   | bleaf _ => 1
-  | l + r => bsize_nat l + bsize_nat r
+  | l + r => bsize l + bsize r
   end.
 
 
+Notation btree_size f := (btree_fold O f Nat.add).
+
+
+Global Instance btree_ret: MRet btree := λ A x, bleaf x.
+Global Instance btree_fmap : FMap btree := λ A B f,
+  fix go (b : btree A) := match b with
+  | l + r => go l + go r
+  | ! a => ! (f a)
+  | 0 => 0
+  end%btree.
+Global Instance btree_omap : OMap btree := λ A B f,
+  fix go (b : btree A) := match b with
+  | l + r => go l + go r
+  | ! a => match (f a) with Some b => ! b | None => bempty end
+  | 0 => 0
+  end%btree.
+Global Instance btree_bind : MBind btree := λ A B f,
+  fix go (b : btree A) := match b with
+  | l + r => go l + go r
+  | ! a => (f a)
+  | 0 => 0
+  end%btree.
+Global Instance btree_join: MJoin btree := λ A,
+  fix go (bs : btree (btree A)) : btree A :=
+  match bs with
+  | l + r => go l + go r
+  | ! a => a
+  | 0 => 0
+  end%btree.
 
     
 

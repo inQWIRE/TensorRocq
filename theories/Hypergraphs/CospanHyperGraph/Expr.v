@@ -435,62 +435,6 @@ Proof.
   done.
 Qed.
 
-Lemma vertices_swapped_stack_graphs_aux {n m n' m'}
-  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
-  tg.(hedges).(hyperedges) ##ₘ tg'.(hedges).(hyperedges) ->
-  vertices (swapped_stack_graphs_aux tg tg') =
-  vertices tg ∪ vertices tg'.
-Proof.
-  intros Hdisj.
-  unfold vertices; cbn.
-  rewrite vertices_hg_union by done.
-  rewrite 2 vec_to_list_app, 5 list_to_set_app_L.
-  apply set_eq; intros x.
-  rewrite 10 elem_of_union. tauto.
-Qed.
-
-Lemma vertices_swapped_stack_graphs {n m n' m'}
-  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
-  vertices (swapped_stack_graphs tg tg') =
-  set_map (bcons false) (vertices tg) ∪
-  set_map (bcons true) (vertices tg').
-Proof.
-  unfold swapped_stack_graphs.
-  rewrite vertices_swapped_stack_graphs_aux.
-  - now rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
-  - cbn.
-    rewrite map_disjoint_fmap.
-    now apply (kmap_inj2_disjoint _).
-Qed.
-
-Lemma vertices_stack_graphs_aux {n m n' m'}
-  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
-  tg.(hedges).(hyperedges) ##ₘ tg'.(hedges).(hyperedges) ->
-  vertices (stack_graphs_aux tg tg') =
-  vertices tg ∪ vertices tg'.
-Proof.
-  intros Hdisj.
-  unfold vertices; cbn.
-  rewrite vertices_hg_union by done.
-  rewrite 2 vec_to_list_app, 5 list_to_set_app_L.
-  apply set_eq; intros x.
-  rewrite 10 elem_of_union. tauto.
-Qed.
-
-Lemma vertices_stack_graphs {n m n' m'}
-  (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
-  vertices (stack_graphs tg tg') =
-  set_map (bcons false) (vertices tg) ∪
-  set_map (bcons true) (vertices tg').
-Proof.
-  unfold stack_graphs.
-  rewrite vertices_stack_graphs_aux.
-  - now rewrite 2 vertices_relabel_graph, 2 (vertices_reindex_graph _).
-  - cbn.
-    rewrite map_disjoint_fmap.
-    now apply (kmap_inj2_disjoint _).
-Qed.
-
 
 Lemma ntl_relabel_absidx_relabel_free f g ntl :
   ntl_relabel_absidx f (ntl_relabel_free g ntl) =

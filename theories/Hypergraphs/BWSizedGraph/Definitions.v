@@ -1,7 +1,7 @@
 From TensorRocq Require Export Tensor.
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
-From TensorRocq Require Export Aux_stdpp Aux_pos.
+From TensorRocq Require Export Aux_stdpp Aux_pos BW bvec.
 From TensorRocq Require Export HyperGraph.
 From TensorRocq Require Export CospanHyperGraph.
 
@@ -22,7 +22,7 @@ Fixpoint map_relabels `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m : 
   | S n' => fun abs A m =>
     let a := (vhd abs).1 in
     let b := (vhd abs).2 in
-    map_relabel_one a b (map_relabels (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs)) 
+    map_relabel_one a b (map_relabels (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs))
     m)
   end.
 
@@ -33,7 +33,7 @@ Fixpoint map_relabels_r `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m 
   | S n' => fun abs A m =>
     let a := (vhd abs).1 in
     let b := (vhd abs).2 in
-    (map_relabels_r (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs)) 
+    (map_relabels_r (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs))
     (map_relabel_one b a m))
   end.
 
@@ -48,8 +48,8 @@ Proof.
   - now rewrite lookup_partial_alter_ne.
 Qed.
 
-(* Lemma fn_singleton_subst_by_vec {n} (abs : vec _ n) a b c : 
-  {[a := b]} (subst_by_vec abs c) = 
+(* Lemma fn_singleton_subst_by_vec {n} (abs : vec _ n) a b c :
+  {[a := b]} (subst_by_vec abs c) =
   subst_by_vec () *)
 
 Lemma lookup_map_relabels_pos {n} (abs : vec _ n) {A} (m : Pmap A) c :
@@ -71,12 +71,14 @@ Qed.
 
 
 (* A graph with h(yper)edges labeled by elements of [T] *)
-Record SizedCospanHyperGraph {N T : Type} {n m : nat} := mk_scohg {
-  sized_cospan :> CospanHyperGraph T n m;
+Record SizedCospanHyperGraph {N T : Type} {n m : btree N} := mk_scohg {
+  sized_inputs : bvec positive n;
+  sized_outputs : bvec positive m;
+  sized_hedges : HyperGraph T;
   sized_map : Pmap N;
 }.
-#[global] Arguments SizedCospanHyperGraph N T : clear implicits.
-#[global] Arguments mk_scohg {_ _} {_ _} (_ _) : assert.
+#[global] Arguments SizedCospanHyperGraph N T n m : clear implicits, assert.
+#[global] Arguments mk_scohg {_ _} {_ _} (_ _ _ _) : assert.
 
 Declare Scope scohg_scope.
 Delimit Scope scohg_scope with scohg.
@@ -85,49 +87,66 @@ Bind Scope scohg_scope with SizedCospanHyperGraph.
 Open Scope scohg_scope.
 
 Lemma scohg_ext {N T} {n m} (tg tg' : SizedCospanHyperGraph N T n m) :
-  tg.(sized_cospan) = tg'.(sized_cospan) ->
+  tg.(sized_inputs) = tg'.(sized_inputs) ->
+  tg.(sized_outputs) = tg'.(sized_outputs) ->
+  tg.(sized_hedges) = tg'.(sized_hedges) ->
   tg.(sized_map) = tg'.(sized_map) ->
   tg = tg'.
 Proof.
   destruct tg, tg'; cbn; congruence.
 Qed.
 
-Lemma cohg_ext' {N T n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :
-  inputs cohg = inputs cohg' ->
-  outputs cohg = outputs cohg' ->
-  hyperedges cohg = hyperedges cohg' ->
-  hypervertices cohg = hypervertices cohg' ->
-  sized_map cohg = sized_map cohg' ->
-  cohg = cohg'.
-Proof.
-  auto using scohg_ext, cohg_ext, hg_ext.
-Qed.
 
 
 
 Section SizedCospanHyperGraph.
 
 Context {N T : Type}.
-Context {n m : nat}.
+Context {n m : btree N}.
 
 Let CoHyGraph := (SizedCospanHyperGraph N T n m).
 
 Implicit Types tg chg : CoHyGraph.
 
-
+Definition scohg_to_cohg tg : CospanHyperGraph T (bsize n) (bsize m) := {|
+  inputs := bvec_to_vec tg.(sized_inputs);
+  outputs := bvec_to_vec tg.(sized_outputs);
+  hedges := tg.(sized_hedges);
+|}.
 
 #[global] Instance empty_cohg {N T : Type} : Empty (SizedCospanHyperGraph N T 0 0) :=
-  mk_scohg ∅ ∅.
+  mk_scohg bvnil bvnil ∅ ∅.
 
 
-Definition sized_vertices tg := vertices tg ∪ dom tg.(sized_map).
+Definition sized_vertices tg := vertices_hg tg.(sized_hedges) ∪
+  bvec_to_set tg.(sized_inputs) ∪ bvec_to_set tg.(sized_outputs) ∪
+     dom tg.(sized_map).
+
+
+Lemma sized_vertices_defn cohg :
+  sized_vertices cohg = vertices (scohg_to_cohg cohg) ∪ dom cohg.(sized_map).
+Proof.
+  unfold sized_vertices.
+  f_equal.
+  rewrite vertices_vertices_hg_decomp, list_to_set_app_L.
+  rewrite <- (union_assoc_L _ _ _).
+  f_equal.
+  cbn.
+  f_equal; apply set_eq; intros x;
+  rewrite elem_of_bvec_to_set, elem_of_list_to_set, elem_of_bvec_to_vec;
+  done.
+Qed.
+
+
 
 
 Definition relabel_sized_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
-  mk_scohg (relabel_graph f tg) (kmap f tg.(sized_map)).
+  mk_scohg (bvmap f tg.(sized_inputs)) (bvmap f tg.(sized_outputs))
+    (relabel_hg f tg.(sized_hedges)) (kmap f tg.(sized_map)).
 
 Definition reindex_sized_graph (f : positive -> positive) (tg : CoHyGraph) : CoHyGraph :=
-  mk_scohg (reindex_graph f tg) tg.(sized_map).
+  mk_scohg tg.(sized_inputs) tg.(sized_outputs)
+    (reindex_hg f tg.(sized_hedges)) tg.(sized_map).
 
 Inductive sized_isomorphic : relation CoHyGraph :=
   | sized_iso_relabel_reindex tg fedge fvert
@@ -144,15 +163,15 @@ Proof.
   firstorder (subst; econstructor; eauto).
 Qed.
 
-
-
 Lemma relabel_sized_graph_ext_strong f g tg :
   (forall i, i ∈ sized_vertices tg -> f i = g i) ->
   relabel_sized_graph f tg = relabel_sized_graph g tg.
 Proof.
   intros Hfg.
   apply scohg_ext; cbn.
-  - apply relabel_graph_ext_strong.
+  - apply bvmap_ext_strong; set_solver.
+  - apply bvmap_ext_strong; set_solver.
+  - apply relabel_hg_ext_strong.
     set_solver +Hfg.
   - apply kmap_ext.
     intros ? _ ?%elem_of_dom_2.
@@ -167,8 +186,11 @@ Qed.
 
 Lemma relabel_sized_graph_id tg : relabel_sized_graph id tg = tg.
 Proof.
-  apply scohg_ext; cbn; [apply relabel_graph_id|].
-  apply kmap_id.
+  apply scohg_ext.
+  - apply bvmap_id.
+  - apply bvmap_id.
+  - apply relabel_hg_id.
+  - apply kmap_id.
 Qed.
 
 Lemma relabel_sized_graph_id_strong f tg :
@@ -193,7 +215,7 @@ Lemma relabel_sized_graph_compose_strong' f g `{Hf : !Inj eq eq f} tg :
   relabel_sized_graph (g ∘ f) tg.
 Proof.
   intros Hgf.
-  apply scohg_ext; [apply relabel_graph_compose|].
+  apply scohg_ext; [symmetry; apply bvmap_compose..|apply relabel_hg_compose|].
   cbn.
   apply map_eq; intros i.
   apply option_eq; intros k.
@@ -214,11 +236,11 @@ Qed.
 
 
 Lemma reindex_sized_graph_ext_strong f g tg :
-  (forall i tabs, tg.(hedges).(hyperedges) !! i = Some tabs -> f i = g i) ->
+  (forall i tabs, tg.(sized_hedges).(hyperedges) !! i = Some tabs -> f i = g i) ->
   reindex_sized_graph f tg = reindex_sized_graph g tg.
 Proof.
   intros Hfg.
-  apply scohg_ext; [now apply reindex_graph_ext_strong|done].
+  apply scohg_ext; [done..|now apply reindex_hg_ext_strong|done].
 Qed.
 
 Lemma reindex_sized_graph_ext f g tg :
@@ -229,12 +251,12 @@ Qed.
 
 Lemma reindex_sized_graph_id tg : reindex_sized_graph id tg = tg.
 Proof.
-  apply scohg_ext; cbn; [apply reindex_graph_id|].
+  apply scohg_ext; cbn; [done..|apply reindex_hg_id|].
   done.
 Qed.
 
 Lemma reindex_sized_graph_id_strong f tg :
-  (forall i tabs, tg.(hedges).(hyperedges) !! i = Some tabs -> f i = i) ->
+  (forall i tabs, tg.(sized_hedges).(hyperedges) !! i = Some tabs -> f i = i) ->
   reindex_sized_graph f tg = tg.
 Proof.
   intros ->%(reindex_sized_graph_ext_strong f id tg).
@@ -250,21 +272,21 @@ Qed.
 
 
 Lemma reindex_sized_graph_compose_strong' f g `{Hf : !Inj eq eq f} tg :
-  (forall i j, i ∈ dom tg.(hedges).(hyperedges) ->
-    j ∈ dom tg.(hedges).(hyperedges) ->
+  (forall i j, i ∈ dom tg.(sized_hedges).(hyperedges) ->
+    j ∈ dom tg.(sized_hedges).(hyperedges) ->
     g (f i) = g (f j) -> f i = f j) ->
   reindex_sized_graph g (reindex_sized_graph f tg) =
   reindex_sized_graph (g ∘ f) tg.
 Proof.
   intros Hg.
-  apply scohg_ext; [now apply reindex_graph_compose_strong'|done].
+  apply scohg_ext; [done..|now apply reindex_hg_compose_strong'|done].
 Qed.
 
 Lemma reindex_sized_graph_compose f g `{!Inj eq eq f, !Inj eq eq g} tg :
   reindex_sized_graph g (reindex_sized_graph f tg) =
   reindex_sized_graph (g ∘ f) tg.
 Proof.
-  apply scohg_ext; [now apply reindex_graph_compose|done].
+  apply scohg_ext; [done..|now apply reindex_hg_compose|done].
 Qed.
 
 
@@ -272,8 +294,8 @@ Lemma reindex_relabel_sized_graph fvert fedge tg :
   reindex_sized_graph fvert (relabel_sized_graph fedge tg) =
   relabel_sized_graph fedge (reindex_sized_graph fvert tg).
 Proof.
-  apply scohg_ext; [|done].
-  apply reindex_relabel_graph.
+  apply scohg_ext; [done..| |done].
+  apply reindex_relabel_hg.
 Qed.
 
 Lemma sized_vertices_relabel_sized_graph f (tg : CoHyGraph) :
@@ -281,9 +303,9 @@ Lemma sized_vertices_relabel_sized_graph f (tg : CoHyGraph) :
 Proof.
   unfold sized_vertices.
   cbn.
-  rewrite vertices_relabel_graph.
+  rewrite vertices_relabel_hg.
   rewrite dom_kmap_L'.
-  now rewrite set_map_union_L.
+  set_solver +.
 Qed.
 
 Lemma sized_vertices_reindex_sized_graph f `{Hfint : !Inj eq eq f} (tg : CoHyGraph) :
@@ -291,14 +313,14 @@ Lemma sized_vertices_reindex_sized_graph f `{Hfint : !Inj eq eq f} (tg : CoHyGra
 Proof.
   unfold sized_vertices.
   cbn.
-  now rewrite (vertices_reindex_graph _).
+  now rewrite (vertices_reindex_hg _).
 Qed.
 
 Lemma sized_isomorphic_of_partial_inj tg fedge fvert :
   (forall i j, i ∈ sized_vertices tg -> j ∈ sized_vertices tg ->
     fedge i = fedge j -> i = j) ->
-  (forall i j tabs tabs', tg.(hedges).(hyperedges) !! i = Some tabs ->
-    tg.(hedges).(hyperedges) !! j = Some tabs' ->
+  (forall i j tabs tabs', tg.(sized_hedges).(hyperedges) !! i = Some tabs ->
+    tg.(sized_hedges).(hyperedges) !! j = Some tabs' ->
     fvert i = fvert j -> i = j) ->
   sized_isomorphic tg (relabel_sized_graph fedge (reindex_sized_graph fvert tg)).
 Proof.
@@ -306,7 +328,7 @@ Proof.
   apply sized_isomorphic_exists.
   destruct (partial_injection_extension' (sized_vertices tg) _ Hfe)
     as (fe' & Hfe' & Hfe'_fe).
-  pose proof (partial_injection_extension' (dom tg.(hedges).(hyperedges):>Pset) fvert)
+  pose proof (partial_injection_extension' (dom tg.(sized_hedges).(hyperedges):>Pset) fvert)
     as Hfv'.
   tspecialize Hfv'. 1:{
     intros i j [tabs Htabs]%elem_of_dom [tabs' Htabs']%elem_of_dom.
@@ -326,8 +348,8 @@ Qed.
 Lemma sized_isomorphic_of_partial_inj' tg tg' fedge fvert :
   (forall i j, i ∈ sized_vertices tg -> j ∈ sized_vertices tg ->
     fedge i = fedge j -> i = j) ->
-  (forall i j tabs tabs', tg.(hedges).(hyperedges) !! i = Some tabs ->
-    tg.(hedges).(hyperedges) !! j = Some tabs' ->
+  (forall i j tabs tabs', tg.(sized_hedges).(hyperedges) !! i = Some tabs ->
+    tg.(sized_hedges).(hyperedges) !! j = Some tabs' ->
     fvert i = fvert j -> i = j) ->
   tg' = relabel_sized_graph fedge (reindex_sized_graph fvert tg) ->
   sized_isomorphic tg tg'.
@@ -339,8 +361,8 @@ Qed.
 Lemma sized_isomorphic_of_partial_inj_dom' tg tg' fedge fvert :
   (forall i j, i ∈ sized_vertices tg -> j ∈ sized_vertices tg ->
     fedge i = fedge j -> i = j) ->
-  (forall i j, i ∈@{Pset} dom tg.(hedges).(hyperedges) ->
-    j ∈@{Pset} dom tg.(hedges).(hyperedges) ->
+  (forall i j, i ∈@{Pset} dom tg.(sized_hedges).(hyperedges) ->
+    j ∈@{Pset} dom tg.(sized_hedges).(hyperedges) ->
     fvert i = fvert j -> i = j) ->
   tg' = relabel_sized_graph fedge (reindex_sized_graph fvert tg) ->
   sized_isomorphic tg tg'.
@@ -366,7 +388,7 @@ Proof.
   intros (fedge & fvert & Hfe & Hfv & ->).
   apply (sized_isomorphic_of_partial_inj_dom' _ _
     (invfun fedge (elements (sized_vertices tg)))
-    (invfun fvert (elements (dom tg.(hedges).(hyperedges))))).
+    (invfun fvert (elements (dom tg.(sized_hedges).(hyperedges))))).
   - intros fi fj.
     rewrite sized_vertices_relabel_sized_graph, (sized_vertices_reindex_sized_graph _).
     intros (i & -> & Hi)%elem_of_map (j & -> & Hj)%elem_of_map.
@@ -455,7 +477,7 @@ Proof.
   intros (fe & fv & Hfe & Hfv & ->)%sized_isomorphic_exists.
   (* apply sized_isomorphic_symm. *)
   eapply (sized_isomorphic_of_partial_inj_dom' _ _
-    fe (f ∘ fv ∘ invfun f (elements (dom (hedges tg).(hyperedges))))).
+    fe (f ∘ fv ∘ invfun f (elements (dom (sized_hedges tg).(hyperedges))))).
   - cbn.
     intros ????; apply Hfe.
   - cbn.
@@ -482,7 +504,10 @@ Qed.
 
 Definition scohg_eq `{Equiv T} : relation CoHyGraph :=
   fun cohg cohg' =>
-  cohg_eq cohg cohg' /\ cohg.(sized_map) = cohg'.(sized_map).
+  cohg.(sized_inputs) = cohg'.(sized_inputs) /\
+  cohg.(sized_outputs) = cohg'.(sized_outputs) /\
+  cohg.(sized_hedges) ≡ cohg'.(sized_hedges) /\
+  cohg.(sized_map) = cohg'.(sized_map).
 
 #[export] Instance scohg_eq_equivalence `{Equiv T, Equivalence T equiv} :
   Equivalence scohg_eq := _.
@@ -509,20 +534,18 @@ Add Parametric Morphism {N} `{Equiv T} {n m} f :
   (@relabel_sized_graph N T n m f) with signature scohg_eq ==> scohg_eq as
   relabel_sized_graph_scohg_eq.
 Proof.
-  intros cohg cohg' (Hcohg & Hmap).
-  split.
-  - cbn; now f_equiv.
-  - cbn; now f_equal.
+  intros cohg cohg' (Hins & Houts & Hhg & Hmap).
+  split_and!;
+  cbn; now f_equiv.
 Qed.
 
 Add Parametric Morphism {N} `{Equiv T} {n m} f :
   (@reindex_sized_graph N T n m f) with signature scohg_eq ==> scohg_eq as
   reindex_sized_graph_scohg_eq.
 Proof.
-  intros cohg cohg' (Hcohg & Hmap).
-  split.
-  - cbn; now f_equiv.
-  - done.
+  intros cohg cohg' (Hins & Houts & Hhg & Hmap).
+  split_and!;
+  cbn; assumption || (now f_equiv).
 Qed.
 
 
@@ -536,7 +559,11 @@ Add Parametric Relation {N T n m} : (SizedCospanHyperGraph N T n m) sized_isomor
 
 Definition stack_sized_graphs_aux {N T n m n' m'} (cohg : SizedCospanHyperGraph N T n m)
   (cohg' : SizedCospanHyperGraph N T n' m') : SizedCospanHyperGraph N T (n + n') (m + m') :=
-  mk_scohg (stack_graphs_aux cohg cohg') (cohg.(sized_map) ∪ cohg'.(sized_map)).
+  mk_scohg
+    (cohg.(sized_inputs) +++ cohg'.(sized_inputs))
+    (cohg.(sized_outputs) +++ cohg'.(sized_outputs))
+    (cohg.(sized_hedges) ∪ cohg'.(sized_hedges))
+    (cohg.(sized_map) ∪ cohg'.(sized_map)).
 
 Definition stack_sized_graphs {N T n m n' m'} (cohg : SizedCospanHyperGraph N T n m)
   (cohg' : SizedCospanHyperGraph N T n' m') : SizedCospanHyperGraph N T (n + n') (m + m') :=
@@ -545,39 +572,41 @@ Definition stack_sized_graphs {N T n m n' m'} (cohg : SizedCospanHyperGraph N T 
     (relabel_sized_graph (bcons true) (reindex_sized_graph (bcons true) cohg')).
 
 
+Definition respan_sized_graph {N T n m n' m'}
+  (fi : bvec positive n -> bvec positive n') (fo : bvec positive m -> bvec positive m')
+  (scohg : SizedCospanHyperGraph N T n m) : SizedCospanHyperGraph N T n' m' :=
+  mk_scohg (fi scohg.(sized_inputs)) (fo scohg.(sized_outputs))
+    scohg.(sized_hedges) scohg.(sized_map).
 
-Definition sized_add_top_loop {N T n m} (cohg : SizedCospanHyperGraph N T (S n) (S m)) : SizedCospanHyperGraph N T n m :=
-  mk_scohg (add_top_loop cohg)
-    (map_relabel_one (vhd cohg.(inputs)) (vhd cohg.(outputs)) cohg.(sized_map)).
 
-Fixpoint sized_add_top_loops {N T n m o} :
+Definition sized_add_top_loop {N T k n m}
+  (cohg : SizedCospanHyperGraph N T (!k + n) (!k + m)) : SizedCospanHyperGraph N T n m :=
+  let f := {[(bvhd cohg.(sized_outputs).1) := (bvhd cohg.(sized_inputs).1)]} in
+  mk_scohg
+    (bvmap f cohg.(sized_inputs).2) (bvmap f cohg.(sized_outputs).2)
+    (relabel_hg f (hg_add_vertices cohg.(sized_hedges) {[bvhd cohg.(sized_inputs).1]}))
+    (map_relabel_one (bvhd cohg.(sized_inputs).1) (bvhd cohg.(sized_outputs).1)
+      ((* <[bvhd cohg.(sized_outputs).1 := k]> *) cohg.(sized_map))).
+
+Fixpoint sized_add_top_loops {N T} {n m o : btree N} :
   forall (cohg : SizedCospanHyperGraph N T (n + m) (n + o)),
   SizedCospanHyperGraph N T m o :=
   match n with
-  | 0 => fun cohg => cohg
-  | S n =>
-    fun cohg => sized_add_top_loops (sized_add_top_loop cohg)
-  end.
-
-Definition sized_add_top_loop' {N T n m} (cohg : SizedCospanHyperGraph N T (S n) (S m)) : SizedCospanHyperGraph N T n m :=
-  mk_scohg (add_top_loop' cohg)
-    (partial_alter (union (cohg.(sized_map) !! (vhd cohg.(inputs))))
-    (vhd cohg.(outputs)) cohg.(sized_map)).
-
-
-Fixpoint sized_add_top_loops' {N T n m o} : forall (cohg : SizedCospanHyperGraph N T (n + m) (n + o)),
-  SizedCospanHyperGraph N T m o :=
-  match n with
-  | 0 => fun cohg => cohg
-  | S n =>
-    fun cohg => sized_add_top_loops' (sized_add_top_loop' cohg)
-  end.
+  | 0 => respan_sized_graph bvsplitr bvsplitr
+  | ! _ => sized_add_top_loop
+  | n1 + n2 =>
+    fun cohg => sized_add_top_loops (sized_add_top_loops (respan_sized_graph bvassoc bvassoc cohg))
+  end%btree.
 
 
 
 Definition swapped_stack_sized_graphs_aux {N T n m n' m'} (cohg : SizedCospanHyperGraph N T n m)
   (cohg' : SizedCospanHyperGraph N T n' m') : SizedCospanHyperGraph N T (n' + n) (m + m') :=
-  mk_scohg (swapped_stack_graphs_aux cohg cohg') (cohg.(sized_map) ∪ cohg'.(sized_map)).
+  mk_scohg
+    (cohg'.(sized_inputs) +++ cohg.(sized_inputs))
+    (cohg.(sized_outputs) +++ cohg'.(sized_outputs))
+    (cohg.(sized_hedges) ∪ cohg'.(sized_hedges))
+    (cohg.(sized_map) ∪ cohg'.(sized_map)).
 
 Definition swapped_stack_sized_graphs {N T n m n' m'} (cohg : SizedCospanHyperGraph N T n m)
   (cohg' : SizedCospanHyperGraph N T n' m') : SizedCospanHyperGraph N T (n' + n) (m + m') :=
@@ -602,39 +631,64 @@ Bind Scope graph_scope with SizedCospanHyperGraph. *)
 Open Scope nat. *)
 
 
-Definition id_sized_graph {N T} {n} (v : vec N n) : SizedCospanHyperGraph N T n n :=
-  mk_scohg (id_graph n) (list_to_map (imap (λ i k, (Pos.of_succ_nat i, k)) v)).
+Definition id_sized_graph {N T} (n : btree N) : SizedCospanHyperGraph N T n n :=
+  mk_scohg
+    (bvec_of_fun (λ p _, p) n)
+    (bvec_of_fun (λ p _, p) n)
+    ∅
+    (bvec_to_map (bvec_of_fun pair n)).
 
-Definition swap_sized_graph {N T} {n m}
-  (v : vec N n) (w : vec N m) : SizedCospanHyperGraph N T (n + m) (m + n) :=
-  mk_scohg (swap_graph n m) (list_to_map (imap (λ i k, (Pos.of_succ_nat i, k)) (v ++ w))).
+Definition swap_sized_graph {N T} (n m : btree N) :
+  SizedCospanHyperGraph N T (n + m) (m + n) :=
+  mk_scohg
+    (bvec_of_fun (λ p _, p~0) n +++ bvec_of_fun (λ p _, p~0) m)
+    (bvec_of_fun (λ p _, p~1) m +++ bvec_of_fun (λ p _, p~0) n)
+    ∅
+    (bvec_to_map (bvec_of_fun (λ p a, (p~0, a)) n +++ bvec_of_fun (λ p a, (p~1, a)) m)).
 
-Definition cup_sized_graph {N T} {n} (v : vec N n) :
+Definition cup_sized_graph {N T} (n : btree N) :
   SizedCospanHyperGraph N T 0 (n + n) :=
-  mk_scohg (cup_graph n) (list_to_map (imap (λ i k, (Pos.of_succ_nat i, k)) v)).
+  mk_scohg
+    bvnil
+    (bvec_of_fun (λ p _, p) n +++ bvec_of_fun (λ p _, p) n)
+    ∅
+    (bvec_to_map (bvec_of_fun pair n)).
 
-Definition cap_sized_graph {N T} {n} (v : vec N n) :
+Definition cap_sized_graph {N T} (n : btree N) :
   SizedCospanHyperGraph N T (n + n) 0 :=
-  mk_scohg (cap_graph n) (list_to_map (imap (λ i k, (Pos.of_succ_nat i, k)) v)).
+  mk_scohg
+    (bvec_of_fun (λ p _, p) n +++ bvec_of_fun (λ p _, p) n)
+    bvnil
+    ∅
+    (bvec_to_map (bvec_of_fun pair n)).
 
 
-Definition sized_graph_of_tensor {N T} (t : T) {n m} (v : vec N n) (w : vec N m) :
+Definition sized_graph_of_tensor {N T} (t : T) (n m : btree N) :
   SizedCospanHyperGraph N T n m :=
-  mk_scohg (graph_of_tensor t n m)
-    (list_to_map (imap (λ i k, (bcons false $ Pos.of_succ_nat i, k)) v) ∪
-    list_to_map (imap (λ i k, (bcons true $ Pos.of_succ_nat i, k)) w)).
+  mk_scohg
+    (bvec_of_fun (λ p _, p~0) n)
+    (bvec_of_fun (λ p _, p~1) m)
+    (mk_hg {[xH := (t, vec_to_list (bvec_to_vec (bvec_of_fun (λ p _, p~0) n)),
+      vec_to_list (bvec_to_vec (bvec_of_fun (λ p _, p~1) m)))]} ∅)
+    (bvec_to_map (bvec_of_fun (λ p a, (p~0, a)) n +++ bvec_of_fun (λ p a, (p~1, a)) m)).
 
+
+Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m n' m'} {fi fo} :
+  (@respan_sized_graph N T n m n' m' fi fo) with signature
+  scohg_eq ==> scohg_eq as respan_sized_graph_scohg_eq.
+Proof.
+  intros cohg cohg' (Hins & Houts & Hhg & Hmap).
+  split_and!; [now cbn; f_equal..| done|done].
+Qed.
 
 Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m n' m'} :
   (@stack_sized_graphs_aux N T n m n' m') with signature
   scohg_eq ==> scohg_eq ==> scohg_eq as stack_sized_graphs_aux_scohg_eq.
 Proof.
   intros cohg1 cohg1' [] cohg2 cohg2' [].
-  split.
-  - cbn.
-    now f_equiv.
-  - cbn.
-    now f_equal.
+  destruct_and!.
+  split_and!;
+  cbn; assumption || now f_equiv.
 Qed.
 
 Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m n' m'} :
@@ -646,25 +700,30 @@ Proof.
   now do 3 f_equiv.
 Qed.
 
-Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m} :
-  (@sized_add_top_loop N T n m) with signature
+Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {k n m} :
+  (@sized_add_top_loop N T k n m) with signature
   scohg_eq ==> scohg_eq as sized_add_top_loop_scohg_eq.
 Proof.
-  intros cohg cohg' (Heq & Hmap).
-  split; [now f_equiv /=|].
+  intros cohg cohg' (Hins & Houts & Hhg & Hmap).
+  split_and!; try solve [cbn; congruence].
+  unfold sized_add_top_loop.
   cbn.
-  now rewrite Hmap, <- Heq.1, <- Heq.2.1.
+  rewrite <- Houts, <- Hins.
+  now do 2 f_equiv.
 Qed.
 
 Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m o} :
   (@sized_add_top_loops N T n m o) with signature
   scohg_eq ==> scohg_eq as sized_add_top_loops_scohg_eq.
 Proof.
-  induction n; [done|].
-  intros cohg cohg' Heq.
-  cbn.
-  apply IHn.
-  now f_equiv.
+  revert m o;
+  induction n; intros m o.
+  - intros cohg cohg' Heq.
+    cbn.
+    apply IHn2, IHn1.
+    now f_equiv.
+  - solve_proper.
+  - solve_proper.
 Qed.
 
 
@@ -672,11 +731,10 @@ Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m n' m'} :
   (@swapped_stack_sized_graphs_aux N T n m n' m') with signature
   scohg_eq ==> scohg_eq ==> scohg_eq as swapped_stack_sized_graphs_aux_scohg_eq.
 Proof.
-  intros cohg1 cohg1' (Heq1 & Hmap1)
-    cohg2 cohg2' (Heq2 & Hmap2).
-  split; [now f_equiv /=|].
-  cbn.
-  now f_equiv.
+  intros cohg1 cohg1' (Hins1 & Houts1 & Hhg1 & Hmap1)
+    cohg2 cohg2' (Hins2 & Houts2 & Hhg2 & Hmap2).
+  split_and!; [cbn; congruence..|now f_equiv /=|].
+  cbn; congruence.
 Qed.
 
 Add Parametric Morphism {N} `{Equiv T, Equivalence T equiv} {n m n' m'} :
@@ -770,7 +828,7 @@ Proof.
 Qed. *)
 
 
-Lemma sized_graph_of_tensor_scohg_eq {N} `{Equiv T}
+(* Lemma sized_graph_of_tensor_scohg_eq {N} `{Equiv T}
   (t t' : T) {n m} (v : vec N n) (w : vec N m) : t ≡ t' ->
   scohg_eq (sized_graph_of_tensor t v w) (sized_graph_of_tensor t' v w).
 Proof.
@@ -778,17 +836,17 @@ Proof.
   split; [|done].
   cbn.
   now apply graph_of_tensor_cohg_eq.
-Qed.
+Qed. *)
 
 
 Add Parametric Morphism {N} `{Equiv T} {n m} : (@sized_vertices N T n m)
   with signature scohg_eq ==> eq as sized_vertices_scohg_eq.
 Proof.
   intros cohg cohg'.
-  intros [Heq Hmap].
+  intros (Hins & Houts & Heq & Hmap).
   unfold sized_vertices.
-  f_equal; [|now f_equal].
-  now apply vertices_cohg_eq_Proper.
+  erewrite vertices_hg_equiv by eassumption.
+  congruence.
 Qed.
 
 (*
@@ -841,10 +899,27 @@ Proof.
   now rewrite isolated_vertices_norm_verts.
 Qed. *)
 
+Definition sized_vertices_aux {N T n m} (cohg : SizedCospanHyperGraph N T n m) : Pset :=
+  vertices_hg cohg.(sized_hedges) ∪
+  bvec_to_set cohg.(sized_inputs) ∪ bvec_to_set cohg.(sized_outputs).
+
+
+Add Parametric Morphism {N} `{Equiv T} {n m} : (@sized_vertices_aux N T n m)
+  with signature scohg_eq ==> eq as sized_vertices_aux_scohg_eq.
+Proof.
+  intros cohg cohg'.
+  intros (Hins & Houts & Heq & Hmap).
+  unfold sized_vertices_aux.
+  erewrite vertices_hg_equiv by eassumption.
+  congruence.
+Qed.
 
 Definition scohg_vert_eq {N T} {n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :=
-  cohg_vert_eq cohg cohg' /\
-  forall v, v ∈ vertices cohg -> cohg.(sized_map) !! v = cohg'.(sized_map) !! v.
+  cohg.(sized_inputs) = cohg'.(sized_inputs) /\
+  cohg.(sized_outputs) = cohg'.(sized_outputs) /\
+  cohg.(sized_hedges).(hyperedges) = cohg'.(sized_hedges).(hyperedges) /\
+  sized_vertices_aux cohg = sized_vertices_aux cohg' /\
+  forall v, v ∈ sized_vertices_aux cohg -> cohg.(sized_map) !! v = cohg'.(sized_map) !! v.
 
 
 
@@ -853,17 +928,17 @@ Proof.
   split.
   - done.
   - intros cohg cohg' [Heq Hmap].
-    split; [now symmetry|].
+    split_and!; [now symmetry..|].
     intros v Hv.
     symmetry.
     apply Hmap.
-    now rewrite <- vertices_norm_verts, (Heq : _ = _), vertices_norm_verts.
-  - intros cohg cohg' cohg'' [Heq1 Hmap1] [Heq2 Hmap2].
-    split; [now etransitivity; eauto|].
+    destruct_and!; congruence.
+  - intros cohg cohg' cohg'' (Hins1 & Houts1 & Heq1 & ? & Hmap1) (Hins2 & Houts2 & Heq2 & ? & Hmap2).
+    split_and!; [now etransitivity; eauto..|].
     intros v Hv.
     rewrite Hmap1 by done.
     apply Hmap2.
-    now rewrite <- vertices_norm_verts, <- (Heq1 : _ = _), vertices_norm_verts.
+    congruence.
 Qed.
 
 Notation "cohg '≡ᵥ' cohg'" := (scohg_vert_eq cohg%scohg cohg'%scohg)
@@ -874,35 +949,47 @@ Notation "cohg '≡ₕ' cohg'" := (scohg_eq cohg%scohg cohg'%scohg)
 
 Definition norm_sized_verts {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
   SizedCospanHyperGraph N T n m :=
-  mk_scohg (norm_verts cohg) (filter (λ kv, kv.1 ∈ vertices cohg) cohg.(sized_map)).
+  mk_scohg
+    cohg.(sized_inputs)
+    cohg.(sized_outputs)
+    (mk_hg cohg.(sized_hedges).(hyperedges) (sized_vertices_aux cohg))
+    (filter (λ kv, kv.1 ∈ sized_vertices_aux cohg) cohg.(sized_map)).
 
 Lemma norm_sized_verts_vert_eq {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
   norm_sized_verts cohg ≡ᵥ cohg.
 Proof.
-  split; [apply norm_verts_vert_eq|].
-  cbn.
-  intros v.
-  rewrite vertices_norm_verts.
-  intros Hv.
-  rewrite map_lookup_filter.
-  cbn.
-  case_guard; [|done].
-  cbn.
-  apply bind_with_Some.
+  eenough (Hen : _);
+  [split_and!; [..|exact Hen| ]; [done..| ] | ]; cycle 1.
+  - unfold norm_sized_verts, sized_vertices_aux.
+    cbn.
+    rewrite 2 vertices_hg_decomp.
+    cbn.
+    unfold referenced_vertices_hg.
+    cbn.
+    set_solver +.
+  - rewrite Hen.
+    intros v Hv.
+    cbn.
+    rewrite map_lookup_filter.
+    cbn.
+    case_guard; [|done].
+    cbn.
+    apply bind_with_Some.
 Qed.
 
 #[export] Instance norm_sized_verts_of_vert_eq {N T n m} :
   Proper (scohg_vert_eq ==> eq) (@norm_sized_verts N T n m).
 Proof.
-  intros cohg cohg' [Heq Hmap].
-  apply scohg_ext.
-  - apply Heq.
+  intros cohg cohg' (Hins & Houts & Heq & Hvert & Hmap).
+  apply scohg_ext; [done..| |].
+  - cbn.
+    congruence.
   - cbn.
     apply map_eq.
     intros i.
     rewrite 2 map_lookup_filter.
     cbn.
-    rewrite <- (vertices_norm_verts cohg'), <- (Heq : _ = _), vertices_norm_verts.
+    rewrite <- Hvert.
     case_guard; [|now cbn; rewrite 2 option_bind_None_r].
     cbn.
     now rewrite <- Hmap by done.
@@ -913,36 +1000,65 @@ Add Parametric Morphism {N} `{Equiv T} {n m} : (@norm_sized_verts N T n m)
   with signature scohg_eq ==> scohg_eq as norm_sized_verts_scohg_eq.
 Proof.
   intros cohg cohg' Heq.
-  split; [apply norm_verts_cohg_eq_Proper, Heq|].
-  cbn.
-  erewrite vertices_cohg_eq_Proper by apply Heq.
-  now rewrite <- Heq.2.
+  pose proof Heq as (Hins & Houts & Hhg & Hmap).
+  apply sized_vertices_aux_scohg_eq_Proper in Heq as Hvert.
+  split_and!; [done..| |].
+  - cbn.
+    split; [|done].
+    apply Hhg.
+  - cbn.
+    rewrite <- Hvert, <- Hmap.
+    done.
 Qed.
 
+
+Definition isolated_sized_vertices {N T n m} (cohg : SizedCospanHyperGraph N T n m) :=
+  sized_vertices_aux cohg ∖ referenced_vertices_hg cohg.(sized_hedges).
+
+Lemma sized_vertices_aux_decomp {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices_aux cohg = referenced_vertices_hg cohg.(sized_hedges) ∪ isolated_sized_vertices cohg.
+Proof.
+  enough (Hen : referenced_vertices_hg cohg.(sized_hedges) ⊆ sized_vertices_aux cohg).
+  - apply leibniz_equiv_iff.
+    unfold isolated_sized_vertices.
+    apply union_difference.
+    done.
+  - unfold sized_vertices_aux.
+    rewrite vertices_hg_decomp.
+    do 3 apply union_subseteq_l'.
+    reflexivity.
+Qed.
 
 
 Lemma scohg_vert_eq_alt {N T n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :
   cohg ≡ᵥ cohg' <->
-  inputs cohg = inputs cohg' /\
-  outputs cohg = outputs cohg' /\
-  hyperedges cohg = cohg' /\
-  isolated_vertices cohg = isolated_vertices cohg' /\
-  forall v, v ∈ vertices cohg ∪ vertices cohg' ->
+  sized_inputs cohg = sized_inputs cohg' /\
+  sized_outputs cohg = sized_outputs cohg' /\
+  hyperedges cohg.(sized_hedges) = hyperedges cohg'.(sized_hedges) /\
+  isolated_sized_vertices cohg = isolated_sized_vertices cohg' /\
+  forall v, v ∈ sized_vertices_aux cohg ∪ sized_vertices_aux cohg' ->
   cohg.(sized_map) !! v = cohg'.(sized_map) !! v.
 Proof.
   split.
-  - intros [Heq Hmap].
-    apply cohg_vert_eq_alt in Heq as Heq'.
-    split_and!; [apply Heq'..|].
-    intros v [Hv|Hv]%elem_of_union; [auto|].
-    rewrite <- vertices_norm_verts, <- (Heq : _ = _), vertices_norm_verts in Hv.
-    auto.
-  - unfold scohg_vert_eq.
-    rewrite cohg_vert_eq_alt.
-    intros Heq.
-    split; [split_and!; apply Heq|].
-    intros v Hv.
-    apply Heq, elem_of_union_l, Hv.
+  - intros (Hins & Houts & Hhg & Hverts & Hmap).
+    split_and!; [easy..| |].
+    + unfold isolated_sized_vertices.
+      rewrite <- Hverts.
+      unfold referenced_vertices_hg.
+      rewrite <- Hhg.
+      done.
+    + rewrite <- Hverts.
+      rewrite union_idemp_L.
+      apply Hmap.
+  - intros (Hins & Houts & Hhg & Hverts & Hmap).
+    eenough (Hen : _);
+    [split_and!; [easy..|apply Hen|]| ].
+    + rewrite <- Hen, union_idemp_L in Hmap.
+      apply Hmap.
+    + rewrite 2 sized_vertices_aux_decomp.
+      unfold referenced_vertices_hg.
+      rewrite <- Hhg, Hverts.
+      done.
 Qed.
 
 
@@ -950,23 +1066,29 @@ Qed.
 Lemma scohg_eq_trans {N} `{Equiv T, Transitive T equiv} {n m} :
   Transitive (@scohg_eq N T n m _).
 Proof.
-  apply rel_intersection_trans, _.
+  repeat apply rel_intersection_trans; try apply _.
   notypeclasses refine (rel_preimage_trans _ _ _).
-  apply cohg_eq_trans.
+  intros a b c Hab Hbc.
+  intros i.
+  hnf.
+  eapply option_Forall2_trans; [apply _|apply Hab|apply Hbc].
 Qed.
 Lemma scohg_eq_symm {N} `{Equiv T, Symmetric T equiv} {n m} :
   Symmetric (@scohg_eq N T n m _).
 Proof.
-  apply rel_intersection_symm, _.
+  repeat apply rel_intersection_symm; try apply _.
   notypeclasses refine (rel_preimage_symm _ _ _).
-  apply cohg_eq_symm.
+  intros a b Hab.
+  intros i.
+  induction (Hab i); constructor; now symmetry.
 Qed.
 Lemma scohg_eq_refl {N} `{Equiv T, Reflexive T equiv} {n m} :
   Reflexive (@scohg_eq N T n m _).
 Proof.
-  apply rel_intersection_refl, _.
-  notypeclasses refine (rel_preimage_refl _ _ _).
-  apply cohg_eq_refl.
+  repeat apply rel_intersection_refl; try apply _.
+  hnf.
+  intros cohg i.
+  apply option_Forall2_refl, _.
 Qed.
 
 
@@ -1027,25 +1149,125 @@ Proof.
   done.
 Qed. *)
 
+Lemma vertices_scohg_to_cohg {N T n m} (scohg : SizedCospanHyperGraph N T n m) :
+  vertices (scohg_to_cohg scohg) = sized_vertices_aux scohg.
+Proof.
+  rewrite vertices_vertices_hg_decomp.
+  unfold sized_vertices_aux.
+  rewrite <- (union_assoc_L _).
+  f_equal.
+  rewrite list_to_set_app_L.
+  cbn.
+  set_unfold; done.
+Qed.
+
+Lemma scohg_vert_eq_alt_cohg_vert_eq {N T} {n m}
+  (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  scohg ≡ᵥ scohg' <->
+  (scohg_to_cohg scohg ≡ᵥ scohg_to_cohg scohg')%cohg /\
+  ∀ v, v ∈ sized_vertices_aux scohg ->
+  scohg.(sized_map) !! v = scohg'.(sized_map) !! v.
+Proof.
+  unfold scohg_vert_eq.
+  rewrite !(and_assoc _).
+  f_equiv.
+  rewrite <- !(and_assoc _).
+  rewrite cohg_vert_eq_alt_vertices.
+  rewrite 2 vertices_scohg_to_cohg.
+  cbn.
+  rewrite 2 (inj_iff bvec_to_vec).
+  done.
+Qed.
+
+Lemma scohg_eq_alt_cohg_eq {N} `{Equiv T} {n m}
+  (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  scohg ≡ₕ scohg' <->
+  (scohg_to_cohg scohg ≡ₕ scohg_to_cohg scohg')%cohg /\
+  scohg.(sized_map) = scohg'.(sized_map).
+Proof.
+  unfold scohg_eq.
+  rewrite !(and_assoc _).
+  f_equiv.
+  rewrite <- !(and_assoc _).
+  unfold cohg_eq.
+  cbn.
+  rewrite 2 (inj_iff bvec_to_vec).
+  done.
+Qed.
+
+Definition cohg_to_scohg {N T n m}
+  (cohg : CospanHyperGraph T (bsize n) (bsize m))
+  (smap : Pmap N) : SizedCospanHyperGraph N T n m :=
+  mk_scohg (vec_to_bvec cohg.(inputs))
+    (vec_to_bvec cohg.(outputs))
+    cohg.(hedges)
+    smap.
+
+Lemma scohg_to_cohg_to_scohg {N T n m}
+  (scohg : SizedCospanHyperGraph N T n m) :
+  cohg_to_scohg (scohg_to_cohg scohg) scohg.(sized_map) = scohg.
+Proof.
+  apply scohg_ext; [cbn; apply (cancel _ _)..|done|done].
+Qed.
+
+#[export] Instance cohg_to_scohg_to_cohg {N T n m} smap :
+  Cancel eq scohg_to_cohg (λ cohg, @cohg_to_scohg N T n m cohg smap).
+Proof.
+  intros cohg.
+  apply cohg_ext; [done|cbn; apply (cancel _ _)..].
+Qed.
+
+Lemma scohg_ext' {N T n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  scohg_to_cohg scohg = scohg_to_cohg scohg' ->
+  scohg.(sized_map) = scohg'.(sized_map) ->
+  scohg = scohg'.
+Proof.
+  intros Heq Hmap.
+  apply (f_equal (λ cohg, cohg_to_scohg cohg scohg.(sized_map))) in Heq.
+  rewrite scohg_to_cohg_to_scohg, Hmap, scohg_to_cohg_to_scohg in Heq.
+  done.
+Qed.
+
+Lemma sized_vertices_aux_cohg_to_scohg {N T n m}
+  (cohg : CospanHyperGraph T (@bsize N n) (bsize m)) smap :
+  sized_vertices_aux (cohg_to_scohg cohg smap) =
+  vertices cohg.
+Proof.
+  rewrite <- (cohg_to_scohg_to_cohg smap cohg).
+  rewrite vertices_scohg_to_cohg.
+  rewrite (cohg_to_scohg_to_cohg smap cohg).
+  done.
+Qed.
+
 Lemma scohg_vert_eq_scohg_eq_commute {N} `{Equiv T} {n m} :
   rel_compose scohg_vert_eq (@scohg_eq N T n m _) ⊆
   rel_compose scohg_eq scohg_vert_eq.
 Proof.
   apply relation_subseteq_iff.
   intros scohg scohg'' (scohg' & Hveq & Heq).
-  pose proof (relation_subseteq_iff.1 cohg_vert_eq_cohg_eq_commute scohg scohg'') as Hcomm.
-  tspecialize Hcomm by now exists scohg'; split; [apply Hveq|apply Heq].
-  destruct Hcomm as (cohg' & Hveq' & Heq').
-  exists (mk_scohg cohg' (scohg.(sized_map))).
+  pose proof (relation_subseteq_iff.1 cohg_vert_eq_cohg_eq_commute
+    (scohg_to_cohg scohg) (scohg_to_cohg scohg'')) as Hcomm.
+  apply scohg_vert_eq_alt_cohg_vert_eq in Hveq as Hveq_.
+  apply scohg_eq_alt_cohg_eq in Heq as Heq_.
+  tspecialize Hcomm by now exists (scohg_to_cohg scohg'); split; [apply Hveq_|apply Heq_].
+  destruct Hcomm as (cohg' & Heq' & Hveq').
+  exists (cohg_to_scohg cohg' (scohg.(sized_map))).
   split.
-  - split; done.
-  - split; [done|].
-    cbn.
-    intros v Hv.
-    rewrite Hveq.2 by now erewrite vertices_cohg_eq_Proper by eassumption.
-    now rewrite Heq.2.
+  - rewrite scohg_eq_alt_cohg_eq.
+    split; [|done].
+    rewrite (cohg_to_scohg_to_cohg _ _).
+    done.
+  - rewrite scohg_vert_eq_alt_cohg_vert_eq.
+    split.
+    + rewrite cohg_to_scohg_to_cohg.
+      done.
+    + rewrite sized_vertices_aux_cohg_to_scohg.
+      cbn.
+      rewrite <- Heq_.2.
+      rewrite <- (vertices_cohg_eq_Proper _ _ Heq').
+      rewrite vertices_scohg_to_cohg.
+      apply Hveq_.2.
 Qed.
-
 
 Definition struct_sized_isomorphic {N T n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :=
   sized_isomorphic (norm_sized_verts cohg) (norm_sized_verts cohg').
@@ -1078,20 +1300,47 @@ Proof.
   now rewrite (set_map_difference_L _).
 Qed. *)
 
-Lemma norm_sized_verts_relabel_sized_graph {N T n m} f `{Hf : !Inj eq eq f}
-  (cohg : SizedCospanHyperGraph N T n m) :
-  norm_sized_verts (relabel_sized_graph f cohg) = relabel_sized_graph f (norm_sized_verts cohg).
+Lemma sized_vertices_aux_relabel_sized_graph {N T n m} f
+  (scohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices_aux (relabel_sized_graph f scohg) =
+  set_map f (sized_vertices_aux scohg).
 Proof.
-  apply scohg_ext; [apply (norm_verts_relabel_graph _)|].
+  unfold sized_vertices_aux.
   cbn.
-  apply map_eq.
-  intros i.
-  apply option_eq; intros k.
-  rewrite map_lookup_filter_Some, 2 (lookup_kmap_Some _).
-  setoid_rewrite map_lookup_filter_Some.
+  rewrite vertices_relabel_hg.
+  set_solver +.
+Qed.
+
+Lemma sized_vertices_aux_reindex_sized_graph {N T n m} f `{Hf : !Inj eq eq f}
+  (scohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices_aux (reindex_sized_graph f scohg) =
+  sized_vertices_aux scohg.
+Proof.
+  unfold sized_vertices_aux.
   cbn.
-  rewrite (vertices_relabel_graph _).
-  set_solver + Hf.
+  rewrite (vertices_reindex_hg _).
+  done.
+Qed.
+
+Lemma norm_sized_verts_relabel_sized_graph {N T n m} f `{Hf : !Inj eq eq f}
+  (scohg : SizedCospanHyperGraph N T n m) :
+  norm_sized_verts (relabel_sized_graph f scohg) = relabel_sized_graph f (norm_sized_verts scohg).
+Proof.
+  apply scohg_ext; [done..| |].
+  - cbn.
+    apply hg_ext; [done|].
+    cbn.
+    rewrite sized_vertices_aux_relabel_sized_graph.
+    done.
+  - cbn.
+    rewrite sized_vertices_aux_relabel_sized_graph.
+    apply map_eq.
+    intros i.
+    apply option_eq; intros k.
+    rewrite map_lookup_filter_Some, 2 (lookup_kmap_Some _).
+    setoid_rewrite map_lookup_filter_Some.
+    cbn.
+    set_solver + Hf.
 Qed.
 
 
@@ -1099,10 +1348,15 @@ Lemma norm_sized_verts_reindex_sized_graph {N T n m} f `{Hf : !Inj eq eq f}
   (cohg : SizedCospanHyperGraph N T n m) :
   norm_sized_verts (reindex_sized_graph f cohg) = reindex_sized_graph f (norm_sized_verts cohg).
 Proof.
-  apply scohg_ext; [apply (norm_verts_reindex_graph _)|].
-  cbn.
-  rewrite (vertices_reindex_graph _).
-  done.
+  apply scohg_ext; [done..| |].
+  - cbn.
+    apply hg_ext; [done|].
+    cbn.
+    rewrite (sized_vertices_aux_reindex_sized_graph _).
+    done.
+  - cbn.
+    rewrite (sized_vertices_aux_reindex_sized_graph _).
+    done.
 Qed.
 
 
@@ -1201,15 +1455,55 @@ Proof.
   now apply scohg_eq_refl.
 Qed.
 
+(* FIXME: Move *)
+Lemma bvec_to_vec_bvmap {N A B} (f : A -> B)
+  {n : btree N} (v : bvec A n) :
+  bvec_to_vec (bvmap f v) = vmap f (bvec_to_vec v).
+Proof.
+  induction v; [done..|].
+  cbn.
+  rewrite Vector.map_append.
+  now f_equal.
+Qed.
+Lemma vec_to_bvec_bvmap {N A B} (f : A -> B)
+  {n : btree N} (v : vec A (bsize n)) :
+  vec_to_bvec (vmap f v) = bvmap f (vec_to_bvec v).
+Proof.
+  apply (inj bvec_to_vec).
+  rewrite bvec_to_vec_bvmap.
+  now rewrite 2 (cancel bvec_to_vec _).
+Qed.
+
+Lemma scohg_to_cohg_relabel_sized_graph {N T n m} f
+  (scohg : SizedCospanHyperGraph N T n m) :
+  scohg_to_cohg (relabel_sized_graph f scohg) =
+  relabel_graph f (scohg_to_cohg scohg).
+Proof.
+  apply cohg_ext; [done|apply bvec_to_vec_bvmap..].
+Qed.
+
+Lemma scohg_to_cohg_reindex_sized_graph {N T n m} f
+  (scohg : SizedCospanHyperGraph N T n m) :
+  scohg_to_cohg (reindex_sized_graph f scohg) =
+  reindex_graph f (scohg_to_cohg scohg).
+Proof.
+  done.
+Qed.
+
 Lemma relabel_sized_graph_scohg_eq_inv_l {N} `{Equiv T} f
   {n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :
   relabel_sized_graph f cohg ≡ₕ cohg' -> exists cohg'',
     cohg' = relabel_sized_graph f cohg'' /\ cohg ≡ₕ cohg''.
 Proof.
   intros Heq.
-  specialize (relabel_graph_cohg_eq_inv_l f _ _ Heq.1) as (cohg'' & Heq'' & Hequiv).
-  exists (mk_scohg cohg'' cohg.(sized_map)).
-  split; [apply scohg_ext; [done|symmetry; apply Heq.2]|].
+  apply scohg_eq_alt_cohg_eq in Heq as Heq_.
+  rewrite scohg_to_cohg_relabel_sized_graph in Heq_.
+  specialize (relabel_graph_cohg_eq_inv_l f _ _ Heq_.1) as (cohg'' & Heq'' & Hequiv).
+  exists (cohg_to_scohg cohg'' cohg.(sized_map)).
+  split; [apply scohg_ext'; [now rewrite scohg_to_cohg_relabel_sized_graph,
+    (cohg_to_scohg_to_cohg _ _)|symmetry; apply Heq_.2]|].
+  apply scohg_eq_alt_cohg_eq.
+  rewrite (cohg_to_scohg_to_cohg _ _).
   split; [done|].
   done.
 Qed.
@@ -1220,23 +1514,30 @@ Lemma reindex_sized_graph_scohg_eq_inv_l {N} `{Equiv T} f `{Hf : !Inj eq eq f}
     cohg' = reindex_sized_graph f cohg'' /\ cohg ≡ₕ cohg''.
 Proof.
   intros Heq.
-  specialize (reindex_graph_cohg_eq_inv_l f _ _ Heq.1) as (cohg'' & Heq'' & Hequiv).
-  exists (mk_scohg cohg'' cohg.(sized_map)).
-  split; [apply scohg_ext; [done|symmetry; apply Heq.2]|].
-  split; done.
+  apply scohg_eq_alt_cohg_eq in Heq as Heq_.
+  rewrite scohg_to_cohg_reindex_sized_graph in Heq_.
+  specialize (reindex_graph_cohg_eq_inv_l f _ _ Heq_.1) as (cohg'' & Heq'' & Hequiv).
+  exists (cohg_to_scohg cohg'' cohg.(sized_map)).
+  split; [apply scohg_ext'; [now rewrite scohg_to_cohg_reindex_sized_graph,
+    (cohg_to_scohg_to_cohg _ _)|symmetry; apply Heq_.2]|].
+  apply scohg_eq_alt_cohg_eq.
+  rewrite (cohg_to_scohg_to_cohg _ _).
+  split; [done|].
+  done.
 Qed.
 
 
 Lemma norm_sized_verts_id {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
-  hypervertices cohg = vertices cohg ->
-  dom cohg.(sized_map) ⊆ vertices cohg ->
+  hypervertices cohg.(sized_hedges) = sized_vertices_aux cohg ->
+  dom cohg.(sized_map) ⊆ sized_vertices_aux cohg ->
   norm_sized_verts cohg = cohg.
 Proof.
   intros Heq Hdom.
-  apply scohg_ext; [now apply norm_verts_id|].
-  cbn.
-  apply map_filter_id.
-  now intros ? ? ?%elem_of_dom_2%Hdom.
+  apply scohg_ext; [done..| |].
+  - apply hg_ext; done.
+  - cbn.
+    apply map_filter_id.
+    now intros ? ? ?%elem_of_dom_2%Hdom.
 Qed.
 
 (* Lemma relabel_sized_graph_set_verts {N T n m} f (cohg : SizedCospanHyperGraph N T n m) vs :
@@ -1255,16 +1556,44 @@ Proof.
   done.
 Qed. *)
 
-Lemma sized_vertices_norm_sized_verts {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
-  sized_vertices (norm_sized_verts cohg) = vertices cohg.
+Lemma sized_vertices_decomp {N T n m} (scohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices scohg = sized_vertices_aux scohg ∪ dom scohg.(sized_map).
 Proof.
-  apply set_eq, set_subseteq_antisymm, union_subseteq_l', eq_reflexivity, symmetry, vertices_norm_verts.
-  apply union_subseteq, and_comm, conj, eq_reflexivity, vertices_norm_verts.
+  done.
+Qed.
+
+Lemma sized_vertices_aux_norm_sized_verts {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices_aux (norm_sized_verts cohg) = sized_vertices_aux cohg.
+Proof.
+  apply set_eq, set_subseteq_antisymm.
+  - cbn.
+    apply union_least, union_subseteq_r.
+    apply union_least, union_subseteq_l', union_subseteq_r.
+    unfold sized_vertices_aux.
+    rewrite 2 vertices_hg_decomp.
+    cbn.
+    apply union_least, reflexivity.
+    apply union_subseteq_l', union_subseteq_l', union_subseteq_l.
+  - do 2 apply union_mono_r.
+    rewrite 2 vertices_hg_decomp.
+    apply union_mono_l.
+    cbn.
+    do 2 apply union_subseteq_l'.
+    rewrite vertices_hg_decomp.
+    apply union_subseteq_r.
+Qed.
+
+Lemma sized_vertices_norm_sized_verts {N T n m} (cohg : SizedCospanHyperGraph N T n m) :
+  sized_vertices (norm_sized_verts cohg) = sized_vertices_aux cohg.
+Proof.
+  rewrite sized_vertices_decomp.
+  rewrite sized_vertices_aux_norm_sized_verts.
+  apply leibniz_equiv_iff, set_union_eq_l.
   cbn.
   etransitivity. 1:{
     apply eq_reflexivity.
     symmetry.
-    refine (filter_dom_L (λ kv, kv ∈ vertices cohg) _).
+    refine (filter_dom_L (λ kv, kv ∈ sized_vertices_aux cohg) _).
   }
   now intros k [Hk _]%elem_of_filter.
 Qed.
@@ -1297,6 +1626,18 @@ Proof.
   set_solver + Hf Hg.
 Qed.
 
+Lemma scohg_to_cohg_norm_sized_verts {N T n m}
+  (scohg : SizedCospanHyperGraph N T n m) :
+  scohg_to_cohg (norm_sized_verts scohg) = norm_verts (scohg_to_cohg scohg).
+Proof.
+  apply cohg_ext; [|done..].
+  apply hg_ext; [done|].
+  cbn.
+  rewrite vertices_scohg_to_cohg.
+  done.
+Qed.
+
+
 Lemma relabel_sized_graph_norm_sized_verts_inv_l {N} `{Equiv T} f `{Hf : !Inj eq eq f}
   {n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :
   norm_sized_verts cohg = relabel_sized_graph f cohg' -> exists f' cohg'',
@@ -1306,8 +1647,8 @@ Lemma relabel_sized_graph_norm_sized_verts_inv_l {N} `{Equiv T} f `{Hf : !Inj eq
 Proof.
   intros Hseq.
 
-  set (to_add := filter (λ kv, kv.1 ∉ vertices cohg) cohg.(sized_map)).
-  pose proof (partial_bijection_extension' (vertices cohg') f
+  set (to_add := filter (λ kv, kv.1 ∉ sized_vertices_aux cohg) cohg.(sized_map)).
+  pose proof (partial_bijection_extension' (sized_vertices_aux cohg') f
     (fun _ _ _ _ => Hf _ _)) as (f' & f'inv & Hf' & Hf'inv & Hrinv & Hlinv & Hf'_f).
   exists f'.
 (*
@@ -1329,31 +1670,38 @@ Proof.
     (forall v, v ∈ sized_vertices cohg' -> f' v = f v)
      /\ cohg = relabel_sized_graph f' cohg'') by naive_solver. *)
 
-  assert (Hcohg'verts : sized_vertices cohg' = vertices cohg'). 1:{
+  assert (Hcohg'verts : sized_vertices cohg' = sized_vertices_aux cohg'). 1:{
+    (* rewrite sized_vertices_decomp.
+    apply leibniz_equiv_iff, set_union_eq_l. *)
     apply (f_equal sized_vertices) in Hseq as Hsized.
     rewrite sized_vertices_norm_sized_verts,
       (sized_vertices_relabel_sized_graph _) in Hsized.
-    apply (f_equal (vertices ∘ sized_cospan)) in Hseq as Hverts.
-    cbn in Hverts.
-    rewrite vertices_norm_verts, vertices_relabel_graph in Hverts.
+    apply (f_equal sized_vertices_aux) in Hseq as Hverts.
+    rewrite sized_vertices_aux_norm_sized_verts in Hverts.
+    rewrite sized_vertices_aux_relabel_sized_graph in Hverts.
     rewrite Hsized in Hverts.
     set_solver +Hf Hverts.
   }
 
-  specialize (relabel_graph_norm_verts_inv_l f _ _ (f_equal sized_cospan Hseq)) as (cohg'' & Hnorm & Heq).
-  exists (mk_scohg cohg'' (cohg'.(sized_map) ∪ (kmap f'inv to_add))).
+  pose proof (f_equal scohg_to_cohg Hseq) as Hseq'.
+  rewrite scohg_to_cohg_norm_sized_verts, scohg_to_cohg_relabel_sized_graph in Hseq'.
+
+  specialize (relabel_graph_norm_verts_inv_l f _ _ Hseq') as (cohg'' & Hnorm & Heq).
+  exists (cohg_to_scohg cohg'' (cohg'.(sized_map) ∪ (kmap f'inv to_add))).
   split_and!; [apply _|..].
   - intros v.
     rewrite Hcohg'verts.
     apply Hf'_f.
-  - apply scohg_ext; [done|].
+  - apply scohg_ext'; [rewrite scohg_to_cohg_norm_sized_verts, cohg_to_scohg_to_cohg; done|].
     cbn.
+    rewrite sized_vertices_aux_cohg_to_scohg.
     etransitivity; [|symmetry;
       refine (map_filter_union' (.∈ vertices cohg'') _ _)].
     rewrite map_filter_id. 2:{
       cbn.
       intros i _ Hi%elem_of_dom_2.
       rewrite <- vertices_norm_verts, <- Hnorm.
+      rewrite vertices_scohg_to_cohg.
       rewrite <- Hcohg'verts.
       now apply elem_of_union_r.
     }
@@ -1365,6 +1713,7 @@ Proof.
     apply map_lookup_filter_Some in Hiv as [Hkv Hk].
     cbn in Hk |- *.
     rewrite <- vertices_norm_verts, <- Hnorm.
+    rewrite vertices_scohg_to_cohg.
     rewrite <- Hcohg'verts.
     apply (f_equal sized_vertices) in Hseq.
     rewrite sized_vertices_norm_sized_verts,
@@ -1377,12 +1726,14 @@ Proof.
     rewrite <- Hf'_f by now rewrite <- Hcohg'verts.
     rewrite (cancel _ _ _).
     done.
-  - apply scohg_ext.
-    + cbn.
-      rewrite Heq.
+  - apply scohg_ext'.
+    + rewrite Heq.
+      rewrite scohg_to_cohg_relabel_sized_graph.
+      rewrite cohg_to_scohg_to_cohg.
       apply relabel_graph_ext_strong.
       intros v.
       rewrite <- vertices_norm_verts, <- Hnorm.
+      rewrite vertices_scohg_to_cohg.
       now intros ?%Hf'_f.
     + cbn.
       rewrite (kmap_union _).
@@ -1458,16 +1809,27 @@ Lemma reindex_sized_graph_norm_sized_verts_inv_l {N} `{Equiv T} f `{Hf : !Inj eq
     cohg' = norm_sized_verts cohg'' /\ cohg = reindex_sized_graph f cohg''.
 Proof.
   intros Heq.
-  specialize (reindex_graph_norm_verts_inv_l f _ _ (f_equal sized_cospan Heq))
+  apply (f_equal scohg_to_cohg) in Heq as Heq_.
+  rewrite scohg_to_cohg_norm_sized_verts, scohg_to_cohg_reindex_sized_graph in Heq_.
+
+  specialize (reindex_graph_norm_verts_inv_l f _ _ Heq_)
     as (cohg'' & Heq'' & Hequiv).
-  exists (mk_scohg cohg'' cohg.(sized_map)).
-  split; [apply scohg_ext; [done|]|apply scohg_ext; done].
-  cbn.
-  symmetry.
-  apply (f_equal vertices) in Hequiv.
-  rewrite (vertices_reindex_graph _) in Hequiv.
-  rewrite <- Hequiv.
-  apply (f_equal sized_map Heq).
+  exists (cohg_to_scohg cohg'' cohg.(sized_map)).
+  split.
+  - apply scohg_ext'; [rewrite scohg_to_cohg_norm_sized_verts, cohg_to_scohg_to_cohg; done|].
+    apply (f_equal sized_map) in Heq as Hmap.
+    cbn in Hmap.
+    rewrite <- Hmap.
+    cbn.
+    rewrite sized_vertices_aux_cohg_to_scohg, <- vertices_norm_verts, <- Heq''.
+    rewrite vertices_scohg_to_cohg.
+    apply (f_equal sized_vertices_aux) in Heq.
+    rewrite sized_vertices_aux_norm_sized_verts, (sized_vertices_aux_reindex_sized_graph _) in Heq.
+    rewrite Heq.
+    done.
+  - apply scohg_ext'; [|done].
+    rewrite scohg_to_cohg_reindex_sized_graph, cohg_to_scohg_to_cohg.
+    apply Hequiv.
 Qed.
 
 
@@ -1861,11 +2223,13 @@ Lemma relabel_sized_graph_scohg_vert_eq {N T n m} f `{Hf : !Inj eq eq f}
   relabel_sized_graph f cohg ≡ᵥ relabel_sized_graph f cohg'.
 Proof.
   intros Heq.
+  rewrite scohg_vert_eq_alt_cohg_vert_eq in Heq |- *.
   split.
-  - now apply relabel_graph_cohg_vert_eq, Heq.1.
+  - rewrite 2 scohg_to_cohg_relabel_sized_graph.
+    now apply relabel_graph_cohg_vert_eq, Heq.1.
   - cbn.
     intros fv.
-    rewrite vertices_relabel_graph.
+    rewrite sized_vertices_aux_relabel_sized_graph.
     intros (v & -> & Hv)%elem_of_map.
     rewrite 2 (lookup_kmap _).
     now apply Heq.2.
@@ -1885,10 +2249,14 @@ Lemma reindex_sized_graph_scohg_vert_eq {N T n m} f `{!Inj eq eq f}
   reindex_sized_graph f cohg ≡ᵥ reindex_sized_graph f cohg'.
 Proof.
   intros Heq.
-  split; [now apply reindex_graph_cohg_vert_eq, Heq.1|].
-  cbn.
-  rewrite (vertices_reindex_graph _).
-  apply Heq.2.
+  rewrite scohg_vert_eq_alt_cohg_vert_eq in Heq |- *.
+  split.
+  - rewrite 2 scohg_to_cohg_reindex_sized_graph.
+    now apply (reindex_graph_cohg_vert_eq _), Heq.1.
+  - cbn.
+    intros fv.
+    rewrite (sized_vertices_aux_reindex_sized_graph _).
+    apply Heq.2.
 Qed.
 
 
@@ -1897,8 +2265,8 @@ Section Compose.
   Context {N T : Type}.
 
   Definition compose_sized_graphs_aux {n m o} (tgl : SizedCospanHyperGraph N T n m) (tgr : SizedCospanHyperGraph N T m o) : SizedCospanHyperGraph N T n o :=
-    mk_scohg (compose_graphs_aux tgl tgr) 
-     (map_relabels_r (vzip (outputs tgl) (inputs tgr))
+    cohg_to_scohg (compose_graphs_aux (scohg_to_cohg tgl) (scohg_to_cohg tgr))
+     (map_relabels_r (vzip (bvec_to_vec tgl.(sized_outputs)) (bvec_to_vec tgr.(sized_inputs)))
       (sized_map tgl ∪ sized_map tgr)).
     (* let connected_substs := propogate_subst (vzip (tgl.(outputs)) (tgr.(inputs))) in
     relabel_sized_graph (subst_by_vec connected_substs)
@@ -1999,22 +2367,80 @@ Proof.
   reflexivity.
 Qed. *)
 
-Lemma sized_cospan_sized_add_top_loop {n m}
-  (scohg : SizedCospanHyperGraph N T (S n) (S m)) :
-  sized_cospan (sized_add_top_loop scohg) = add_top_loop scohg.
+Lemma scohg_to_cohg_sized_add_top_loop {n m k}
+  (scohg : SizedCospanHyperGraph N T (! k + n) (! k + m)) :
+  scohg_to_cohg (sized_add_top_loop scohg) = add_top_loop (scohg_to_cohg scohg).
 Proof.
-  done.
+  destruct scohg as [ins outs hg].
+  induction ins as [i ins] using bvec_node_inv.
+  induction outs as [o outs] using bvec_node_inv.
+  induction i as [i] using bvec_leaf_inv.
+  induction o as [o] using bvec_leaf_inv.
+  apply cohg_ext; [done|apply bvec_to_vec_bvmap..].
 Qed.
 
-Lemma sized_cospan_sized_add_top_loops {n m m'}
-  (scohg : SizedCospanHyperGraph N T (n + m) (n + m')) :
-  sized_cospan (sized_add_top_loops scohg) = add_top_loops scohg.
+
+Lemma add_top_loops_assoc {n m o p}
+  (cohg : CospanHyperGraph T (n + (m + o)) (n + (m + p))) :
+  add_top_loops (add_top_loops cohg) =
+  add_top_loops (cast_graph (Nat.add_assoc _ _ _) (Nat.add_assoc _ _ _) cohg).
 Proof.
   induction n.
-  - done.
+  - cbn.
+    now rewrite cast_graph_id.
   - cbn.
     rewrite IHn.
-    rewrite sized_cospan_sized_add_top_loop.
+    rewrite cast_graph_add_top_loop.
+    do 4 f_equal; apply proof_irrel.
+Qed.
+
+Lemma vector_cast_assoc {A n m o} (v : vec A (n + m + o)) H :
+  Vector.cast v H = vsplitl (vsplitl v) +++ (vsplitr (vsplitl v) +++ vsplitr v).
+Proof.
+  apply vec_to_list_inj2.
+  rewrite vec_to_list_cast, 2 vec_to_list_app.
+  induction v as [vl vr] using vec_add_inv.
+  induction vl as [vll vlr] using vec_add_inv.
+  rewrite !vsplitl_app, !vsplitr_app.
+  rewrite 2 vec_to_list_app.
+  now rewrite app_assoc.
+Qed.
+
+Lemma scohg_to_cohg_reassoc_sized_graph {n m o n' m' o'}
+  (scohg : SizedCospanHyperGraph N T (n + m + o) (n' + m' + o')) :
+  scohg_to_cohg (respan_sized_graph bvassoc bvassoc scohg) =
+  cast_graph
+     (eq_sym (Nat.add_assoc (bsize n) (bsize m) (bsize o)))
+     (eq_sym (Nat.add_assoc (bsize n') (bsize m') (bsize o')))
+     (scohg_to_cohg scohg).
+Proof.
+  apply cohg_ext; [done|..];
+  cbn; rewrite vector_cast_assoc;
+  [induction scohg.(sized_inputs) as [vl vr] using bvec_node_inv|
+  induction scohg.(sized_outputs) as [vl vr] using bvec_node_inv];
+  induction vl as [vll vlr] using bvec_node_inv;
+  cbn; rewrite !vsplitl_app, !vsplitr_app; done.
+Qed.
+
+Lemma scohg_to_cohg_sized_add_top_loops {n m m'}
+  (scohg : SizedCospanHyperGraph N T (n + m) (n + m')) :
+  scohg_to_cohg (sized_add_top_loops scohg) = @add_top_loops T (bsize n) (bsize m) (bsize m') (scohg_to_cohg scohg).
+Proof.
+  revert m m' scohg;
+  induction n; intros m m' scohg.
+  - cbn.
+    rewrite IHn2, IHn1.
+    cbn.
+    rewrite add_top_loops_assoc.
+    rewrite scohg_to_cohg_reassoc_sized_graph.
+    now rewrite cast_graph_cast_graph, cast_graph_id.
+  - apply scohg_to_cohg_sized_add_top_loop.
+  - cbn.
+    destruct scohg as [ins outs].
+    induction ins as [i ins] using bvec_node_inv.
+    induction outs as [o outs] using bvec_node_inv.
+    induction i using bvec_nil_inv.
+    induction o using bvec_nil_inv.
     done.
 Qed.
 
@@ -2022,7 +2448,7 @@ Qed.
 (* Lemma kmap_fn_singleton `{FinMap K1 M1, FinMap K2 M2} (a b : ) *)
 
 (* FIXME: Move *)
-Lemma vhd_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w : 
+Lemma vhd_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w :
   vhd (vzip_with f v w) = f (vhd v) (vhd w).
 Proof.
   destruct v as [vh v] using vec_S_inv.
@@ -2030,7 +2456,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma vtl_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w : 
+Lemma vtl_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w :
   vtl (vzip_with f v w) = vzip_with f (vtl v) (vtl w).
 Proof.
   destruct v as [vh v] using vec_S_inv.
@@ -2058,23 +2484,79 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma map_relabels_r_app_pmap
+  {n n'} (v : vec (positive * positive) n) (w : vec (positive * positive) n') {A} (m : Pmap A) :
+  map_relabels_r (vmap (prod_map (subst_by_vec (propogate_subst w))
+    (subst_by_vec (propogate_subst w))) v) (map_relabels_r w m) =
+  map_relabels_r (w +++ v) m.
+Proof.
+  revert n v w m;
+  induction n'; intros n v w m.
+  - inv_all_vec_fin.
+    cbn.
+    f_equal.
+    apply vmap_id'; now intros [].
+  - cbn -[map_relabel_one].
+    induction w as [whd w] using vec_S_inv.
+    destruct whd as [whd1 whd2].
+    cbn -[map_relabel_one].
+    rewrite Vector.map_append.
+    rewrite <- IHn'.
+    f_equal.
+    rewrite Vector.map_map.
+    done.
+Qed.
+
+Lemma sized_inputs_by_cohg {n m} (scohg : SizedCospanHyperGraph N T n m) :
+  sized_inputs scohg = vec_to_bvec (scohg_to_cohg scohg).(inputs).
+Proof.
+  symmetry; apply bvec_to_vec_to_bvec.
+Qed.
+
+Lemma sized_outputs_by_cohg {n m} (scohg : SizedCospanHyperGraph N T n m) :
+  sized_outputs scohg = vec_to_bvec (scohg_to_cohg scohg).(outputs).
+Proof.
+  symmetry; apply bvec_to_vec_to_bvec.
+Qed.
 
 Lemma sized_map_sized_add_top_loops {n m m'}
   (scohg : SizedCospanHyperGraph N T (n + m) (n + m')) :
   (sized_add_top_loops scohg).(sized_map) =
-  map_relabels_r (vzip (vsplitl scohg.(outputs))
-    (vsplitl scohg.(inputs))) scohg.(sized_map).
+  map_relabels_r (vzip (bvec_to_vec scohg.(sized_outputs).1)
+    (bvec_to_vec scohg.(sized_inputs).1)) scohg.(sized_map).
 Proof.
-  induction n; [done|].
-  cbn.
-  rewrite IHn.
-  rewrite vhd_vzip_with, vtl_vzip_with.
-  rewrite 2 vhd_vsplitl.
-  rewrite 2 vtl_vsplitl.
-  cbn -[map_relabel_one].
-  rewrite 2 vsplitl_map.
-  rewrite vzip_map.
-  done.
+  revert m m' scohg;
+  induction n; intros m m' scohg.
+  - cbn.
+    rewrite IHn2, IHn1.
+    cbn.
+    destruct scohg as [ins outs hg].
+    cbn.
+    induction ins as [insl insr] using bvec_node_inv.
+    induction insl as [insll inslr] using bvec_node_inv.
+    induction outs as [outsl outsr] using bvec_node_inv.
+    induction outsl as [outsll outslr] using bvec_node_inv.
+    cbn.
+    unfold respan_sized_graph, bvassoc; cbn.
+    rewrite sized_outputs_by_cohg, sized_inputs_by_cohg, 
+      scohg_to_cohg_sized_add_top_loops, outputs_add_top_loops, inputs_add_top_loops.
+    cbn.
+    rewrite vzip_with_app.
+    rewrite <- map_relabels_r_app_pmap.
+    f_equal.
+    rewrite 2 vsplitr_app, 2 Vector.map_append, 4 vsplitl_app.
+    rewrite <- vzip_map.
+    rewrite 2 vec_to_bvec_to_vec.
+    done.
+  - cbn.
+    destruct scohg as [ins outs hg].
+    cbn.
+    induction ins as [insl insr] using bvec_node_inv.
+    induction insl as [i] using bvec_leaf_inv.
+    induction outs as [outsl outsr] using bvec_node_inv.
+    induction outsl as [o] using bvec_leaf_inv.
+    done.
+  - done.
 Qed.
 
 (*
@@ -2210,23 +2692,42 @@ Proof.
   set_solver.
 Qed. *)
 
+Lemma scohg_to_cohg_swapped_stack_sized_graphs_aux {n m n' m'}
+  (scohg : SizedCospanHyperGraph N T n m) (scohg' : SizedCospanHyperGraph N T n' m') : 
+  scohg_to_cohg (swapped_stack_sized_graphs_aux scohg scohg') = 
+  swapped_stack_graphs_aux (scohg_to_cohg scohg) (scohg_to_cohg scohg').
+Proof.
+  done.
+Qed.
 
+Lemma scohg_to_cohg_swapped_stack_sized_graphs {n m n' m'}
+  (scohg : SizedCospanHyperGraph N T n m) (scohg' : SizedCospanHyperGraph N T n' m') : 
+  scohg_to_cohg (swapped_stack_sized_graphs scohg scohg') = 
+  swapped_stack_graphs (scohg_to_cohg scohg) (scohg_to_cohg scohg').
+Proof.
+  unfold swapped_stack_sized_graphs.
+  rewrite scohg_to_cohg_swapped_stack_sized_graphs_aux,
+    2 scohg_to_cohg_relabel_sized_graph, 2 scohg_to_cohg_reindex_sized_graph.
+  done.
+Qed.
 
 Lemma compose_sized_graphs_alt_aux_correct {n m o}
   (tgl : SizedCospanHyperGraph N T n m) (tgr : SizedCospanHyperGraph N T m o) :
-  hyperedges tgl ##ₘ hyperedges tgr ->
+  hyperedges tgl.(sized_hedges) ##ₘ hyperedges tgr.(sized_hedges) ->
   sized_add_top_loops (swapped_stack_sized_graphs_aux tgl tgr) ≡ᵥ
     compose_sized_graphs_aux tgl tgr.
 Proof.
   intros Hdisj.
+  apply scohg_vert_eq_alt_cohg_vert_eq.
   split.
-  - rewrite sized_cospan_sized_add_top_loops.
-    cbn.
+  - rewrite scohg_to_cohg_sized_add_top_loops.
+    unfold compose_sized_graphs_aux.
+    rewrite cohg_to_scohg_to_cohg.
+    rewrite scohg_to_cohg_swapped_stack_sized_graphs_aux.
     now apply compose_graphs_alt_aux_correct.
   - intros v Hv.
     rewrite sized_map_sized_add_top_loops.
     cbn.
-    rewrite 2 vsplitl_app.
     done.
 Qed.
 

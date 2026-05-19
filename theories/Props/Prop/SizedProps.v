@@ -1,7 +1,6 @@
 From TensorRocq Require Export Tensor Algebra Monoid.
 From TensorRocq Require Import BW.
 
-Notation btree_size f := (btree_fold O f Nat.add).
 
 Class InterpStruct {A} (MStruct : btree A -> btree A -> Type)
   (Struct : nat -> nat -> Type) :=
@@ -155,32 +154,6 @@ Notation MCPROP := (MPRO MCartesian).
 (* FIXME: Move *)
 
 
-Global Instance btree_ret: MRet btree := λ A x, bleaf x.
-Global Instance btree_fmap : FMap btree := λ A B f,
-  fix go (b : btree A) := match b with
-  | l + r => go l + go r
-  | ! a => ! (f a)
-  | 0 => 0
-  end%btree.
-Global Instance btree_omap : OMap btree := λ A B f,
-  fix go (b : btree A) := match b with
-  | l + r => go l + go r
-  | ! a => match (f a) with Some b => ! b | None => bempty end
-  | 0 => 0
-  end%btree.
-Global Instance btree_bind : MBind btree := λ A B f,
-  fix go (b : btree A) := match b with
-  | l + r => go l + go r
-  | ! a => (f a)
-  | 0 => 0
-  end%btree.
-Global Instance btree_join: MJoin btree := λ A,
-  fix go (bs : btree (btree A)) : btree A :=
-  match bs with
-  | l + r => go l + go r
-  | ! a => a
-  | 0 => 0
-  end%btree.
 
 
 
@@ -318,7 +291,7 @@ Definition Mstruct' {A Struct T n m} (s : SMPRO Struct n m) : @MPRO A Struct T n
 Import vector.
 
 
-Fixpoint btree_velems {A} (b : btree A) : vec A (bsize_nat b) :=
+Fixpoint btree_velems {A} (b : btree A) : vec A (bsize b) :=
   match b with
   | 0 => [#]
   | !a => [# a]
@@ -328,21 +301,21 @@ Fixpoint btree_velems {A} (b : btree A) : vec A (bsize_nat b) :=
 (* Coercion btree_velems : btree >-> Vector.t. *)
 
 Fixpoint fin_btree_size_cases {A} (f : A -> nat) (b : btree A) :
-  fin (btree_size f b) -> {i : fin (bsize_nat b) & fin (f (btree_velems b !!! i))} :=
+  fin (btree_size f b) -> {i : fin (bsize b) & fin (f (btree_velems b !!! i))} :=
   match b (* as b return
-  fin (btree_size f b) -> {i : fin (bsize_nat b) & fin (f (btree_velems b !!! i))} *) with
+  fin (btree_size f b) -> {i : fin (bsize b) & fin (f (btree_velems b !!! i))} *) with
   | 0 => fin_0_inv _
   | !a => fun i => existT 0%fin i
   | l + r => fun i : fin (btree_size f l + btree_size f r) =>
     sum_rect (λ _, _)
-    ((λ '(existT i' j), existT (P:=λ i, fin (f (_ !!! i))) (Fin.L (bsize_nat r) i')
+    ((λ '(existT i' j), existT (P:=λ i, fin (f (_ !!! i))) (Fin.L (bsize r) i')
       (Fin.cast j (f_equal f (eq_sym (lookup_vapp_L (btree_velems l) (btree_velems r) i'))))) ∘ fin_btree_size_cases f l)
-    ((λ '(existT i' j), existT (P:=λ i, fin (f (_ !!! i))) (Fin.R (bsize_nat l) i')
+    ((λ '(existT i' j), existT (P:=λ i, fin (f (_ !!! i))) (Fin.R (bsize l) i')
       (Fin.cast j (f_equal f (eq_sym (lookup_vapp_R (btree_velems l) (btree_velems r) i'))))) ∘ fin_btree_size_cases f r) (fin_sum_case i)
   end%btree.
 
 Fixpoint fin_btree_size_cases_inv {A} (f : A -> nat) (b : btree A) :
-  forall (i : fin (bsize_nat b)) (j : fin (f (btree_velems b !!! i))), fin (btree_size f b) :=
+  forall (i : fin (bsize b)) (j : fin (f (btree_velems b !!! i))), fin (btree_size f b) :=
   match b with
   | 0 => fin_0_inv _
   | !a => fin_S_inv _ id (fin_0_inv _)
@@ -406,7 +379,7 @@ Proof.
   - easy.
 Qed.
 
-Lemma fin_btree_size_cases_rinv {A} (f : A -> nat) (b : btree A) (i : fin (bsize_nat b)) j :
+Lemma fin_btree_size_cases_rinv {A} (f : A -> nat) (b : btree A) (i : fin (bsize b)) j :
   fin_btree_size_cases f b (fin_btree_size_cases_inv f b i j) = existT i j.
 Proof.
   induction b.
@@ -432,7 +405,7 @@ Proof.
   - easy.
 Qed.
 
-Lemma length_btree_elems {A} (b : btree A) : length b = bsize_nat b.
+Lemma length_btree_elems {A} (b : btree A) : length b = bsize b.
 Proof.
   induction b; [|done..].
   cbn.
@@ -478,7 +451,7 @@ Proof.
 Qed.
 
 Lemma MMonoidal_eq {A} {n m : btree A} (p : MMonoidal n m) :
-  bsize_nat n = bsize_nat m.
+  bsize n = bsize m.
 Proof.
   induction p; cbn; lia.
 Qed.
@@ -522,13 +495,13 @@ Proof.
 Qed.
 
 Definition MSymmetric_perm {A} {n m : btree A} (g : MSymmetric n m) :
-  fin (bsize_nat n) -> fin (bsize_nat m) :=
+  fin (bsize n) -> fin (bsize m) :=
   match g with
   | inl m => fun i => Fin.cast i (MMonoidal_eq m)
   | inr s =>
     match s with
-    | MSwap n m => fun i => sum_rect (λ _, fin (bsize_nat m + bsize_nat n))
-      (Fin.R (bsize_nat m)) (Fin.L (bsize_nat n)) (@fin_sum_case (bsize_nat n) (bsize_nat m) i)
+    | MSwap n m => fun i => sum_rect (λ _, fin (bsize m + bsize n))
+      (Fin.R (bsize m)) (Fin.L (bsize n)) (@fin_sum_case (bsize n) (bsize m) i)
     end
   end.
 
@@ -548,16 +521,16 @@ Qed.
 
 
 Fixpoint MSymmetric_SMPRO_perm {A} {n m : btree A} (g : SMPRO MSymmetric n m) :
-  fin (bsize_nat n) -> fin (bsize_nat m) :=
+  fin (bsize n) -> fin (bsize m) :=
   match g with
   | Mid _ => id
   | Mstruct _ _ s => MSymmetric_perm s
   | Mgen _ _ m => match m with end
   | Mcompose l r => MSymmetric_SMPRO_perm r ∘ MSymmetric_SMPRO_perm l
   | Mstack l r =>
-    fun i => sum_rect (λ _, fin (bsize_nat _ + bsize_nat _))
-      (Fin.L (bsize_nat _) ∘ MSymmetric_SMPRO_perm l)
-      (Fin.R (bsize_nat _) ∘ MSymmetric_SMPRO_perm r) (@fin_sum_case (bsize_nat _) (bsize_nat _) i)
+    fun i => sum_rect (λ _, fin (bsize _ + bsize _))
+      (Fin.L (bsize _) ∘ MSymmetric_SMPRO_perm l)
+      (Fin.R (bsize _) ∘ MSymmetric_SMPRO_perm r) (@fin_sum_case (bsize _) (bsize _) i)
   end.
 
 Lemma lookup_btree_velems_MSymmetric_SMPRO_perm {A} {n m : btree A} (g : SMPRO MSymmetric n m) i :

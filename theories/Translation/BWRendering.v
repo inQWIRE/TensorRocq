@@ -80,6 +80,7 @@ Definition SR_whisker_r {A} (b : btree A) (r : StructuralRender A) : StructuralR
 
 Definition SR_compose {A} (l r : StructuralRender A) : StructuralRender A :=
   match l, r with
+  | SRid a, SRid _ => SRid a
   | SRid _, r => r
   | l, SRid _ => l
   | SRmors lm lms, SRmors rm rms => SRmors lm (lms ++ rm :: rms)
@@ -90,14 +91,56 @@ Definition SR_stack {A} (t b : StructuralRender A) : StructuralRender A :=
 
 
 Fixpoint gbpath_to_SR {A} {M : Mor (btree A)} 
-  (fM : forall n m, M n m -> StructuralRenderElement A)
+  (fM : forall n m, M n m -> StructuralRender A)
   {a b} (p : a ~>[M] b) : StructuralRender A :=
   match p with
   | @brefl _ _ a => SRid a
-  | bgen g => SRmors (0, fM _ _ g, 0) []
+  | bgen g => fM _ _ g
   | bprop t b => SR_stack (gbpath_to_SR fM t) (gbpath_to_SR fM b)
   | btrans l r => SR_compose (gbpath_to_SR fM l) (gbpath_to_SR fM r)
   end.
+
+
+Definition bmon_to_SR {A} {a b : btree A} (m : bmonoidal a b) : StructuralRender A :=
+  SRid a.
+
+Definition bsym_to_SR {A} {a b : btree A} (m : bsymmetric a b) : StructuralRender A :=
+  match m with
+  | bmonoidal_bsymmetric m => bmon_to_SR m
+  | @bsymm _ a b => SRmors (0, RenderSwap a b, 0) []
+  end.
+
+
+Definition baut_to_SR {A} {a b : btree A} (m : bautonomous a b) : StructuralRender A :=
+  match m with
+  | bsymmetric_bautonomous m => bsym_to_SR m
+  | @bcup _ a => SRmors (0, RenderCup a, 0) []
+  | @bcap _ a => SRmors (0, RenderCap a, 0) []
+  end.
+
+Definition bpath_to_SR {A} {a b : btree A} (p : a ~> b) : StructuralRender A :=
+  SRid a.
+
+Lemma bpath_to_SR_eq {A} {a b : btree A} (p : a ~> b) : 
+  bpath_to_SR p = gbpath_to_SR (λ _ _, bmon_to_SR) p.
+Proof.
+  induction p.
+  - easy.
+  - easy.
+  - cbn.
+    rewrite <- IHp1, <- IHp2.
+    easy.
+  - cbn.
+    rewrite <- IHp1, <- IHp2.
+    easy.
+Qed.
+
+Definition sbpath_to_SRE {A} {a b : btree A} (p : a ~>ₛ b) : StructuralRender A :=
+  gbpath_to_SR (λ _ _, bsym_to_SR) p.
+
+Definition abpath_to_SRE {A} {a b : btree A} (p : a ~>ₐ b) : StructuralRender A :=
+  gbpath_to_SR (λ _ _, baut_to_SR) p.
+
 
 (* Import stdpp.sorting.
 

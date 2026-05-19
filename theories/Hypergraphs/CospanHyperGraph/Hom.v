@@ -1,4 +1,4 @@
-Require Export CospanHyperGraph.Definitions CospanHyperGraph.Expr
+From TensorRocq Require Export CospanHyperGraph.Definitions CospanHyperGraph.Expr
   CospanHyperGraph.Semantics.
 
 
@@ -396,7 +396,7 @@ Lemma graph_apply_hom_norm_verts cohg :
 Proof.
   apply cohg_ext; [|done..].
   cbn.
-  rewrite isolated_vertices_graph_apply_hom.
+  rewrite vertices_graph_apply_hom.
   done.
 Qed.
 

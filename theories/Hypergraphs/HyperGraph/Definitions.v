@@ -11,7 +11,8 @@ Notation HyperEdge T := (T * list positive * list positive)%type.
 #[export] Instance HyperEdge_equiv `{Equiv T} : Equiv (HyperEdge T) :=
   prod_relation (prod_relation (≡) (=)) (=).
 
-Notation "x → t ← y" := (t, x, y). 
+Notation "x → t ← y" := (@pair (_ * list positive) (list positive) 
+  (t, x) y). 
 
 (* A [HyperGraph] representation where edges have a type [T] and the
   graph is represented as a map of positives to [HyperEdge]s

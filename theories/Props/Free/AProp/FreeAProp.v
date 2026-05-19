@@ -651,7 +651,7 @@ Lemma instantiates_holds (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig f}
   AProp_semantics $ map_aprop f rhs.
 Proof.
   intros Heq.
-  rewrite 2 (AProp_semantics_via_free f) by apply Hf.
+  rewrite 2 (AProp_semantics_via_free f).
   intros v w Hv Hw.
   refine (FSR_eval_eqg _ (SigTens_eval f) (rel_image (FSR_map nat2SR) (SigTensRel Sig)) _ _ _ _);
   [apply (instantiation_eval_helper f)|].
