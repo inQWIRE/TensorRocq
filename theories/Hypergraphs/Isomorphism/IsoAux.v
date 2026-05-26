@@ -1,140 +1,6 @@
 From stdpp Require Export pmap.
 Require Import Aux_pos Aux_relset.
 
-Lemma list_filter_bind {A B} {P : B -> Prop} `{forall b, Decision (P b)}
-  (f : A -> list B) (l : list A) :
-  filter P (l ≫= f) = l ≫= filter P ∘ f.
-Proof.
-  induction l; [done|].
-  cbn.
-  now rewrite filter_app; f_equal.
-Qed.
-
-Lemma list_bind_filter {A B} {P : A -> Prop} `{forall b, Decision (P b)}
-  (f : A -> list B) (l : list A) :
-  filter P l ≫= f = l ≫= λ a, if decide (P a) then f a else [].
-Proof.
-  induction l; [done|].
-  cbn.
-  case_decide; cbn; [f_equal|]; apply IHl.
-Qed.
-
-Lemma list_filter_to_bind {A} (P : A -> Prop) `{forall a, Decision (P a)}
-  (l : list A) : filter P l = l ≫= λ x, filter P [x].
-Proof.
-  cbn.
-  induction l; [done|].
-  cbn.
-  case_decide; cbn; f_equal; apply IHl.
-Qed.
-
-Lemma list_select_and {A} (P Q : A -> Prop) `{forall a, Decision (P a)}
-  `{forall a, Decision (Q a)} (l : list A) :
-  list_select (λ a, P a /\ Q a) l = filter (λ a_as, P a_as.1) $ list_select Q l.
-Proof.
-  unfold list_select.
-  rewrite list_filter_filter.
-  done.
-Qed.
-
-
-Lemma map_inverses_inj_l `{FinMap K1 M1, FinMap K2 M2}
-  (m1 m1' : M1 K2) (m2 : M2 K1) :
-  map_inverses m1 m2 -> map_inverses m1' m2 ->
-  m1 = m1'.
-Proof.
-  intros Hinv Hinv'.
-  apply map_eq.
-  intros k.
-  apply option_eq; intros x.
-  now rewrite (Hinv k x), (Hinv' k x).
-Qed.
-
-Lemma map_inverses_inj_r `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 m2' : M2 K1) :
-  map_inverses m1 m2 -> map_inverses m1 m2' ->
-  m2 = m2'.
-Proof.
-  intros Hinv Hinv'.
-  apply map_eq.
-  intros k.
-  apply option_eq; intros x.
-  now rewrite <- (Hinv x k), <- (Hinv' x k).
-Qed.
-
-Lemma map_inverses_delete_Some `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) k1 k2 :
-  map_inverses m1 m2 -> m1 !! k1 = Some k2 ->
-  map_inverses (delete k1 m1) (delete k2 m2).
-Proof.
-  intros Hinv Hmk1 k1' k2'.
-  destruct_decide (decide (k1' = k1)) as Hk1.
-  - subst k1'.
-    rewrite lookup_delete.
-    split; [easy|].
-    intros (Hk2 & Heq)%lookup_delete_Some.
-    contradict Hk2.
-    rewrite <- (Hinv _ _) in Heq.
-    congruence.
-  - rewrite lookup_delete_ne by done.
-    rewrite (Hinv _ _).
-    split; [|now intros []%lookup_delete_Some].
-    intros Hlook.
-    rewrite (Hinv _ _) in Hmk1.
-    now rewrite lookup_delete_ne by congruence.
-Qed.
-
-
-Lemma map_inverses_delete_None `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) k1 :
-  map_inverses m1 m2 -> m1 !! k1 = None ->
-  map_inverses (delete k1 m1) m2.
-Proof.
-  intros Hinv Hmk1.
-  now rewrite delete_notin by done.
-Qed.
-
-Lemma map_inverses_delete_case `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) k1 :
-  map_inverses m1 m2 ->
-  map_inverses (delete k1 m1) (match m1 !! k1 with
-    | None => m2
-    | Some k2 => delete k2 m2
-    end).
-Proof.
-  intros Hinv.
-  case_match eqn:Heq.
-  - now apply map_inverses_delete_Some.
-  - now apply map_inverses_delete_None.
-Qed.
-
-Lemma map_inverses_iff_perm `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) : map_inverses m1 m2 <->
-  map_to_list m1 ≡ₚ prod_swap <$> map_to_list m2.
-Proof.
-  split.
-  - intros Hinv.
-    apply NoDup_Permutation; [apply NoDup_map_to_list|
-      apply (NoDup_fmap _), NoDup_map_to_list|..].
-    intros (k1 & k2).
-    rewrite elem_of_map_to_list.
-    change (k1, k2) with (prod_swap (k2, k1)).
-    rewrite (elem_of_list_fmap_inj _).
-    rewrite elem_of_map_to_list.
-    apply Hinv.
-  - intros Heq k1 k2.
-    rewrite <- 2 elem_of_map_to_list.
-    rewrite Heq.
-    change (k1, k2) with (prod_swap (k2, k1)).
-    apply (elem_of_list_fmap_inj _).
-Qed.
-
-#[export] Instance map_inverses_dec `{FinMap K1 M1, FinMap K2 M2}
-  (m1 : M1 K2) (m2 : M2 K1) : Decision (map_inverses m1 m2).
-  refine (cast_if (decide (map_to_list m1 ≡ₚ prod_swap <$> map_to_list m2))).
-  abstract (now rewrite map_inverses_iff_perm).
-  abstract (now rewrite map_inverses_iff_perm).
-Defined.
 
 Record Piso := mk_Piso' {
   Piso_map : Pmap positive;
@@ -576,34 +442,6 @@ Proof.
 Qed.
 
 
-Lemma list_bind_mono_l {A B} (f : A -> list B) (l l' : list A) :
-  l ⊆ l' ->
-  l ≫= f ⊆ l' ≫= f.
-Proof.
-  intros Hl.
-  intros x.
-  rewrite 2 elem_of_list_bind.
-  naive_solver.
-Qed.
-
-Lemma list_bind_mono_r {A B} (f g : A -> list B) (l : list A) :
-  (forall x, x ∈ l -> f x ⊆ g x) ->
-  l ≫= f ⊆ l ≫= g.
-Proof.
-  rewrite <- Forall_forall.
-  intros Hl.
-  induction Hl; [done|cbn].
-  now apply list_subseteq_app.
-Qed.
-
-Lemma list_bind_mono {A B} (f g : A -> list B) (l l' : list A) :
-  (forall x, x ∈ l -> f x ⊆ g x) ->
-  l ⊆ l' ->
-  l ≫= f ⊆ l' ≫= g.
-Proof.
-  intros ->%list_bind_mono_r.
-  apply list_bind_mono_l.
-Qed.
 
 
 Definition extend_posmap_one k v (m : Pmap positive) : option (Pmap positive) :=
@@ -1225,68 +1063,6 @@ Proof.
 Qed.
 
 
-Lemma map_relation_kmap `{FinMap K1 M1, FinMap K2 M2}
-  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B)
-  (f : K1 -> K2) `{Hf : !Inj eq eq f} :
-  map_relation (λ _, R) (λ _, P) (λ _, Q) (kmap f m1 :> M2 A) (kmap f m2) <->
-  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
-Proof.
-  split.
-  - intros Hfeq.
-    intros i.
-    specialize (Hfeq (f i)).
-    now rewrite 2 (lookup_kmap f _) in Hfeq.
-  - intros Heq.
-    intros i.
-    destruct (kmap f m1 !! i) as [fm1i|] eqn:Hfm1i;
-    [|destruct (kmap f m2 !! i) as [fm2i|] eqn:Hfm2i].
-    + apply (lookup_kmap_Some _) in Hfm1i as Hj.
-      destruct Hj as (j & -> & Hm1j).
-      rewrite (lookup_kmap _).
-      rewrite <- Hm1j.
-      apply Heq.
-    + apply (lookup_kmap_Some _) in Hfm2i as Hj.
-      destruct Hj as (j & -> & Hm2j).
-      rewrite <- Hfm1i, <- Hm2j.
-      rewrite (lookup_kmap _).
-      apply Heq.
-    + done.
-Qed.
-
-
-Lemma exists_kmap_map_relation_iff `{FinMap K1 M1, FinMap K2 M2}
-  `{!Countable K1, Infinite K2}
-  {A B} (R : A -> B -> Prop) P Q (m1 : M1 A) (m2 : M1 B) :
-  (exists (f : K1 -> K2), Inj eq eq f /\
-  map_relation (λ _, R) (λ _, P) (λ _, Q)
-    (kmap f m1 :> M2 A) (kmap f m2)) <->
-  map_relation (λ _, R) (λ _, P) (λ _, Q) m1 m2.
-Proof.
-  split.
-  - now intros (? & ? & ?%map_relation_kmap).
-  - intros Hrel.
-    destruct (partial_injection_extension []
-      ((infinite_injection ∘ Pos.to_nat ∘ encode) :> K1 -> K2))
-    as (f & Hf & _); [easy|].
-    exists f.
-    split; [done|].
-    now apply map_relation_kmap.
-Qed.
-
-Lemma map_inj_list_to_map `{FinMap K M} {A} (l : list (K * A)) :
-  NoDup l.*1 -> NoDup l.*2 ->
-  map_inj (list_to_map l :> M A).
-Proof.
-  intros Hks Hvs.
-  intros k k' v.
-  rewrite <- 2 elem_of_list_to_map by done.
-  intros (i & Hi)%elem_of_list_lookup (j & Hj)%elem_of_list_lookup.
-  specialize (NoDup_lookup _ i j v Hvs) as Hij.
-  rewrite 2 list_lookup_fmap, Hi, Hj in Hij.
-  destruct Hij as []; [done..|congruence].
-Qed.
-
-
 
 
 
@@ -1297,42 +1073,25 @@ Qed.
 
 Export SetoidList SetoidPermutation list.
 
-Lemma PermutationA_flip `(R : relation A) l l' :
-  PermutationA (flip R) l l' <-> PermutationA R l' l.
+(* FIXME: Move *)
+#[export] Instance vapp_inj2 {A n m} : Inj2 eq eq eq (@Vector.append A n m).
 Proof.
-  split.
-  - intros Heq.
-    induction Heq; eauto using PermutationA.
-  - intros Heq.
-    induction Heq; eauto using PermutationA.
-Qed.
-
-Add Parametric Morphism {A} : (@PermutationA A) with signature
-  subseteq ==> subseteq as PermutationA_subseteq.
-Proof.
-  intros R R' HR%relation_subseteq_iff.
-  apply relation_subseteq_iff.
-  intros l l' Hl.
-  induction Hl; eauto using PermutationA.
-Qed.
-
-Add Parametric Morphism {A} : (@PermutationA A) with signature
-  equiv ==> equiv as PermutationA_equiv.
-Proof.
-  intros R R' HR.
-  apply set_subseteq_antisymm; apply PermutationA_subseteq; firstorder.
-Qed.
-
-Lemma PermutationA_length `(R : relation A) l l' :
-  PermutationA R l l' -> length l = length l'.
-Proof.
+  intros vl wl vr wr.
   intros Heq.
-  induction Heq; cbn; congruence.
+  apply (f_equal vsplitl) in Heq as Hl.
+  apply (f_equal vsplitr) in Heq.
+  rewrite 2 vsplitr_app in Heq.
+  rewrite 2 vsplitl_app in Hl.
+  done.
 Qed.
 
-Lemma PermutationA_nil `(R : relation A) l :
-  PermutationA R [] l -> l = [].
+Lemma pupdates_correct_fmap (ks vs : list positive) m m' :
+  length ks = length vs ->
+  pupdates (zip ks vs) m = Some m' ->
+  (m'.(Piso_map) !!.) <$> ks = Some <$> vs.
 Proof.
-  intros Heq%PermutationA_length.
-  now destruct l.
+  intros Hlen Hm'%pupdates_correct.
+  rewrite Forall_zip_with in Hm' by done.
+  apply list_eq_Forall2, Forall2_fmap.
+  done.
 Qed.

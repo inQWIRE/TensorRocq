@@ -758,3 +758,23 @@ Proof.
   reflexivity.
 Qed.
 
+
+
+Import SetoidList SetoidPermutation list Aux_stdpp.
+
+
+Add Parametric Morphism {A} : (@PermutationA A) with signature
+  subseteq ==> subseteq as PermutationA_subseteq.
+Proof.
+  intros R R' HR%relation_subseteq_iff.
+  apply relation_subseteq_iff.
+  intros l l' Hl.
+  induction Hl; eauto using PermutationA.
+Qed.
+
+Add Parametric Morphism {A} : (@PermutationA A) with signature
+  equiv ==> equiv as PermutationA_equiv.
+Proof.
+  intros R R' HR.
+  apply set_subseteq_antisymm; apply PermutationA_subseteq; firstorder.
+Qed.
