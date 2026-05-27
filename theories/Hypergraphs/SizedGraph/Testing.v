@@ -1092,7 +1092,7 @@ Qed.
 
 End init.
 
-Context `{EqDecision N}.
+Context {N : Type} `{EqDecision N}.
 
 
 Definition sized_graph_isos {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
@@ -1462,21 +1462,6 @@ Definition weak_sized_graph_monos {i j n m} (subscohg : SizedCospanHyperGraph N 
         scohg.(hedges).(hyperedges) (∅, (@empty _ WSPiso_empty)).
 
 
-
-End dec_equiv.
-
-
-
-
-
-
-
-
-Section dec_equiv.
-
-Context `{Equiv T, !RelDecision (≡@{T})}.
-
-
 Section nth_mono_init.
 
 Context (R : relation positive) `{Hmrel : !RelDecision R}.
@@ -1630,3 +1615,4 @@ Definition nth_weak_sized_graph_monos {i j n m} (subscohg : SizedCospanHyperGrap
     nth_weak_sized_hyperedge_map_monos_extending _ n subscohg.(hedges).(hyperedges)
         scohg.(hedges).(hyperedges) (∅, (@empty _ WSPiso_empty)).
 
+End dec_equiv.

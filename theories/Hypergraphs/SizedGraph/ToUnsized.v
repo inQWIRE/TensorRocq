@@ -3885,7 +3885,7 @@ Proof.
 Qed.
 
 
-From TensorRocq Require Import IsoAux.
+From TensorRocq Require Import Isomorphism.IsoAux.
 
 Lemma isomorphic_id_graph_of_empty_NoDup {T n}
   (cohg : CospanHyperGraph T n n) :

@@ -1,5 +1,6 @@
 From TensorRocq Require Export MProp.
 From TensorRocq Require Import AbstractTensorQuote. (* FIXME: Factor IsNth stuff out of here *)
+From TensorRocq Require Export SizedGraph.IsoAux.
 From TensorRocq Require Export FreeAProp SizedGraph.ToUnsized
   SizedGraph.Testing SizedGraphTerm.
 From TensorRocq Require Export BW.
@@ -720,7 +721,7 @@ Definition sized_graph_rewrite_helper {N}
   {i j} (GLHS : SizedCospanHyperGraph N T i j) (match_number : nat) :
   option {k & (SizedCospanHyperGraph N T n (k + i) *
     SizedCospanHyperGraph N T (k + j) m)%type} :=
-  match prod_map Piso_map Piso_map <$> (sized_graph_monos GLHS GTarg !! match_number) with
+  match prod_map Piso_map SPiso_map <$> (sized_graph_monos GLHS GTarg !! match_number) with
   | None => None
   | Some mhe_mv =>
     Some $

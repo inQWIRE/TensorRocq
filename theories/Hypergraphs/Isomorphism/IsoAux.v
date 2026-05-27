@@ -1032,6 +1032,57 @@ Proof.
 Qed.
 
 
+
+
+
+
+Fixpoint list_nth_bind {A B} (f : nat -> A -> B + nat)
+  (n : nat) (l : list A) : B + nat :=
+  match l with
+  | [] => inr n
+  | x :: l =>
+    match f n x with
+    | inl b => inl b
+    | inr n' =>
+      list_nth_bind f n' l
+    end
+  end.
+
+Lemma list_nth_bind_eq_nth {A B} (f : A -> list B) n l :
+  list_nth_bind (fun n a => from_option inl (inr (n - length (f a))) (f a !! n)) n l =
+  from_option inl (inr (n - length (l ≫= f))) ((l ≫= f) !! n).
+Proof.
+  revert n; induction l; intros n;
+  [cbn; now rewrite Nat.sub_0_r|].
+  cbn.
+  rewrite lookup_app.
+  destruct (f a !! n); [done|cbn].
+  rewrite IHl.
+  do 2 f_equal.
+  rewrite length_app.
+  lia.
+Qed.
+
+Lemma list_nth_bind_ext {A B} (f g : nat -> A -> B + nat) n l :
+  (forall n x, x ∈ l -> f n x = g n x) ->
+  list_nth_bind f n l = list_nth_bind g n l.
+Proof.
+  intros Hl'.
+  assert (Hl : Forall (fun x => forall n, f n x = g n x) l) by
+    (rewrite Forall_forall; naive_solver).
+  clear Hl'.
+  revert n;
+  induction Hl as [|x l Hx Hl IHl]; [done|]; intros n.
+  cbn.
+  rewrite <- Hx.
+  case_match; [done|].
+  auto.
+Qed.
+
+
+
+
+
 Lemma map_inj_subseteq `{FinMap K M} {A} (m m' : M A) :
   m ⊆ m' -> map_inj m' -> map_inj m.
 Proof.
