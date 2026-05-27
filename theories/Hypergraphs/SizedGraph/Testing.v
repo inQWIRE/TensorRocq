@@ -1,4 +1,5 @@
-From TensorRocq Require Import Isomorphism.Testing Isomorphism.IsoAux SizedGraph.Definitions.
+From TensorRocq Require Import Isomorphism.Testing Isomorphism.IsoAux
+  SizedGraph.Definitions SizedGraph.IsoAux.
 
 Definition restrict_map `{ElemOf K SK, !RelDecision (∈@{SK}), Filter (K * A) MA}
   (d : SK) (m : MA) : MA :=
@@ -949,7 +950,7 @@ Proof.
         }
         rewrite <- Heq.
         cbn.
-        rewrite (referenced_vertices_hg_reindex_hg _), 
+        rewrite (referenced_vertices_hg_reindex_hg _),
         referenced_vertices_hg_relabel_hg.
         done.
     - done.
@@ -1013,9 +1014,14 @@ Section dec_equiv.
 
 Context `{Equiv T, !RelDecision (≡@{T})}.
 
-Fixpoint hyperedge_map_isos_extending_aux
+
+Section init.
+
+Context (R : relation positive) `{Hmrel : !RelDecision R}.
+
+Fixpoint sized_hyperedge_map_isos_extending_aux
   (hg hg' : list (HyperEdge T))
-  (mv : Piso) : list Piso :=
+  (mv : SPiso R) : list (SPiso R) :=
   match hg with
   | [] => match hg' with | [] => [mv] | _::_ => [] end
   | (t, ins, outs) :: hg =>
@@ -1023,90 +1029,104 @@ Fixpoint hyperedge_map_isos_extending_aux
       length (tio.1.2) = length ins /\
       length (tio.2) = length outs) hg' ≫= λ '(tio, hg'rest),
       default [] (
-        mv' ← pupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
-        Some (hyperedge_map_isos_extending_aux hg hg'rest
+        mv' ← spupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
+        Some (sized_hyperedge_map_isos_extending_aux hg hg'rest
          mv'))
   end.
 
-Definition hyperedge_map_isos_extending
-  (hg hg' : Pmap (HyperEdge T)) (mv : Piso) : list Piso :=
-  hyperedge_map_isos_extending_aux (map_to_list hg).*2 (map_to_list hg').*2 mv.
+Definition sized_hyperedge_map_isos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mv : SPiso R) : list (SPiso R) :=
+  sized_hyperedge_map_isos_extending_aux (map_to_list hg).*2 (map_to_list hg').*2 mv.
 
-Definition graph_isos {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  list Piso :=
-  if decide (size (isolated_vertices cohg) = size (isolated_vertices cohg')) then
+Lemma sized_hyperedge_map_isos_extending_aux_correct `{Equivalence T equiv}
+  (hg hg' : list (HyperEdge T)) (mv : SPiso R) :
+  SPiso_Piso <$> sized_hyperedge_map_isos_extending_aux hg hg' mv ⊆
+  hyperedge_map_isos_extending_aux hg hg' mv.
+Proof.
+  revert hg' mv; induction hg as [|[[t i] o] hg IHhg];
+    intros hg' mv; [cbn; destruct hg'; done|].
+  cbn.
+  rewrite list_bind_fmap.
+  apply list_bind_mono, reflexivity.
+  intros (tio, hg'rest) _.
+  destruct (spupdates _ _) as [mv'|] eqn:Hmv'; [|easy].
+  cbn.
+  rewrite IHhg.
+  apply spupdates_correct in Hmv' as ->.
+  done.
+Qed.
+
+
+Lemma sized_hyperedge_map_isos_extending_aux_correct' `{Equivalence T equiv}
+  (hg hg' : list (HyperEdge T)) (mv : SPiso R) :
+  Forall (λ mv', mv.(SPiso_map) ⊆ mv'.(SPiso_map) /\
+    is_edges_iso mv'.(SPiso_map) hg hg')
+    (sized_hyperedge_map_isos_extending_aux hg hg' mv).
+Proof.
+  rewrite Forall_forall.
+  intros mv' Hmv'%(elem_of_list_fmap_1 SPiso_Piso)%sized_hyperedge_map_isos_extending_aux_correct.
+  pose proof (hyperedge_map_isos_extending_aux_correct hg hg' mv) as Hall.
+  rewrite Forall_forall in Hall.
+  now apply Hall in Hmv'.
+Qed.
+
+Lemma sized_hyperedge_map_isos_extending_correct `{Equivalence T equiv}
+  (hg hg' : Pmap (HyperEdge T)) (mv : SPiso R) :
+  SPiso_Piso <$> sized_hyperedge_map_isos_extending hg hg' mv ⊆
+  hyperedge_map_isos_extending hg hg' mv.
+Proof.
+  apply sized_hyperedge_map_isos_extending_aux_correct.
+Qed.
+
+Lemma sized_hyperedge_map_isos_extending_correct' `{Equivalence T equiv}
+  (hg hg' : Pmap (HyperEdge T)) (mv : SPiso R) :
+  Forall (λ mv', mv.(SPiso_map) ⊆ mv'.(SPiso_map) /\ is_edges_iso mv'.(SPiso_map)
+    (map_to_list hg).*2 (map_to_list hg').*2)
+    (sized_hyperedge_map_isos_extending hg hg' mv).
+Proof.
+  apply sized_hyperedge_map_isos_extending_aux_correct'.
+Qed.
+
+
+
+
+End init.
+
+Context `{EqDecision N}.
+
+
+Definition sized_graph_isos {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  list (@SPiso (λ k v, scohg.(sized_map) !! k = scohg'.(sized_map) !! v)
+    (fun k v => decide_rel eq _ _)) :=
+  if decide ((scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ≡ₚ
+    (scohg'.(sized_map) !!.) <$> elements (isolated_vertices scohg')) then
     default []
-      (mv ← pupdates (zip (cohg.(inputs) ++ cohg.(outputs))
-        (cohg'.(inputs) ++ cohg'.(outputs))) ∅;
+      (mv ← spupdates (zip (scohg.(inputs) ++ scohg.(outputs))
+        (scohg'.(inputs) ++ scohg'.(outputs))) (@empty _ SPiso_empty);
       Some
-      (hyperedge_map_isos_extending cohg.(hedges).(hyperedges)
-        cohg'.(hedges).(hyperedges) mv))
+      (sized_hyperedge_map_isos_extending _ scohg.(hedges).(hyperedges)
+        scohg'.(hedges).(hyperedges) mv))
   else
     [].
 
 
-Lemma hyperedge_map_isos_extending_aux_correct `{Equivalence T equiv}
-  (hg hg' : list (HyperEdge T)) (mv : Piso) :
-  Forall (λ mv', mv.(Piso_map) ⊆ mv'.(Piso_map) /\ is_edges_iso mv'.(Piso_map) hg hg')
-    (hyperedge_map_isos_extending_aux hg hg' mv).
+
+Lemma sized_graph_isos_correct_aux `{Equivalence T equiv} {n m}
+  (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  Forall (λ mv : SPiso _,
+    (scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ≡ₚ
+    (scohg'.(sized_map) !!.) <$> elements (isolated_vertices scohg') /\
+    is_edges_iso mv (map_to_list scohg.(hedges).(hyperedges)).*2
+      (map_to_list scohg'.(hedges).(hyperedges)).*2 /\
+    (mv.(SPiso_map) !!.) <$> (inputs scohg ++ outputs scohg) =
+    Some <$> (inputs scohg' ++ outputs scohg'))
+  (sized_graph_isos scohg scohg').
 Proof.
-  revert hg' mv; induction hg as [|[[t i] o] hg IHhg];
-    intros hg' mv; [cbn;
-    destruct hg'; [|done]; do 2 constructor; [done|constructor]|].
-  cbn.
-  rewrite Forall_bind.
-  rewrite Forall_forall.
-  intros [tio' hg''] ((Ht & Hi & Ho) & Hhg')%elem_of_list_select_perm_Prop.
-  cbn.
-  destruct (pupdates (zip (i ++ o) _) mv)
-    as [mv'|] eqn:Hmv'; [|now constructor].
-  cbn.
-
-  eapply Forall_impl; [apply IHhg|].
-  cbn.
-  intros mv'' [Hmv'mv'' Hmv''].
-  rewrite Hhg'.
-  split.
-  - apply pupdates_correct_extends in Hmv'.
-    now transitivity mv'.
-  - destruct tio' as [[t' i'] o'].
-    apply pupdates_correct_fmap in Hmv' as Hio; [|rewrite 2 length_app; now f_equal].
-    cbn in *.
-    rewrite 2 fmap_app in Hio.
-    apply app_inj_len_l in Hio as [Hmv'i Hmv'o]; [|now rewrite 2 length_fmap].
-
-    apply is_edges_iso_cons.
-    + done.
-    + done.
-    + revert Hmv'i; now apply fmap_lookup_weaken.
-    + revert Hmv'o; now apply fmap_lookup_weaken.
-Qed.
-
-
-Lemma hyperedge_map_isos_extending_correct `{Equivalence T equiv}
-  (hg hg' : Pmap (HyperEdge T)) (mv : Piso) :
-  Forall (λ mv', mv.(Piso_map) ⊆ mv'.(Piso_map) /\ is_edges_iso mv'.(Piso_map)
-    (map_to_list hg).*2 (map_to_list hg').*2)
-    (hyperedge_map_isos_extending hg hg' mv).
-Proof.
-  apply hyperedge_map_isos_extending_aux_correct.
-Qed.
-
-Lemma graph_isos_correct_aux `{Equivalence T equiv} {n m}
-  (cohg cohg' : CospanHyperGraph T n m) :
-  Forall (λ mv : Piso,
-    size (isolated_vertices cohg) = size (isolated_vertices cohg') /\
-    is_edges_iso mv (map_to_list cohg.(hedges).(hyperedges)).*2
-      (map_to_list cohg'.(hedges).(hyperedges)).*2 /\
-    (mv.(Piso_map) !!.) <$> (inputs cohg ++ outputs cohg) =
-    Some <$> (inputs cohg' ++ outputs cohg'))
-  (graph_isos cohg cohg').
-Proof.
-  unfold graph_isos.
+  unfold sized_graph_isos.
   case_decide; [|constructor].
-  destruct (pupdates _ ∅) as [mio|] eqn:Hmio; [|done].
+  destruct (spupdates _ ∅) as [mio|] eqn:Hmio; [|done].
   cbn.
-  eapply Forall_impl; [apply hyperedge_map_isos_extending_correct|].
+  eapply Forall_impl; [apply (sized_hyperedge_map_isos_extending_correct' _)|].
   cbn.
   intros mv'.
   intros (Hmiomv' & Hiso).
@@ -1115,58 +1135,64 @@ Proof.
   apply (fmap_lookup_weaken mio.(Piso_map)); [done|].
   apply pupdates_correct_fmap with ∅.
   - now rewrite 2 length_app, 4 length_vec_to_list.
-  - done.
+  - now apply spupdates_correct in Hmio.
 Qed.
 
 
-Lemma graph_isos_correct `{Equivalence T equiv} {n m}
-  (cohg cohg' : CospanHyperGraph T n m) :
-  Forall (λ _, cohg ≡ₛ cohg')
-    (graph_isos cohg cohg').
+Lemma sized_graph_isos_correct `{Equivalence T equiv} {n m}
+  (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  Forall (λ _, scohg ≡ₛ scohg')
+    (sized_graph_isos scohg scohg').
 Proof.
-  eapply Forall_impl; [apply graph_isos_correct_aux|].
+  eapply Forall_impl; [apply sized_graph_isos_correct_aux|].
   cbn.
   intros mv (Hsize & Hiso & Hio).
-  apply cohg_syntactic_eq_of_is_edges_iso_isolated_vertices with mv; try done.
-  apply Piso_map_inj.
+  apply scohg_syntactic_eq_of_is_edges_iso_isolated_vertices with mv; try done.
+  - apply SPiso_map_inj.
+  - apply SPiso_prop.
 Qed.
 
-Lemma graph_isos_test `{Equivalence T equiv}
-  {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  match graph_isos cohg cohg' with
+Lemma sized_graph_isos_test `{Equivalence T equiv}
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  match sized_graph_isos scohg scohg' with
   | [] => False
   | _ :: _ => True
-  end -> cohg ≡ₛ cohg'.
+  end -> scohg ≡ₛ scohg'.
 Proof.
-  pose proof (graph_isos_correct cohg cohg') as Hcorr.
-  destruct (graph_isos _ _); [done|].
+  pose proof (sized_graph_isos_correct scohg scohg') as Hcorr.
+  destruct (sized_graph_isos _ _); [done|].
   rewrite Forall_cons in Hcorr.
   easy.
 Qed.
 
-Definition graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
-  match graph_isos cohg cohg' with
+Definition sized_graph_iso_partial_test {n m} 
+  (scohg scohg' : SizedCospanHyperGraph N T n m) : bool :=
+  match sized_graph_isos scohg scohg' with
   | [] => false
   | _ :: _ => true
   end.
 
-Lemma graph_iso_partial_test_correct `{Equivalence T equiv}
-  {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  graph_iso_partial_test cohg cohg' = true ->
-  cohg ≡ₛ cohg'.
+Lemma sized_graph_iso_partial_test_correct `{Equivalence T equiv}
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  sized_graph_iso_partial_test scohg scohg' = true ->
+  scohg ≡ₛ scohg'.
 Proof.
   intros Heq.
-  apply graph_isos_test.
+  apply sized_graph_isos_test.
   revert Heq.
-  unfold graph_iso_partial_test.
+  unfold sized_graph_iso_partial_test.
   now case_match.
 Qed.
 
 
 
-Fixpoint weak_hyperedge_map_isos_extending_aux
+Section weak_init.
+
+Context (R : relation positive) `{Hmrel : !RelDecision R}.
+
+Fixpoint weak_sized_hyperedge_map_isos_extending_aux
   (hg hg' : list (HyperEdge T))
-  (mv : WPiso) : list WPiso :=
+  (mv : WSPiso R) : list (WSPiso R) :=
   match hg with
   | [] => match hg' with | [] => [mv] | _::_ => [] end
   | (t, ins, outs) :: hg =>
@@ -1174,30 +1200,19 @@ Fixpoint weak_hyperedge_map_isos_extending_aux
       length (tio.1.2) = length ins /\
       length (tio.2) = length outs) hg' ≫= λ '(tio, hg'rest),
       default [] (
-        mv' ← wpupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
-        Some (weak_hyperedge_map_isos_extending_aux hg hg'rest
+        mv' ← wspupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
+        Some (weak_sized_hyperedge_map_isos_extending_aux hg hg'rest
          mv'))
   end.
 
-Definition weak_hyperedge_map_isos_extending
-  (hg hg' : Pmap (HyperEdge T)) (mv : WPiso) : list WPiso :=
-  weak_hyperedge_map_isos_extending_aux (map_to_list hg).*2 (map_to_list hg').*2 mv.
+Definition weak_sized_hyperedge_map_isos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mv : WSPiso R) : list (WSPiso R) :=
+  weak_sized_hyperedge_map_isos_extending_aux (map_to_list hg).*2 (map_to_list hg').*2 mv.
 
-Definition weak_graph_isos {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  list WPiso :=
-  if decide (size (isolated_vertices cohg) = size (isolated_vertices cohg')) then
-    default []
-      (mv ← wpupdates (zip (cohg.(inputs) ++ cohg.(outputs))
-        (cohg'.(inputs) ++ cohg'.(outputs))) ∅;
-      Some
-      (weak_hyperedge_map_isos_extending cohg.(hedges).(hyperedges)
-        cohg'.(hedges).(hyperedges) mv))
-  else
-    [].
 
-Lemma weak_hyperedge_map_isos_extending_aux_correct hg hg' (mv : Piso) :
-  weak_hyperedge_map_isos_extending_aux hg hg' (Piso_to_weak mv) =
-  Piso_to_weak <$> hyperedge_map_isos_extending_aux hg hg' mv.
+Lemma weak_sized_hyperedge_map_isos_extending_aux_correct hg hg' (mv : SPiso R) :
+  weak_sized_hyperedge_map_isos_extending_aux hg hg' (SPiso_to_weak mv) =
+  SPiso_to_weak <$> sized_hyperedge_map_isos_extending_aux R hg hg' mv.
 Proof.
   revert hg' mv; induction hg as [|[[t i] o] hg IHhg]; intros hg' mv;
   [destruct hg'; done|].
@@ -1205,86 +1220,47 @@ Proof.
   rewrite list_bind_fmap.
   apply list_bind_ext, reflexivity.
   intros [[[]] ?].
-  rewrite wpupdates_correct.
+  rewrite wspupdates_correct.
   rewrite option_fmap_bind.
   cbn.
-  destruct (pupdates _ mv); [|done].
+  destruct (spupdates _ mv); [|done].
   cbn.
   apply IHhg.
 Qed.
 
-Lemma weak_hyperedge_map_isos_extending_correct hg hg' (mv : Piso) :
-  weak_hyperedge_map_isos_extending hg hg' (Piso_to_weak mv) =
-  Piso_to_weak <$> hyperedge_map_isos_extending hg hg' mv.
+Lemma weak_sized_hyperedge_map_isos_extending_correct hg hg' (mv : SPiso R) :
+  weak_sized_hyperedge_map_isos_extending hg hg' (SPiso_to_weak mv) =
+  SPiso_to_weak <$> sized_hyperedge_map_isos_extending R hg hg' mv.
 Proof.
-  apply weak_hyperedge_map_isos_extending_aux_correct.
-Qed.
-
-Lemma weak_graph_isos_correct {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  weak_graph_isos cohg cohg' = Piso_to_weak <$> graph_isos cohg cohg'.
-Proof.
-  unfold weak_graph_isos, graph_isos.
-  case_decide; [|done].
-  rewrite WPiso_empty_correct, wpupdates_correct.
-  destruct (pupdates _ _); [|done].
-  cbn.
-  apply weak_hyperedge_map_isos_extending_correct.
-Qed.
-
-Definition weak_graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
-  match weak_graph_isos cohg cohg' with
-  | [] => false
-  | _ :: _ => true
-  end.
-
-Lemma weak_graph_iso_partial_test_correct `{Equivalence T equiv}
-  {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  weak_graph_iso_partial_test cohg cohg' = true ->
-  cohg ≡ₛ cohg'.
-Proof.
-  intros Heq.
-  apply (graph_iso_partial_test_correct cohg cohg').
-  revert Heq.
-  unfold weak_graph_iso_partial_test, graph_iso_partial_test.
-  rewrite weak_graph_isos_correct.
-  now destruct (graph_isos _ _).
+  apply weak_sized_hyperedge_map_isos_extending_aux_correct.
 Qed.
 
 
-Fixpoint opt_weak_hyperedge_map_isos_extending_aux
+Fixpoint opt_weak_sized_hyperedge_map_isos_extending_aux
   (hg hg' : list (HyperEdge T))
-  (mv : WPiso) : option WPiso :=
+  (mv : WSPiso R) : option (WSPiso R) :=
   match hg with
   | [] => match hg' with | [] => Some mv | _::_ => None end
   | (t, ins, outs) :: hg =>
     list_first_omap
     (λ '(tio, hg'rest),
-        mv' ← wpupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
-        opt_weak_hyperedge_map_isos_extending_aux hg hg'rest
+        mv' ← wspupdates (zip (ins ++ outs) (tio.1.2 ++ tio.2)) mv;
+        opt_weak_sized_hyperedge_map_isos_extending_aux hg hg'rest
          mv')
     (list_select (λ tio, t ≡ tio.1.1 /\
       length (tio.1.2) = length ins /\
       length (tio.2) = length outs) hg')
   end.
 
-Definition opt_weak_hyperedge_map_isos_extending
-  (hg hg' : Pmap (HyperEdge T)) (mv : WPiso) : option WPiso :=
-  opt_weak_hyperedge_map_isos_extending_aux (map_to_list hg).*2 (map_to_list hg').*2 mv.
-
-Definition opt_weak_graph_iso {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  option WPiso :=
-  if decide (size (isolated_vertices cohg) = size (isolated_vertices cohg')) then
-    mv ← wpupdates (zip (cohg.(inputs) ++ cohg.(outputs))
-        (cohg'.(inputs) ++ cohg'.(outputs))) ∅;
-    opt_weak_hyperedge_map_isos_extending cohg.(hedges).(hyperedges)
-        cohg'.(hedges).(hyperedges) mv
-  else
-    None.
+Definition opt_weak_sized_hyperedge_map_isos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mv : WSPiso R) : option (WSPiso R) :=
+  opt_weak_sized_hyperedge_map_isos_extending_aux 
+    (map_to_list hg).*2 (map_to_list hg').*2 mv.
 
 
-Lemma opt_weak_hyperedge_map_isos_extending_aux_correct hg hg' mv :
-  opt_weak_hyperedge_map_isos_extending_aux hg hg' mv =
-  head (weak_hyperedge_map_isos_extending_aux hg hg' mv).
+Lemma opt_weak_sized_hyperedge_map_isos_extending_aux_correct hg hg' mv :
+  opt_weak_sized_hyperedge_map_isos_extending_aux hg hg' mv =
+  head (weak_sized_hyperedge_map_isos_extending_aux hg hg' mv).
 Proof.
   revert hg' mv; induction hg as [|[[t i] o] hg IHhg]; intros hg' mv;
   [destruct hg'; done|].
@@ -1296,53 +1272,122 @@ Proof.
   apply list_bind_ext, reflexivity.
   intros [[[]] ?].
   cbn.
-  destruct (wpupdates _ mv); [|done].
+  destruct (wspupdates _ mv); [|done].
   cbn.
   rewrite IHhg.
   done.
 Qed.
 
-Lemma opt_weak_hyperedge_map_isos_extending_correct hg hg' mv :
-  opt_weak_hyperedge_map_isos_extending hg hg' mv =
-  head (weak_hyperedge_map_isos_extending hg hg' mv).
+Lemma opt_weak_sized_hyperedge_map_isos_extending_correct hg hg' mv :
+  opt_weak_sized_hyperedge_map_isos_extending hg hg' mv =
+  head (weak_sized_hyperedge_map_isos_extending hg hg' mv).
 Proof.
-  apply opt_weak_hyperedge_map_isos_extending_aux_correct.
+  apply opt_weak_sized_hyperedge_map_isos_extending_aux_correct.
 Qed.
 
-Lemma opt_weak_graph_iso_correct {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  opt_weak_graph_iso cohg cohg' = head (weak_graph_isos cohg cohg').
+End weak_init.
+
+
+Definition weak_sized_graph_isos {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  list (@WSPiso (λ k v, scohg.(sized_map) !! k = scohg'.(sized_map) !! v)
+    (fun k v => decide_rel eq _ _)) :=
+  if decide ((scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ≡ₚ
+    (scohg'.(sized_map) !!.) <$> elements (isolated_vertices scohg')) then
+    default []
+      (mv ← wspupdates (zip (scohg.(inputs) ++ scohg.(outputs))
+        (scohg'.(inputs) ++ scohg'.(outputs))) (@empty _ WSPiso_empty);
+      Some
+      (weak_sized_hyperedge_map_isos_extending _ scohg.(hedges).(hyperedges)
+        scohg'.(hedges).(hyperedges) mv))
+  else
+    [].
+
+
+Lemma weak_sized_graph_isos_correct {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  weak_sized_graph_isos scohg scohg' = SPiso_to_weak <$> sized_graph_isos scohg scohg'.
 Proof.
-  unfold weak_graph_isos, opt_weak_graph_iso.
+  unfold weak_sized_graph_isos, sized_graph_isos.
   case_decide; [|done].
-  destruct (wpupdates _ _); [|done].
+  rewrite WSPiso_empty_correct, wspupdates_correct.
+  destruct (spupdates _ _); [|done].
   cbn.
-  apply opt_weak_hyperedge_map_isos_extending_correct.
+  apply weak_sized_hyperedge_map_isos_extending_correct.
 Qed.
 
-Definition opt_weak_graph_iso_partial_test {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
-  match opt_weak_graph_iso cohg cohg' with
+Definition weak_sized_graph_iso_partial_test {n m} 
+  (scohg scohg' : SizedCospanHyperGraph N T n m) : bool :=
+  match weak_sized_graph_isos scohg scohg' with
+  | [] => false
+  | _ :: _ => true
+  end.
+
+Lemma weak_sized_graph_iso_partial_test_correct `{Equivalence T equiv}
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  weak_sized_graph_iso_partial_test scohg scohg' = true ->
+  scohg ≡ₛ scohg'.
+Proof.
+  intros Heq.
+  apply (sized_graph_iso_partial_test_correct scohg scohg').
+  revert Heq.
+  unfold weak_sized_graph_iso_partial_test, sized_graph_iso_partial_test.
+  rewrite weak_sized_graph_isos_correct.
+  now destruct (sized_graph_isos _ _).
+Qed.
+
+
+Definition opt_weak_sized_graph_iso {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  option (@WSPiso (λ k v, scohg.(sized_map) !! k = scohg'.(sized_map) !! v)
+    (fun k v => decide_rel eq _ _)) :=
+  if decide ((scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ≡ₚ
+    (scohg'.(sized_map) !!.) <$> elements (isolated_vertices scohg')) then
+    mv ← wspupdates (zip (scohg.(inputs) ++ scohg.(outputs))
+      (scohg'.(inputs) ++ scohg'.(outputs))) (@empty _ WSPiso_empty);
+    opt_weak_sized_hyperedge_map_isos_extending _ scohg.(hedges).(hyperedges)
+        scohg'.(hedges).(hyperedges) mv
+  else
+    None.
+
+
+Lemma opt_weak_sized_graph_iso_correct {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  opt_weak_sized_graph_iso scohg scohg' = head (weak_sized_graph_isos scohg scohg').
+Proof.
+  unfold weak_sized_graph_isos, opt_weak_sized_graph_iso.
+  case_decide; [|done].
+  destruct (wspupdates _ _); [|done].
+  cbn.
+  apply opt_weak_sized_hyperedge_map_isos_extending_correct.
+Qed.
+
+Definition opt_weak_sized_graph_iso_partial_test {n m} 
+  (scohg scohg' : SizedCospanHyperGraph N T n m) : bool :=
+  match opt_weak_sized_graph_iso scohg scohg' with
   | None => false
   | Some _ => true
   end.
 
-Lemma opt_weak_graph_iso_partial_test_correct `{Equivalence T equiv}
-  {n m} (cohg cohg' : CospanHyperGraph T n m) :
-  opt_weak_graph_iso_partial_test cohg cohg' = true ->
-  cohg ≡ₛ cohg'.
+Lemma opt_weak_sized_graph_iso_partial_test_correct `{Equivalence T equiv}
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  opt_weak_sized_graph_iso_partial_test scohg scohg' = true ->
+  scohg ≡ₛ scohg'.
 Proof.
   intros Heq.
-  apply (weak_graph_iso_partial_test_correct cohg cohg').
+  apply (weak_sized_graph_iso_partial_test_correct scohg scohg').
   revert Heq.
-  unfold weak_graph_iso_partial_test, opt_weak_graph_iso_partial_test.
-  rewrite opt_weak_graph_iso_correct.
-  now destruct (weak_graph_isos _ _).
+  unfold weak_sized_graph_iso_partial_test, opt_weak_sized_graph_iso_partial_test.
+  rewrite opt_weak_sized_graph_iso_correct.
+  now destruct (weak_sized_graph_isos _ _).
 Qed.
 
 
-Fixpoint hyperedge_map_monos_extending_aux
+
+Section mono_init.
+
+Context (R : relation positive) `{Hmrel : !RelDecision R}.
+
+Fixpoint sized_hyperedge_map_monos_extending_aux
   (hg hg' : list (positive * (HyperEdge T)))
-  (mhe_mv : Piso * Piso) :
-  list (Piso * Piso) :=
+  (mhe_mv : Piso * SPiso R) :
+  list (Piso * SPiso R) :=
   match hg with
   | [] => [mhe_mv]
   | (k, (t, ins, outs)) :: hg =>
@@ -1350,32 +1395,71 @@ Fixpoint hyperedge_map_monos_extending_aux
       length (k_tio.2.1.2) = length ins /\
       length (k_tio.2.2) = length outs) hg' ≫= λ '(k_tio, hg'rest),
       default [] (mhe' ← pupdate k k_tio.1 mhe_mv.1;
-        mv' ← pupdates (zip (ins ++ outs) (k_tio.2.1.2 ++ k_tio.2.2))
+        mv' ← spupdates (zip (ins ++ outs) (k_tio.2.1.2 ++ k_tio.2.2))
           mhe_mv.2;
-        Some (hyperedge_map_monos_extending_aux hg hg'rest
+        Some (sized_hyperedge_map_monos_extending_aux hg hg'rest
          (mhe', mv')))
   end.
 
 
-Definition hyperedge_map_monos_extending
-  (hg hg' : Pmap (HyperEdge T)) (mhe_mv : Piso * Piso) :
-  list (Piso * Piso) :=
-  hyperedge_map_monos_extending_aux (map_to_list hg)
+Definition sized_hyperedge_map_monos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mhe_mv : Piso * SPiso R) :
+  list (Piso * SPiso R) :=
+  sized_hyperedge_map_monos_extending_aux (map_to_list hg)
     (map_to_list hg') mhe_mv.
 
-Definition graph_monos {i j n m} (subcohg : CospanHyperGraph T i j)
-  (cohg : CospanHyperGraph T n m) :
-  list (Piso * Piso) :=
-  if decide (size (isolated_vertices subcohg) <= size (isolated_vertices cohg)) then
-    hyperedge_map_monos_extending subcohg.(hedges).(hyperedges)
-        cohg.(hedges).(hyperedges) (∅, ∅)
-  else
-    [].
+Fixpoint weak_sized_hyperedge_map_monos_extending_aux
+  (hg hg' : list (positive * (HyperEdge T)))
+  (mhe_mv : WPiso * WSPiso R) :
+  list (WPiso * WSPiso R) :=
+  match hg with
+  | [] => [mhe_mv]
+  | (k, (t, ins, outs)) :: hg =>
+    list_select (λ k_tio, t ≡ k_tio.2.1.1 /\
+      length (k_tio.2.1.2) = length ins /\
+      length (k_tio.2.2) = length outs) hg' ≫= λ '(k_tio, hg'rest),
+      default [] (mhe' ← wpupdate k k_tio.1 mhe_mv.1;
+        mv' ← wspupdates (zip (ins ++ outs) (k_tio.2.1.2 ++ k_tio.2.2))
+          mhe_mv.2;
+        Some (weak_sized_hyperedge_map_monos_extending_aux hg hg'rest
+         (mhe', mv')))
+  end.
 
 
-(* Definition graph_matches {i j n m} (subcohg : CospanHyperGraph T i j)
-  (cohg : CospanHyperGraph T n m) :
-  list (list positive) *)
+Definition weak_sized_hyperedge_map_monos_extending
+  (hg hg' : Pmap (HyperEdge T)) (mhe_mv : WPiso * WSPiso R) :
+  list (WPiso * WSPiso R) :=
+  weak_sized_hyperedge_map_monos_extending_aux (map_to_list hg)
+    (map_to_list hg') mhe_mv.
+
+End mono_init.
+
+
+
+
+Definition sized_graph_monos {i j n m} (subscohg : SizedCospanHyperGraph N T i j)
+  (scohg : SizedCospanHyperGraph N T n m) :
+  list (Piso * (@SPiso (λ k v, subscohg.(sized_map) !! k = scohg.(sized_map) !! v)
+    (fun k v => decide_rel eq _ _))) :=
+  (* NB: For performance, since we don't handle isolated vertices right now anyways,
+    I'm ignoring this check. *) 
+  (* if decide ((subscohg.(sized_map) !!.) <$> elements (isolated_vertices subscohg) 
+      ⊆+ (scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ) then *)
+    sized_hyperedge_map_monos_extending _ subscohg.(hedges).(hyperedges)
+        scohg.(hedges).(hyperedges) (∅, (@empty _ SPiso_empty)).
+
+
+
+Definition weak_sized_graph_monos {i j n m} (subscohg : SizedCospanHyperGraph N T i j)
+  (scohg : SizedCospanHyperGraph N T n m) :
+  list (WPiso * (@WSPiso (λ k v, subscohg.(sized_map) !! k = scohg.(sized_map) !! v)
+    (fun k v => decide_rel eq _ _))) :=
+  (* NB: For performance, since we don't handle isolated vertices right now anyways,
+    I'm ignoring this check. *) 
+  (* if decide ((subscohg.(sized_map) !!.) <$> elements (isolated_vertices subscohg) 
+      ⊆+ (scohg.(sized_map) !!.) <$> elements (isolated_vertices scohg) ) then *)
+    weak_sized_hyperedge_map_monos_extending _ subscohg.(hedges).(hyperedges)
+        scohg.(hedges).(hyperedges) (∅, (@empty _ WSPiso_empty)).
 
 
 
