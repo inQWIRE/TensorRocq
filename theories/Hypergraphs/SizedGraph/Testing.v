@@ -442,13 +442,6 @@ Proof.
     now rewrite map_img_alt, Himg, list_to_set_elements.
 Qed.
 
-#[export] Instance scohg_equiv_syntactic_eq
-  {N} `{Equiv T, Equivalence T equiv} {n m} : subrelation (≡@{SizedCospanHyperGraph N T n m}) scohg_syntactic_eq.
-Proof.
-  intros scohg scohg' Heq%scohg_equiv_alt'_rel.
-  rewrite <- norm_sized_verts_vert_eq, Heq, norm_sized_verts_vert_eq.
-  done.
-Qed.
 
 Lemma scohg_vert_eq_set_verts_isolated_verts {N T n m}
   (scohg : SizedCospanHyperGraph N T n m) :

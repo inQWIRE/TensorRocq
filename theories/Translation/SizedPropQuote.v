@@ -290,6 +290,8 @@ Class StructuralMorphism (M : Mor nat) (a b : nat) :=
 
 Definition structuralMMorphism_structuralMorphism {A} 
   (f : A -> nat) {M : Mor (btree A)} {M' : Mor nat}
+    {EqM : forall a b, Equiv (M a b)}
+    {EqM' : forall a b, Equiv (M' a b)}
     {HM : InterpStruct M M'} (a b : btree A) :
   StructuralMMorphism M a b ->
   StructuralMorphism M' (btree_size f a) (btree_size f b) :=
@@ -318,8 +320,8 @@ Definition structuralMMorphism_structuralMorphism {A}
 Import Props.
 
 (* FIXME: Move *)
-Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric SymmetricG := _.
-Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous Autonomous := _.
+Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric _ SymmetricG _:= _.
+Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous _ Autonomous _ := _.
 
 #[export] Hint Extern 0 (StructuralMorphism SymmetricG _ _) => 
   ltac2:(
@@ -377,25 +379,20 @@ Notation " f  ;;'@{ M } g " := (Pcompose_join (Struct:=M) f%pro g%pro _) (at lev
 Notation " f  ;;' g " := (Pcompose_join f%pro g%pro _) (at level 100) : pro_scope.
 
 
-Open Scope pro_scope.
+(* Open Scope pro_scope. *)
 
 (* Goal forall n m o : nat, True.
 intros n m o.
-Check Pgen (n + m) (n + m + o) true ;;'@{Symmetric} Pgen (n + (o + m)) 0 false. *)
+Check Pgen (n + m) (n + m + o) true ;;'@{SymmetricG} Pgen (n + (o + m)) 0 false. *)
 
-(* 
-Goal forall n m o, StructuralMorphism Autonomous (n + 0 + 1 + m + o + 1) (n + (o + 0 + m)).
-Proof.
-  apply _.
 
-Goal forall n m o, StructuralMorphism Monoidal (n + 0 + m + o) (n + (m + 0 + o)).
+(* Goal forall n m o, StructuralMorphism Autonomous (n + 0 + 1 + m + o + 1) (n + (o + 0 + m)).
 Proof.
-  Time apply _.
-  intros.
-  (* test_denote_nat_bw_parse_nat_btree_assert [] '(n + m + o). *)
-  (
-  ).
-  simpl in s. *)
+  apply _. *)
+
+(* Goal forall n m o, StructuralMorphism Monoidal (n + 0 + m + o) (n + (m + 0 + o)).
+Proof.
+  Time apply _. *)
 
 
 

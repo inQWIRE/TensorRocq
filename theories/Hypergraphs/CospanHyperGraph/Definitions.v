@@ -1654,6 +1654,13 @@ Proof.
 Qed.
 
 
+#[export] Instance cohg_equiv_syntactic_eq `{Equiv T, Equivalence T equiv} {n m} : 
+  subrelation (≡@{CospanHyperGraph T n m}) cohg_syntactic_eq.
+Proof.
+  intros cohg cohg' Heq%cohg_equiv_alt'_rel.
+  rewrite <- norm_verts_vert_eq, Heq, norm_verts_vert_eq.
+  done.
+Qed.
 
 
 

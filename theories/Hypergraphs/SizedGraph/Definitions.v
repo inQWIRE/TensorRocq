@@ -1598,6 +1598,13 @@ Qed.
 
 
 
+#[export] Instance scohg_equiv_syntactic_eq
+  {N} `{Equiv T, Equivalence T equiv} {n m} : subrelation (≡@{SizedCospanHyperGraph N T n m}) scohg_syntactic_eq.
+Proof.
+  intros scohg scohg' Heq%scohg_equiv_alt'_rel.
+  rewrite <- norm_sized_verts_vert_eq, Heq, norm_sized_verts_vert_eq.
+  done.
+Qed.
 
 
 

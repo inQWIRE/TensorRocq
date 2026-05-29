@@ -5,7 +5,7 @@ Require Export Syntax CospanHyperGraph.Definitions CospanHyperGraph.Expr.
 
 Section TensorGraphSemantics.
 
-Context `{TensT : TensorLike R rO rI radd rmul req A T, !EqDecision A}.
+Context `{TensT : TensorLike R rO rI radd rmul req A T}.
 
 Let TensorGraph := (CospanHyperGraph T).
 

@@ -2,18 +2,38 @@ From TensorRocq Require Export Tensor Algebra Monoid.
 From TensorRocq Require Import BW.
 
 
+(* FIXME: Move *)
+#[export] Instance sum_map_proper `{RA : relation A, RA' : relation A',
+  RB : relation B, RB' : relation B'} (f : A -> B) (f' : A' -> B')
+  {Hf : Proper (RA ==> RB) f} {Hf' : Proper (RA' ==> RB') f'} :
+  Proper (sum_relation RA RA' ==> sum_relation RB RB') (sum_map f f').
+Proof.
+  intros a b Hab.
+  induction Hab; cbn; constructor; now f_equiv.
+Qed.
+
 Class InterpStruct {A} (MStruct : btree A -> btree A -> Type)
-  (Struct : nat -> nat -> Type) :=
+  `{EqM : forall a b, Equiv (MStruct a b)}
+  (Struct : nat -> nat -> Type)
+  `{EqS : forall n m, Equiv (Struct n m)} := {
   interpStruct (f : A -> nat) {n m} (ms : MStruct n m) :
-    Struct (btree_size f n) (btree_size f m).
+    Struct (btree_size f n) (btree_size f m);
+  interpStructProper (f : A -> nat) {n m} ::
+    Proper ((≡@{MStruct n m}) ==> equiv) (interpStruct f)
+  }.
 
 #[export] Instance interpStructMorUnion {A}
   (MStruct MStruct' : btree A -> btree A -> Type)
+  `{EqM : forall a b, Equiv (MStruct a b)}
+  `{EqM' : forall a b, Equiv (MStruct' a b)}
   (Struct Struct' : nat -> nat -> Type)
+  `{EqS : forall n m, Equiv (Struct n m)}
+  `{EqS' : forall n m, Equiv (Struct' n m)}
   (interp : InterpStruct MStruct Struct)
   (interp' : InterpStruct MStruct' Struct') :
   InterpStruct (MorUnion MStruct MStruct') (MorUnion Struct Struct') := {
-  interpStruct f n m ms := sum_map (interpStruct f) (interpStruct f) ms
+  interpStruct f n m ms := sum_map (interpStruct f) (interpStruct f) ms;
+  interpStructProper f n m := sum_map_proper _ _
 }.
 
 #[universes(template)]
@@ -82,6 +102,11 @@ Definition MAutonomous {A} : btree A -> btree A -> Type := MorUnion MSymmetric M
 
 Definition MCartesian {A} : btree A -> btree A -> Type  := MorUnion MAutonomous MSCartesian.
 
+#[export] Instance MMonoidal_equiv {A a b} : Equiv (@MMonoidal A a b) := eq.
+#[export] Instance MSymmetry_equiv {A a b} : Equiv (@MSymmetry A a b) := eq.
+#[export] Instance MAutonomy_equiv {A a b} : Equiv (@MAutonomy A a b) := eq.
+#[export] Instance MSCartesian_equiv {A a b} : Equiv (@MSCartesian A a b) := eq.
+
 
 Section TensorLikePermutations.
 
@@ -97,8 +122,8 @@ Definition interpMMonoidal {A} (f : A -> nat) {n m}
   | MInvRUnit => InvRUnit
   end.
 
-#[export] Instance interpStructMonoidal {A} : @InterpStruct A MMonoidal Monoidal :=
-  interpMMonoidal.
+#[export] Instance interpStructMonoidal {A} : InterpStruct (@MMonoidal A) Monoidal :=
+  { interpStruct := interpMMonoidal }.
 
 Definition interpMSymmetry {A} (f : A -> nat) {n m}
   (p : MSymmetry n m) : Symmetry (btree_size f n) (btree_size f m) :=
@@ -106,8 +131,8 @@ Definition interpMSymmetry {A} (f : A -> nat) {n m}
   | MSwap a b => Swap (btree_size f a) (btree_size f b)
   end.
 
-#[export] Instance interpStructSymmetry {A} : @InterpStruct A MSymmetry Symmetry :=
-  interpMSymmetry.
+#[export] Instance interpStructSymmetry {A} : InterpStruct (@MSymmetry A) Symmetry :=
+  { interpStruct := interpMSymmetry }.
 
 Definition interpMAutonomy {A} (f : A -> nat) {n m}
   (p : MAutonomy n m) : Autonomy (btree_size f n) (btree_size f m) :=
@@ -116,8 +141,8 @@ Definition interpMAutonomy {A} (f : A -> nat) {n m}
   | MCap a => Cap (btree_size f a)
   end.
 
-#[export] Instance interpStructAutonomy {A} : @InterpStruct A MAutonomy Autonomy :=
-  interpMAutonomy.
+#[export] Instance interpStructAutonomy {A} : InterpStruct (@MAutonomy A) Autonomy :=
+  { interpStruct := interpMAutonomy }.
 
 Definition interpMSCartesian {A} (f : A -> nat) {n m}
   (p : MSCartesian n m) : SCartesian (btree_size f n) (btree_size f m) :=
@@ -125,8 +150,8 @@ Definition interpMSCartesian {A} (f : A -> nat) {n m}
   | MDelta a b => Delta (btree_size f a) (btree_size f b)
   end.
 
-#[export] Instance interpStructSCartesian {A} : @InterpStruct A MSCartesian SCartesian :=
-  interpMSCartesian.
+#[export] Instance interpStructSCartesian {A} : InterpStruct (@MSCartesian A) SCartesian :=
+  { interpStruct := interpMSCartesian }.
 
 
 End TensorLikePermutations.
@@ -817,7 +842,7 @@ Proof.
       rewrite fcast_cast.
       f_equal; apply proof_irrel.
   - rewrite 2 fin_perm_eta.
-    cbn.
+    cbn -[interpStruct].
     rewrite <- SymmetricG_perm_by_MSymmetric_perm_correct.
     rewrite <- 2 fin_perm_eta.
     unfold SymmetricG_SPRO_perm_by_MSymmetric_SMPRO_perm, SymmetricG_perm_by_MSymmetric_perm.

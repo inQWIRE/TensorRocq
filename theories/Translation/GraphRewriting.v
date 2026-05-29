@@ -2681,8 +2681,8 @@ Qed.
     }
 
     simpl.
-    rewrite 2 compose_graphs_unsafe'_to_compose_graphs, 
-      (fun H1 H2 => subrel (R2:=struct_isomorphic) 
+    rewrite 2 compose_graphs_unsafe'_to_compose_graphs,
+      (fun H1 H2 => subrel (R2:=struct_isomorphic)
       (stack_graphs_aux_to_stack_graphs_disjoint _ _ H1 H2)).
     - done.
     - cbn.
@@ -2900,13 +2900,13 @@ Qed.
     )).
 
 
-  Lemma DoublePushout_with_unsafe_to_safe {T n m} (H : CospanHyperGraph T n m) G L 
+  Lemma DoublePushout_with_unsafe_to_safe {T n m} (H : CospanHyperGraph T n m) G L
     {ni nj} (i : vec _ ni) (j : vec _ nj) :
     vertices_hg G ∖ vertices_hg (decompose_L1 H L) ## vertices H ->
     hyperedges G ∖ hyperedges (decompose_L1 H L) ##ₘ hyperedges H ->
     list_to_set i = decompose_iset H L (list_to_set H.(inputs)) ->
-    list_to_set j = decompose_jset H L 
-      (decompose_C1 H L (list_to_set H.(inputs))) 
+    list_to_set j = decompose_jset H L
+      (decompose_C1 H L (list_to_set H.(inputs)))
       (isolated_vertices H) (list_to_set H.(outputs)) ->
     DoublePushout_with_unsafe H G L i j ≡ᵢ DoublePushout_with H G L i j.
   Proof.
@@ -3084,9 +3084,9 @@ Qed.
   Qed.
 
   Lemma compose_graphs_unsafe'_boundary_indep {T n m m' o}
-    (H G : HyperGraph T) (i : vec _ n) (jH j : vec _ m) (jH' j' : vec _ m') (k : vec _ o) : 
+    (H G : HyperGraph T) (i : vec _ n) (jH j : vec _ m) (jH' j' : vec _ m') (k : vec _ o) :
     list_to_set j =@{Pset} list_to_set j' ->
-    compose_graphs_unsafe' (i -> H <- jH) (j -> G <- k) = 
+    compose_graphs_unsafe' (i -> H <- jH) (j -> G <- k) =
     compose_graphs_unsafe' (i -> H <- jH') (j' -> G <- k).
   Proof.
     intros Hj.
@@ -3094,10 +3094,10 @@ Qed.
     cbn.
     now rewrite Hj.
   Qed.
-  
+
   Lemma compose_graphs_unsafe'_boundary_indep' {T n m m' o}
     (H : CospanHyperGraph T n m) (G : CospanHyperGraph T m o)
-    (H' : CospanHyperGraph T n m') (G' : CospanHyperGraph T m' o) : 
+    (H' : CospanHyperGraph T n m') (G' : CospanHyperGraph T m' o) :
     hedges H = hedges H' -> inputs H = inputs H' ->
     hedges G = hedges G' -> outputs G = outputs G' ->
     list_to_set G.(inputs) =@{Pset} list_to_set G'.(inputs) ->
@@ -3108,10 +3108,10 @@ Qed.
     intros; subst.
     now apply compose_graphs_unsafe'_boundary_indep.
   Qed.
-  
+
   Lemma compose_graphs_unsafe'_boundary_indep'' {T n m o n' m' o'}
     (H : CospanHyperGraph T n m) (G : CospanHyperGraph T m o)
-    (H' : CospanHyperGraph T n' m') (G' : CospanHyperGraph T m' o') : 
+    (H' : CospanHyperGraph T n' m') (G' : CospanHyperGraph T m' o') :
     hedges H = hedges H' -> list_to_set $ inputs H =@{Pset} list_to_set $ inputs H' ->
     hedges G = hedges G' -> list_to_set $ outputs G =@{Pset} list_to_set $ outputs G' ->
     list_to_set G.(inputs) =@{Pset} list_to_set G'.(inputs) ->
@@ -3125,13 +3125,13 @@ Qed.
     done.
   Qed.
 
-  Lemma DoublePushout_with_unsafe_to_unsafe {T n m} (H : CospanHyperGraph T n m) G L 
+  Lemma DoublePushout_with_unsafe_to_unsafe {T n m} (H : CospanHyperGraph T n m) G L
     {ni nj} (i : vec _ ni) (j : vec _ nj) :
     vertices_hg G ∖ vertices_hg (decompose_L1 H L) ## vertices H ->
     hyperedges G ∖ hyperedges (decompose_L1 H L) ##ₘ hyperedges H ->
     list_to_set i = decompose_iset H L (list_to_set H.(inputs)) ->
-    list_to_set j = decompose_jset H L 
-      (decompose_C1 H L (list_to_set H.(inputs))) 
+    list_to_set j = decompose_jset H L
+      (decompose_C1 H L (list_to_set H.(inputs)))
       (isolated_vertices H) (list_to_set H.(outputs)) ->
     DoublePushout_with_unsafe H G L i j = DoublePushout_unsafe H G L.
   Proof.
@@ -3161,7 +3161,7 @@ Qed.
   Qed.
 
   Lemma DPO_with_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
-    (Target : CospanHyperGraph T n m) (G : HyperGraph T) (L : list positive) 
+    (Target : CospanHyperGraph T n m) (G : HyperGraph T) (L : list positive)
     {ni nj} (i : vec _ ni) (j : vec _ nj) :
     list_to_set i =@{Pset} list_to_set $ decompose_ilist Target L ->
     list_to_set j =@{Pset} list_to_set $ decompose_jlist Target L ->
@@ -3171,10 +3171,10 @@ Qed.
     intros Hi Hj Heq.
     rewrite (decompose_is_graph Target L) at 1.
     rewrite decompose_is_DoublePushout_unsafe.
-    assert (Haux1 : vertices_hg (decompose_L1 Target L) ∖ 
+    assert (Haux1 : vertices_hg (decompose_L1 Target L) ∖
       vertices_hg (decompose_L1 Target L) ## vertices Target) by set_solver +.
-    assert (Haux2 : (hyperedges $ decompose_L1 Target L) ∖ 
-      (hyperedges $ decompose_L1 Target L) ##ₘ hyperedges Target) by 
+    assert (Haux2 : (hyperedges $ decompose_L1 Target L) ∖
+      (hyperedges $ decompose_L1 Target L) ##ₘ hyperedges Target) by
       now rewrite map_difference_diag; solve_map_disjoint.
     assert (Haux3 : list_to_set i = decompose_iset Target L (list_to_set (inputs Target))) by set_solver + Hi.
     assert (Haux4 : list_to_set j = decompose_jset Target L (decompose_C1 Target L (list_to_set (inputs Target)))
@@ -3189,8 +3189,6 @@ Qed.
   Qed.
 
 
-    
-  
 
 
 
@@ -3198,7 +3196,9 @@ Qed.
 
 
 
-(* 
+
+
+(*
 
   Definition graph_wrap_r_under {T n m o} (cohg : CospanHyperGraph T n (m + o)) :
     CospanHyperGraph T (n + o) m :=
@@ -3218,7 +3218,7 @@ Qed.
       rewrite vsplitr_app.
       apply app_vsplit.
   Qed.
-  
+
   Lemma graph_wrap_r_l_under {T n m o} (cohg : CospanHyperGraph T (n + m) o) :
     graph_wrap_r_under (graph_wrap_l_under cohg) = cohg.
   Proof.
@@ -3230,20 +3230,20 @@ Qed.
       now rewrite vsplitl_app.
   Qed.
 
-  Lemma graph_semantics_wrap_r_under {n m o} 
+  Lemma graph_semantics_wrap_r_under {n m o}
     `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
     (cohg : CospanHyperGraph T n (m + o)) :
     graph_semantics
 
   Lemma graph_wrap_r_under_semantic_eq {n m o}
-    `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A} 
-    (cohg cohg' : CospanHyperGraph T n (m + o)) : 
+    `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+    (cohg cohg' : CospanHyperGraph T n (m + o)) :
     cohg ≡ₜ cohg' -> graph_wrap_r_under cohg ≡ₜ graph_wrap_r_under cohg'.
   Proof.
 
   Lemma hg_equiv_pull_around_aux {n m}
     `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
-    (hgl hgr : HyperGraph T) (v : vec _ n) (w : vec _ m) : 
+    (hgl hgr : HyperGraph T) (v : vec _ n) (w : vec _ m) :
     (v -> hgl <- w) ≡ₜ (v -> hgr <- w) <->
 
   Proof. *)
@@ -3458,3 +3458,45 @@ Proof.
   do 2 f_equiv; [done..|].
   now rewrite He1, He2.
 Qed.
+
+
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m o} : (@compose_graphs T n m o)
+  with signature cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq
+  as compose_graphs_cohg_syntactic_eq.
+Proof.
+  intros cohg1 cohg1' Heq1
+    cohg2 cohg2' Heq2.
+  induction Heq1 as [cohg1 cohg1' fv1 fe1 Hfv1 Hfe1 Heq1].
+  induction Heq2 as [cohg2 cohg2' fv2 fe2 Hfv2 Hfe2 Heq2].
+  etransitivity; [|etransitivity].
+  - apply (subrel' struct_isomorphic).
+    apply compose_graphs_struct_isomorphic_Proper; symmetry; apply (subrel (norm_verts_vert_eq _)).
+  - apply (subrel' cohg_eq).
+    apply compose_graphs_cohg_eq_Proper; [apply Heq1|apply Heq2].
+  - apply (subrel' struct_isomorphic).
+    apply compose_graphs_struct_isomorphic_Proper; rewrite (norm_verts_vert_eq _); 
+    apply (subrel' isomorphic); constructor; done.
+Qed.
+
+Add Parametric Morphism `{Equiv T, Equivalence T equiv}
+  {n m n' m'} : (@stack_graphs T n m n' m')
+  with signature cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq
+  as stack_graphs_cohg_syntactic_eq.
+Proof.
+  intros cohg1 cohg1' Heq1
+    cohg2 cohg2' Heq2.
+  induction Heq1 as [cohg1 cohg1' fv1 fe1 Hfv1 Hfe1 Heq1].
+  induction Heq2 as [cohg2 cohg2' fv2 fe2 Hfv2 Hfe2 Heq2].
+  etransitivity; [|etransitivity].
+  - apply (subrel' struct_isomorphic).
+    apply stack_graphs_struct_isomorphic_Proper; symmetry; apply (subrel (norm_verts_vert_eq _)).
+  - apply (subrel' cohg_eq).
+    apply stack_graphs_cohg_eq_Proper; [apply Heq1|apply Heq2].
+  - apply (subrel' struct_isomorphic).
+    apply stack_graphs_struct_isomorphic_Proper; rewrite (norm_verts_vert_eq _); 
+    apply (subrel' isomorphic); constructor; done.
+Qed.
+
+

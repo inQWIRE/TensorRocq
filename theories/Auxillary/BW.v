@@ -1,4 +1,4 @@
-From stdpp Require Import list.
+From stdpp Require Import vector list.
 From TensorRocq Require Export Monoid.
 From TensorRocq Require Import AbstractTensorQuote.
 From TensorRocq Require Import Aux_pos.
@@ -1026,6 +1026,13 @@ Fixpoint bsize {A} (b : btree A) : nat :=
   | 0 => O
   | bleaf _ => 1
   | l + r => bsize l + bsize r
+  end.
+
+Fixpoint btree_to_vec {A} (b : btree A) : vec A (bsize b) :=
+  match b with
+  | 0 => [#]
+  | bleaf a => [#a]
+  | l + r => btree_to_vec l +++ btree_to_vec r
   end.
 
 
