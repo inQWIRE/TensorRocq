@@ -366,9 +366,9 @@ Definition Pcompose_join_Monoidal (* {Struct : Mor nat} *) {T}
   {a b b' c : nat} (f : PRO Monoidal T a b) (g : PRO Monoidal T b' c)
   (Hb : StructuralMorphism Monoidal b b') : PRO Monoidal T a c :=
   f ;; Hb T ;; g.
-
+(* 
 Notation " f  ;;ₘ g " := (Pcompose_join_Monoidal f%pro g%pro _) (at level 100) : pro_scope.
-
+ *)
 
 Definition Pcompose_join {Struct : Mor nat} {T}
   {a b b' c : nat} (f : PRO Struct T a b) (g : PRO Struct T b' c)
@@ -379,10 +379,31 @@ Notation " f  ;;'@{ M } g " := (Pcompose_join (Struct:=M) f%pro g%pro _) (at lev
 Notation " f  ;;' g " := (Pcompose_join f%pro g%pro _) (at level 100) : pro_scope.
 
 
-(* Open Scope pro_scope. *)
+(* #[global] Arguments substruct_refl /. *)
 
-(* Goal forall n m o : nat, True.
+Definition Pcompose_join_sub (Struct : Mor nat) {Struct' : Mor nat} 
+  {SubS : SubStruct Struct Struct'} {T}
+  {a b b' c : nat} (f : PRO Struct' T a b) (g : PRO Struct' T b' c)
+  (Hb : StructuralMorphism Struct b b') : PRO Struct' T a c :=
+  f ;; map_PRO (fun _ _ => includeStruct) id (Hb T) ;; g.
+
+Definition Pcompose_joinM {Struct : Mor nat} 
+  {SubS : SubStruct Monoidal Struct} {T}
+  {a b b' c : nat} (f : PRO Struct T a b) (g : PRO Struct T b' c)
+  (Hb : StructuralMorphism Monoidal b b') : PRO Struct T a c :=
+  f ;; map_PRO (fun _ _ => includeStruct) id (Hb T) ;; g.
+
+Notation " f  ;;ₘ@{ M } g " := (Pcompose_joinM (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
+
+Notation " f  ;;ₘ g " := (Pcompose_joinM f%pro g%pro _) (at level 100) : pro_scope.
+
+
+(* Open Scope pro_scope.
+
+Goal forall n m o : nat, True.
 intros n m o.
+Check Pgen (n + m) (n + m + o) true ;;ₘ@{Monoidal} Pgen (n + (m + o)) 0 false.
+Check Pgen (n + m) (n + m + o) true ;;ₘ@{SymmetricG} Pgen (n + (m + o)) 0 false.
 Check Pgen (n + m) (n + m + o) true ;;'@{SymmetricG} Pgen (n + (o + m)) 0 false. *)
 
 
