@@ -307,6 +307,10 @@ Fixpoint PRO_graph_semantics {Struct : Mor nat}
   end.
 
 
+Definition PRO_graph_eq `{StructGraphable Struct T} `{Equiv T}
+  {n m} (p p' : PRO Struct T n m) :=
+  PRO_graph_semantics p ≡ₛ PRO_graph_semantics p'.
+
 Lemma PRO_graph_semantics_correct {Struct : Mor nat}
   `{EqS : forall n m, Equiv (Struct n m), 
     EquivS : forall n m, Equivalence (≡@{(Struct n m)})}
