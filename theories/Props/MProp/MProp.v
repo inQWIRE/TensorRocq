@@ -1,4 +1,4 @@
-From TensorRocq Require Export Monoid.
+From TensorRocq Require Export sigT2_relation Monoid.
 From TensorRocq Require Import AProp.
 From TensorRocq Require Import SizedGraph.ToUnsized.
 

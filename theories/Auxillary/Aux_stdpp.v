@@ -5987,3 +5987,15 @@ Qed.
   abstract (now rewrite map_inverses_iff_perm).
   abstract (now rewrite map_inverses_iff_perm).
 Defined.
+
+
+Lemma subrel {A} {R1 R2 : relation A} `{H12 : !subrelation R1 R2} {x y} :
+  R1 x y -> R2 x y.
+Proof.
+  firstorder.
+Qed.
+Definition subrel' := @subrel.
+#[global] Arguments subrel' {_} _ {_ _} {_ _} _ : assert.
+
+Definition subrel'' := @subrel.
+#[global] Arguments subrel'' {_ _} _ {_} {_ _} _ : assert.

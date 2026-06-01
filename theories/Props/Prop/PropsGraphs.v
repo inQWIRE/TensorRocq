@@ -364,7 +364,7 @@ Qed.
     end.
 
 
-#[export] Instance SCartesian_graphable {T} : StructGraphable SCartesian T :=
+#[export] Instance Frobenial_graphable {T} : StructGraphable Frobenial T :=
   fun n m mon => match mon with
     | Delta n m => delta_spider_graph n m
     end.
@@ -431,8 +431,8 @@ Proof.
   - apply graph_semantics_cap.
 Qed.
 
-#[export] Instance SCartesian_lawful_graphable : 
-  LawfulStructGraphable SCartesian T.
+#[export] Instance Frobenial_lawful_graphable : 
+  LawfulStructGraphable Frobenial T.
 Proof.
   constructor.
   intros n m mon.

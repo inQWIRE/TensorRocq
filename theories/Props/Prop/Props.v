@@ -103,15 +103,15 @@ Inductive Autonomy : nat -> nat -> Type :=
   | Cup n : Autonomy 0 (n + n)
   | Cap n : Autonomy (n + n) 0.
 
-Inductive SCartesian : nat -> nat -> Type :=
-  | Delta n m : SCartesian n m.
+Inductive Frobenial : nat -> nat -> Type :=
+  | Delta n m : Frobenial n m.
 
 
 Definition SymmetricG := MorUnion Monoidal Symmetry.
 
 Definition Autonomous := MorUnion SymmetricG Autonomy.
 
-Definition Cartesian := MorUnion Autonomous SCartesian.
+Definition Frobenius := MorUnion Autonomous Frobenial.
 
 
 Section TensorLikePermutations.
@@ -167,16 +167,16 @@ Definition autoToTensor (n m : nat) (p : Autonomy n m) : Tensor (R:=R) n m A :=
     strictInterpretTensor := autoToTensor;
   }.
 
-Definition cartesianToTensor (n m : nat) (p : SCartesian n m) : Tensor (R:=R) n m A :=
+Definition FrobeniusToTensor (n m : nat) (p : Frobenial n m) : Tensor (R:=R) n m A :=
   match p with
   | Delta n m => delta_spider_tensor
   end.
 
-#[export] Instance SCartesianEquiv {n m} : Equiv (SCartesian n m) := eq.
+#[export] Instance FrobenialEquiv {n m} : Equiv (Frobenial n m) := eq.
 
-#[export] Instance TensorLikeSCartesian : StrictTensorLike R A SCartesian :=
+#[export] Instance TensorLikeFrobenial : StrictTensorLike R A Frobenial :=
   {
-    strictInterpretTensor := cartesianToTensor;
+    strictInterpretTensor := FrobeniusToTensor;
   }.
 
 End TensorLikePermutations.
@@ -185,20 +185,20 @@ Definition monoidal_inl {n m} (p : Monoidal n m) : SymmetricG n m := inl p.
 Definition symmetry_inr {n m} (p : Symmetry n m) : SymmetricG n m := inr p.
 Definition symmetric_inl {n m} (p : SymmetricG n m) : Autonomous n m := inl p.
 Definition autonomy_inr {n m} (p : Autonomy n m) : Autonomous n m := inr p.
-Definition autonomous_inl {n m} (p : Autonomous n m) : Cartesian n m := inl p.
-Definition scartesian_inr {n m} (p : SCartesian n m) : Cartesian n m := inr p.
+Definition autonomous_inl {n m} (p : Autonomous n m) : Frobenius n m := inl p.
+Definition Frobenial_inr {n m} (p : Frobenial n m) : Frobenius n m := inr p.
 
 
 Coercion monoidal_inl : Monoidal >-> SymmetricG.
 Coercion symmetry_inr : Symmetry >-> SymmetricG.
 Coercion symmetric_inl : SymmetricG >-> Autonomous.
 Coercion autonomy_inr : Autonomy >-> Autonomous.
-Coercion autonomous_inl : Autonomous >-> Cartesian.
-Coercion scartesian_inr : SCartesian >-> Cartesian.
+Coercion autonomous_inl : Autonomous >-> Frobenius.
+Coercion Frobenial_inr : Frobenial >-> Frobenius.
 
 Notation PROP := (PRO SymmetricG).
 Notation APROP := (PRO Autonomous).
-Notation CPROP := (PRO Cartesian).
+Notation FPROP := (PRO Frobenius).
 
 
 
@@ -793,7 +793,7 @@ Local Set Typeclasses Unique Instances.
 #[global] Instance substruct_monoidal_autonomous : SubStruct Monoidal Autonomous :=
   fun _ _ s => s.
 
-#[global] Instance substruct_monoidal_cartesian : SubStruct Monoidal Cartesian :=
+#[global] Instance substruct_monoidal_Frobenius : SubStruct Monoidal Frobenius :=
   fun _ _ s => s.
 
 #[global] Instance substruct_symmetry_symmetricg : SubStruct Symmetry SymmetricG :=
@@ -802,25 +802,25 @@ Local Set Typeclasses Unique Instances.
 #[global] Instance substruct_symmetry_autonomous : SubStruct Symmetry Autonomous :=
   fun _ _ s => s.
 
-#[global] Instance substruct_symmetry_cartesian : SubStruct Symmetry Cartesian :=
+#[global] Instance substruct_symmetry_Frobenius : SubStruct Symmetry Frobenius :=
   fun _ _ s => s.
 
 #[global] Instance substruct_autonomy_autonomous : SubStruct Autonomy Autonomous :=
   fun _ _ s => s.
 
-#[global] Instance substruct_autonomy_cartesian : SubStruct Autonomy Cartesian :=
+#[global] Instance substruct_autonomy_Frobenius : SubStruct Autonomy Frobenius :=
   fun _ _ s => s.
 
-#[global] Instance substruct_scartesian_cartesian : SubStruct SCartesian Cartesian :=
+#[global] Instance substruct_Frobenial_Frobenius : SubStruct Frobenial Frobenius :=
   fun _ _ s => s.
 
 #[global] Instance substruct_symmetricg_autonomous : SubStruct SymmetricG Autonomous :=
   fun _ _ s => s.
 
-#[global] Instance substruct_symmetricg_cartesian : SubStruct SymmetricG Cartesian :=
+#[global] Instance substruct_symmetricg_Frobenius : SubStruct SymmetricG Frobenius :=
   fun _ _ s => s.
 
-#[global] Instance substruct_autonomous_cartesian : SubStruct Autonomous Cartesian :=
+#[global] Instance substruct_autonomous_Frobenius : SubStruct Autonomous Frobenius :=
   fun _ _ s => s.
 
 
@@ -835,6 +835,13 @@ Local Set Typeclasses Unique Instances.
 
 #[global] Instance substruct_autonomous_autonomy `{!SubStruct Autonomous Struct} : 
   SubStruct Autonomy Struct | 5 := substruct_trans Autonomous.
+
+
+#[global] Instance substruct_frobenius_autonomous `{!SubStruct Frobenius Struct} : 
+  SubStruct Autonomous Struct | 5 := substruct_trans Frobenius.
+
+#[global] Instance substruct_frobenius_frobenial `{!SubStruct Frobenius Struct} : 
+  SubStruct Frobenial Struct | 5 := substruct_trans Frobenius.
 
 End instances.
 
@@ -852,6 +859,8 @@ Definition Pcap {Struct T} {SubS : SubStruct Autonomy Struct} (n : nat) :
   PRO Struct T (n + n) 0 :=
   [str includeStruct (Cap n)].
 
+Definition Pdelta {Struct T} `{!SubStruct Frobenial Struct}
+  n m : PRO Struct T n m := [str includeStruct (Delta n m)].
 
 
 Definition cast_PRO {Struct T n m n' m'}
@@ -927,6 +936,15 @@ Definition ocast_PRO {Struct T n m n' m'} (ap : PRO Struct T n m) : option (PRO 
   | left Hnm => Some (cast_PRO Hnm.1 Hnm.2 ap)
   | right _ => None
   end.
+
+Definition ocompose_PRO {Struct T} {n m m' o}
+  (p : PRO Struct T n m) (p' : PRO Struct T m' o) :
+  option (PRO Struct T n o) :=
+  match decide (m' = m) with
+  | left Heq => Some (p ;; cast_PRO Heq eq_refl p')%pro
+  | right _ => None
+  end.
+
 
 Definition Ppad_nonsquare {Struct T a b} (ap : PRO Struct T a b) n m :
   option (PRO Struct T n m) :=
@@ -1035,11 +1053,25 @@ Qed.
     | Cap (S n) => [str Cap (S n)]
     end%pro.
 
-#[export] Instance cleanable_scartesian : CleanableStruct SCartesian :=
+#[export] Instance cleanable_Frobenial : CleanableStruct Frobenial :=
   fun T n m s => match s with
     | Delta 1 1 => Pid 1
     | Delta n m => [str Delta n m]
     end%pro.
+
+
+#[export] Instance cleanable_Frobenius : CleanableStruct Frobenius :=
+  fun T n m s => match s with
+    | inl s => map_PRO (λ _ _, inl) id (cleanStruct T s)
+    | inr s => 
+      match s with
+      | Delta 1 1 => Pid 1
+      | Delta 0 2 => Pcup 1
+      | Delta 2 0 => Pcap 1
+      | Delta n m => Pdelta n m
+      end%pro
+    end.
+
 
 Class ComposableStruct (Struct : Mor nat) :=
   composeStruct : forall T {n m o}, Struct n m -> Struct m o -> PRO Struct T n o.
@@ -1101,6 +1133,11 @@ Definition Pcompose'_raw {Struct T} {n m o}
   end.
 
 #[export] Instance composeable_autonomy : ComposableStruct Autonomy :=
+  fun T n m o s s' => 
+    Pcompose'_raw (cleanStruct T s) (cleanStruct T s').
+
+
+#[export] Instance composeable_frobenius : ComposableStruct Frobenius :=
   fun T n m o s s' => 
     Pcompose'_raw (cleanStruct T s) (cleanStruct T s').
 

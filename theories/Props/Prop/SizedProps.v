@@ -92,20 +92,20 @@ Inductive MAutonomy {A} : btree A -> btree A -> Type :=
   | MCup n : MAutonomy 0 (n + n)
   | MCap n : MAutonomy (n + n) 0.
 
-Inductive MSCartesian {A} : btree A -> btree A -> Type :=
-  | MDelta n m : MSCartesian n m.
+Inductive MFrobenial {A} : btree A -> btree A -> Type :=
+  | MDelta n m : MFrobenial n m.
 
 
 Definition MSymmetric {A} : btree A -> btree A -> Type := MorUnion MMonoidal MSymmetry.
 
 Definition MAutonomous {A} : btree A -> btree A -> Type := MorUnion MSymmetric MAutonomy.
 
-Definition MCartesian {A} : btree A -> btree A -> Type  := MorUnion MAutonomous MSCartesian.
+Definition MFrobenius {A} : btree A -> btree A -> Type  := MorUnion MAutonomous MFrobenial.
 
 #[export] Instance MMonoidal_equiv {A a b} : Equiv (@MMonoidal A a b) := eq.
 #[export] Instance MSymmetry_equiv {A a b} : Equiv (@MSymmetry A a b) := eq.
 #[export] Instance MAutonomy_equiv {A a b} : Equiv (@MAutonomy A a b) := eq.
-#[export] Instance MSCartesian_equiv {A a b} : Equiv (@MSCartesian A a b) := eq.
+#[export] Instance MFrobenial_equiv {A a b} : Equiv (@MFrobenial A a b) := eq.
 
 
 Section TensorLikePermutations.
@@ -144,14 +144,14 @@ Definition interpMAutonomy {A} (f : A -> nat) {n m}
 #[export] Instance interpStructAutonomy {A} : InterpStruct (@MAutonomy A) Autonomy :=
   { interpStruct := interpMAutonomy }.
 
-Definition interpMSCartesian {A} (f : A -> nat) {n m}
-  (p : MSCartesian n m) : SCartesian (btree_size f n) (btree_size f m) :=
+Definition interpMFrobenial {A} (f : A -> nat) {n m}
+  (p : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
   match p with
   | MDelta a b => Delta (btree_size f a) (btree_size f b)
   end.
 
-#[export] Instance interpStructSCartesian {A} : InterpStruct (@MSCartesian A) SCartesian :=
-  { interpStruct := interpMSCartesian }.
+#[export] Instance interpStructFrobenial {A} : InterpStruct (@MFrobenial A) Frobenial :=
+  { interpStruct := interpMFrobenial }.
 
 
 End TensorLikePermutations.
@@ -160,21 +160,21 @@ Definition mmonoidal_inl {A} {n m} (p : @MMonoidal A n m) : MSymmetric n m := in
 Definition msymmetry_inr {A} {n m} (p : @MSymmetry A n m) : MSymmetric n m := inr p.
 Definition msymmetric_inl {A} {n m} (p : @MSymmetric A n m) : MAutonomous n m := inl p.
 Definition mautonomy_inr {A} {n m} (p : @MAutonomy A n m) : MAutonomous n m := inr p.
-Definition mautonomous_inl {A} {n m} (p : @MAutonomous A n m) : MCartesian n m := inl p.
-Definition mscartesian_inr {A} {n m} (p : @MSCartesian A n m) : MCartesian n m := inr p.
+Definition mautonomous_inl {A} {n m} (p : @MAutonomous A n m) : MFrobenius n m := inl p.
+Definition mFrobenial_inr {A} {n m} (p : @MFrobenial A n m) : MFrobenius n m := inr p.
 
 
 Coercion mmonoidal_inl : MMonoidal >-> MSymmetric.
 Coercion msymmetry_inr : MSymmetry >-> MSymmetric.
 Coercion msymmetric_inl : MSymmetric >-> MAutonomous.
 Coercion mautonomy_inr : MAutonomy >-> MAutonomous.
-Coercion mautonomous_inl : MAutonomous >-> MCartesian.
-Coercion mscartesian_inr : MSCartesian >-> MCartesian.
+Coercion mautonomous_inl : MAutonomous >-> MFrobenius.
+Coercion mFrobenial_inr : MFrobenial >-> MFrobenius.
 
 
 Notation MPROP := (MPRO MSymmetric).
 Notation MAPROP := (MPRO MAutonomous).
-Notation MCPROP := (MPRO MCartesian).
+Notation MFPROP := (MPRO MFrobenius).
 
 (* FIXME: Move *)
 

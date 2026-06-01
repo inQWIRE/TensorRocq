@@ -114,7 +114,7 @@ Ltac2 quote_Autonomy (ns : constr list) (c : constr) : constr list * constr :=
   end.
 
 
-Ltac2 quote_SCartesian (ns : constr list) (c : constr) : constr list * constr :=
+Ltac2 quote_Frobenial (ns : constr list) (c : constr) : constr list * constr :=
   let rec go ns c :=
     match! c with
     | @Delta ?n ?m => 
@@ -132,7 +132,7 @@ Ltac2 quote_SCartesian (ns : constr list) (c : constr) : constr list * constr :=
       let c' := Std.eval_hnf c in 
       if Constr.equal c' c then 
         Control.throw_invalid_argument 
-          "quote_SCartesian: argument is not reducible to a [SCartesian] constant"
+          "quote_Frobenial: argument is not reducible to a [Frobenial] constant"
       else go ns c'
     else go ns c'
   end.
@@ -201,7 +201,7 @@ Ltac2 quote_Autonomous (ns : constr list) (c : constr) : constr list * constr :=
   end.
 
 
-Ltac2 quote_Cartesian (ns : constr list) (c : constr) : constr list * constr :=
+Ltac2 quote_Frobenius (ns : constr list) (c : constr) : constr list * constr :=
   let rec go ns c :=
     match! c with
     | autonomous_inl ?m => 
@@ -210,12 +210,12 @@ Ltac2 quote_Cartesian (ns : constr list) (c : constr) : constr list * constr :=
     | inl ?m => 
       let (ns, m') := quote_Autonomous ns m in 
       (ns, '(mautonomous_inl $m'))
-    | scartesian_inr ?m => 
-      let (ns, m') := quote_SCartesian ns m in 
-      (ns, '(mscartesian_inr $m'))
+    | Frobenial_inr ?m => 
+      let (ns, m') := quote_Frobenial ns m in 
+      (ns, '(mFrobenial_inr $m'))
     | inr ?m => 
-      let (ns, m') := quote_SCartesian ns m in 
-      (ns, '(mscartesian_inr $m'))
+      let (ns, m') := quote_Frobenial ns m in 
+      (ns, '(mFrobenial_inr $m'))
     end in 
   match! c with
   | ?m => go ns m
@@ -226,7 +226,7 @@ Ltac2 quote_Cartesian (ns : constr list) (c : constr) : constr list * constr :=
       if Constr.equal c' c then 
         Control.throw_invalid_argument 
           (String.app 
-            "quote_Cartesian: argument is not reducible to a [Cartesian] constant"
+            "quote_Frobenius: argument is not reducible to a [Frobenius] constant"
             (Message.to_string (Message.of_constr c)))
       else go ns c'
     else go ns c'

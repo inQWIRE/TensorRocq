@@ -1,4 +1,4 @@
-From TensorRocq Require Import BW Props SizedProps PropsGraphs SizedCospanHyperGraph.
+From TensorRocq Require Import sigT2_relation BW Props SizedProps PropsGraphs SizedCospanHyperGraph.
 
 
 
@@ -540,7 +540,7 @@ Qed.
     end.
 
 (*
-#[export] Instance SCartesian_graphable {T} : StructGraphable SCartesian T :=
+#[export] Instance Frobenial_graphable {T} : StructGraphable Frobenial T :=
   fun n m mon => match mon with
     | Delta n m => delta_spider_graph n m
     end. *)
@@ -610,8 +610,8 @@ Proof.
     done.
 Qed.
 
-(* #[export] Instance SCartesian_lawful_graphable :
-  LawfulStructGraphable SCartesian T.
+(* #[export] Instance Frobenial_lawful_graphable :
+  LawfulStructGraphable Frobenial T.
 Proof.
   constructor.
   intros n m mon.
