@@ -47,7 +47,7 @@ Qed.
 
 
 #[universes(template)]
-Inductive PRO  {Struct : nat -> nat -> Type} {Ty : Type} : nat -> nat -> Type :=
+Inductive PRO {Struct : nat -> nat -> Type} {Ty : Type} : nat -> nat -> Type :=
   (* Identity process*)
   | Pid n : PRO n n
   (* Composition of processes *)
@@ -186,7 +186,7 @@ Definition symmetry_inr {n m} (p : Symmetry n m) : SymmetricG n m := inr p.
 Definition symmetric_inl {n m} (p : SymmetricG n m) : Autonomous n m := inl p.
 Definition autonomy_inr {n m} (p : Autonomy n m) : Autonomous n m := inr p.
 Definition autonomous_inl {n m} (p : Autonomous n m) : Frobenius n m := inl p.
-Definition Frobenial_inr {n m} (p : Frobenial n m) : Frobenius n m := inr p.
+Definition frobenial_inr {n m} (p : Frobenial n m) : Frobenius n m := inr p.
 
 
 Coercion monoidal_inl : Monoidal >-> SymmetricG.
@@ -194,7 +194,7 @@ Coercion symmetry_inr : Symmetry >-> SymmetricG.
 Coercion symmetric_inl : SymmetricG >-> Autonomous.
 Coercion autonomy_inr : Autonomy >-> Autonomous.
 Coercion autonomous_inl : Autonomous >-> Frobenius.
-Coercion Frobenial_inr : Frobenial >-> Frobenius.
+Coercion frobenial_inr : Frobenial >-> Frobenius.
 
 Notation PROP := (PRO SymmetricG).
 Notation APROP := (PRO Autonomous).

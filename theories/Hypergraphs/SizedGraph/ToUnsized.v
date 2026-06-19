@@ -1122,7 +1122,7 @@ Qed.
 
 
 
-From TensorRocq Require Import sigT2_relation.
+From TensorRocq Require Export sigT2_relation.
 
 
 
@@ -3051,17 +3051,6 @@ Proof.
   apply enlarge_hypergraph_reindex_hg.
 Qed.
 
-(* FIXME: Move to Aux_pos *)
-Definition pos_case {P : positive -> Type}
-  (fl : forall p, P (p~0))
-  (fr : forall p, P (p~1))
-  (P1 : P xH) : forall p, P p :=
-  fun p =>
-  match p with
-  | p~0 => fl p
-  | p~1 => fr p
-  | xH => P1
-  end.
 
 (* FIXME: Put this in GraphRewriting, overwriting existing lemma *)
 

@@ -473,4 +473,34 @@ Section TensorOpsFacts.
     apply Sorted_eq_iff.
   Qed.
 
+  Lemma delta_spider_tensor'_alt {n m} vi wi :
+    delta_spider_tensor' (SR:=SR) (n:=n) (m:=m) vi wi ≡
+    (fun v w => 
+    if decide (forall (i j : fin (n + m)), 
+      (vi +++ wi) !!! i = (vi +++ wi) !!! j ->
+      (v +++ w) !!! i = (v +++ w) !!! j) then rI else rO).
+  Proof.
+    intros v w _ _.
+    unfold delta_spider_tensor'.
+    apply eq_reflexivity, decide_ext.
+    unfold equal_on_indices.
+    split.
+    - intros Hall i j.
+      apply (Hall (_ !!! _, _ !!! _) (_ !!! _, _ !!! _)); apply elem_of_list_In.
+      + apply elem_of_list_lookup.
+        exists i.
+        rewrite lookup_vec_to_list_fin.
+        rewrite vlookup_zip_with.
+        done.
+      + apply elem_of_list_lookup.
+        exists j.
+        rewrite lookup_vec_to_list_fin.
+        rewrite vlookup_zip_with.
+        done.
+    - intros Hall ia jb [i <-]%elem_of_list_In%elem_of_vlookup [j <-]%elem_of_list_In%elem_of_vlookup.
+      rewrite 2 vlookup_zip_with.
+      cbn.
+      apply Hall.
+  Qed.
+
 End TensorOpsFacts.

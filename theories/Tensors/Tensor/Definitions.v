@@ -12,7 +12,7 @@ From TensorRocq Require Export Summable.
 Definition Tensor {R} (n m : nat) (A : Type) :=
   Vector.t A n -> Vector.t A m -> R.
 
-(* A tensor with arguments in [A] and values in [R] parametric over 
+(* A tensor with arguments in [A] and values in [R] parametric over
   its dimensions *)
 Definition DimensionlessTensor {R} (A : Type) :=
   forall n m,
@@ -20,9 +20,9 @@ Definition DimensionlessTensor {R} (A : Type) :=
 
 (* The default equivalence relation on tensors with arguments in a
   [Summable] type [A] and values in a [SemiRing], [R]. Two tensors
-  are equivalent if they agree (up to the semiring equality [req] 
+  are equivalent if they agree (up to the semiring equality [req]
   of [R]) on all arguments whose elements are [SummedElement]s, i.e.
-  appear in the list of summed elements of [A]. 
+  appear in the list of summed elements of [A].
   This is registered as the [Equiv] ([(≡)]) instance for tensors. *)
 Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A} {n m} : relation (Tensor (R:=R) n m A) :=
@@ -32,7 +32,7 @@ Definition tensoreq `{SR : SemiRing R rO rI radd rmul req}
 #[global] Instance Tensor_equiv `{SemiRing R rO rI radd rmul req}
   `{Summable A} {n m} : Equiv (Tensor (R:=R) n m A) := tensoreq.
 
-(* The default equivalence relation on dimensionless tensors, 
+(* The default equivalence relation on dimensionless tensors,
   lifting that of tensors by quantifying over all possible dimensions.
   This is registered as the [Equiv] ([(≡)]) instance for dimensionless tensors. *)
 Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
@@ -45,7 +45,7 @@ Definition dimensionlesstensoreq `{SR : SemiRing R rO rI radd rmul req}
 (* A class registering that elements [T] can be interpreted as
   dimensionless tensors with arguments in [A] and values in [R].
   This interpretation should respect the [Equiv] instance of [T]. *)
-Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} 
+Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req}
   (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : Type) `{Equiv T}
     `{Equivalence T equiv} := {
   interpretTensor (x : T) : DimensionlessTensor (R:=R) A;
@@ -54,7 +54,7 @@ Class TensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req}
 
 #[global] Hint Mode TensorLike - - - - - - -   - - -   + - - : typeclass_instances.
 
-Class StrictTensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : nat -> nat -> Type) 
+Class StrictTensorLike (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type) `{SA : Summable A, EQA : EqDecision A} (T : nat -> nat -> Type)
   `{EqT : forall n m, Equiv (T n m)} `{EquivT : forall n m, @Equivalence (T n m) equiv} := {
   strictInterpretTensor {n m} (x : T n m) : Tensor (R:=R) n m A;
   strictInterpretTensorProper :: forall n m, Proper (equiv ==> equiv) (@strictInterpretTensor n m)
@@ -150,6 +150,136 @@ Section TensorOps.
     SR : SemiRing R rO rI radd rmul req} {n m} : Tensor n m A :=
     fun v w => if decide (Sorted.Sorted eq (v +++ w)) then rI else rO.
 
+  Definition equal_on_indices {I A} (l : list (I * A)) : Prop :=
+    ForallPairs (fun i_a j_b => i_a.1 = j_b.1 -> i_a.2 = j_b.2) l.
+
+  Definition equal_on_indicesb {I} `{EqDecision I} {A} (eqa : A -> A -> bool) :=
+    fix go (fuel : nat) (l : list (I * A)) : bool :=
+    match fuel with
+    | 0 => false
+    | S fuel =>
+      match l with
+      | [] => true
+      | (i, a) :: l =>
+        if forallb (λ j_b, eqa a j_b.2) (filter (λ j_b, i = j_b.1) l) then
+          go fuel (filter (λ j_b, i <> j_b.1) l)
+        else false
+      end
+    end.
+
+  #[export] Instance ForallPairs_Permutation {A} (RA : relation A) :
+    Proper (Permutation ==> iff) (ForallPairs RA).
+  Proof.
+    intros l l' Hl.
+    unfold ForallPairs.
+    setoid_rewrite <- Hl.
+    done.
+  Qed.
+
+  Lemma equal_on_indicesb_True_1 {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
+    (Heqa : forall a b, eqa a b -> a = b) fuel (l : list (I * A)) :
+    equal_on_indicesb eqa fuel l -> equal_on_indices l.
+  Proof.
+    unfold equal_on_indices.
+    revert l; induction fuel; intros l; [done|].
+    cbn.
+    destruct l as [|(i, a) l]; [easy|].
+    rewrite lazy_andb_True.
+    rewrite forallb_True.
+    rewrite ForallPairs_cons.
+    intros [Hall Hfilt%IHfuel].
+    pose proof (filter_with_neg_Permutation (P := λ j_b, j_b.1 = i) l) as Hl.
+    split; [done|].
+    cbn.
+    rewrite Forall_filter in Hall.
+    split.
+    1:{
+      eapply Forall_impl; [apply Hall|].
+      cbn.
+      eauto.
+    }
+    split.
+    - rewrite <- Hl, Forall_app.
+      rewrite 2 Forall_filter.
+      split; [|apply Forall_forall; easy].
+      eapply Forall_impl; [apply Hall|].
+      intros (j, b).
+      cbn.
+      now intros Hab ->%eq_sym%Hab%Heqa.
+    - intros (j, b) (j', c) Hb%elem_of_list_In Hc%elem_of_list_In [= <-].
+      cbn.
+      destruct_decide (decide (i = j)) as Hij.
+      + subst.
+        rewrite Forall_forall in Hall.
+        apply Hall in Hb, Hc; [|done..].
+        cbn in Hb, Hc.
+        apply Heqa in Hb, Hc.
+        congruence.
+      + apply (Hfilt (j, b) (j, c));
+        [apply elem_of_list_In, elem_of_list_filter..|]; done.
+  Qed.
+
+  Lemma equal_on_indicesb_True_2 {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
+    (Heqa : forall a, eqa a a) fuel (l : list (I * A)) :
+    length l < fuel -> equal_on_indices l -> equal_on_indicesb eqa fuel l.
+  Proof.
+    revert l.
+    induction fuel as [|fuel IHfuel]; [lia|].
+    intros [|(i, a) l] Hl; [done|].
+    cbn in Hl.
+    apply Nat.succ_lt_mono in Hl.
+    intros Hleq.
+    cbn.
+    apply lazy_andb_True.
+    split.
+    - rewrite forallb_True, Forall_filter, Forall_forall.
+      intros (j, b) Hjb.
+      specialize (Hleq (i, a) (j, b) ltac:(now left) ltac:(now right; apply elem_of_list_In)).
+      cbn in Hleq.
+      cbn.
+      intros <-.
+      rewrite Hleq by done; auto.
+    - apply IHfuel.
+      + eapply Nat.le_lt_trans, Hl; apply length_filter.
+      + intros x y.
+        rewrite <- 2 elem_of_list_In.
+        intros [_ Hx%elem_of_list_In]%elem_of_list_filter [_ Hy%elem_of_list_In]%elem_of_list_filter.
+        specialize (Hleq x y ltac:(now right) ltac:(now right)).
+        done.
+  Qed.
+
+  Lemma equal_on_indicesb_True {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
+    (Heqa : forall a b, eqa a b <-> a = b) fuel (l : list (I * A)) :
+    length l < fuel ->
+    equal_on_indicesb eqa fuel l <-> equal_on_indices l.
+  Proof.
+    intros Hllen.
+    split.
+    + apply equal_on_indicesb_True_1.
+      now intros; apply Heqa.
+    + apply equal_on_indicesb_True_2, Hllen.
+      now intros; apply Heqa.
+  Qed.
+
+  #[export] Instance equal_on_indices_dec {I} `{EqDecision I} `{EqDecision A}
+    (l : list (I * A)) : Decision (equal_on_indices l).
+  refine (cast_if (Is_true_dec (equal_on_indicesb (fun a b => bool_decide (a = b)) (S (length l)) l))).
+  - abstract (select (Is_true (equal_on_indicesb _ _ _)) ltac:(fun H => revert H);
+    rewrite equal_on_indicesb_True; [done|intros; apply bool_decide_spec|lia]).
+  - abstract (select (¬ Is_true (equal_on_indicesb _ _ _)) ltac:(fun H => revert H);
+    rewrite equal_on_indicesb_True; [done|intros; apply bool_decide_spec|lia]).
+  Defined.
+
+
+
+
+
+  Definition delta_spider_tensor' `{SA : Summable A, EqA : EqDecision A,
+    SR : SemiRing R rO rI radd rmul req} {n m}
+      (vi : vec positive n) (wi : vec positive m) : Tensor n m A :=
+    fun v w =>
+      if decide (equal_on_indices (vzip (vi +++ wi) (v +++ w))) then rI else rO.
+
   Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
     fun a b => t [# a] [# b].
 
@@ -165,12 +295,12 @@ Section TensorOps.
 
   Definition fn_delta_tensor_l `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m}
-    (f : vec A n -> vec A m) : Tensor n m A := 
+    (f : vec A n -> vec A m) : Tensor n m A :=
     fun v w => delta_tensor (f v) w.
 
   Definition fn_delta_tensor_r `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m}
-    (f : vec A m -> vec A n) : Tensor n m A := 
+    (f : vec A m -> vec A n) : Tensor n m A :=
     fun v w => delta_tensor v (f w).
 
   Definition assoc_tensor `{SA : Summable A, EqA : EqDecision A,
@@ -183,7 +313,7 @@ Section TensorOps.
 
   Definition perm_tensor `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m} (f : fin n -> fin m) : Tensor n m A :=
-    fun v w => 
+    fun v w =>
     delta_tensor v (fun_to_vec $ (w !!!.) ∘ f).
 
   Definition permute_tensor_l {A n m o} (f : fin n -> fin m) (t : Tensor n o A) : Tensor m o A :=

@@ -143,6 +143,19 @@ Definition interpMAutonomy {A} (f : A -> nat) {n m}
 
 #[export] Instance interpStructAutonomy {A} : InterpStruct (@MAutonomy A) Autonomy :=
   { interpStruct := interpMAutonomy }.
+(* 
+From stdpp Require Import vector.
+
+Inductive Frobenial' : nat -> nat -> Set :=
+  | Delta' {n m} (v : vec positive n) (w : vec positive m) : Frobenial' n m.
+
+delta_spider_tensor 
+
+Definition interpMFrobenial {A} (f : A -> nat) {n m}
+  (p : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
+  match p with
+  | MDelta a b => Delta (btree_size f a) (btree_size f b)
+  end. *)
 
 Definition interpMFrobenial {A} (f : A -> nat) {n m}
   (p : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
@@ -161,7 +174,7 @@ Definition msymmetry_inr {A} {n m} (p : @MSymmetry A n m) : MSymmetric n m := in
 Definition msymmetric_inl {A} {n m} (p : @MSymmetric A n m) : MAutonomous n m := inl p.
 Definition mautonomy_inr {A} {n m} (p : @MAutonomy A n m) : MAutonomous n m := inr p.
 Definition mautonomous_inl {A} {n m} (p : @MAutonomous A n m) : MFrobenius n m := inl p.
-Definition mFrobenial_inr {A} {n m} (p : @MFrobenial A n m) : MFrobenius n m := inr p.
+Definition mfrobenial_inr {A} {n m} (p : @MFrobenial A n m) : MFrobenius n m := inr p.
 
 
 Coercion mmonoidal_inl : MMonoidal >-> MSymmetric.
@@ -169,7 +182,7 @@ Coercion msymmetry_inr : MSymmetry >-> MSymmetric.
 Coercion msymmetric_inl : MSymmetric >-> MAutonomous.
 Coercion mautonomy_inr : MAutonomy >-> MAutonomous.
 Coercion mautonomous_inl : MAutonomous >-> MFrobenius.
-Coercion mFrobenial_inr : MFrobenial >-> MFrobenius.
+Coercion mfrobenial_inr : MFrobenial >-> MFrobenius.
 
 
 Notation MPROP := (MPRO MSymmetric).

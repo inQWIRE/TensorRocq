@@ -4,24 +4,7 @@ From TensorRocq Require Import Isomorphism.IsoAux.
 
 
 
-(* Want: mapping from vertices to edges *)
 
-Definition vertex_map_union (m m' : Pmap (Pset * Pset)) :=
-  union_with (fun '(i, o) '(i', o') => Some (i ∪ i', o ∪ o')) m m'.
-
-Fixpoint vertex_map_aux {T} (hg : list (positive * (T * list positive * list positive))) :
-  Pmap (Pset * Pset) :=
-  match hg with
-  | [] => ∅
-  | (idx, (t, ins, outs)) :: hg =>
-    vertex_map_union (list_to_map ((λ i, (i, ({[idx]}, ∅))) <$> ins))
-      $
-      vertex_map_union (list_to_map ((λ i, (i, (∅, {[idx]}))) <$> outs))
-        (vertex_map_aux hg)
-  end.
-
-Definition vertex_map {T} (hg : Pmap (T * list positive * list positive)) :=
-  vertex_map_aux (map_to_list hg).
 
 #[export] Instance HyperEdge_equiv_dec `{Equiv T, !RelDecision (≡@{T})} :
   RelDecision (≡@{HyperEdge T}) :=

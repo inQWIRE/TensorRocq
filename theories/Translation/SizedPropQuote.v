@@ -210,12 +210,12 @@ Ltac2 quote_Frobenius (ns : constr list) (c : constr) : constr list * constr :=
     | inl ?m => 
       let (ns, m') := quote_Autonomous ns m in 
       (ns, '(mautonomous_inl $m'))
-    | Frobenial_inr ?m => 
+    | frobenial_inr ?m => 
       let (ns, m') := quote_Frobenial ns m in 
-      (ns, '(mFrobenial_inr $m'))
+      (ns, '(mfrobenial_inr $m'))
     | inr ?m => 
       let (ns, m') := quote_Frobenial ns m in 
-      (ns, '(mFrobenial_inr $m'))
+      (ns, '(mfrobenial_inr $m'))
     end in 
   match! c with
   | ?m => go ns m

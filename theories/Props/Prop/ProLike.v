@@ -242,9 +242,13 @@ Qed.
 
 
 Class Compositional (D : Mor nat) := {
+  EqD n m :: Equiv (D n m);
+  EquivD n m :: Equivalence (≡@{D n m});
   Did n : D n n;
   Dcompose {n m o} : D n m -> D m o -> D n o;
+  Dcompose_proper n m o :: Proper (equiv ==> equiv ==> equiv) (@Dcompose n m o);
   Dstack {n m n' m'} : D n m -> D n' m' -> D (n + n') (m + m');
+  Dstack_proper n m n' m' :: Proper (equiv ==> equiv ==> equiv) (@Dstack n m n' m');
 }.
 
 Class StructableDiagram (Struct : Mor nat) (D : Mor nat) :=
@@ -299,22 +303,19 @@ Qed.
 
 
 Class DiagramQuote `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m)}
   {n m} (d : D n m) (p : PRO Struct T n m) := {
   diagram_quote : PRO_to_diagram p ≡ Some d;
 }.
 
 Class DiagramDenote `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m)}
   {n m} (d : D n m) (p : PRO Struct T n m) := {
   diagram_denote : PRO_to_diagram p ≡ Some d;
 }.
 
-#[global] Hint Mode DiagramQuote  - - ! - -   - -  + - : typeclass_instances.
-#[global] Hint Mode DiagramDenote - - ! - -   - -  - + : typeclass_instances.
+#[global] Hint Mode DiagramQuote  - ! - -   - -  + - : typeclass_instances.
+#[global] Hint Mode DiagramDenote - ! - -   - -  - + : typeclass_instances.
 
 Lemma DiagramQuote_iff `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m)}
   {n m} (d : D n m) (p : PRO Struct T n m) :
   DiagramQuote d p <-> PRO_to_diagram p ≡ Some d.
 Proof.
@@ -322,7 +323,6 @@ Proof.
 Qed.
 
 Lemma DiagramDenote_iff `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m)}
   {n m} (d : D n m) (p : PRO Struct T n m) :
   DiagramDenote d p <-> PRO_to_diagram p ≡ Some d.
 Proof.
@@ -330,7 +330,6 @@ Proof.
 Qed.
 
 Lemma DiagramQuote_iff_DiagramDenote `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m)}
   {n m} (d : D n m) (p : PRO Struct T n m) :
   DiagramQuote d p <-> DiagramDenote d p.
 Proof.
@@ -338,7 +337,6 @@ Proof.
 Qed.
 
 #[export] Instance DiagramQuote_proper_equiv `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m), EquivD : forall n m, Equivalence (≡@{D n m})}
   {n m} : Proper ((≡@{D n m}) ==> eq ==> iff) DiagramQuote.
 Proof.
   intros d d' Hd p _ <-.
@@ -347,12 +345,76 @@ Proof.
 Qed.
 
 #[export] Instance DiagramDenote_proper_equiv `{ProD : ProLike Struct T D}
-  `{EqD : forall n m, Equiv (D n m), EquivD : forall n m, Equivalence (≡@{D n m})}
   {n m} : Proper ((≡@{D n m}) ==> eq ==> iff) DiagramDenote.
 Proof.
   intros d d' Hd p _ <-.
   rewrite 2 DiagramDenote_iff.
   now rewrite <- Hd.
+Qed.
+
+#[export] Instance quote_id `{ProD : ProLike Struct T D} n :
+  DiagramQuote (Did n) (Pid n).
+Proof.
+  done.
+Qed.
+
+#[export] Instance quote_compose `{ProD : ProLike Struct T D}
+  {n m o} 
+  (d : D n m) (d' : D m o) (p : PRO Struct T n m) (p' : PRO Struct T m o) :
+  DiagramQuote d p -> DiagramQuote d' p' -> 
+  DiagramQuote (Dcompose d d') (Pcompose p p').
+Proof.
+  intros [Hd] [Hd'].
+  constructor.
+  cbn.
+  unfold omap2.
+  case_match; [|inversion Hd].
+  case_match; [|inversion Hd'].
+  f_equiv.
+  now f_equiv; apply (inj Some).
+Qed.
+
+#[export] Instance quote_stack `{ProD : ProLike Struct T D}
+  {n m n' m'} 
+  (d : D n m) (d' : D n' m') (p : PRO Struct T n m) (p' : PRO Struct T n' m') :
+  DiagramQuote d p -> DiagramQuote d' p' -> 
+  DiagramQuote (Dstack d d') (Pstack p p').
+Proof.
+  intros [Hd] [Hd'].
+  constructor.
+  cbn.
+  unfold omap2.
+  case_match; [|inversion Hd].
+  case_match; [|inversion Hd'].
+  f_equiv.
+  now f_equiv; apply (inj Some).
+Qed.
+
+
+#[export] Instance denote_id `{ProD : ProLike Struct T D} n :
+  DiagramDenote (Did n) (Pid n).
+Proof.
+  done.
+Qed.
+
+#[export] Instance denote_compose `{ProD : ProLike Struct T D}
+  {n m o} 
+  (d : D n m) (d' : D m o) (p : PRO Struct T n m) (p' : PRO Struct T m o) :
+  DiagramDenote d p -> DiagramDenote d' p' -> 
+  DiagramDenote (Dcompose d d') (Pcompose p p').
+Proof.
+  rewrite <- 3 DiagramQuote_iff_DiagramDenote.
+  apply _.
+Qed.
+
+#[export] Instance denote_stack `{ProD : ProLike Struct T D}
+  {n m n' m'} 
+  (d : D n m) (d' : D n' m') (p : PRO Struct T n m) (p' : PRO Struct T n' m') :
+  DiagramDenote d p -> DiagramDenote d' p' -> 
+  DiagramDenote (Dstack d d') (Pstack p p').
+Proof.
+  rewrite <- 3 DiagramQuote_iff_DiagramDenote.
+  apply _.
 Qed.
 
 
@@ -363,10 +425,7 @@ Context (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
 
 
 Class LawfulCompositional (D : nat -> nat -> Type)
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
-  {TensD : StrictTensorLike R A D}
-  {CompD : Compositional D} := {
+  {CompD : Compositional D} {TensD : StrictTensorLike R A D} := {
   Did_correct n : strictInterpretTensor (Did n) ≡ delta_tensor;
   Dcompose_correct {n m o} (d : D n m) (d' : D m o) :
     strictInterpretTensor (Dcompose d d') ≡
@@ -415,8 +474,6 @@ Class LawfulProLike
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   := {
   LPL_compD :: LawfulCompositional D;
@@ -431,8 +488,6 @@ Lemma PRO_to_diagram_correct {Struct T D} `{ProD : ProLike Struct T D}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p : PRO Struct T n m) (d : D n m) :
@@ -464,8 +519,7 @@ Lemma DiagramQuote_proper_semantics_aux {Struct T D} `{ProD : ProLike Struct T D
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
+  
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -495,8 +549,6 @@ Lemma DiagramQuote_proper_semantics {Struct T D} `{ProD : ProLike Struct T D}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -513,8 +565,6 @@ Lemma DiagramDenote_proper_semantics {Struct T D} `{ProD : ProLike Struct T D}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -533,8 +583,6 @@ Lemma DiagramQuote_correct {Struct T D} `{ProD : ProLike Struct T D}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d d' : D n m) : 
@@ -558,8 +606,6 @@ Lemma DiagramQuote_to_DiagramDenote_correct {Struct T D} `{ProD : ProLike Struct
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  `{EqD : forall n m, Equiv (D n m)}
-  `{EquivD : forall n m, @Equivalence (D n m) equiv}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d d' : D n m) : 

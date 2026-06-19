@@ -79,3 +79,21 @@ Lemma iff_True_1 {P} : P -> (P <-> True).
 Proof. tauto. Qed.
 Lemma iff_True_2 {P} : (P <-> True) -> P.
 Proof. tauto. Qed.  
+
+
+
+(* FIXME: Move *)
+Tactic Notation "vm_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  vm_compute in Hx;
+  subst x.
+
+Tactic Notation "vm_eval" uconstr(pat) "in" 
+  ne_hyp_list_sep(H, ",") :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in H;
+  vm_compute in Hx;
+  subst x.

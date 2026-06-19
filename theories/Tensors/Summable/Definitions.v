@@ -347,39 +347,6 @@ Fixpoint vec_elements `(l : list A) (n : nat) : list (Vector.t A n) :=
   | S n' => flat_map (fun a => map (@Vector.cons A a n') (vec_elements l n')) l
   end.
 
-Lemma ForallPairs_cons `(R : relation A) a (l : list A) :
-  ForallPairs R (a :: l) <-> R a a /\ Forall (R a) l /\
-    Forall (fun x => R x a) l /\ ForallPairs R l.
-Proof.
-  rewrite 2 Forall_forall.
-  unfold ForallPairs.
-  setoid_rewrite elem_of_list_In.
-  cbn.
-  firstorder subst; auto.
-Qed.
-
-Lemma ForallPairs_not_eq_ForallOrdPairs_NoDup `(R : relation A) (l : list A) :
-  NoDup l ->
-  ForallPairs (fun x y => x <> y -> R x y) l ->
-  ForallOrdPairs R l.
-Proof.
-  intros Hl.
-  induction Hl as [|a l Ha Hl IHHl]; [constructor|].
-  rewrite ForallPairs_cons.
-  intros [_ [Hal [Hla Hl'%IHHl]]].
-  constructor; [|easy].
-  rewrite Forall_forall in Hal |- *.
-  intros x Hx; apply Hal in Hx as Hx'; [easy|now intros ->].
-Qed.
-
-Lemma ForallPairs_map `(f : A -> B) (P : B -> B -> Prop) (l : list A) :
-  ForallPairs P (map f l) <-> ForallPairs (fun x y => P (f x) (f y)) l.
-Proof.
-  unfold ForallPairs.
-  setoid_rewrite in_map_iff.
-  firstorder subst; eauto.
-Qed.
-
 Lemma vec_elements_nonempty `(l : list A) n :
   l <> [] -> vec_elements l n <> [].
 Proof.

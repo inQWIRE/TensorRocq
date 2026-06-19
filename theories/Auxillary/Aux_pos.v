@@ -2196,6 +2196,17 @@ Proof.
   intros [] [] [=]; f_equal; (eapply inj; [|eassumption]); eauto.
 Qed.
 
+Definition pos_case {P : positive -> Type}
+  (fl : forall p, P (p~0))
+  (fr : forall p, P (p~1))
+  (P1 : P xH) : forall p, P p :=
+  fun p =>
+  match p with
+  | p~0 => fl p
+  | p~1 => fr p
+  | xH => P1
+  end.
+
 Notation pos_nat_add n :=
   (λ p, pos_add_N p (N.of_nat n)).
 
