@@ -1,4 +1,4 @@
-Require Import CospanHyperGraph.Facts.
+From TensorRocq Require Import CospanHyperGraph.Definitions.
 
 
 
