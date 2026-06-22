@@ -599,6 +599,20 @@ Proof.
   cbn.
   now case_match.
 Qed.
+(* 
+Lemma Pset_min_le (s : Pset) : set_Forall (λ p, Pset_min s <= Npos p)%N s.
+Proof.
+  rewrite set_Forall_elements.
+  unfold Pset_min.
+  induction (elements s); [done|].
+  rewrite Forall_cons.
+  split.
+  - cbn.
+    case_match; lia.
+  - eapply Forall_impl; [apply IHl|].
+    intros p.
+    cbn.
+    case_match; cbn; try lia. *)
 
 
 
@@ -884,6 +898,57 @@ Definition partition_of_func (f : positive -> positive)
   make_blocks (map_to_list (foldr (λ p m,
     partial_alter (λ s, Some $ from_option ({[p]} ∪.) {[p]} s)
       (f p) m) (∅ :> Pmap Pset) l)).*2.
+
+
+
+
+
+
+
+Definition prel := Pmap Pset.
+
+Definition prel_relation (R : prel) (p q : positive) : bool :=
+  from_option (λ s, bool_decide (q ∈ s)) false (R !! p).
+
+Definition prel_add_relatees (R : prel) (p : positive) (qs : Pset) : prel :=
+  partial_alter (λ s, Some $ from_option (qs ∪.) qs s) p R.
+
+Definition prel_img (R : prel) (s : Pset) : Pset :=
+  set_bind (λ p, default ∅ (R !! p)) s.
+
+Definition prel_compose (R S : prel) : prel :=
+  prel_img S <$> R.
+
+Definition prel_union_compose (R S : prel) : prel :=
+  (λ s, s ∪ prel_img S s) <$> R.
+
+
+Fixpoint prel_tc_aux (fuel : nat) (Racc : prel) (R : prel) : prel :=
+  match fuel with
+  | O => Racc
+  | S fuel => 
+    prel_union_compose (prel_tc_aux fuel Racc R) R
+  end.
+
+Definition prel_tc (R : prel) : prel :=
+  prel_tc_aux (Nat.pred $ size R) R R.
+
+Definition prel_union (R S : prel) : prel :=
+  merge (union_with (λ s t, Some $ s ∪ t)) R S.
+
+
+Fixpoint prel_tc_img_aux (R : prel) (fuel : nat) (img : Pset) : Pset :=
+  match fuel with
+  | O => img
+  | S fuel => 
+    let img' := prel_tc_img_aux R fuel img in 
+    img' ∪ prel_img R img'
+  end.
+
+Definition prel_tc_img (R : prel) (s : Pset) : Pset :=
+  prel_tc_img_aux R (Nat.pred $ size R) s.
+  
+
 
 
 (* Lemma length_partitions_of_list_aux l :
