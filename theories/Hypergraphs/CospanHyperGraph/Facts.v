@@ -1,10 +1,11 @@
-Require Export CospanHyperGraph.Expr CospanHyperGraph.Semantics.
-Require Import Aux_pos.
-Require Import Tensor.
+From TensorRocq Require Export CospanHyperGraph.Expr
+  CospanHyperGraph.Semantics CospanHyperGraph.StackComposeCorrect.
+From TensorRocq Require Import Aux_pos.
+From TensorRocq Require Import Tensor.
 From stdpp Require Import list fin_maps.
 From stdpp Require Import pmap gmap.
 Require ZifyBool.
-Require Import Syntax.Cospans Syntax.Permutations.
+From TensorRocq Require Import Syntax.Cospans Syntax.Permutations.
 
 
 #[local] Coercion pos_to_nat_pred : positive >-> nat.
@@ -26,7 +27,14 @@ Qed.
 
 
 
+
+
+
+
+
+
 Section TensorGraphFacts.
+
 
 Context `{SR : SemiRing R rO rI radd rmul req,
   SA : Summable A, EQA : EqDecision A} `{Equiv T} `{Equivalence T equiv}.
@@ -52,8 +60,6 @@ Local Existing Instance Radd_proper.
 
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
-
-
 
 
 
@@ -524,6 +530,23 @@ Proof.
   split; [done|].
   apply graph_namedtensorlist_semantics_WF.
 Qed.
+
+
+Lemma graph_semantics_permute_graph {_ : WFSummable A} {n n' m m'}
+  (fl : fin n -> fin n') {Hfl : Inj eq eq fl} (Hn : n = n')
+  (fr : fin m -> fin m') {Hfr : Inj eq eq fr} (Hm : m = m') (cohg : CospanHyperGraph T n m) :
+  graph_semantics (permute_graph fl fr cohg) ≡@{@Tensor R n' m' A}
+  permute_tensor fl fr (graph_semantics cohg).
+Proof.
+  subst n' m'.
+  rewrite 2 graph_semantics_to_contl.
+  change (graph_mabs _) with (graph_mabs cohg).
+  rewrite <- (contl_semantics_permute_contl _ fl eq_refl fr eq_refl) by
+    (cbn; rewrite vec_to_list_map, vec_to_list_seq, (NoDup_fmap _); apply NoDup_seq).
+  eapply contl_eq_correct; [apply graph_contl_semantics_WT|].
+  now apply graph_contl_semantics_permute_graph.
+Qed.
+
 
 Lemma graph_contl_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
   contl_eq (graph_contl_semantics (add_top_loop tg))
@@ -1898,7 +1921,7 @@ Proof.
     rewrite length_vec_to_list.
     replace (m + j - m)%nat with j by lia.
     rewrite lookup_app_l by now rewrite length_vec_to_list; lia.
-    
+
     assert (Hjv : j < length v) by now rewrite length_vec_to_list; lia.
     assert (Hjw : j < length wr) by now rewrite length_vec_to_list.
     rewrite <- lookup_lt_is_Some in Hjv, Hjw.
@@ -1942,8 +1965,8 @@ Proof.
     rewrite lookup_app_r by now rewrite length_vec_to_list; lia.
     rewrite length_vec_to_list.
     replace (n + j - n)%nat with j by lia.
-    
-    
+
+
     assert (Hjv : n + j < length v) by now rewrite length_vec_to_list; lia.
     assert (Hjw : j < length wl) by now rewrite length_vec_to_list.
     rewrite <- lookup_lt_is_Some in Hjv, Hjw.
@@ -1996,7 +2019,7 @@ Proof.
   rewrite <- (length_vec_to_list (wl +++ wr)) at 1.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ j).
-  replace (seq 0 (n + n)) with (seq 0 (length (wl +++ wr))) by 
+  replace (seq 0 (n + n)) with (seq 0 (length (wl +++ wr))) by
     now rewrite length_vec_to_list.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ (n + j)).
@@ -2059,7 +2082,7 @@ Proof.
   rewrite <- (length_vec_to_list (wl +++ wr)) at 1.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ j).
-  replace (seq 0 (n + n)) with (seq 0 (length (wl +++ wr))) by 
+  replace (seq 0 (n + n)) with (seq 0 (length (wl +++ wr))) by
     now rewrite length_vec_to_list.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ (n + j)).
@@ -2331,20 +2354,20 @@ Proof.
   - now apply cohg_vert_eq_semantic_eq.
 Qed.
 
-#[export] Instance cohg_syntactic_eq_semantic_eq {n m} : 
+#[export] Instance cohg_syntactic_eq_semantic_eq {n m} :
   subrelation (@cohg_syntactic_eq T _ n m) cohg_semantic_eq.
 Proof.
   refine graph_semantics_syntactic_eq.
 Qed.
 
-#[export] Instance cohg_eq_semantic_eq {n m} : 
+#[export] Instance cohg_eq_semantic_eq {n m} :
   subrelation (@cohg_eq T n m _) cohg_semantic_eq.
 Proof.
   rewrite <- cohg_syntactic_eq_semantic_eq.
   apply _.
 Qed.
 
-#[export] Instance isomorphic_semantic_eq {n m} : 
+#[export] Instance isomorphic_semantic_eq {n m} :
   subrelation (@isomorphic T n m) cohg_semantic_eq.
 Proof.
   rewrite <- cohg_syntactic_eq_semantic_eq.
@@ -2352,7 +2375,7 @@ Proof.
 Qed.
 
 (* FIXME: Move *)
-#[export] Instance struct_isomorphic_syntactic_eq {n m} : 
+#[export] Instance struct_isomorphic_syntactic_eq {n m} :
   subrelation (@struct_isomorphic T n m) cohg_syntactic_eq.
 Proof.
   intros x y Heq.
@@ -2361,14 +2384,14 @@ Proof.
   apply (subrel (norm_verts_vert_eq y)).
 Qed.
 
-#[export] Instance struct_isomorphic_semantic_eq {n m} : 
+#[export] Instance struct_isomorphic_semantic_eq {n m} :
   subrelation (@struct_isomorphic T n m) cohg_semantic_eq.
 Proof.
   rewrite <- cohg_syntactic_eq_semantic_eq.
   apply _.
 Qed.
 
-#[export] Instance compose_graphs_semantic_eq {n m o} : 
+#[export] Instance compose_graphs_semantic_eq {n m o} :
   Proper (cohg_semantic_eq ==> cohg_semantic_eq ==> cohg_semantic_eq)
     (@compose_graphs T n m o).
 Proof.
@@ -2378,7 +2401,7 @@ Proof.
   now apply compose_tensor_mor.
 Qed.
 
-#[export] Instance stack_graphs_semantic_eq {n1 m1 n2 m2} : 
+#[export] Instance stack_graphs_semantic_eq {n1 m1 n2 m2} :
   Proper (cohg_semantic_eq ==> cohg_semantic_eq ==> cohg_semantic_eq)
     (@stack_graphs T n1 m1 n2 m2).
 Proof.
@@ -2387,6 +2410,307 @@ Proof.
   rewrite 2 graph_semantics_stack_graphs.
   now apply stack_tensor_mor.
 Qed.
+
+(* FIXME: Move *)
+Lemma decide_rI_rO_mul `{Decision P, Decision Q} :
+  (if decide P then rI else rO) * (if decide Q then rI else rO) ==
+  if decide (P /\ Q) then rI else rO.
+Proof.
+  do 3 case_decide; tauto || ring.
+Qed.
+
+
+(*
+Lemma list_to_lookup_elements_set `{Inhabited B} `{FinSet B SB}
+  (l : list B) (X : SB) : list_to_set l ⊆ X ->
+  l = (elements X !!!.) <$> ((λ a, default 0 (list_index a (elements X))) <$> l).
+Proof.
+  intros Hl.
+  symmetry.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_id'.
+  intros a [i Hi]%(elem_of_list_to_set (C:=SB))%Hl%elem_of_elements%list_index_is_Some.
+  apply list_index_Some in Hi as Hi'.
+  cbn.
+  rewrite Hi.
+  cbn.
+  rewrite list_lookup_total_alt.
+  now rewrite Hi'.1.
+Qed.
+
+FIXME: Complete, using permute_graph to turn it into
+a stack of spiders, then use stack correctness to get that working.
+
+Lemma empty_graph_semantics {n m} (vi : vec positive n) (wi : vec positive m) :
+  graph_semantics (mk_cohg ∅ vi wi) ≡@{@Tensor R n m A}
+  delta_spider_tensor' vi wi.
+Proof.
+  unfold graph_semantics.
+  cbn.
+  rewrite fmap_empty.
+
+  intros v w Hv Hw.
+  unfold namedtensorlist_to_tensor.
+  cbn.
+  rewrite vertices_empty_graph.
+  assert (@tg_abstracts T ∅ = []) as -> by done.
+  cbn.
+  rewrite fmap_app, 2 fmap_imap.
+  unfold compose.
+  cbn.
+  unfold delta_spider_tensor'.
+  rewrite (list_to_lookup_elements_set vi (list_to_set (vi +++ wi) :> Pset)).
+  remember (_ <$> vec_to_list vi) as vi' eqn:Hvi'; clear Hvi'. *)
+
+
+
+
+
+Lemma delta_spider_graph_semantics {n m} :
+  graph_semantics (@delta_spider_graph T n m) ≡@{@Tensor R n m A} delta_spider_tensor.
+Proof.
+  unfold graph_semantics.
+  cbn.
+  rewrite fmap_empty.
+  rewrite delta_spider_tensor_alt.
+  intros v w Hv Hw.
+  unfold namedtensorlist_to_tensor.
+  cbn.
+  rewrite vertices_delta_spider_graph.
+  assert (@tg_abstracts T ∅ = []) as -> by done.
+  cbn.
+  case_decide as Hnm.
+  1:{
+    assert (n = 0) as -> by lia.
+    assert (m = 0) as -> by lia.
+    rewrite elements_empty.
+    cbn.
+    inv_all_vec_fin.
+    apply rmul_1_l.
+  }
+  rewrite elements_singleton.
+  cbn.
+  rewrite 2 (vec_to_list_fun_to_vec (const xH)).
+  rewrite 2 fmap_const, 2 length_seq.
+  rewrite 2 imap_replicate.
+  rewrite fmap_app.
+  rewrite <- 2 list_fmap_compose.
+  unfold compose.
+  simpl.
+  rewrite lookup_insert.
+  cbn.
+  erewrite sum_of_ext'. 2:{
+    intros a Ha.
+    rewrite rmul_1_l at 1.
+    rewrite fmap_app, <- 2 list_fmap_compose.
+    unfold compose.
+    cbn.
+    unfold make_vecs_map.
+    rewrite Rlist_prod_app at 1.
+    apply Rmul_proper.
+    - apply eq_reflexivity.
+      apply f_equal.
+      apply (list_fmap_ext _ (fun i =>
+        if decide (vec_to_list v !! i = Some a) then rI else rO)).
+      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
+      rewrite lookup_union.
+      rewrite vec_to_list_zip_with, vec_to_list_map, vec_to_list_seq.
+      rewrite zip_with_fmap_l.
+      rewrite <- (length_vec_to_list v) at 1.
+      rewrite <- imap_to_zip_with_seq.
+      rewrite (lookup_list_to_map_imap (λ n, (Pos.of_succ_nat n)~0) id).
+      rewrite option_fmap_id.
+      rewrite <- (fin_to_nat_to_fin _ _ Hi).
+      rewrite lookup_vec_to_list_fin.
+      rewrite union_Some_l.
+      cbn.
+      change (_ !! _) with (Some a).
+      cbn.
+      apply decide_ext.
+      rewrite (inj_iff Some).
+      split; [|now intros <-].
+      now intros ?%vcons_inj.
+    - apply eq_reflexivity.
+      apply f_equal.
+      apply (list_fmap_ext _ (fun i =>
+        if decide (vec_to_list w !! i = Some a) then rI else rO)).
+      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
+      rewrite lookup_union.
+      rewrite 2 vec_to_list_zip_with, 2 vec_to_list_map, 2 vec_to_list_seq.
+      rewrite 2 zip_with_fmap_l.
+      rewrite <- (length_vec_to_list v) at 1.
+      rewrite <- (length_vec_to_list w) at 1.
+      rewrite <- 2 imap_to_zip_with_seq.
+      rewrite (not_elem_of_dom (list_to_map (imap _ v)) _).1.
+      2:{
+        rewrite dom_list_to_map, fmap_imap.
+        unfold compose.
+        cbn.
+        rewrite imap_seq_0.
+        set_solver.
+      }
+      rewrite (left_id_L None (∪)).
+      rewrite (lookup_list_to_map_imap (λ n, (Pos.of_succ_nat n)~1) id).
+      rewrite option_fmap_id.
+      rewrite <- (fin_to_nat_to_fin _ _ Hi).
+      rewrite lookup_vec_to_list_fin.
+      cbn.
+      change (_ !! _) with (Some a).
+      cbn.
+      apply decide_ext.
+      rewrite (inj_iff Some).
+      split; [|now intros <-].
+      now intros ?%vcons_inj.
+  }
+  erewrite (sum_of_ext' _ (fun a =>
+    if decide ((v +++ w) = fun_to_vec (λ _, a)) then rI else rO)). 2:{
+    intros a Ha.
+    unshelve erewrite decide_ext by (now
+        rewrite fun_to_vec_plus, vapp_eq_iff, vsplitl_app, vsplitr_app;
+        unfold compose); [apply _|].
+    rewrite <- decide_rI_rO_mul.
+    f_equiv.
+    - rewrite <- Rlist_prod_vec_if_eq.
+      f_equiv.
+      apply eq_reflexivity.
+      apply list_fmap_ext.
+      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
+      rewrite <- (fin_to_nat_to_fin _ _ Hi).
+      rewrite 2 lookup_vec_to_list_fin, lookup_fun_to_vec.
+      done.
+    - rewrite <- Rlist_prod_vec_if_eq.
+      f_equiv.
+      apply eq_reflexivity.
+      apply list_fmap_ext.
+      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
+      rewrite <- (fin_to_nat_to_fin _ _ Hi).
+      rewrite 2 lookup_vec_to_list_fin, lookup_fun_to_vec.
+      done.
+  }
+  generalize (_ : SummedElement (v +++ w)).
+  generalize (v +++ w) as vw.
+  revert Hnm.
+  generalize (n + m)%nat as nm.
+  clear n m v w Hv Hw.
+  intros [|n] Hn v Hv; [done|].
+  rewrite (sum_of_unique' _ (v!!!0%fin)).
+  - apply eq_reflexivity, decide_ext.
+    inv_all_vec_fin.
+    cbn.
+    unfold compose.
+    split.
+    + intros [_ ->]%vcons_inj.
+      constructor; [done|].
+      rewrite (vec_to_list_fun_to_vec (fun _ => _)).
+      rewrite Forall_fmap.
+      rewrite Forall_forall; easy.
+    + rewrite Forall_cons.
+      intros [_ Hveq].
+      f_equal.
+      apply vec_eq; intros i.
+      rewrite lookup_fun_to_vec.
+      rewrite Forall_vlookup in Hveq.
+      specialize (Hveq i).
+      congruence.
+  - intros b _.
+    inv_all_vec_fin.
+    cbn.
+    intros Hxb.
+    apply eq_reflexivity, decide_False.
+    intros [[]%Hxb _]%vcons_inj.
+Qed.
+
+
+Lemma vertices_delta_spider_graph_bundled k n m :
+  vertices (@delta_spider_graph_bundled T k n m) =
+  if decide (n + m = 0)%nat then ∅ else list_to_set (Pos.of_succ_nat <$> seq 0 k).
+Proof.
+  case_decide.
+  1:{
+    replace n with 0 in * by lia.
+    replace m with 0 in * by lia.
+    reflexivity.
+  }
+  unfold vertices.
+  cbn.
+  change (vertices_hg _) with (∅ :> Pset).
+  rewrite union_empty_l_L.
+  rewrite 2 (vec_to_list_fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
+  rewrite list_to_set_app_L.
+  transitivity (list_to_set
+    ((λ i, Pos.of_succ_nat (i `mod` k)) <$> seq 0 ((max n m) * k)) :> Pset).
+  1:{
+    rewrite <- 3 (set_map_list_to_set_L (SA:=gset nat)).
+    rewrite <- set_map_union_L.
+    f_equal.
+    set_unfold.
+    setoid_rewrite elem_of_seq.
+    nia.
+  }
+  assert (n `max` m <> 0) by lia.
+  apply leibniz_equiv_iff, set_subseteq_antisymm.
+  - set_unfold.
+    setoid_rewrite elem_of_seq.
+    intros ? (x & -> & ?).
+    exists (x `mod` k).
+    split; [done|].
+    split; [lia|].
+    apply Nat.mod_upper_bound.
+    lia.
+  - destruct (n `max` m); [easy|].
+    cbn.
+    rewrite seq_app.
+    rewrite fmap_app, list_to_set_app_L.
+    apply union_subseteq_l'.
+    apply eq_reflexivity.
+    f_equal.
+    apply list_fmap_ext.
+    intros _ x Hx%elem_of_list_lookup_2%elem_of_seq.
+    now rewrite Nat.mod_small by apply Hx.
+Qed.
+
+Lemma graph_semantics_n_stack_graphs k {n m} (cohg : CospanHyperGraph T n m) :
+  graph_semantics (n_stack_graphs k cohg) ≡@{@Tensor R _ _ A}
+  n_stack_tensor k (graph_semantics cohg).
+Proof.
+  induction k; [|].
+  - cbn.
+    rewrite graph_semantics_id.
+    intros v w _ _.
+    inv_all_vec_fin.
+    done.
+  - cbn.
+    rewrite graph_semantics_stack_graphs.
+    apply stack_tensor_mor, IHk; done.
+Qed.
+
+Lemma graph_semantics_copy_graph k {n m} (cohg : CospanHyperGraph T n m) :
+  graph_semantics (copy_graph k cohg) ≡@{@Tensor R _ _ A}
+  copy_tensor k (graph_semantics cohg).
+Proof.
+  unfold copy_graph.
+  rewrite (graph_semantics_permute_graph _ (Nat.mul_comm _ _) _ (Nat.mul_comm _ _)).
+  rewrite copy_tensor_alt.
+  apply permute_tensor_mor; [done..|].
+  rewrite graph_semantics_n_stack_graphs.
+  done.
+Qed.
+
+Lemma delta_spider_graph_bundled_semantics k n m :
+  graph_semantics (@delta_spider_graph_bundled T k n m) ≡@{@Tensor R _ _ A} delta_spider_tensor_bundled k.
+Proof.
+  erewrite graph_semantics_syntactic_eq by
+    apply (subrel (delta_spider_graph_bundled_alt k n m)).
+  rewrite graph_semantics_copy_graph.
+  erewrite copy_tensor_mor by apply delta_spider_graph_semantics.
+  done.
+Qed.
+
+
+
+
+
+
 
 End TensorGraphFacts.
 

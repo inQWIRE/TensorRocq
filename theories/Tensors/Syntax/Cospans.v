@@ -807,8 +807,33 @@ Proof.
 Qed.
 
 
+Definition permute_contl {n n' m m'}
+  (fl : fin n -> fin n') (fr : fin m -> fin m') (contl : CospanNamedTensorList n m) :
+  CospanNamedTensorList n' m' :=
+  mk_contl contl.(contl_expr)
+    (fun_to_vec (λ i, from_option (contl.(contl_inputs) !!!.) xH (fin_inj_inv fl i)))
+    (fun_to_vec (λ i, from_option (contl.(contl_outputs) !!!.) xH (fin_inj_inv fr i))).
 
-Require Export Tensor Syntax.Semantics.
+Definition permute_contl_alt {n m}
+  (fl : fin n -> fin n) {Hfl : Inj eq eq fl}
+  (fr : fin m -> fin m) {Hfr : Inj eq eq fr} (contl : CospanNamedTensorList n m) :
+  permute_contl fl fr contl =
+  mk_contl contl.(contl_expr)
+    (permute_vec (fin_perm_inv fl) contl.(contl_inputs))
+    (permute_vec (fin_perm_inv fr) contl.(contl_outputs)).
+Proof.
+  unfold permute_contl.
+  f_equal;
+  apply vec_eq;
+  intros i;
+  cbn -[fin_inj_inv];
+  rewrite lookup_fun_to_vec, lookup_permute_vec;
+  rewrite (fin_inj_inv_to_perm _);
+  done.
+Qed.
+
+
+From TensorRocq Require Export Tensor Syntax.Semantics.
 
 
 
@@ -1345,6 +1370,41 @@ Proof.
     intros ? []%elem_of_map []%elem_of_map; lia].
   now apply stack_tensor_mor; 
   apply (contl_semantics_relabel_contl_free _ _).
+Qed.
+
+
+Lemma contl_semantics_permute_contl {n n' m m'}
+  tm (fl : fin n -> fin n') {Hfl : Inj eq eq fl} (Hn : n = n')
+  (fr : fin m -> fin m') {Hfr : Inj eq eq fr} (Hm : m = m')
+  (contl : CospanNamedTensorList n m) : 
+  NoDup contl.(contl_inputs) -> NoDup contl.(contl_outputs) ->
+  contl_semantics tm (permute_contl fl fr contl) ≡@{Tensor n' m'}
+  permute_tensor fl fr (contl_semantics tm contl).
+Proof.
+  destruct contl as [ntl ins outs].
+  intros Hins Houts v w Hv Hw.
+  subst n' m'.
+  rewrite (permute_contl_alt _ _).
+  cbn -[make_vecs_map] in *.
+  unfold make_vecs_map.
+  f_equiv.
+  symmetry; f_equal; (apply list_to_map_proper;
+  [now rewrite vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list|]);
+  symmetry.
+  - rewrite <- (permute_vec_perm fl eq_refl).
+    apply eq_reflexivity.
+    f_equal.
+    apply vec_eq.
+    intros i.
+    rewrite lookup_permute_vec, 2 vlookup_zip_with, 2 lookup_permute_vec.
+    now rewrite (fin_perm_inv_linv fl).
+  - rewrite <- (permute_vec_perm fr eq_refl).
+    apply eq_reflexivity.
+    f_equal.
+    apply vec_eq.
+    intros i.
+    rewrite lookup_permute_vec, 2 vlookup_zip_with, 2 lookup_permute_vec.
+    now rewrite (fin_perm_inv_linv fr).
 Qed.
 
 

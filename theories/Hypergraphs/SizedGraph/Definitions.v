@@ -11,59 +11,6 @@ From TensorRocq Require Export CospanHyperGraph.
 Definition N : True := I.
 
 
-(* FIXME: Move *)
-
-Definition map_relabel_one `{FinMap K M} {A} (a b : K) (m : M A) : M A :=
-  partial_alter (λ _, (m !! b)) a m.
-
-Fixpoint map_relabels `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m : M A), M A :=
-  match n with
-  | 0 => fun abs A m => m
-  | S n' => fun abs A m =>
-    let a := (vhd abs).1 in
-    let b := (vhd abs).2 in
-    map_relabel_one a b (map_relabels (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs)) 
-    m)
-  end.
-
-
-Fixpoint map_relabels_r `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m : M A), M A :=
-  match n with
-  | 0 => fun abs A m => m
-  | S n' => fun abs A m =>
-    let a := (vhd abs).1 in
-    let b := (vhd abs).2 in
-    (map_relabels_r (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs)) 
-    (map_relabel_one b a m))
-  end.
-
-Lemma lookup_map_relabel_one `{FinMap K M} (a b : K) {A} (m : M A) c :
-  map_relabel_one a b m !! c = m !! ({[a := b]} c).
-Proof.
-  rewrite fn_lookup_singleton_case.
-  unfold map_relabel_one.
-  case_decide.
-  - subst.
-    now rewrite lookup_partial_alter.
-  - now rewrite lookup_partial_alter_ne.
-Qed.
-
-(* Lemma fn_singleton_subst_by_vec {n} (abs : vec _ n) a b c : 
-  {[a := b]} (subst_by_vec abs c) = 
-  subst_by_vec () *)
-
-Lemma lookup_map_relabels_pos {n} (abs : vec _ n) {A} (m : Pmap A) c :
-  map_relabels abs m !! c = m !! (subst_by_vec (propogate_subst abs) c).
-Proof.
-  revert m c; induction n as [|n IHn]; [done|].
-  intros m c.
-  destruct abs as [(a, b) abs] using vec_S_inv.
-  cbn -[map_relabel_one].
-  rewrite lookup_map_relabel_one.
-  rewrite IHn.
-  reflexivity.
-Qed.
-
 
 
 
@@ -1269,34 +1216,6 @@ Proof.
   now intros k [Hk _]%elem_of_filter.
 Qed.
 
-(* FIXME: Move *)
-Lemma map_filter_union' `{FinMap K M} {A} (P : K -> Prop)
-  `{HP : forall ka, Decision (P ka)} (m1 m2 : M A) :
-  filter (λ kv, P kv.1) (m1 ∪ m2) =
-  filter (λ kv, P kv.1) m1 ∪ filter (λ kv, P kv.1) m2.
-Proof.
-  apply map_eq; intros k.
-  apply option_eq.
-  intros a.
-  rewrite map_lookup_filter_Some.
-  rewrite 2 lookup_union.
-  rewrite 2 map_lookup_filter.
-  destruct (m1 !! k), (m2 !! k); cbn;
-  try case_guard; cbn; naive_solver.
-Qed.
-Lemma kmap_kmap `{FinMap K1 M1, FinMap K2 M2, FinMap K3 M3} {A}
-  (f : K1 -> K2) (g : K2 -> K3) `{Hf : !Inj eq eq f, Hg : !Inj eq eq g}
-  (m : M1 A) :
-  kmap g (kmap f m :> M2 A) =@{M3 A} kmap (g ∘ f) m.
-Proof.
-  apply map_eq.
-  intros i.
-  apply option_eq; intros v.
-  rewrite 2 (lookup_kmap_Some _).
-  setoid_rewrite (lookup_kmap_Some _).
-  set_solver + Hf Hg.
-Qed.
-
 Lemma relabel_sized_graph_norm_sized_verts_inv_l {N} `{Equiv T} f `{Hf : !Inj eq eq f}
   {n m} (cohg cohg' : SizedCospanHyperGraph N T n m) :
   norm_sized_verts cohg = relabel_sized_graph f cohg' -> exists f' cohg'',
@@ -2023,46 +1942,6 @@ Proof.
     rewrite IHn.
     rewrite sized_cospan_sized_add_top_loop.
     done.
-Qed.
-
-(* FIXME: Move *)
-(* Lemma kmap_fn_singleton `{FinMap K1 M1, FinMap K2 M2} (a b : ) *)
-
-(* FIXME: Move *)
-Lemma vhd_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w : 
-  vhd (vzip_with f v w) = f (vhd v) (vhd w).
-Proof.
-  destruct v as [vh v] using vec_S_inv.
-  destruct w as [wh w] using vec_S_inv.
-  reflexivity.
-Qed.
-
-Lemma vtl_vzip_with {A B C} (f : A -> B -> C) {n} (v : vec A (S n)) w : 
-  vtl (vzip_with f v w) = vzip_with f (vtl v) (vtl w).
-Proof.
-  destruct v as [vh v] using vec_S_inv.
-  destruct w as [wh w] using vec_S_inv.
-  reflexivity.
-Qed.
-
-Lemma vhd_vsplitl {A n m} (v : vec A ((S n) + m)) :
-  vhd (vsplitl v) = vhd v.
-Proof.
-  destruct v as [vl vr] using vec_add_inv.
-  destruct vl as [vlh vl] using vec_S_inv.
-  rewrite vsplitl_app.
-  reflexivity.
-Qed.
-
-Lemma vtl_vsplitl {A n m} (v : vec A ((S n) + m)) :
-  vtl (vsplitl v) = vsplitl (vtl v).
-Proof.
-  destruct v as [vl vr] using vec_add_inv.
-  destruct vl as [vlh vl] using vec_S_inv.
-  rewrite vsplitl_app.
-  cbn.
-  rewrite vsplitl_app.
-  reflexivity.
 Qed.
 
 

@@ -1066,6 +1066,20 @@ Global Instance btree_join: MJoin btree := λ A,
   | 0 => 0
   end%btree.
 
+
+Lemma btree_size_fmap {A B} (f : A -> B) (g : B -> nat) (b : btree A) : 
+  btree_size g (f <$> b) = btree_size (g ∘ f) b.
+Proof.
+  induction b; cbn; congruence.
+Qed.
+
+
+Lemma btree_size_const_0 {A} {b : btree A} :
+  btree_size (λ _, O) b = O.
+Proof.
+  induction b; [|done..];
+  cbn; lia.
+Qed.
     
 
 (* Search (option ?A -> is_Some _ -> ?A). *)

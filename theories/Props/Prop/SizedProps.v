@@ -93,8 +93,7 @@ Inductive MAutonomy {A} : btree A -> btree A -> Type :=
   | MCap n : MAutonomy (n + n) 0.
 
 Inductive MFrobenial {A} : btree A -> btree A -> Type :=
-  | MDelta n m : MFrobenial n m.
-
+  | MDelta a (n m : btree unit) : MFrobenial ((λ _, a) <$> n) ((λ _, a) <$> m).
 
 Definition MSymmetric {A} : btree A -> btree A -> Type := MorUnion MMonoidal MSymmetry.
 
@@ -143,27 +142,76 @@ Definition interpMAutonomy {A} (f : A -> nat) {n m}
 
 #[export] Instance interpStructAutonomy {A} : InterpStruct (@MAutonomy A) Autonomy :=
   { interpStruct := interpMAutonomy }.
-(* 
-From stdpp Require Import vector.
 
-Inductive Frobenial' : nat -> nat -> Set :=
-  | Delta' {n m} (v : vec positive n) (w : vec positive m) : Frobenial' n m.
 
-delta_spider_tensor 
+Fixpoint bring_first_wires_to_top_SPRO
+  `{!SubStruct Monoidal Struct, !SubStruct Symmetry Struct} {T}
+  {A} (f : A -> nat) (b : btree A) :
+  PRO Struct T (btree_size (S ∘ f) b) (bsize b + btree_size f b) :=
+  match b with
+  | l + r =>
+    bring_first_wires_to_top_SPRO f l * bring_first_wires_to_top_SPRO f r ;;
+    Pswap2
+  | !a => Pid _
+  | 0 => Pid _
+  end%pro%btree.
 
-Definition interpMFrobenial {A} (f : A -> nat) {n m}
-  (p : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
-  match p with
-  | MDelta a b => Delta (btree_size f a) (btree_size f b)
+Fixpoint bring_first_wires_from_top_SPRO
+  `{!SubStruct Monoidal Struct, !SubStruct Symmetry Struct} {T}
+  {A} (f : A -> nat) (b : btree A) :
+  PRO Struct T (bsize b + btree_size f b) (btree_size (S ∘ f) b) :=
+  match b with
+  | l + r =>
+    Pswap2 ;;
+    bring_first_wires_from_top_SPRO f l * bring_first_wires_from_top_SPRO f r
+  | !a => Pid _
+  | 0 => Pid _
+  end%pro%btree.
+
+
+
+(* Definition interpMFrobenial_alt {T} {A} (f : A -> nat) {n m : btree A}
+  (d : MFrobenial n m) : PRO Frobenius T (btree_size f n) (btree_size f m) :=
+  match d with
+  | MDelta a n m =>
+    cast_PRO' (btree_size_fmap (λ _, a) f n) (btree_size_fmap (λ _, a) f m)
+      (copy_PRO (T:=T) n m ([str frobenial_inr $ Delta 1 (bsize n) (bsize m)]%pro) (f a))
   end. *)
 
-Definition interpMFrobenial {A} (f : A -> nat) {n m}
-  (p : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
-  match p with
-  | MDelta a b => Delta (btree_size f a) (btree_size f b)
+
+(* FIXME: Move *)
+Definition cast_gen {D n m n' m'}
+  (Hn : n = n') (Hm : m = m') (p : D n m) : D n' m' :=
+  match Nat.eq_dec n n' with
+  | left Hn' =>
+    match Nat.eq_dec m m' with
+    | left Hm' => match Hn', Hm' with
+      | eq_refl, eq_refl => p
+      end
+    | right HFm => False_rect _ (HFm Hm)
+    end
+  | right HFn => False_rect _ (HFn Hn)
   end.
 
-#[export] Instance interpStructFrobenial {A} : InterpStruct (@MFrobenial A) Frobenial :=
+Notation cast_gen' Hn Hm := (cast_gen (eq_sym Hn) (eq_sym Hm)).
+
+(*FIXME: Make this translation not use casts (i.e. go back to sending it to a PRO) *)
+
+Lemma btree_size_fmap_const {A B} {f : A -> nat} {a} {b : btree B} :
+  btree_size f ((λ _, a) <$> b) = bsize b * f a.
+Proof.
+  induction b; cbn; lia.
+Qed.
+
+Definition interpMFrobenial {A} (f : A -> nat)
+  {n m : btree A} (d : MFrobenial n m) : Frobenial (btree_size f n) (btree_size f m) :=
+  match d with
+  | MDelta k n m =>
+    cast_gen' btree_size_fmap_const btree_size_fmap_const (Delta (f k) _ _)
+  end.
+
+#[export] Instance interpStructFrobenial {A} :
+  InterpStruct (@MFrobenial A) Frobenial :=
   { interpStruct := interpMFrobenial }.
 
 
@@ -731,7 +779,7 @@ Proof.
     + induction i' using fin_add_inv; [|easy].
       revert j'.
       cbn.
-      replace (Fin.cast (Fin.L 0 i') _) with i' by 
+      replace (Fin.cast (Fin.L 0 i') _) with i' by
         now apply fin_to_nat_inj; rewrite fin_to_nat_cast, fin_to_nat_L.
       rewrite fin_add_inv_L.
       intros.
@@ -739,7 +787,7 @@ Proof.
       do 2 f_equal.
       apply fin_to_nat_inj.
       now rewrite ?fin_to_nat_cast.
-    + replace (Fin.cast i' _) with (Fin.L 0 i') by 
+    + replace (Fin.cast i' _) with (Fin.L 0 i') by
         now apply fin_to_nat_inj; rewrite fin_to_nat_cast, fin_to_nat_L.
       rewrite fin_add_inv_L.
       intros.

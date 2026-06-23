@@ -2219,6 +2219,7 @@ Proof.
   hnf; lia.
 Qed.
 
+Definition pos_tail (p : positive) := pos_elim id id p.
 
 Definition Pmap_map (m : Pmap positive) : positive -> positive :=
   fun v => default v (m !! v).
@@ -2542,6 +2543,23 @@ Proof.
   done.
 Qed.
 
+
+(* Lemma fn_singleton_subst_by_vec {n} (abs : vec _ n) a b c : 
+  {[a := b]} (subst_by_vec abs c) = 
+  subst_by_vec () *)
+
+Lemma lookup_map_relabels_pos {n} (abs : vec _ n) {A} (m : Pmap A) c :
+  map_relabels abs m !! c = m !! (subst_by_vec (propogate_subst abs) c).
+Proof.
+  revert m c; induction n as [|n IHn]; [done|].
+  intros m c.
+  destruct abs as [(a, b) abs] using vec_S_inv.
+  cbn -[map_relabel_one].
+  rewrite lookup_map_relabel_one.
+  rewrite IHn.
+  reflexivity.
+Qed.
+
 Definition Pmap_injmap (m : Pmap positive) (k : positive) : positive :=
   default (infinite_injection_avoiding (map_to_list m).*2 (Pos.to_nat k)) (m !! k).
 
@@ -2602,4 +2620,20 @@ Lemma set_map_Pmap_injmap_dom m :
 Proof.
   rewrite set_map_Pmap_injmap by done.
   apply set_map_dom_map_img_L.
+Qed.
+
+
+Definition nat_map_to_pos_map (f : nat -> nat) (p : positive) : positive :=
+  Pos.of_succ_nat (f (pos_to_nat_pred p)).
+
+#[export] Instance nat_map_to_pos_map_inj f (Hf : Inj eq eq f) :
+  Inj eq eq (nat_map_to_pos_map f) := _.
+
+
+Lemma nat_map_to_pos_map_compose (f g : nat -> nat) (p : positive) :
+  nat_map_to_pos_map g (nat_map_to_pos_map f p) =
+  nat_map_to_pos_map (g ∘ f) p.
+Proof.
+  unfold nat_map_to_pos_map, compose.
+  now rewrite pos_to_nat_pred_of_nat.
 Qed.

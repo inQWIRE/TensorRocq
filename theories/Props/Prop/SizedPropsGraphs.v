@@ -107,6 +107,73 @@ Next Obligation.
   now rewrite 2 btree_to_vec_to_list.
 Qed.
 
+(* FIXME: Move *)
+Definition delta_spider_sized_graph {N T} (a : N) (n m : nat) :
+  SizedCospanHyperGraph N T n m :=
+  mk_scohg (delta_spider_graph n m) {[xH := a]}.
+
+Lemma sized_inputs_delta_spider_sized_graph {N T} (a : N) n m :
+  sized_inputs (@delta_spider_sized_graph N T a n m) =
+  replicate n (Some a).
+Proof.
+  cbn.
+  rewrite <- vec_to_list_map, vmap_fun_to_vec.
+  unfold compose.
+  rewrite vec_to_list_fun_to_vec_gen.
+  rewrite <- (length_fin_elements n) at 3.
+  apply fmap_const.
+Qed.
+
+Lemma sized_outputs_delta_spider_sized_graph {N T} (a : N) n m :
+  sized_outputs (@delta_spider_sized_graph N T a n m) =
+  replicate m (Some a).
+Proof.
+  cbn.
+  rewrite <- vec_to_list_map, vmap_fun_to_vec.
+  unfold compose.
+  rewrite vec_to_list_fun_to_vec_gen.
+  rewrite <- (length_fin_elements m) at 3.
+  apply fmap_const.
+Qed.
+
+(* FIXME: Move *)
+Lemma btree_elems_fmap {A B} (f : A -> B) (b : btree A) :
+  btree_elems (f <$> b) =@{list _} f <$> (b :> list _).
+Proof.
+  induction b; [|done..].
+  cbn.
+  now rewrite fmap_app; congruence.
+Qed.
+
+Lemma bsize_fmap {A B} (f : A -> B) (b : btree A) :
+  bsize (f <$> b) = bsize b.
+Proof.
+  induction b; cbn; congruence.
+Qed.
+
+Program Definition delta_spider_bw_sized_graph {N T} {B} a (n m : btree B) :
+  BWSizedCospanHyperGraph N T ((λ _, a) <$> n) ((λ _, a) <$> m) := {|
+  bw_scohg := delta_spider_sized_graph a _ _;
+|}.
+Next Obligation.
+  intros N T B a n m.
+  rewrite sized_inputs_delta_spider_sized_graph.
+  rewrite btree_elems_fmap, <- list_fmap_compose.
+  unfold compose.
+  etransitivity; [|symmetry; apply fmap_const].
+  rewrite length_btree_elems, bsize_fmap.
+  done.
+Qed.
+Next Obligation.
+  intros N T B a n m.
+  rewrite sized_outputs_delta_spider_sized_graph.
+  rewrite btree_elems_fmap, <- list_fmap_compose.
+  unfold compose.
+  etransitivity; [|symmetry; apply fmap_const].
+  rewrite length_btree_elems, bsize_fmap.
+  done.
+Qed.
+
 Program Definition bw_sized_graph_of_tensor {N T} t n m :
   BWSizedCospanHyperGraph N T n m := {|
   bw_scohg := sized_graph_of_tensor t (btree_to_vec n) (btree_to_vec m);
@@ -379,6 +446,164 @@ Proof.
   done.
 Qed.
 
+(* FIXME: Move *)
+Lemma fmap_const' {A B} (a : A) (l : list B) :
+  (λ _, a) <$> l = replicate (length l) a.
+Proof.
+  apply fmap_const.
+Qed.
+
+Lemma sum_list_with_const {A} (n : nat) (l : list A) :
+  sum_list_with (λ _, n) l = length l * n.
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma list_bind_const {A B} (l : list A) (l' : list B) :
+  (_ ← l; l') = concat (replicate (length l) l').
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma fun_to_vec_mul {A} {n m} (f : fin (n * m) -> A) :
+  fun_to_vec f =
+  vjoin (fun_to_vec (λ i, fun_to_vec (λ j, f (fin_prod i j)))).
+Proof.
+  apply vec_eq; intros i.
+  rewrite lookup_vjoin, 3 lookup_fun_to_vec.
+  rewrite <- uncurry_alt, fin_prod_split.
+  done.
+Qed.
+
+Lemma sized_graph_to_graph_delta_spider_sized_graph {N T} (f : N -> nat)
+  a (n m : nat) :
+  sigT2_relation (@isomorphic T)
+    (graph_to_pair_bundled (sized_graph_to_graph f (@delta_spider_sized_graph N T a n m)))
+    (graph_to_pair_bundled (delta_spider_graph_bundled (f a) n m)).
+Proof.
+  symmetry.
+  apply sigT2_relation_alt.
+  cbn.
+  assert (Hsize' : forall n,
+    sum_list_with (λ p, default 0 (f <$> ({[xH := a]} :> Pmap N) !! p))
+      (fun_to_vec (λ _ : fin n, xH)) = n * f a). 1:{
+    intros n'.
+    rewrite vec_to_list_fun_to_vec_gen, sum_list_with_fmap.
+    unfold compose.
+    rewrite sum_list_with_const.
+    rewrite length_fin_elements.
+    done.
+  }
+  apply exists_by_forall.
+  - now rewrite 2 Hsize'.
+  - intros H.
+    apply isomorphic_exists.
+    exists (λ i, encode (xH, pos_to_nat_pred i)), id.
+    split; [apply _|].
+    split; [apply _|].
+    rewrite eq_rect_r_to_cast_graph.
+    apply CospanHyperGraph.Definitions.cohg_ext; [done|..].
+    + cbn.
+      apply vec_to_list_inj2.
+      rewrite vec_to_list_cast.
+      rewrite vec_to_list_bind.
+      rewrite vec_to_list_fun_to_vec_gen, list_fmap_bind.
+      unfold compose.
+      rewrite list_bind_const.
+      rewrite lookup_singleton.
+      cbn.
+      rewrite (vec_to_list_fun_to_vec (λ i, encode (xH, i))).
+      rewrite length_fin_elements.
+      rewrite vmap_fun_to_vec.
+      clear.
+      rewrite fun_to_vec_mul.
+      unfold compose; cbn.
+      erewrite fun_to_vec_ext_mor_Proper.
+      2:{
+        intros i.
+        apply fun_to_vec_ext_mor_Proper.
+        intros j.
+        rewrite fin_to_nat_prod.
+        rewrite Nat.add_comm, Nat.Div0.mod_add.
+        reflexivity.
+      }
+      induction n; [done|].
+      cbn.
+      rewrite vec_to_list_app.
+      f_equal; [|apply IHn].
+      rewrite <- vec_to_list_seq, <- vec_to_list_map.
+      f_equal.
+      apply vec_eq; intros j.
+      rewrite vlookup_map, lookup_fun_to_vec.
+      rewrite pos_to_nat_pred_of_nat.
+      rewrite vlookup_seq, Nat.mod_small by apply fin_to_nat_lt.
+      done.
+    + cbn.
+      apply vec_to_list_inj2.
+      rewrite vec_to_list_cast.
+      rewrite vec_to_list_bind.
+      rewrite vec_to_list_fun_to_vec_gen, list_fmap_bind.
+      unfold compose.
+      rewrite list_bind_const.
+      rewrite lookup_singleton.
+      cbn.
+      rewrite (vec_to_list_fun_to_vec (λ i, encode (xH, i))).
+      rewrite length_fin_elements.
+      rewrite vmap_fun_to_vec.
+      clear.
+      rewrite fun_to_vec_mul.
+      unfold compose; cbn.
+      erewrite fun_to_vec_ext_mor_Proper.
+      2:{
+        intros i.
+        apply fun_to_vec_ext_mor_Proper.
+        intros j.
+        rewrite fin_to_nat_prod.
+        rewrite Nat.add_comm, Nat.Div0.mod_add.
+        reflexivity.
+      }
+      induction m; [done|].
+      cbn.
+      rewrite vec_to_list_app.
+      f_equal; [|apply IHm].
+      rewrite <- vec_to_list_seq, <- vec_to_list_map.
+      f_equal.
+      apply vec_eq; intros j.
+      rewrite vlookup_map, lookup_fun_to_vec.
+      rewrite pos_to_nat_pred_of_nat.
+      rewrite vlookup_seq, Nat.mod_small by apply fin_to_nat_lt.
+      done.
+Qed.
+
+Lemma graph_rel_cast_r {T} (R : forall n m, relation (CospanHyperGraph T n m))
+  {n m n' m'} (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m')
+  Hn Hm : 
+  R n m cohg (cast_graph Hn Hm cohg') <-> R n' m' (cast_graph (eq_sym Hn) (eq_sym Hm) cohg) cohg'.
+Proof.
+  subst; now rewrite 2 cast_graph_id.
+Qed.
+
+Lemma bw_sized_graph_to_graph_delta {N T} {B} f a (n m : btree B) :
+  isomorphic (bw_sized_graph_to_graph f (@delta_spider_bw_sized_graph N T B a n m))
+    (cast_graph (eq_sym btree_size_fmap_const) (eq_sym btree_size_fmap_const)
+      (delta_spider_graph_bundled (f a) (bsize n) (bsize m))).
+Proof.
+  unfold bw_sized_graph_to_graph. cbn -[sized_graph_to_graph cast_graph].
+  pose proof (sized_graph_to_graph_delta_spider_sized_graph (T:=T) f a 
+    (bsize ((λ _, a) <$> n)) (bsize ((λ _, a) <$> m))) as Hrw.
+  eapply (fun H G => transitivity G H) in Hrw as Hrw'.
+  2:{
+    rewrite 2 bsize_fmap.
+    done.
+  }
+  apply sigT2_relation_alt in Hrw' as [Heqs Hiso].
+  rewrite Hiso.
+  rewrite graph_rel_cast_r.
+  rewrite eq_rect_r_to_cast_graph.
+  rewrite 2 cast_graph_cast_graph, cast_graph_id.
+  done.
+Qed.
+
 Lemma bw_sized_graph_to_graph_of_tensor {N T} f (t : T) n m :
   isomorphic (bw_sized_graph_to_graph f (@bw_sized_graph_of_tensor N T t n m))
     (graph_of_tensor t (btree_size f n) (btree_size f m)).
@@ -539,11 +764,10 @@ Qed.
     | MCup n => cup_bw_sized_graph n
     end.
 
-(*
-#[export] Instance Frobenial_graphable {T} : StructGraphable Frobenial T :=
+#[export] Instance MFrobenial_sized_graphable {N T} : SizedStructGraphable (@MFrobenial N) T :=
   fun n m mon => match mon with
-    | Delta n m => delta_spider_graph n m
-    end. *)
+    | MDelta a n m => delta_spider_bw_sized_graph a n m
+    end.
 
 
 
@@ -610,15 +834,29 @@ Proof.
     done.
 Qed.
 
-(* #[export] Instance Frobenial_lawful_graphable :
-  LawfulStructGraphable Frobenial T.
+(* FIXME: Move *)
+Lemma cast_gen_id {D} {n m} (Hn : n = n) (Hm : m = m) (d : D n m) : 
+  cast_gen Hn Hm d = d.
+Proof.
+  unfold cast_gen.
+  case_match; [|done].
+  case_match; [|done].
+  rewrite 2 (proof_irrel _ eq_refl).
+  done.
+Qed.
+
+#[export] Instance MFrobenial_lawful_graphable {N} `{EqT : Equiv T, EquivT : Equivalence T equiv} :
+  LawfulSizedStructGraphable (@MFrobenial N) Frobenial T.
 Proof.
   constructor.
-  intros n m mon.
-  induction mon as [n m].
+  intros f n m s.
+  induction s as [a n m].
   cbn.
-  apply delta_spider_graph_semantics.
-Qed. *)
+  rewrite bw_sized_graph_to_graph_delta.
+  do 2 destruct (eq_sym _).
+  rewrite cast_gen_id, cast_graph_id.
+  done.
+Qed.
 
 End lawful.
 

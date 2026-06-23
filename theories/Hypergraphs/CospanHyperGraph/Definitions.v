@@ -2683,3 +2683,65 @@ Lemma isolated_vertices_set_verts {T n m} (cohg : CospanHyperGraph T n m) v :
 Proof.
   done.
 Qed.
+
+
+Definition delta_spider_graph {T} (n m : nat) : CospanHyperGraph T n m :=
+  mk_cohg ∅ (fun_to_vec (λ _, xH)) (fun_to_vec (λ _, xH)).
+
+Definition delta_spider_graph_bundled {T} (k n m : nat) : CospanHyperGraph T (n * k) (m * k) :=
+  mk_cohg ∅ (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))) (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
+
+
+
+Definition permute_graph {T n n' m m'}
+  (fl : fin n -> fin n') (fr : fin m -> fin m') (cohg : CospanHyperGraph T n m) :
+  CospanHyperGraph T n' m' :=
+  mk_cohg cohg
+    (fun_to_vec (λ i, from_option (cohg.(inputs) !!!.) xH (fin_inj_inv fl i)))
+    (fun_to_vec (λ i, from_option (cohg.(outputs) !!!.) xH (fin_inj_inv fr i))).
+
+Lemma permute_graph_alt {T n m}
+  (fl : fin n -> fin n) {Hfl : Inj eq eq fl}
+  (fr : fin m -> fin m) {Hfr : Inj eq eq fr} (cohg : CospanHyperGraph T n m) :
+  permute_graph fl fr cohg =
+  mk_cohg cohg (permute_vec (fin_perm_inv fl) cohg.(inputs))
+    (permute_vec (fin_perm_inv fr) cohg.(outputs)).
+Proof.
+  apply cohg_ext; [done|..];
+  apply vec_eq;
+  intros i;
+  cbn -[fin_inj_inv];
+  rewrite lookup_permute_vec, lookup_fun_to_vec;
+  rewrite (fin_inj_inv_to_perm _);
+  done.
+Qed.
+
+
+Lemma vertices_permute_graph {T n m}
+  (fl : fin n -> fin n) {Hfl : Inj eq eq fl}
+  (fr : fin m -> fin m) {Hfr : Inj eq eq fr}
+  (cohg : CospanHyperGraph T n m) :
+  vertices (permute_graph fl fr cohg) = vertices cohg.
+Proof.
+  rewrite (permute_graph_alt _ _).
+  unfold vertices.
+  f_equal.
+  cbn.
+  rewrite 2 (permute_vec_perm _ eq_refl).
+  done.
+Qed.
+
+
+Fixpoint n_stack_graphs {T n m} k (cohg : CospanHyperGraph T n m) :
+  CospanHyperGraph T (k * n) (k * m) :=
+  match k with
+  | 0 => id_graph 0
+  | S k => stack_graphs cohg $ n_stack_graphs k cohg
+  end.
+
+Definition copy_graph {T} k {n m} (cohg : CospanHyperGraph T n m) : 
+  CospanHyperGraph T (n * k) (m * k) :=
+  permute_graph fin_prod_comm fin_prod_comm (n_stack_graphs k cohg).
+
+
+

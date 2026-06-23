@@ -577,6 +577,8 @@ Definition plist_to_unique_counts l :=
 
 (* Compute plist_to_unique_counts [# 1; 2; 1; 2]%positive. *)
 
+Definition Pdelta1 `{!SubStruct Frobenial Struct} {T} n m : PRO Struct T n m :=
+  cast_PRO (Nat.mul_1_r n) (Nat.mul_1_r m) (Pdelta 1 n m).
 
   (* TODO: Replace ocompose_PRO with a cast by proof *)
 (* FIXME: Make this not put all the things which are only outputs at the end,
@@ -601,9 +603,9 @@ Definition FPjoin {Struct T} `{!SubStruct Frobenius Struct}
       flat_map (λ '(p, count), if decide (inarity p = 0) then replicate (Pos.to_nat count) p
         else []) outuniques) outputs) in
   let spiders : PRO Struct T _ _ := Pstacks (n := fun p_count => Pos.to_nat p_count.2)
-    (m := fun p_count => outarity p_count.1) (fun p_count => Pdelta _ _) inuniques in
+    (m := fun p_count => outarity p_count.1) (fun p_count => Pdelta1 _ _) inuniques in
   let outspiders : PRO Struct T _ _ := Pstacks (n := fun _ => 0)
-    (m := fun p_count => Pos.to_nat p_count.2) (fun _ => Pdelta _ _)
+    (m := fun p_count => Pos.to_nat p_count.2) (fun _ => Pdelta1 _ _)
     (filter (λ p_count, inaritymap !! p_count.1 = None) outuniques) in
 
 

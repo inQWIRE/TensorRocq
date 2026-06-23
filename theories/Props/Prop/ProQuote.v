@@ -1427,20 +1427,22 @@ Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
     reflexivity
   end.
 
-(* Goal True.
+(*
+Goal True.
 Open Scope positive_scope.
 Check ((Pgen 1 2 xH ;; Pswap 1 1 ;; Pgen 1 2 10%positive * Pgen 1 0 5%positive)%pro : PROP positive _ _).
 Ltac2 Eval 
-  let c := '((Pgen 1 2 xH ;; Pswap 1 1 ;; Pgen 1 2 10%positive * Pgen 1 0 5%positive)%pro : PROP positive _ _) in
+  let c := '((Pgen 1 2 xH ;; Pswap 1 1 ;; Pgen 1 2 10%positive * Pgen 1 1 5%positive ;; Pcap 1 * Pid 1)%pro : APROP positive _ _) in
   Std.resolve_tc c;
-  let p := CC.of_PRO CC.of_nat (CC.of_SymmetricG CC.of_nat) id c in 
+  let p := CC.of_PRO CC.of_nat (CC.of_Autonomous CC.of_nat) id c in 
   let of_int := (fun i => JSON.jlist (List.repeat (Jint 0) i)) in
   let jp := json_of_PRO of_int
-    (json_of_SymmetricG of_int)
+    (json_of_Autonomous of_int)
     (fun i => Jstring (Message.to_string (Message.of_constr i))) p in 
   let dp := Jobject (!Map(string_tag){
     "type" : Jstring "diagram";
-    "types" : JSON.jlist [Jstring "1"];
+    "types" : JSON.jlist [Jstring ""];
+    "diagramtype" : Jstring "autonomous";
     "data" : jp
   }) in 
   Message.print (JSON.print_JSON (dp)).

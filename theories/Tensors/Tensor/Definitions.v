@@ -150,135 +150,21 @@ Section TensorOps.
     SR : SemiRing R rO rI radd rmul req} {n m} : Tensor n m A :=
     fun v w => if decide (Sorted.Sorted eq (v +++ w)) then rI else rO.
 
-  Definition equal_on_indices {I A} (l : list (I * A)) : Prop :=
-    ForallPairs (fun i_a j_b => i_a.1 = j_b.1 -> i_a.2 = j_b.2) l.
-
-  Definition equal_on_indicesb {I} `{EqDecision I} {A} (eqa : A -> A -> bool) :=
-    fix go (fuel : nat) (l : list (I * A)) : bool :=
-    match fuel with
-    | 0 => false
-    | S fuel =>
-      match l with
-      | [] => true
-      | (i, a) :: l =>
-        if forallb (λ j_b, eqa a j_b.2) (filter (λ j_b, i = j_b.1) l) then
-          go fuel (filter (λ j_b, i <> j_b.1) l)
-        else false
-      end
-    end.
-
-  #[export] Instance ForallPairs_Permutation {A} (RA : relation A) :
-    Proper (Permutation ==> iff) (ForallPairs RA).
-  Proof.
-    intros l l' Hl.
-    unfold ForallPairs.
-    setoid_rewrite <- Hl.
-    done.
-  Qed.
-
-  Lemma equal_on_indicesb_True_1 {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
-    (Heqa : forall a b, eqa a b -> a = b) fuel (l : list (I * A)) :
-    equal_on_indicesb eqa fuel l -> equal_on_indices l.
-  Proof.
-    unfold equal_on_indices.
-    revert l; induction fuel; intros l; [done|].
-    cbn.
-    destruct l as [|(i, a) l]; [easy|].
-    rewrite lazy_andb_True.
-    rewrite forallb_True.
-    rewrite ForallPairs_cons.
-    intros [Hall Hfilt%IHfuel].
-    pose proof (filter_with_neg_Permutation (P := λ j_b, j_b.1 = i) l) as Hl.
-    split; [done|].
-    cbn.
-    rewrite Forall_filter in Hall.
-    split.
-    1:{
-      eapply Forall_impl; [apply Hall|].
-      cbn.
-      eauto.
-    }
-    split.
-    - rewrite <- Hl, Forall_app.
-      rewrite 2 Forall_filter.
-      split; [|apply Forall_forall; easy].
-      eapply Forall_impl; [apply Hall|].
-      intros (j, b).
-      cbn.
-      now intros Hab ->%eq_sym%Hab%Heqa.
-    - intros (j, b) (j', c) Hb%elem_of_list_In Hc%elem_of_list_In [= <-].
-      cbn.
-      destruct_decide (decide (i = j)) as Hij.
-      + subst.
-        rewrite Forall_forall in Hall.
-        apply Hall in Hb, Hc; [|done..].
-        cbn in Hb, Hc.
-        apply Heqa in Hb, Hc.
-        congruence.
-      + apply (Hfilt (j, b) (j, c));
-        [apply elem_of_list_In, elem_of_list_filter..|]; done.
-  Qed.
-
-  Lemma equal_on_indicesb_True_2 {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
-    (Heqa : forall a, eqa a a) fuel (l : list (I * A)) :
-    length l < fuel -> equal_on_indices l -> equal_on_indicesb eqa fuel l.
-  Proof.
-    revert l.
-    induction fuel as [|fuel IHfuel]; [lia|].
-    intros [|(i, a) l] Hl; [done|].
-    cbn in Hl.
-    apply Nat.succ_lt_mono in Hl.
-    intros Hleq.
-    cbn.
-    apply lazy_andb_True.
-    split.
-    - rewrite forallb_True, Forall_filter, Forall_forall.
-      intros (j, b) Hjb.
-      specialize (Hleq (i, a) (j, b) ltac:(now left) ltac:(now right; apply elem_of_list_In)).
-      cbn in Hleq.
-      cbn.
-      intros <-.
-      rewrite Hleq by done; auto.
-    - apply IHfuel.
-      + eapply Nat.le_lt_trans, Hl; apply length_filter.
-      + intros x y.
-        rewrite <- 2 elem_of_list_In.
-        intros [_ Hx%elem_of_list_In]%elem_of_list_filter [_ Hy%elem_of_list_In]%elem_of_list_filter.
-        specialize (Hleq x y ltac:(now right) ltac:(now right)).
-        done.
-  Qed.
-
-  Lemma equal_on_indicesb_True {I} `{EqDecision I} {A} (eqa : A -> A -> bool)
-    (Heqa : forall a b, eqa a b <-> a = b) fuel (l : list (I * A)) :
-    length l < fuel ->
-    equal_on_indicesb eqa fuel l <-> equal_on_indices l.
-  Proof.
-    intros Hllen.
-    split.
-    + apply equal_on_indicesb_True_1.
-      now intros; apply Heqa.
-    + apply equal_on_indicesb_True_2, Hllen.
-      now intros; apply Heqa.
-  Qed.
-
-  #[export] Instance equal_on_indices_dec {I} `{EqDecision I} `{EqDecision A}
-    (l : list (I * A)) : Decision (equal_on_indices l).
-  refine (cast_if (Is_true_dec (equal_on_indicesb (fun a b => bool_decide (a = b)) (S (length l)) l))).
-  - abstract (select (Is_true (equal_on_indicesb _ _ _)) ltac:(fun H => revert H);
-    rewrite equal_on_indicesb_True; [done|intros; apply bool_decide_spec|lia]).
-  - abstract (select (¬ Is_true (equal_on_indicesb _ _ _)) ltac:(fun H => revert H);
-    rewrite equal_on_indicesb_True; [done|intros; apply bool_decide_spec|lia]).
-  Defined.
-
-
-
-
-
   Definition delta_spider_tensor' `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m}
       (vi : vec positive n) (wi : vec positive m) : Tensor n m A :=
     fun v w =>
       if decide (equal_on_indices (vzip (vi +++ wi) (v +++ w))) then rI else rO.
+
+  Definition copy_tensor {A} `{SR : SemiRing R rO rI radd rmul req} 
+    (k : nat) {n m} (f : Tensor n m A) : 
+      Tensor (n * k) (m * k) A :=
+    fun v w => 
+      Rlist_prod (Vector.map2 f (vunjoin' v) (vunjoin' w)).
+
+  Definition delta_spider_tensor_bundled `{SA : Summable A, EqA : EqDecision A,
+    SR : SemiRing R rO rI radd rmul req} k n m : Tensor (n * k) (m * k) A :=
+    copy_tensor k delta_spider_tensor.
 
   Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
     fun a b => t [# a] [# b].
@@ -287,6 +173,14 @@ Section TensorOps.
     SR : SemiRing R rO rI radd rmul req} {n} (t : Tensor 1 1 A) : Tensor n n A :=
     fun v w =>
     Vector.fold_right rmul (vzip_with (tensor_11_to_fun t) v w) rI.
+
+  Fixpoint n_stack_tensor `{SA : Summable A,
+    SR : SemiRing R rO rI radd rmul req}
+    k {n m} (t : Tensor n m A) : Tensor (k * n) (k * m) A :=
+    match k with
+    | 0 => const_tensor rI
+    | S k => stack_tensor t (n_stack_tensor k t)
+    end.
 
   Definition tensor_to_dimensionless `{SR : SemiRing R rO rI radd rmul req}
     {A n m} (t : Tensor n m A) : @DimensionlessTensor R A :=
@@ -317,10 +211,15 @@ Section TensorOps.
     delta_tensor v (fun_to_vec $ (w !!!.) ∘ f).
 
   Definition permute_tensor_l {A n m o} (f : fin n -> fin m) (t : Tensor n o A) : Tensor m o A :=
-    fun v w => t (fun_to_vec $ (v !!!.) ∘ f) w.
+    fun v w => t (permute_vec f v) w.
 
   Definition permute_tensor_r {A n m o} (f : fin m -> fin o) (t : Tensor n m A) : Tensor n o A :=
-    fun v w => t v (fun_to_vec $ (w !!!.) ∘ f).
+    fun v w => t v (permute_vec f w).
+
+  Definition permute_tensor {A n m n' m'} 
+    (fl : fin n -> fin n') (fr : fin m -> fin m')
+    (t : Tensor n m A) : Tensor n' m' A :=
+    fun v w => t (permute_vec fl v) (permute_vec fr w).
 
   Definition tensor_wrap_l_under {A n m o} (t : Tensor n (m + o) A) : Tensor (n + o) m A :=
     fun v w => t (vsplitl v) (w +++ vsplitr v).
@@ -347,7 +246,15 @@ Section TensorOps.
   #[global] Arguments cup_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
   #[global] Arguments cap_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
   #[global] Arguments swap_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
+
+  #[global] Arguments delta_spider_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
+  #[global] Arguments delta_spider_tensor' {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ _ / : assert.
+
+  #[global] Arguments copy_tensor {_} {_ _ _ _ _ _} _ {_ _} _ _ _ / : assert.
+  #[global] Arguments delta_spider_tensor_bundled {_ _ _} {_ _ _ _ _ _} _ {_ _} _ _ / : assert.
+
   #[global] Arguments stack_n_tensor_1 {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
+  #[global] Arguments n_stack_tensor {_ _} {_ _ _ _ _ _} !_ {_ _} / _ _ _ : assert.
   #[global] Arguments tensor_to_dimensionless {_ _ _ _ _ _} {_} {_ _} _ _ _ _ _ / : assert.
   #[global] Arguments tensor_11_to_fun {_} _ _ _ / : assert.
 
@@ -360,6 +267,7 @@ Section TensorOps.
 
   #[global] Arguments permute_tensor_l {_ _ _ _} _ _ _ _ / : assert.
   #[global] Arguments permute_tensor_r {_ _ _ _} _ _ _ _ / : assert.
+  #[global] Arguments permute_tensor {_ _ _ _ _} _ _ _ _ _ / : assert.
 
   #[global] Arguments tensor_wrap_l_under {_ _ _ _} _ _ _ / : assert.
   #[global] Arguments tensor_wrap_r_under {_ _ _ _} _ _ _ / : assert.

@@ -1,6 +1,6 @@
-Require Export CospanHyperGraph.Definitions Isomorphism.Testing Aux_pos.
+From TensorRocq Require Export CospanHyperGraph.Definitions Isomorphism.Testing Aux_pos.
 
-Require Export Syntax.Definitions Syntax.Cospans.
+From TensorRocq Require Export Syntax.Definitions Syntax.Cospans.
 
 (* FIXME: Move: *)
 Require Combinators.
@@ -60,7 +60,7 @@ Definition tg_list_to_deltas (is_output : bool)
   imap (λ idx input, (free $ bcons is_output (Pos.of_succ_nat idx), bound input))
     idxs.
 
-(* The interpretation of a cospan of a hypergraph as a syntactic 
+(* The interpretation of a cospan of a hypergraph as a syntactic
   [namedtensorlist]. *)
 Definition graph_namedtensorlist_semantics {n m} (tg : TensorGraph n m) : namedtensorlist := {|
   ntl_sums := elements (vertices tg);
@@ -555,8 +555,8 @@ Qed.
 
 
 
-Lemma graph_namedtensorlist_semantics_norm_verts {n m} (cohg : TensorGraph n m) : 
-  graph_namedtensorlist_semantics (norm_verts cohg) = 
+Lemma graph_namedtensorlist_semantics_norm_verts {n m} (cohg : TensorGraph n m) :
+  graph_namedtensorlist_semantics (norm_verts cohg) =
   graph_namedtensorlist_semantics cohg.
 Proof.
   unfold graph_namedtensorlist_semantics.
@@ -564,8 +564,8 @@ Proof.
   done.
 Qed.
 
-Lemma graph_contl_semantics_norm_verts {n m} (cohg : TensorGraph n m) : 
-  graph_contl_semantics (norm_verts cohg) = 
+Lemma graph_contl_semantics_norm_verts {n m} (cohg : TensorGraph n m) :
+  graph_contl_semantics (norm_verts cohg) =
   graph_contl_semantics cohg.
 Proof.
   unfold graph_contl_semantics.
@@ -588,8 +588,114 @@ Lemma graph_namedtensorlist_semantics_vert_eq {n m} (tg tg' : TensorGraph n m) :
   tg ≡ᵥ tg' -> graph_namedtensorlist_semantics tg = graph_namedtensorlist_semantics tg'.
 Proof.
   intros Heq.
-  now rewrite <- graph_namedtensorlist_semantics_norm_verts, Heq, 
+  now rewrite <- graph_namedtensorlist_semantics_norm_verts, Heq,
     graph_namedtensorlist_semantics_norm_verts.
+Qed.
+
+
+
+Lemma graph_ntl_semantics_permute_graph {n m}
+  (fl : fin n -> fin n) {Hfl : Inj eq eq fl}
+  (fr : fin m -> fin m) {Hfr : Inj eq eq fr} (cohg : CospanHyperGraph T n m) :
+  ntl_aeq
+    (graph_namedtensorlist_semantics (permute_graph fl fr cohg))
+    (ntl_relabel_free
+     (pos_map (nat_map_to_pos_map (fin_inj_to_nat_inj ((* fin_perm_inv *) fl)))
+        (nat_map_to_pos_map (fin_inj_to_nat_inj ((* fin_perm_inv *) fr))))
+      (graph_namedtensorlist_semantics cohg)).
+Proof.
+  unfold graph_namedtensorlist_semantics.
+  rewrite (vertices_permute_graph _ _).
+  eapply (subrel' ntl_aeq).
+  apply ntl_aeq_of_perm; [try done..|].
+  - unfold ntl_relabel_free; cbn.
+    rewrite relabel_frees_tg_abstracts.
+    done.
+  - rewrite (permute_graph_alt _ _).
+    cbn -[tg_list_to_deltas].
+    unfold tg_list_to_deltas.
+    rewrite fmap_app, 2 fmap_imap.
+    cbn.
+    unfold compose; cbn.
+    f_equiv.
+    + rewrite 2 imap_to_zip_with_seq.
+      rewrite 2 length_vec_to_list.
+      rewrite seq_0_to_vfinseq.
+      rewrite 2 zip_with_fmap_l.
+      rewrite <- 2 vec_to_list_zip_with.
+      rewrite <- (permute_vec_perm fl eq_refl).
+      apply eq_reflexivity.
+      f_equal.
+      apply vec_eq.
+      intros i.
+      rewrite lookup_permute_vec, 2 vlookup_zip_with, lookup_permute_vec,
+        2 lookup_vfinseq.
+      rewrite (fin_perm_inv_linv _ _).
+      unfold nat_map_to_pos_map.
+      rewrite pos_to_nat_pred_of_nat, fin_inj_to_nat_inj_fin.
+      done.
+    + rewrite 2 imap_to_zip_with_seq.
+      rewrite 2 length_vec_to_list.
+      rewrite seq_0_to_vfinseq.
+      rewrite 2 zip_with_fmap_l.
+      rewrite <- 2 vec_to_list_zip_with.
+      rewrite <- (permute_vec_perm fr eq_refl).
+      apply eq_reflexivity.
+      f_equal.
+      apply vec_eq.
+      intros i.
+      rewrite lookup_permute_vec, 2 vlookup_zip_with, lookup_permute_vec,
+        2 lookup_vfinseq.
+      rewrite (fin_perm_inv_linv _ _).
+      unfold nat_map_to_pos_map.
+      rewrite pos_to_nat_pred_of_nat, fin_inj_to_nat_inj_fin.
+      done.
+Qed.
+
+
+Lemma graph_contl_semantics_permute_graph {n n' m m'}
+  (fl : fin n -> fin n') {Hfl : Inj eq eq fl} (Hn : n = n')
+  (fr : fin m -> fin m') {Hfr : Inj eq eq fr} (Hm : m = m') (cohg : CospanHyperGraph T n m) :
+  contl_eq (graph_contl_semantics (permute_graph fl fr cohg))
+    (permute_contl fl fr (graph_contl_semantics cohg)).
+Proof.
+  unfold graph_contl_semantics.
+  subst n' m'.
+  cbn.
+  rewrite (permute_contl_alt _ _).
+  cbn.
+  symmetry.
+  rewrite
+    (contl_eq_relabel_free (pos_map (nat_map_to_pos_map (fin_inj_to_nat_inj fl))
+      (nat_map_to_pos_map (fin_inj_to_nat_inj fr)))).
+  unfold relabel_contl_free; cbn.
+  unfold permute_vec.
+  rewrite 2 vmap_fun_to_vec.
+  unfold compose; cbn.
+
+  erewrite (fun_to_vec_ext_mor_Proper). 2:{
+    intros i.
+    rewrite vlookup_map, vlookup_seq, Nat.add_0_l.
+    cbn.
+    unfold nat_map_to_pos_map.
+    rewrite pos_to_nat_pred_of_nat, fin_inj_to_nat_inj_fin.
+    rewrite (fin_perm_inv_rinv _ _).
+    done.
+  }
+  erewrite (fun_to_vec_ext_mor_Proper (λ _, pos_map _ _ _)). 2:{
+    intros i.
+    rewrite vlookup_map, vlookup_seq, Nat.add_0_l.
+    cbn.
+    unfold nat_map_to_pos_map.
+    rewrite pos_to_nat_pred_of_nat, fin_inj_to_nat_inj_fin.
+    rewrite (fin_perm_inv_rinv _ _).
+    done.
+  }
+  rewrite 2 vseq_fun_to_vec, 2 vmap_fun_to_vec.
+  apply contl_eq_of_ntl_eq.
+  unfold compose.
+  rewrite (graph_ntl_semantics_permute_graph _ _).
+  done.
 Qed.
 
 End TensorGraphExpr.
