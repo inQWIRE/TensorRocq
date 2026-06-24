@@ -1778,6 +1778,27 @@ Proof.
   now apply rel_union_proper.
 Qed.
 
+Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_binary `{Equiv T1, Equivalence T1 equiv,
+  Equiv T2, Equivalence T2 equiv, Equiv T3, Equivalence T3 equiv} {n1 m1 n2 m2 n3 m3}
+  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
+    CospanHyperGraph T3 n3 m3) :
+  Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq) f ->
+  Proper (isomorphic ==> isomorphic ==> isomorphic) f ->
+  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) f ->
+  Proper (cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq) f.
+Proof.
+  intros Hfvert Hfiso Hfcohg.
+  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
+  induction Hcohg1 as [cohg1 cohg1' fv1 fe1 Hfv1 Hfe1 Hverteq1].
+  rewrite <- (norm_verts_vert_eq cohg1).
+  rewrite Hverteq1, norm_verts_vert_eq.
+  rewrite <- iso_relabel_reindex by done.
+  induction Hcohg2 as [cohg2 cohg2' fv2 fe2 Hfv2 Hfe2 Hverteq2].
+  rewrite <- (norm_verts_vert_eq cohg2).
+  rewrite Hverteq2, norm_verts_vert_eq.
+  rewrite <- iso_relabel_reindex by done.
+  done.
+Qed.
 (*
 Lemma proper_cohg_syntactic_eq_of_iso_vert_eq_binary `{Equiv T1, Reflexive T1 equiv,
   Transitive T1 equiv, Equiv T2, Reflexive T2 equiv, Transitive T2 equiv} {n1 m1 n2 m2}

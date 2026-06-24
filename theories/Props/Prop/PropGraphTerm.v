@@ -813,10 +813,10 @@ Lemma graph_to_FPROP'_correct {Struct T} {SubS : SubStruct Frobenius Struct}
   `{CleanableStruct Struct, ComposableStruct Struct}
   `{Equiv T, Equivalence T equiv, !RelDecision (≡@{T})}
   {n m} (cohg : CospanHyperGraph T n m) p :
-  graph_to_APROP' cohg = Some p ->
+  graph_to_FPROP' cohg = Some p ->
   PRO_graph_semantics p ≡ₛ cohg.
 Proof.
-  unfold graph_to_APROP'.
+  unfold graph_to_FPROP'.
   destruct (_ <$> _) as [p'|]; [|done].
   cbn.
   case_match eqn:Hiso; [|done].

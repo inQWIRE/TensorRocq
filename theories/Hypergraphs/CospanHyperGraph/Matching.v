@@ -2,7 +2,7 @@ From TensorRocq Require Import Isomorphism.IsoAux Isomorphism.Testing CospanHype
   CospanHyperGraph.Ops.
 Require Ltac2.Ltac2.
 
-
+Local Existing Instance Countable_Equiv.
 
 
 (* FIXME: Move *)
@@ -296,9 +296,9 @@ From TensorRocq Require Import tc.
   (({[1 := 1; 2:= 1; 3 := 4; 5:= 1]} :> Pmap positive) !!!.)
   [1;2;3;5])%positive. *)
 
-#[export] Instance pretty_sigT {A} {P : A -> Type} 
+#[export] Instance pretty_sigT {A} {P : A -> Type}
   `{Pretty A, forall a, Pretty (P a)} : Pretty (sigT P) :=
-  (fun '(existT a p) => 
+  (fun '(existT a p) =>
   String.concat " " [
     "existT";
     pretty a;
@@ -325,7 +325,7 @@ Definition hg_succ_aux (vmap : Pmap (Pset * Pset)) : prel :=
     prel_union (set_to_map (.,precs) succs) m) ∅ vmap.
 
 Definition hg_succ {T} (hg : Pmap (T * list positive * list positive)) : prel :=
-  let vmap := vertex_map hg in 
+  let vmap := vertex_map hg in
   hg_succ_aux vmap.
 
 Definition hg_succs {T} (hg : Pmap (T * list positive * list positive)) : prel :=
@@ -465,7 +465,7 @@ Definition cohg_degree_map {T n m} (cohg : CospanHyperGraph T n m) : Pmap nat :=
 Definition hg_iodegree_map {T} (hg : Pmap (T * list positive * list positive)) :
   Pmap (nat * nat) :=
   map_fold (λ _ '(_, ins, outs) m,
-    merge (union_with (λ '(n, n') '(m, m'), Some (n + m, n' + m'))) 
+    merge (union_with (λ '(n, n') '(m, m'), Some (n + m, n' + m')))
       (merge (λ mayout mayin,
         match mayin, mayout with
         | Some indeg, Some outdeg => Some (indeg, outdeg)
@@ -476,7 +476,7 @@ Definition hg_iodegree_map {T} (hg : Pmap (T * list positive * list positive)) :
 
 
 Definition cohg_iodegree_map {T n m} (cohg : CospanHyperGraph T n m) : Pmap (nat * nat) :=
-  merge (union_with (λ '(n, n') '(m, m'), Some (n + m, n' + m'))) 
+  merge (union_with (λ '(n, n') '(m, m'), Some (n + m, n' + m')))
       (merge (λ mayin mayout,
         match mayin, mayout with
         | Some indeg, Some outdeg => Some (indeg, outdeg)
@@ -750,7 +750,7 @@ Definition monog_edge_matchings `{Countable T}
   (es' : Pmap (T * list positive * list positive))
     (* The edges of cohg *) : list (Piso * Piso) :=
   let vmap := vertex_map es' in
-  let cohg_succ := hg_succ_aux vmap in 
+  let cohg_succ := hg_succ_aux vmap in
   filter (
     fun '(me, mv) =>
     let boundary' : Pset := set_omap (mv.(Piso_map) !!.) boundary in
@@ -769,7 +769,7 @@ Definition monog_edge_matchings `{Countable T}
           end))
       mv.(Piso_map) /\
       (* Convexity : *)
-      let es' : Pset := dom me.(Piso_invmap) in 
+      let es' : Pset := dom me.(Piso_invmap) in
       es' ## prel_img cohg_succs (prel_img cohg_succ es' ∖ es')
   ) $
     bimonog_edge_matchings_extending es es' (∅, ∅).
@@ -801,7 +801,7 @@ Definition monog_graph_matchings `{Countable T}
   let boundary := graph_boundary subcohg in
   '(me, mv) ← monog_edge_matchings boundary cohg_succs subcohg cohg;
   let codom_verts := elements $ filter (λ v, mv.(Piso_invmap) !! v = None) (vertices cohg) in
-  (λ mv', (me, mv')) <$> 
+  (λ mv', (me, mv')) <$>
     monog_vertex_matchings_extending (inputs subcohg ++ outputs subcohg) codom_verts mv.
 
 
@@ -997,6 +997,27 @@ Definition all_frobenius_contexts `{Countable T}
     exploded_interfaced_context subcohg cohg me mv true_bnd in
   quotiented_contexts f_g_equiv_classes exploded_interfaced_context.
 
+  
+Definition select_frobenius_context `{Countable T}
+  {i j} (subcohg : CospanHyperGraph T i j)
+  {n m} (cohg : CospanHyperGraph T n m) 
+  (match_number quotient_number : nat) : option (CospanHyperGraph T n ((i + j) + m)) :=
+  (* First, check we have enough isolated vertices and remove
+    those we'll replace *)
+  let num_sub_isol := size (isolated_vertices subcohg) in
+  let cohg_isol := elements (isolated_vertices cohg) in
+  if decide (length cohg_isol < num_sub_isol) then None else
+
+  let cohg := (set_verts cohg (list_to_set (drop num_sub_isol cohg_isol))) in
+
+  (* Next, we get a candidate matching *)
+
+  '(me, mv, true_bnd) ← frobenius_graph_matchings subcohg cohg !! match_number;
+  let '(f_g_equiv_classes, exploded_interfaced_context) :=
+    exploded_interfaced_context subcohg cohg me mv true_bnd in
+  quotiented_contexts f_g_equiv_classes exploded_interfaced_context !! quotient_number.
+
+
 Definition frobenius_graph_rewriting_correctness `{Countable T}
   {i j} (subcohg : CospanHyperGraph T i j)
   {n m} (cohg : CospanHyperGraph T n m) : nat * bool :=
@@ -1037,6 +1058,29 @@ Definition all_bimonog_contexts `{Countable T}
     exploded_interfaced_context subcohg cohg me mv true_bnd in
   filter is_bimonogamousb $ quotiented_contexts f_g_equiv_classes exploded_interfaced_context.
 
+
+Definition select_bimonog_context `{Countable T}
+  {i j} (subcohg : CospanHyperGraph T i j)
+  {n m} (cohg : CospanHyperGraph T n m) 
+  (match_number : nat)
+  (quotient_number : nat) : option (CospanHyperGraph T n ((i + j) + m)) :=
+  (* First, check we have enough isolated vertices and remove
+    those we'll replace *)
+  let num_sub_isol := size (isolated_vertices subcohg) in
+  let cohg_isol := elements (isolated_vertices cohg) in
+  if decide (length cohg_isol < num_sub_isol) then None else
+
+  let cohg' := (set_verts cohg (list_to_set (drop num_sub_isol cohg_isol))) in
+
+  (* Next, we get a candidate matching *)
+
+  '(me, mv, true_bnd) ← bimonog_graph_matchings subcohg cohg' !! match_number;
+  let '(f_g_equiv_classes, exploded_interfaced_context) :=
+    exploded_interfaced_context subcohg cohg' me mv true_bnd in
+  (filter is_bimonogamousb $ quotiented_contexts f_g_equiv_classes 
+    exploded_interfaced_context) !! quotient_number.
+
+
 Definition bimonog_graph_rewriting_correctness `{Countable T}
   {i j} (subcohg : CospanHyperGraph T i j)
   {n m} (cohg : CospanHyperGraph T n m) : nat * bool :=
@@ -1060,26 +1104,26 @@ Definition monog_graph_decomp {T}
   {n m} (cohg : CospanHyperGraph T n m)
   (cohg_succs : prel)
   (me mv : Piso) : {k : nat & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type :=
-  let L_edges : Pset := dom me.(Piso_invmap) in 
-  let C2_edges := prel_img cohg_succs L_edges ∖ L_edges in 
-  let C1_edges := dom (hyperedges cohg) ∖ (C2_edges ∪ L_edges) in 
-  let C1_hg : HyperGraph T := 
-    mk_hg (restrict_map C1_edges (hyperedges cohg)) (isolated_vertices cohg) in 
-  let C2_hg : HyperGraph T := 
-    mk_hg (restrict_map C2_edges (hyperedges cohg)) ∅ in 
-  let k_set := ((list_to_set cohg.(inputs) ∪ referenced_vertices_hg C1_hg) ∩ 
-    (list_to_set cohg.(outputs) ∪ referenced_vertices_hg C2_hg)) ∖ dom mv.(Piso_invmap) in 
-  let k_vec := list_to_vec (elements k_set) in 
-  let i_vec := vmap (mv.(Piso_map)!!!.) subcohg.(inputs) in 
-  let j_vec := vmap (mv.(Piso_map)!!!.) subcohg.(outputs) in 
-  existT _ (mk_cohg C1_hg cohg.(inputs) (k_vec +++ i_vec), 
+  let L_edges : Pset := dom me.(Piso_invmap) in
+  let C2_edges := prel_img cohg_succs L_edges ∖ L_edges in
+  let C1_edges := dom (hyperedges cohg) ∖ (C2_edges ∪ L_edges) in
+  let C1_hg : HyperGraph T :=
+    mk_hg (restrict_map C1_edges (hyperedges cohg)) (isolated_vertices cohg) in
+  let C2_hg : HyperGraph T :=
+    mk_hg (restrict_map C2_edges (hyperedges cohg)) ∅ in
+  let k_set := ((list_to_set cohg.(inputs) ∪ referenced_vertices_hg C1_hg) ∩
+    (list_to_set cohg.(outputs) ∪ referenced_vertices_hg C2_hg)) ∖ dom mv.(Piso_invmap) in
+  let k_vec := list_to_vec (elements k_set) in
+  let i_vec := vmap (mv.(Piso_map)!!!.) subcohg.(inputs) in
+  let j_vec := vmap (mv.(Piso_map)!!!.) subcohg.(outputs) in
+  existT _ (mk_cohg C1_hg cohg.(inputs) (k_vec +++ i_vec),
     mk_cohg C2_hg (k_vec +++ j_vec) cohg.(outputs)).
 
 Definition make_monog_pushout {T i j}
   (subcohg : CospanHyperGraph T i j)
-  {n m} (context : {k & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type) : 
+  {n m} (context : {k & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type) :
     CospanHyperGraph T n m :=
-  let '(existT k (C1, C2)) := context in 
+  let '(existT k (C1, C2)) := context in
   compose_graphs (compose_graphs C1 (stack_graphs (id_graph k) subcohg)) C2.
 
 Definition all_monog_contexts `{Countable T}
@@ -1098,6 +1142,84 @@ Definition all_monog_contexts `{Countable T}
   let cohg_succs := hg_succs cohg in
   (λ '(me, mv), monog_graph_decomp subcohg cohg cohg_succs me mv)
     <$> monog_graph_matchings subcohg cohg cohg_succs.
+
+Definition verified_monog_graph_decomp `{Countable T} {i j}
+  (subcohg : CospanHyperGraph T i j) {n m} (cohg cohg' : CospanHyperGraph T n m)
+  cohg_succs me mv :
+    option {k & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type :=
+  let ctx := monog_graph_decomp subcohg cohg' cohg_succs me mv in
+  (* TODO: Replace with something that uses me and mv productively to make this
+    almost trivial. Also probably need something with isol verts to do that I guess? *)
+  if default_countable_graph_iso_test cohg (make_monog_pushout subcohg ctx) then
+    Some ctx
+  else None.
+
+Lemma verified_monog_graph_decomp_correct `{Countable T} {i j}
+  (subcohg : CospanHyperGraph T i j) {n m} (cohg cohg' : CospanHyperGraph T n m)
+  cohg_succs me mv ctx :
+  verified_monog_graph_decomp subcohg cohg cohg' cohg_succs me mv = Some ctx ->
+  cohg ≡ₛ make_monog_pushout subcohg ctx.
+Proof.
+  unfold verified_monog_graph_decomp.
+  destruct (default_countable_graph_iso_test_correct' cohg
+    (make_monog_pushout subcohg
+      (monog_graph_decomp subcohg cohg' cohg_succs me mv))); [|done].
+  now intros [= <-].
+Qed.
+
+
+Definition verified_select_monog_context `{Countable T}
+  {i j} (subcohg : CospanHyperGraph T i j)
+  {n m} (cohg : CospanHyperGraph T n m)
+  (match_number : nat)
+  : option {k : nat & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type :=
+  (* First, check we have enough isolated vertices and remove
+    those we'll replace *)
+  let num_sub_isol := size (isolated_vertices subcohg) in
+  let cohg_isol := elements (isolated_vertices cohg) in
+  if decide (length cohg_isol < num_sub_isol) then None else
+
+  let cohg' := (set_verts cohg (list_to_set (drop num_sub_isol cohg_isol))) in
+
+  (* Next, we get a candidate matching *)
+  let cohg_succs := hg_succs cohg in
+  '(me, mv) ← monog_graph_matchings subcohg cohg' cohg_succs !! match_number;
+  verified_monog_graph_decomp subcohg cohg cohg' cohg_succs me mv.
+
+Lemma verified_select_monog_context_correct `{Countable T}
+  {i j} (subcohg : CospanHyperGraph T i j)
+  {n m} (cohg : CospanHyperGraph T n m)
+  (match_number : nat) ctx :
+  verified_select_monog_context subcohg cohg match_number = Some ctx ->
+  cohg ≡ₛ make_monog_pushout subcohg ctx.
+Proof.
+  unfold verified_select_monog_context.
+  case_decide; [done|].
+  destruct (_ !! _) as [[me mv]|]; [|done].
+  cbn.
+  apply verified_monog_graph_decomp_correct.
+Qed.
+
+
+Definition select_monog_context `{Countable T}
+  {i j} (subcohg : CospanHyperGraph T i j)
+  {n m} (cohg : CospanHyperGraph T n m)
+  (match_number : nat)
+  : option {k : nat & CospanHyperGraph T n (k + i) * CospanHyperGraph T (k + j) m}%type :=
+  (* First, check we have enough isolated vertices and remove
+    those we'll replace *)
+  let num_sub_isol := size (isolated_vertices subcohg) in
+  let cohg_isol := elements (isolated_vertices cohg) in
+  if decide (length cohg_isol < num_sub_isol) then None else
+
+  let cohg' := (set_verts cohg (list_to_set (drop num_sub_isol cohg_isol))) in
+
+  (* Next, we get a candidate matching *)
+  let cohg_succs := hg_succs cohg in
+  (λ '(me, mv), monog_graph_decomp subcohg cohg' cohg_succs me mv)
+  <$> monog_graph_matchings subcohg cohg' cohg_succs !! match_number.
+
+
 
 
 Definition monog_graph_rewriting_correctness `{Countable T}
@@ -1222,14 +1344,14 @@ Definition test_graph_33_rhs_stack2 : CospanHyperGraph string 2 2 :=
 
 (* Compute is_monogamousb (test_graph_33_array 3 2). *)
 
-(* Compute monog_graph_rewriting_correctness test_graph_33_rhs_stack2 
+(* Compute monog_graph_rewriting_correctness test_graph_33_rhs_stack2
   (test_graph_33_array 3 2). *)
 
 (* Compute monog_graph_rewriting_correctness (stack_graphs (id_graph 1)
 test_graph_33_rhs_stack2) (test_graph_33_array 3 2). *)
 
 (* Succeed Compute ltac:(let r := eval vm_compute in
-      (frobenius_graph_rewriting_correctness test_graph_33_rhs_stack2 
+      (frobenius_graph_rewriting_correctness test_graph_33_rhs_stack2
         (test_graph_33_array 2 2)) in
     lazymatch r with
     | (12%nat, true) => idtac
@@ -1241,7 +1363,7 @@ test_graph_33_rhs_stack2) (test_graph_33_array 3 2). *)
 (* Compute pretty $ monog_graph_matchings
   test_graph_33_rhs test_graph_33_rhs_stack2 (hg_succs test_graph_33_rhs_stack2). *)
 
-  
+
 (* Compute pretty $ uncurry (monog_graph_decomp test_graph_33_rhs test_graph_33_rhs_stack2
   (hg_succs test_graph_33_rhs_stack2)) <$> monog_graph_matchings
   test_graph_33_rhs test_graph_33_rhs_stack2 (hg_succs test_graph_33_rhs_stack2). *)
@@ -1251,7 +1373,7 @@ test_graph_33_rhs_stack2) (test_graph_33_array 3 2). *)
 (* Compute monog_graph_rewriting_correctness' test_graph_33_rhs test_graph_33_rhs. (test_graph_33_array 2 2). *)
 
 
-(* 
+(*
 Definition test_graph_cap_lhs : CospanHyperGraph string 2 0 := cap_graph 1.
 Definition test_graph_cap_rhs : CospanHyperGraph string 2 0 :=
   (mk_cohg (mk_hg {[1 := ("f", [1;2], [])]} ∅) [#1;2] [#])%positive.
@@ -1274,7 +1396,19 @@ Compute filter is_bimonogamousb $ all_bimonog_contexts test_graph_cap_lhs (test_
 
 (* Compute frobenius_graph_rewriting_correctness test_graph_33_rhs (test_graph_34_exploded 3). *)
 
+(* Definition Plist_idxmap (l : list positive) : Pmap positive :=
+  list_to_map (imap (λ i p, (p, Pos.of_succ_nat i)) l).
 
+Definition reduce_graph {T n m} (cohg : CospanHyperGraph T n m) : CospanHyperGraph T n m :=
+  let fe := Plist_idxmap (map_to_list (hyperedges cohg)).*1 in
+  let fv := Plist_idxmap (elements (vertices cohg)) in
+  relabel_graph (fv !!!.) (reindex_graph (fe !!!.) cohg). *)
+
+(* Compute pretty $ (reduce_graph (test_graph_34_exploded 3)). *)
+
+(* Time Compute
+  let cohg := ((* reduce_graph *) (test_graph_34_exploded 2)) in
+  monog_graph_rewriting_correctness test_graph_33_rhs cohg. *)
 
 
 Module PaperExample.

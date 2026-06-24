@@ -134,6 +134,19 @@ Proof.
   now rewrite (map_fmap_ext _ id), map_fmap_id by now intros _ [[]] _.
 Qed.
 
+Lemma hypergraph_apply_hom_ext g hg :
+  (forall t, f t = g t) ->
+  hypergraph_apply_hom f hg = hypergraph_apply_hom g hg.
+Proof.
+  intros Hfg.
+  apply hg_ext, reflexivity.
+  cbn.
+  apply map_fmap_ext.
+  intros _ [[t i] o] _.
+  cbn.
+  now rewrite Hfg.
+Qed.
+
 Lemma hypergraph_apply_hom_add_vertices hg vs :
   hypergraph_apply_hom f (hg_add_vertices hg vs) =
   hg_add_vertices (hypergraph_apply_hom f hg) vs.
@@ -178,7 +191,32 @@ End hypergraph_hom.
 
 Section graph_hom.
 
-Context {T T'} (f : T -> T') .
+Context {T T' T'' : Type } (f : T -> T').
+
+
+Lemma graph_apply_hom_compose (g : T' -> T'') {n m} (cohg : CospanHyperGraph T n m) :
+  graph_apply_hom g (graph_apply_hom f cohg) =
+  graph_apply_hom (g ∘ f) cohg.
+Proof.
+  apply cohg_ext; [|done..].
+  apply hypergraph_apply_hom_compose.
+Qed.
+
+Lemma graph_apply_hom_id {n m} (cohg : CospanHyperGraph T n m) :
+  graph_apply_hom id cohg = cohg.
+Proof.
+  apply cohg_ext; [|done..].
+  apply hypergraph_apply_hom_id.
+Qed.
+
+Lemma graph_apply_hom_ext g {n m} (cohg : CospanHyperGraph T n m) :
+  (forall t, f t = g t) ->
+  graph_apply_hom f cohg = graph_apply_hom g cohg.
+Proof.
+  intros Hfg.
+  apply cohg_ext; [|done..].
+  now apply hypergraph_apply_hom_ext.
+Qed.
 
 Lemma graph_apply_hom_relabel_graph {n m} g (cohg : CospanHyperGraph T n m) :
   graph_apply_hom f (relabel_graph g cohg) =
@@ -497,7 +535,7 @@ Proof.
   rewrite 2 (relation_equiv_iff.1 cohg_syntactic_eq_alt).
   refine ((relation_subseteq_iff (RA:=rel_preimage (graph_apply_hom _) _)).1 _ _ _).
   rewrite rel_preimage_rtc.
-  
+
   intros (cohg'' & fv & fe & Hfv & Hfe & Hveq & Happl)%cohg_syntactic_eq_exists.
 
    *)

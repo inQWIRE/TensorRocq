@@ -128,7 +128,7 @@ Ltac split_forall2 := match goal with
 (* To make the [IsNth] condition work, we use the following hint *)
 #[global] Hint Extern 0 (IsNth _ _ _) => get_nth : typeclass_instances.
 
-Require Import Aux_pos.
+From TensorRocq Require Import Aux_pos.
 
 #[export] Instance positive_equiv : Equiv positive := eq.
 
@@ -156,9 +156,74 @@ Proof.
 Qed.
 
 
+Fixpoint pos_to_nat_pred' (p : positive) : nat :=
+  match p with
+  | xI p => let np' := pos_to_nat_pred' p in S (S (np' + np'))
+  | xO p => let np' := pos_to_nat_pred' p in S (np' + np')
+  | xH => 0
+  end.
+
+Lemma pos_to_nat_pred'_correct (p : positive) :
+  pos_to_nat_pred' p = Aux_pos.pos_to_nat_pred p.
+Proof.
+  induction p; cbn; lia.
+Qed.
+
+Fixpoint list_drop_pos {A} (p : positive) (l : list A) : list A :=
+  match p with
+  | xI p => tail $ tail $ list_drop_pos p (list_drop_pos p l)
+  | xO p => tail $ list_drop_pos p (list_drop_pos p l)
+  | xH => l
+  end.
+
+Lemma tail_drop_1 {A} (l : list A) :
+  tail l = drop 1 l.
+Proof.
+  now destruct l.
+Qed.
+
+Lemma drop_S_tail {A} n (l : list A) :
+  drop (S n) l = tail (drop n l).
+Proof.
+  rewrite tail_drop_1, drop_drop, Nat.add_comm.
+  done.
+Qed.
+
+Lemma list_drop_pos_drop {A} (p : positive) (l : list A) :
+  list_drop_pos p l = drop (pos_to_nat_pred p) l.
+Proof.
+  rewrite <- pos_to_nat_pred'_correct.
+  revert l; induction p; intros l.
+  - cbn.
+    rewrite 2 drop_S_tail.
+    rewrite 2 IHp, drop_drop.
+    done.
+  - cbn.
+    rewrite drop_S_tail.
+    rewrite 2 IHp, drop_drop.
+    done.
+  - cbn.
+    now rewrite drop_0.
+Qed.
+
+Definition list_pth {A} (l : list A) (p : positive) : option A :=
+  head (list_drop_pos p l).
+
+Lemma list_pth_lookup {A} (l : list A) (p : positive) :
+  list_pth l p = l !! (pos_to_nat_pred p).
+Proof.
+  unfold list_pth.
+  rewrite list_drop_pos_drop.
+  rewrite head_lookup, lookup_drop, Nat.add_0_r.
+  done.
+Qed.
+
 Definition interp_discrete_hg_inhab `{Inhabited T} (l : list T) (p : positive) :
   T :=
-  l !!! (pos_to_nat_pred p).
+  match list_pth l p with
+  | Some t => t
+  | None => inhabitant
+  end.
 
 #[global] Instance interp_discrete_hg_inhab_proper `{Inhabited T} 
   `{Equiv T, Reflexive T equiv} ctx :
@@ -175,9 +240,7 @@ Proof.
   intros Hn%IsNth_iff.
   constructor.
   unfold interp_discrete_hg_inhab.
-  rewrite list_lookup_total_alt.
-  rewrite pos_to_nat_pred_of_nat.
-  rewrite Hn.
+  rewrite list_pth_lookup, pos_to_nat_pred_of_nat, Hn.
   done.
 Qed.
 

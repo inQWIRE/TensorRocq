@@ -148,9 +148,9 @@ Proof.
 Qed.
 
 #[export] Instance quote_compose `{ProD : ProLike Struct T D}
-  {n m o} 
+  {n m o}
   (d : D n m) (d' : D m o) (p : PRO Struct T n m) (p' : PRO Struct T m o) :
-  DiagramQuote d p -> DiagramQuote d' p' -> 
+  DiagramQuote d p -> DiagramQuote d' p' ->
   DiagramQuote (Dcompose d d') (Pcompose p p').
 Proof.
   intros [Hd] [Hd'].
@@ -164,9 +164,9 @@ Proof.
 Qed.
 
 #[export] Instance quote_stack `{ProD : ProLike Struct T D}
-  {n m n' m'} 
+  {n m n' m'}
   (d : D n m) (d' : D n' m') (p : PRO Struct T n m) (p' : PRO Struct T n' m') :
-  DiagramQuote d p -> DiagramQuote d' p' -> 
+  DiagramQuote d p -> DiagramQuote d' p' ->
   DiagramQuote (Dstack d d') (Pstack p p').
 Proof.
   intros [Hd] [Hd'].
@@ -179,6 +179,14 @@ Proof.
   now f_equiv; apply (inj Some).
 Qed.
 
+Lemma quote_unique `{ProD : ProLike Struct T D}
+  {n m} (d d' : D n m) p : DiagramQuote d p -> DiagramQuote d' p -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hd'p].
+  rewrite Hdp in Hd'p.
+  now apply (inj Some) in Hd'p.
+Qed.
+
 
 #[export] Instance denote_id `{ProD : ProLike Struct T D} n :
   DiagramDenote (Did n) (Pid n).
@@ -187,9 +195,9 @@ Proof.
 Qed.
 
 #[export] Instance denote_compose `{ProD : ProLike Struct T D}
-  {n m o} 
+  {n m o}
   (d : D n m) (d' : D m o) (p : PRO Struct T n m) (p' : PRO Struct T m o) :
-  DiagramDenote d p -> DiagramDenote d' p' -> 
+  DiagramDenote d p -> DiagramDenote d' p' ->
   DiagramDenote (Dcompose d d') (Pcompose p p').
 Proof.
   rewrite <- 3 DiagramQuote_iff_DiagramDenote.
@@ -197,14 +205,109 @@ Proof.
 Qed.
 
 #[export] Instance denote_stack `{ProD : ProLike Struct T D}
-  {n m n' m'} 
+  {n m n' m'}
   (d : D n m) (d' : D n' m') (p : PRO Struct T n m) (p' : PRO Struct T n' m') :
-  DiagramDenote d p -> DiagramDenote d' p' -> 
+  DiagramDenote d p -> DiagramDenote d' p' ->
   DiagramDenote (Dstack d d') (Pstack p p').
 Proof.
   rewrite <- 3 DiagramQuote_iff_DiagramDenote.
   apply _.
 Qed.
+
+Lemma denote_unique `{ProD : ProLike Struct T D}
+  {n m} (d d' : D n m) p : DiagramDenote d p -> DiagramDenote d' p -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hd'p].
+  rewrite Hdp in Hd'p.
+  now apply (inj Some) in Hd'p.
+Qed.
+
+
+
+(* To support rewriting with specifying a type of generators, we use
+  the following class which will enable rewriting using bundled diagrams
+  as generators *)
+Class AbstractProLike (Struct : Mor nat) (D : Mor nat) := {
+  APL_compD :: Compositional D;
+  APL_structD :: StructableDiagram Struct D;
+}.
+
+Fixpoint SPRO_to_diagram {Struct} `{AbsProD : AbstractProLike Struct D}
+  {n m} (p : SPRO Struct n m) : D n m :=
+  match p with
+  | Pid n => Did n
+  | Pcompose l r => Dcompose (SPRO_to_diagram l) (SPRO_to_diagram r)
+  | Pstack t b => Dstack (SPRO_to_diagram t) (SPRO_to_diagram b)
+  | Pstruct n m s => ofStruct s
+  | Pgen n m t => Empty_set_rect _ t
+  end.
+
+
+
+Class StructQuote `{AbsProD : AbstractProLike Struct D}
+  {n m} (d : D n m) (p : SPRO Struct n m) := {
+  struct_quote : SPRO_to_diagram p ≡ d;
+}.
+
+Class StructDenote `{AbsProD : AbstractProLike Struct D}
+  {n m} (d : D n m) (p : SPRO Struct n m) := {
+  struct_denote : SPRO_to_diagram p ≡ d;
+}.
+
+#[global] Hint Mode StructQuote  - ! -   - -  + - : typeclass_instances.
+#[global] Hint Mode StructDenote - ! -   - -  - + : typeclass_instances.
+
+Lemma StructQuote_iff `{AbsProD : AbstractProLike Struct D}
+  {n m} (d : D n m) (p : SPRO Struct n m) :
+  StructQuote d p <-> SPRO_to_diagram p ≡ d.
+Proof.
+  now split; [intros []|constructor].
+Qed.
+
+Lemma StructDenote_iff `{AbsProD : AbstractProLike Struct D}
+  {n m} (d : D n m) (p : SPRO Struct n m) :
+  StructDenote d p <-> SPRO_to_diagram p ≡ d.
+Proof.
+  now split; [intros []|constructor].
+Qed.
+
+Lemma StructQuote_iff_StructDenote `{AbsProD : AbstractProLike Struct D}
+  {n m} (d : D n m) (p : SPRO Struct n m) :
+  StructQuote d p <-> StructDenote d p.
+Proof.
+  now split; intros []; constructor.
+Qed.
+
+#[export] Instance StructQuote_proper_equiv `{AbsProD : AbstractProLike Struct D}
+  {n m} : Proper ((≡@{D n m}) ==> eq ==> iff) StructQuote.
+Proof.
+  intros d d' Hd p _ <-.
+  rewrite 2 StructQuote_iff.
+  now rewrite <- Hd.
+Qed.
+
+#[export] Instance StructDenote_proper_equiv `{AbsProD : AbstractProLike Struct D}
+  {n m} : Proper ((≡@{D n m}) ==> eq ==> iff) StructDenote.
+Proof.
+  intros d d' Hd p _ <-.
+  rewrite 2 StructDenote_iff.
+  now rewrite <- Hd.
+Qed.
+
+Lemma struct_quote_unique `{AbsProD : AbstractProLike Struct D}
+  {n m} (d d' : D n m) p : StructQuote d p -> StructQuote d' p -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hd'p].
+  now rewrite Hdp in Hd'p.
+Qed.
+
+Lemma struct_denote_unique `{AbsProD : AbstractProLike Struct D}
+  {n m} (d d' : D n m) p : StructDenote d p -> StructDenote d' p -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hd'p].
+  now rewrite Hdp in Hd'p.
+Qed.
+
 
 
 Section Lawful.
@@ -308,7 +411,7 @@ Lemma DiagramQuote_proper_semantics_aux {Struct T D} `{ProD : ProLike Struct T D
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
-  
+
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -374,7 +477,7 @@ Lemma DiagramQuote_correct {Struct T D} `{ProD : ProLike Struct T D}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
-  {n m} (p p' : PRO Struct T n m) (d d' : D n m) : 
+  {n m} (p p' : PRO Struct T n m) (d d' : D n m) :
   DiagramQuote d p -> DiagramQuote d' p' ->
   PRO_semantics p ≡ PRO_semantics p' ->
   d ≡ d'.
@@ -397,13 +500,83 @@ Lemma DiagramQuote_to_DiagramDenote_correct {Struct T D} `{ProD : ProLike Struct
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
-  {n m} (p p' : PRO Struct T n m) (d d' : D n m) : 
+  {n m} (p p' : PRO Struct T n m) (d d' : D n m) :
   DiagramQuote d p -> DiagramDenote d' p' ->
   PRO_semantics p ≡ PRO_semantics p' ->
   d ≡ d'.
 Proof.
   rewrite <- DiagramQuote_iff_DiagramDenote.
   apply DiagramQuote_correct.
+Qed.
+
+
+Class LawfulAbstractProLike
+  (Struct : Mor nat) (D : Mor nat)
+  {AbsProD : AbstractProLike Struct D}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensD : StrictTensorLike R A D}
+  := {
+  LAPL_compD :: LawfulCompositional D;
+  LAPL_structD :: LawfulStructableDiagram Struct D;
+}.
+
+Lemma SPRO_to_diagram_correct {Struct D} {AbsProD : AbstractProLike Struct D}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensD : StrictTensorLike R A D}
+  {LawAbsProD : LawfulAbstractProLike Struct D}
+  {n m} (p : SPRO Struct n m) :
+  strictInterpretTensor (SPRO_to_diagram p) ≡ PRO_semantics p.
+Proof.
+  induction p.
+  - cbn.
+    apply Did_correct.
+  - cbn.
+    rewrite Dcompose_correct.
+    apply compose_tensor_mor; eauto.
+  - cbn.
+    rewrite Dstack_correct.
+    apply stack_tensor_mor; eauto.
+  - cbn.
+    apply ofStruct_correct.
+  - cbn.
+    apply Empty_set_rect; done.
+Qed.
+
+
+Lemma StructQuote_proper_semantics {Struct D} {AbsProD : AbstractProLike Struct D}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensD : StrictTensorLike R A D}
+  {LawAbsProD : LawfulAbstractProLike Struct D}
+  {n m} (p p' : SPRO Struct n m) (d : D n m) :
+  PRO_semantics p ≡ PRO_semantics p' ->
+  StructQuote d p <-> StructQuote d p'.
+Proof.
+  rewrite 2 StructQuote_iff.
+  intros Hp.
+  f_equiv.
+  apply Dsemantics_correct.
+  now rewrite 2 SPRO_to_diagram_correct.
+Qed.
+
+
+Lemma StructDenote_proper_semantics {Struct D} {AbsProD : AbstractProLike Struct D}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensD : StrictTensorLike R A D}
+  {LawAbsProD : LawfulAbstractProLike Struct D}
+  {n m} (p p' : SPRO Struct n m) (d : D n m) :
+  PRO_semantics p ≡ PRO_semantics p' ->
+  StructDenote d p <-> StructDenote d p'.
+Proof.
+  rewrite <- 2 StructQuote_iff_StructDenote.
+  apply StructQuote_proper_semantics.
 Qed.
 
 
@@ -438,7 +611,7 @@ Definition BundledDiagram_rect {D} (P : BundledDiagram D -> Type)
   fun d => match d with
   | existT (n, m) d => HP n m d
   end.
-  
+
 Definition BundledDiagram_rec {D} (P : BundledDiagram D -> Set)
   (HP : forall n m (d : D n m), P (bundleDiagram d)) :
   forall d, P d :=
@@ -455,34 +628,69 @@ Definition BundledDiagram_ind {D} (P : BundledDiagram D -> Prop)
 
 From TensorRocq Require Import sigT2_relation.
 
-#[export] Instance bundledDiagram_equiv {D : Mor nat} {EquivD : forall n m, Equiv (D n m)} : 
+#[export] Instance bundledDiagram_equiv {D : Mor nat} {EquivD : forall n m, Equiv (D n m)} :
   Equiv (BundledDiagram D) := sigT2_relation (λ n m, equiv).
 
-#[export] Instance bundledDiagram_equivalence {D : Mor nat} 
-  {EquivD : forall n m, Equiv (D n m)} 
-  {EquivD : forall n m, Equivalence (≡@{D n m})} : 
+#[export] Instance bundledDiagram_equivalence {D : Mor nat}
+  {EquivD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})} :
   @Equivalence (BundledDiagram D) equiv := _.
+
+
+
+Fixpoint nat_eq_dec_eval (n m : nat) : Decision (n = m) :=
+  match n, m with
+  | 0, 0 => left eq_refl
+  | 0, S m => right (Nat.neq_0_succ m)
+  | S n, 0 => right (Nat.neq_succ_0 n)
+  | S n, S m =>
+    match nat_eq_dec_eval n m with
+    | left Hnm => left (match Hnm with | eq_refl => eq_refl end)
+    | right Hnm =>
+      right (not_eq_S _ _ Hnm)
+    end
+  end.
+
+Definition pair_eq_dec_eval {A B} (HA : forall a b : A, Decision (a = b))
+  (HB : forall a b : B, Decision (a = b)) (pq pq' : A * B) : Decision (pq = pq') :=
+  match pq, pq' with
+  | (p, q), (p', q') =>
+    match HA p p' with
+    | left Hp =>
+      match HB q q' with
+      | left Hq =>
+        left (match Hp, Hq with | eq_refl, eq_refl => eq_refl end)
+      | right Hq =>
+        right (fun Hpq => Hq (@f_equal _ _ snd (p, q) (p', q') Hpq))
+      end
+    | right Hp =>
+      right (fun Hpq => Hp (@f_equal _ _ fst (p, q) (p', q') Hpq))
+    end
+  end.
+
+Definition nat_pair_eq_dec_eval (nm nm' : nat * nat) : Decision (nm = nm') :=
+  pair_eq_dec_eval nat_eq_dec_eval nat_eq_dec_eval nm nm'.
+
 
 Definition unbundleDiagram {D} n m (d : BundledDiagram D) : option (D n m) :=
   match d with
-  | existT nm d => 
-    match decide ((n, m) = nm) with
+  | existT nm d =>
+    match nat_pair_eq_dec_eval (n, m) nm with
     | right _ => None
     | left Hnm => Some (eq_rect_r (λ nm, D nm.1 nm.2) d Hnm)
     end
   end.
 
-#[export] Instance unbundleDiagramProper 
-  {D : Mor nat} {EquivD : forall n m, Equiv (D n m)} n m : 
+#[export] Instance unbundleDiagramProper
+  {D : Mor nat} {EquivD : forall n m, Equiv (D n m)} n m :
   Proper (equiv ==> equiv) (unbundleDiagram (D:=D) n m).
 Proof.
   intros d d' Hd.
   induction Hd.
-  cbn.
-  case_decide as Heq; [|constructor].
-  apply pair_eq in Heq as Heq'.
-  destruct Heq' as [<- <-].
-  rewrite (proof_irrel Heq eq_refl).
+  cbn -[nat_pair_eq_dec_eval].
+  case_match; [|constructor].
+  assert (n = a /\ m = b) as [-> ->] by (eapply pair_eq; eauto).
+  rewrite (proof_irrel _ eq_refl).
   now constructor.
 Qed.
 
@@ -490,13 +698,13 @@ Qed.
 Definition WithDiagrams T (D : Mor nat) : Type := T + BundledDiagram D.
 
 
-#[export] Instance withDiagrams_equiv `{Equiv T} {D : Mor nat} 
+#[export] Instance withDiagrams_equiv `{Equiv T} {D : Mor nat}
   {EquivD : forall n m, Equiv (D n m)} : Equiv (WithDiagrams T D) := _.
 
 
-#[export] Instance withDiagrams_tensorable `{TensorableDiagram T D} : 
+#[export] Instance withDiagrams_tensorable `{TensorableDiagram T D} :
   TensorableDiagram (WithDiagrams T D) D :=
-  fun n m d => 
+  fun n m d =>
   match d with
   | inl t => ofTensor n m t
   | inr d => unbundleDiagram n m d
@@ -506,6 +714,11 @@ Definition WithDiagrams T (D : Mor nat) : Type := T + BundledDiagram D.
 
 
 
+(* The construction of rewriting using bundled diagrams, requiring only
+  quoting structure *)
+
+
+(* TODO: Declare Reduction dequote_bundled *)
 
 
 
@@ -516,7 +729,7 @@ Definition WithDiagrams T (D : Mor nat) : Type := T + BundledDiagram D.
 
 
 
-(* 
+(*
 
 
 (* TODO: Rewrite. Emphasize this captures the _behavior_ of a PRO, _not_

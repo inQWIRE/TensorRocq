@@ -17,6 +17,19 @@ Proof.
   done.
 Qed.
 
+Class PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{Equiv T'} (f : T -> T') {n m}
+  (p : PRO Struct T n m) (p' : PRO Struct T' n m) :=
+  find_denote_pro : PRO_denote f p ≡ p'.
+
+Lemma mk_PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{Equiv T'} (f : T -> T') {n m}
+  (p : PRO Struct T n m) (p' : PRO Struct T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_unquote f p p'.
+Proof.
+  done.
+Qed.
+
 From Ltac2 Require Import Ltac2.
 From TensorRocq Require Import Ltac2.ConstrExtra Ltac2.FSetExtra.
 
@@ -701,7 +714,7 @@ Ltac2 Type 'n Autonomy := [
 ].
 
 Ltac2 Type 'n Frobenial := [
-  | Delta ('n, 'n)
+  | Delta ('n, int, int)
 ].
 
 Ltac2 Type 'n SymmetricG := ('n Monoidal, 'n Symmetry) Sum.
@@ -835,12 +848,12 @@ Ltac2 json_of_Autonomy (of_n : 'n -> JSON)
 
 Ltac2 json_of_Frobenial (of_n : 'n -> JSON)
   (p : 'n Frobenial) : JSON :=
-  let (n, m) := match p with | Delta n m => (n, m) end in
+  let (k, n, m) := match p with | Delta k n m => (k, n, m) end in
   Jobject (!Map(string_tag) {
     "type" : Jstring "delta";
-    "spidertype" : Jint 0; (* TODO: Fix when we have proper sense of sized deltas *)
-    "insize" : of_n n;
-    "outsize" : of_n m}).
+    "spidertype" : of_n k; (* TODO: Fix when we have proper sense of sized deltas *)
+    "insize" : Jint n;
+    "outsize" : Jint m}).
 
 Ltac2 json_of_SymmetricG (of_n : 'n -> JSON)
   (p : 'n SymmetricG) : JSON :=
@@ -1194,10 +1207,13 @@ Ltac2 of_Autonomy (of_n : constr -> 'n) (c : constr) : 'n Autonomy :=
 Ltac2 of_Frobenial (of_n : constr -> 'n) (c : constr) : 'n Frobenial :=
   mk_of "of_Frobenial" "Frobenial" (let rec go c :=
     lazy_match! c with
-    | @Delta ?n ?m => 
-      let n' := of_n n in 
-      let m' := of_n m in 
-      Delta n' m'
+    | @Delta ?k ?n ?m => 
+      let k' := of_n k in 
+      let n' := of_nat n in
+      let m' := of_nat m in
+      (* let n' := of_n n in 
+      let m' := of_n m in  *)
+      Delta k' n' m'
     end in go) c.
   (* match! c with
   | ?m => go m
@@ -1348,10 +1364,11 @@ Ltac2 to_Autonomy (to_n : 'n -> constr) (m : 'n Autonomy) : constr :=
 
 Ltac2 to_Frobenial (to_n : 'n -> constr) (m : 'n Frobenial) : constr :=
   match m with
-  | Delta n m => 
-    let n' := to_n n in 
-    let m' := to_n m in 
-    '(Delta $n' $m')
+  | Delta k n m => 
+    let k' := to_n k in 
+    let n' := to_nat n in 
+    let m' := to_nat m in 
+    '(Delta $k' $n' $m')
   end.
 
 Ltac2 to_SymmetricG (to_n : 'n -> constr) (m : 'n SymmetricG) : constr :=
@@ -1373,6 +1390,28 @@ match! goal with
 | [|- ?l = _] => 
   extend_evar_ended_list ['(1); '(2)] l
 end. *)
+
+
+
+Ltac2 of_evar_ended_list (pA : constr -> 'a) (c : constr) : 'a list :=
+  let rec go p :=
+  if Constr.is_evar p then [] else
+  match! p with 
+  | nil => []
+  | cons ?a ?l => pA a :: go l
+  | app ?l ?r => List.append (of_list pA l) (go r)
+  | _ => 
+    let p' := Std.eval_red p in 
+    if Constr.equal p' p then 
+      let p' := Std.eval_hnf p in 
+      if Constr.equal p' p then 
+        Control.throw_invalid_argument 
+          "of_list: argument is not reducible to a [list] constant"
+      else go p'
+    else go p'
+  end in 
+  go c.
+
 
 
 End CC.
@@ -1412,12 +1451,15 @@ Local Ltac2 id : 'a -> 'a := fun a => a.
 Ltac2 intify_PRO (ns : constr list) (p : ('n, 's, constr) PRO) : constr list * ('n, 's, int) PRO :=
   map_PRO_with pair pair constr_get_nth ns p.
 
+Ltac2 deintify_PRO (ns : constr list) (p : ('n, 's, int) PRO) : ('n, 's, constr) PRO :=
+  map_PRO id id (fun i => Ltac2.List.nth ns i) p.
+
 Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
   match! goal with
   | [|- PRO_quote (Struct:=?struct_T) (interp_discrete_hg_inhab (T:=?t_T) ?cts) 
     (n:=?_cn) (m:=?_cm) ?cqp ?cp] =>
     let p := CC.of_PRO id id id cp in 
-    let ts := CC.of_list id cts in 
+    let ts := CC.of_evar_ended_list id cts in 
     let (ts', pi) := (intify_PRO ts p) in 
     let pi := map_PRO id id (fun x => CC.to_pos (Int.add x 1)) pi in 
     let (_, _, cpi) := CC.to_PRO_safe struct_T t_T id id id pi in
@@ -1426,6 +1468,85 @@ Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
     refine '(mk_PRO_quote (interp_discrete_hg_inhab $cts) $cpi $cp _);
     reflexivity
   end.
+
+Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab () :=
+  refine '(mk_PRO_unquote _ _ _ _);
+  ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab 
+    list_pth head list_drop_pos tail]);
+  reflexivity.
+
+Global Hint Extern 0 (PRO_quote (interp_discrete_hg_inhab _) _ _) => 
+  ltac2:(mk_PRO_quote_interp_discrete_hg_inhab()) : typeclass_instances.
+
+Global Hint Extern 0 (PRO_unquote (interp_discrete_hg_inhab _) _ _) => 
+  ltac2:(mk_PRO_unquote_interp_discrete_hg_inhab()) : typeclass_instances.
+
+(* Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab () :=
+  match! goal with
+  | [|- PRO_unquote (Struct:=?struct_T) (interp_discrete_hg_inhab (T:=?t_T) ?cts) 
+    (n:=?_cn) (m:=?_cm) ?cqp ?cp] =>
+    let qp := CC.of_PRO id id CC.of_pos cqp in 
+    let ts := CC.of_evar_ended_list id cts in 
+
+    let pi := (deintify_PRO ts (map_PRO id id (fun i => Int.sub i 1) qp)) in 
+    let (_, _, cpi) := CC.to_PRO_safe struct_T t_T id id id pi in
+    Std.unify cp cpi;
+    refine '(mk_PRO_unquote (interp_discrete_hg_inhab $cts) $cqp $cp _);
+    match! goal with
+    | [|- ?req _ _] =>
+      let req_equiv : constr := '(_ : Reflexive $req) in
+      Std.resolve_tc req_equiv;
+      refine '(@Aux.eq_reflexivity _ $req $req_equiv _ _ _);
+      ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab list_pth head list_drop_pos tail]);
+      Control.enter (fun () => Message.print (Message.of_constr (Control.goal ())));
+      reflexivity
+    end
+  end.
+
+Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab' () :=
+  match! goal with
+  | [|- PRO_unquote (Struct:=?struct_T) (interp_discrete_hg_inhab (T:=?t_T) ?cts) 
+    (n:=?_cn) (m:=?_cm) ?cqp ?cp] =>
+    let qp := CC.of_PRO id id CC.of_pos cqp in 
+    let ts := CC.of_evar_ended_list id cts in 
+
+    let pi := (deintify_PRO ts (map_PRO id id (fun i => Int.sub i 1) qp)) in 
+    let (_, _, cpi) := CC.to_PRO_safe struct_T t_T id id id pi in
+    Std.unify cp cpi;
+      ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab list_pth head list_drop_pos tail]);
+    refine '(mk_PRO_unquote (interp_discrete_hg_inhab $cts) $cqp $cp _);
+    reflexivity
+  end. *)
+
+
+
+(* Goal True.
+
+
+eassert (H : PRO_quote (interp_discrete_hg_inhab _) _
+  (Pcomposes_square (replicate 10 (Pgen 1 2 xH ;; Pgen 1 2 10%positive * Pgen 1 0 1%positive ;;
+    Psw [1;2] ;;
+    Pgen 1 0 5%positive * Pid 1))%pro : PROP positive _ _)).
+Time
+mk_PRO_quote_interp_discrete_hg_inhab ().
+Proof Mode "Classic".
+match type of H with
+| PRO_quote ?f ?qp _ => eassert (PRO_unquote f qp _)
+end.
+Proof Mode "Ltac2".
+(* Time mk_PRO_unquote_interp_discrete_hg_inhab' (). *)
+Time 
+refine '(mk_PRO_unquote _ _ _ _);
+ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab list_pth head list_drop_pos tail]);
+reflexivity.
+
+
+match! goal with
+
+  Time
+mk_PRO_unquote_interp_discrete_hg_inhab' (). *)
+
+
 
 (*
 Goal True.

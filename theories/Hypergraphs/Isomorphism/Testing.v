@@ -1104,4 +1104,47 @@ Definition nth_weak_graph_monos {i j n m} (subscohg : CospanHyperGraph T i j)
 End dec_equiv.
 
 
+(* Change this for different iso tests - also TODO: Write a countable-focused iso test? *)
+Definition default_graph_iso_test `{Equiv T, Equivalence T equiv, 
+  !RelDecision (≡@{T})} {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
+  opt_weak_graph_iso_partial_test cohg cohg'.
 
+Lemma default_graph_iso_test_correct  `{Equiv T, Equivalence T equiv, 
+  !RelDecision (≡@{T})}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  default_graph_iso_test cohg cohg' = true ->
+  cohg ≡ₛ cohg'.
+Proof.
+  apply opt_weak_graph_iso_partial_test_correct.
+Qed.
+
+Lemma default_graph_iso_test_correct'  `{Equiv T, Equivalence T equiv, 
+  !RelDecision (≡@{T})}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  BoolSpec (cohg ≡ₛ cohg') True (default_graph_iso_test cohg cohg').
+Proof.
+  pose proof (default_graph_iso_test_correct cohg cohg').
+  destruct (default_graph_iso_test cohg cohg'); constructor; auto.
+Qed.
+
+Local Instance Countable_Equiv `{Countable A} : Equiv A := eq.
+
+(* Change this for different iso tests - also TODO: Write a countable-focused iso test? *)
+Definition default_countable_graph_iso_test `{Countable T} {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
+  opt_weak_graph_iso_partial_test cohg cohg'.
+
+Lemma default_countable_graph_iso_test_correct `{Countable T}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  default_countable_graph_iso_test cohg cohg' = true ->
+  cohg ≡ₛ cohg'.
+Proof.
+  apply opt_weak_graph_iso_partial_test_correct.
+Qed.
+
+Lemma default_countable_graph_iso_test_correct' `{Countable T}
+  {n m} (cohg cohg' : CospanHyperGraph T n m) :
+  BoolSpec (cohg ≡ₛ cohg') True (default_countable_graph_iso_test cohg cohg').
+Proof.
+  pose proof (default_countable_graph_iso_test_correct cohg cohg').
+  destruct (default_countable_graph_iso_test cohg cohg'); constructor; auto.
+Qed.
