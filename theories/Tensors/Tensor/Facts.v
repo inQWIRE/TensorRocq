@@ -368,7 +368,7 @@ Section TensorOpsFacts.
   Add Parametric Morphism `{SA : Summable A,
     SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
     (permute_tensor (R:=R) (A:=A) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
-    pointwise_relation _ eq ==> pointwise_relation _ eq ==> 
+    equiv ==> equiv ==> 
       (≡) ==> (≡) as permute_tensor_mor.
   Proof.
     intros fl fl' Hfl fr fr' Hfr t t' Ht.
@@ -378,6 +378,17 @@ Section TensorOpsFacts.
     apply Ht; apply _.
   Qed.
   
+
+  #[export] Instance perm_tensor_proper
+    `{SA : Summable A, EqA : EqDecision A, SR : SemiRing R rO rI radd rmul req}
+    {n m} : Proper (equiv ==> equiv) (perm_tensor (A:=A) (R:=R) (n:=n) (m:=m)).
+  Proof.
+    intros f f' Hf v w _ _.
+    cbn.
+    erewrite permute_vec_ext; [apply SR| |done].
+    apply Hf.
+  Qed.
+
 
   Context `{SR : SemiRing R rO rI radd rmul req}.
 
@@ -657,6 +668,131 @@ Section TensorOpsFacts.
     cbn.
     rewrite <- 2 vunjoin'_to_vunjoin.
     done.
+  Qed.
+
+  Lemma permute_tensor_compose {n n' n'' m m' m''}
+    (fn : fin n -> fin n') (fn' : fin n' -> fin n'')
+    (fm : fin m -> fin m') (fm' : fin m' -> fin m'') 
+    (g : Tensor n m A) : 
+    permute_tensor fn' fm' (permute_tensor fn fm g) ≡
+    permute_tensor (fn' ∘ fn) (fm' ∘ fm) g.
+  Proof.
+    intros v w Hv Hw.
+    cbn.
+    rewrite 2 permute_vec_compose.
+    done.
+  Qed.
+
+
+  Lemma compose_perm_tensor_l `{WFA : !WFSummable A}
+    {n m o} (Hnm : n = m) 
+    (f : fin n -> fin m) {Hf : Inj eq eq f}
+    (g : Tensor m o A) : compose_tensor (perm_tensor f) g ≡ 
+    permute_tensor (fin_perm_inv_cast Hnm f) id g.
+  Proof.
+    subst m.
+    intros v w Hv Hw.
+    cbn.
+    rewrite fin_perm_inv_cast_id.
+    rewrite (sum_of_unique' _ (permute_vec (fin_perm_inv f) v)).
+    - rewrite (permute_vec_cancel _ _ _).
+      rewrite decide_True by done.
+      rewrite permute_vec_id.
+      ring.
+    - intros b Hb.
+      intros Hbneq.
+      case_decide as Hvb; [|ring].
+      subst v.
+      rewrite (permute_vec_cancel _ _ _) in Hbneq.
+      done.
+  Qed.
+  
+  Lemma compose_perm_tensor_r `{WFA : !WFSummable A}
+    {n m o} (g : Tensor n m A) 
+    (f : fin m -> fin o) {Hf : Inj eq eq f} (Hmo : m = o) : compose_tensor g (perm_tensor f) ≡ 
+    permute_tensor id f g.
+  Proof.
+    intros v w Hv Hw.
+    cbn.
+    rewrite (sum_of_unique' _ (permute_vec f w)).
+    - rewrite decide_True by done.
+      rewrite permute_vec_id; ring.
+    - intros; rewrite decide_False by done.
+      ring.
+  Qed.
+
+  Lemma perm_tensor_ext
+    {n m} (f g : fin n -> fin m) (Hfg : forall i, f i = g i) :
+    perm_tensor f ≡@{Tensor n m A} perm_tensor g.
+  Proof.
+    now apply perm_tensor_proper.
+  Qed.
+
+  Lemma perm_tensor_id' 
+    {n} (f : fin n -> fin n) (Hf : forall i, f i = i) :
+    perm_tensor f ≡@{@Tensor n n A} delta_tensor.
+  Proof.
+    pose proof SR as [_ _ []].
+    intros v w _ _.
+    cbn.
+    rewrite permute_vec_id' by done.
+    done.
+  Qed.
+
+  Lemma perm_tensor_compose {WFA : WFSummable A}
+    {n m o} (f : fin n -> fin m) (g : fin m -> fin o) :
+    compose_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor n o A} perm_tensor (g ∘ f).
+  Proof.
+    pose proof SR as [_ _ []].
+    intros v w Hv Hw.
+    cbn.
+    etransitivity;
+    [refine (
+      sum_of_unique' (SR:=SR) _ (permute_vec g w)
+      _)|].
+    - intros b Hb Hne.
+      rewrite (decide_False (P:=b = _)) by done.
+      apply rmul_0_r.
+    - rewrite (decide_True (P:=permute_vec g w = _)) by done.
+      rewrite rmul_1_r.
+      apply Aux.eq_reflexivity.
+      apply decide_ext.
+      f_equiv.
+      rewrite permute_vec_compose.
+      done.
+  Qed.
+
+
+  Lemma perm_tensor_stack {WFA : WFSummable A}
+    {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m') :
+    stack_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor _ _ A}
+    perm_tensor (fin_perm_stack f g).
+  Proof.
+    pose proof SR as [_ _ []].
+    intros v w Hv Hw.
+    cbn.
+    induction v as [vl vr] using vec_add_inv.
+    induction w as [wl wr] using vec_add_inv.
+    rewrite 2 vsplitl_app, 2 vsplitr_app.
+    transitivity (if decide
+          (vl = permute_vec f wl /\
+            vr = permute_vec g wr)
+          then rI else rO); [(repeat case_decide); first [easy | exfalso; tauto | apply SR]|].
+    apply Aux.eq_reflexivity, decide_ext.
+    rewrite vapp_eq_iff.
+    do 2 f_equiv.
+    - apply vec_eq; intros i.
+      rewrite lookup_vsplitl.
+      rewrite 2 lookup_permute_vec.
+      rewrite fin_perm_stack_L.
+      rewrite lookup_vapp_L.
+      done.
+    - apply vec_eq; intros i.
+      rewrite lookup_vsplitr.
+      rewrite 2 lookup_permute_vec.
+      rewrite fin_perm_stack_R.
+      rewrite lookup_vapp_R.
+      done.
   Qed.
 
     

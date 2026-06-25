@@ -381,3 +381,391 @@ Proof.
   rewrite vunjoin_to_vunjoin'.
   now rewrite (permute_vec_cancel _ _ _).
 Qed.
+
+
+
+Lemma div_sub_one_r n m :
+  ((n - m) / m = n / m - 1)%nat.
+Proof.
+  destruct_decide (decide (n < m)).
+  - replace (n - m)%nat with O by lia.
+    rewrite Nat.Div0.div_0_l, Nat.div_small; lia.
+  - replace (n / m)%nat with ((1 * m + (n - m)) / m)%nat by (f_equal; lia).
+    destruct m.
+    + rewrite 2 Nat.div_0_r; done.
+    + rewrite Nat.div_add_l by lia.
+      lia.
+Qed.
+
+(* FIXME: Move *) 
+Lemma rev_const {A n} (a : A) :
+  Vector.rev (Vector.const a n) = Vector.const a n.
+Proof.
+  apply Vector.to_list_inj.
+  rewrite Vector.to_list_rev, Vector.to_list_const.
+  rewrite rev_repeat.
+  reflexivity.
+Qed.
+
+Lemma vlookup_eq_nth {A n} (v : vec A n) i : 
+  v !!! i = Vector.nth v i.
+Proof.
+  revert i; induction v; [apply fin_0_inv|apply fin_S_inv; [done|]].
+  intros i.
+  apply IHv.
+Qed.
+
+Lemma vlookup_const {A n} (a : A) (i : fin n) :
+  Vector.const a n !!! i = a.
+Proof.
+  now rewrite vlookup_eq_nth, Vector.const_nth.
+Qed.
+
+
+
+(* FIXME: Move, replace in Aux_stdpp_base *)
+
+#[export] Instance omap2_Proper {A B C}
+  `{RA : relation A, RB : relation B, RC : relation C}
+  (f : A -> B -> C) {Hf : Proper (RA ==> RB ==> RC) f} :
+  Proper (option_Forall2 RA ==> option_Forall2 RB ==> option_Forall2 RC) (omap2 f).
+Proof.
+  intros ma ma' Hma mb mb' Hmb.
+  induction Hma as [a a' Ha|]; [|constructor].
+  induction Hmb as [b b' Hb|]; [|constructor].
+  constructor.
+  now f_equiv.
+Qed.
+#[export] Instance omap2_Proper_equiv {A B C}
+  `{RA : Equiv A, RB : Equiv B, RC : Equiv C}
+  (f : A -> B -> C) {Hf : Proper (equiv ==> equiv ==> equiv) f} :
+  Proper (equiv ==> equiv ==> equiv) (omap2 f).
+Proof.
+  apply omap2_Proper, Hf.
+Qed.
+
+Import stdpp.fin.
+
+(* FIXME: Move *)
+(* Record finperm n m := {
+  finperm_vec : vec (fin m) n
+}.
+
+Definition finperm_fun {n m} (f : finperm n m) : fin n -> fin m :=
+  (f.(finperm_vec n m) !!!.).
+ *)
+Notation id := Datatypes.id.
+
+
+#[export] Instance fin_perm_equiv {n m} : Equiv (fin n -> fin m) :=
+  pointwise_relation (fin n) eq.
+
+Definition fin_add_comm {n m} (i : fin (n + m)) : fin (m + n) :=
+  match fin_sum_case i with
+  | inl i => Fin.R _ i
+  | inr i => Fin.L _ i
+  end.
+
+Definition fin_perm_stack {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m') :
+  fin (n + n') -> fin (m + m') :=
+  fun i =>
+  match fin_sum_case i with
+  | inl i => Fin.L _ (f i)
+  | inr i => Fin.R _ (g i)
+  end.
+
+Lemma fin_perm_stack_L {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m')
+  i : fin_perm_stack f g (Fin.L _ i) = Fin.L _ (f i).
+Proof.
+  unfold fin_perm_stack.
+  rewrite fin_sum_case_L.
+  done.
+Qed.
+
+Lemma fin_perm_stack_R {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m')
+  i : fin_perm_stack f g (Fin.R _ i) = Fin.R _ (g i).
+Proof.
+  unfold fin_perm_stack.
+  rewrite fin_sum_case_R.
+  done.
+Qed.
+
+Definition fin_perm_assoc {n m o} (i : fin (n + m + o)) : fin (n + (m + o)) :=
+  match fin_sum_case i with
+  | inl i => match fin_sum_case i with
+    | inl i => Fin.L _ i
+    | inr i => Fin.R _ (Fin.L _ i)
+    end
+  | inr i => Fin.R _ (Fin.R _ i)
+  end.
+
+Definition fin_perm_invassoc {n m o} (i : fin (n + (m + o))) : fin (n + m + o) :=
+  match fin_sum_case i with
+  | inl i => Fin.L _ (Fin.L _ i)
+  | inr i =>
+    match fin_sum_case i with
+    | inl i => Fin.L _ (Fin.R _ i)
+    | inr i => Fin.R _ i
+    end
+  end.
+
+#[export] Instance fin_perm_stack_proper {n m n' m'} :
+  Proper (equiv ==> equiv ==> equiv) (@fin_perm_stack n m n' m').
+Proof.
+  intros f f' Hf g g' Hg.
+  intros i.
+  induction i as [i|i] using fin_add_inv.
+  - rewrite 2 fin_perm_stack_L, Hf.
+    done.
+  - rewrite 2 fin_perm_stack_R, Hg.
+    done.
+Qed.
+
+
+#[export] Instance fin_compose_proper_gen {n m o} :
+  Proper (equiv ==> equiv ==> equiv)
+    (λ (g : fin m -> fin o) (f : fin n -> fin m), λ i, g (f i)).
+Proof.
+  intros f f' Hf g g' Hg.
+  intros i.
+  cbn.
+  now rewrite Hf, Hg.
+Qed.
+
+#[export] Instance fin_inv_compose_proper_gen {n m o} :
+  Proper (equiv ==> equiv ==> equiv)
+    (λ (f : fin n -> fin m) (g : fin m -> fin o), λ i, g (f i)).
+Proof.
+  intros f f' Hf g g' Hg.
+  intros i.
+  cbn.
+  now rewrite Hf, Hg.
+Qed.
+
+#[export] Instance fin_compose_proper {n m o} :
+  Proper (equiv ==> equiv ==> equiv) (@compose (fin n) (fin m) (fin o)).
+Proof.
+  apply _.
+Qed.
+
+
+Definition fin_perm_mul_S_r {n m} (i : fin (n * S m)) : fin (n + n * m) :=
+  let '(il, ir) := fin_split i in
+  fin_S_inv (λ _, fin (n + n * m)) (Fin.L _ il)
+    (λ ir', Fin.R _ (fin_prod il ir')) ir.
+
+Lemma fin_prod_comm_S_r {n m} : @fin_prod_comm n (S m) ≡
+  fin_perm_stack id (@fin_prod_comm n m) ∘ fin_perm_mul_S_r.
+Proof.
+  intros i.
+  induction i as [il ir] using fin_mul_ind.
+  cbn.
+  rewrite fin_prod_comm_prod.
+  unfold fin_perm_mul_S_r.
+  rewrite fin_split_prod.
+  induction ir as [|ir'] using fin_S_inv.
+  - cbn.
+    rewrite fin_perm_stack_L.
+    done.
+  - cbn.
+    rewrite fin_perm_stack_R, fin_prod_comm_prod.
+    done.
+Qed.
+
+Definition fin_perm_invmul_S_r {n m} (i : fin (n + n * m)) : fin (n * S m) :=
+  match fin_sum_case i with
+  | inl i => fin_prod i 0
+  | inr i =>
+    let '(il, ir') := fin_split i in
+    fin_prod il (FS ir')
+  end.
+
+Lemma fin_prod_comm_S_l {n m} : @fin_prod_comm (S n) m ≡
+  fin_perm_invmul_S_r ∘ fin_perm_stack id (@fin_prod_comm n m).
+Proof.
+  intros i.
+  induction i as [il ir] using fin_mul_ind.
+  cbn.
+  rewrite fin_prod_comm_prod.
+  induction il as [|il'] using fin_S_inv.
+  - cbn.
+    rewrite fin_perm_stack_L.
+    unfold fin_perm_invmul_S_r.
+    rewrite fin_sum_case_L.
+    done.
+  - cbn.
+    rewrite fin_perm_stack_R.
+    unfold fin_perm_invmul_S_r.
+    rewrite fin_sum_case_R, fin_prod_comm_prod, fin_split_prod.
+    done.
+Qed.
+
+Lemma fin_perm_stack_id {n m} : @fin_perm_stack n n m m (λ i, i) (λ i, i) ≡
+  (λ i, i).
+Proof.
+  intros i.
+  induction i using fin_add_inv.
+  - now rewrite fin_perm_stack_L.
+  - now rewrite fin_perm_stack_R.
+Qed.
+
+
+Definition cast_fin_perm {n n' m m'}
+  (Hn : n = n') (Hm : m = m') (f : fin n -> fin m) : fin n' -> fin m' :=
+  match Nat.eq_dec n n' with
+  | right HFn => False_rect _ (HFn Hn)
+  | left Hn' =>
+    match Nat.eq_dec m m' with
+    | right HFm => False_rect _ (HFm Hm)
+    | left Hm' =>
+      match Hn', Hm' with
+      | eq_refl, eq_refl => f
+      end
+    end
+  end.
+
+Lemma cast_fin_perm_refl {n m}
+  (Hn : n = n) (Hm : m = m) (f : fin n -> fin m) :
+  cast_fin_perm Hn Hm f = f.
+Proof.
+  unfold cast_fin_perm.
+  case_match; [|done].
+  case_match; [|done].
+  rewrite 2 (proof_irrel _ eq_refl).
+  done.
+Qed.
+
+Lemma cast_fin_perm_apply {n m n' m'}
+  (Hn : n = n') (Hm : m = m') (f : fin n -> fin m) i :
+  cast_fin_perm Hn Hm f i = Fin.cast (f (Fin.cast i (eq_sym Hn))) Hm.
+Proof.
+  subst.
+  rewrite cast_fin_perm_refl.
+  now rewrite 2 fcast_id.
+Qed.
+
+
+
+#[export] Instance cast_fin_perm_proper {n n' m m'}
+  (Hn : n = n') (Hm : m = m') : Proper ((≡) ==> (≡)) (cast_fin_perm Hn Hm).
+Proof.
+  intros f f' Hf.
+  subst.
+  rewrite 2 cast_fin_perm_refl.
+  done.
+Qed.
+
+Notation finL := (Fin.L _).
+Notation finR := (Fin.R _).
+
+Class FinCases (n : nat) (T : Type) := mk_FinCases {
+  fin_cases : fin n -> T;
+  fin_cases_rev : T -> fin n;
+}.
+
+#[global] Arguments mk_FinCases {_ _} _ _ : assert.
+#[global] Arguments fin_cases {_ _} {_} / _ : assert.
+#[global] Arguments fin_cases_rev {_ _} {_} / _ : assert.
+
+
+#[export] Instance fin_cases_refl n : FinCases n (fin n) | 100 :=
+  mk_FinCases (fun i => i) (fun i => i).
+
+#[export] Instance fin_cases_succ `{FinCases n T} : FinCases (S n) (option T) :=
+  mk_FinCases (fin_S_inv (λ _, option T) None (Some ∘ fin_cases)) (from_option (FS ∘ fin_cases_rev) 0%fin).
+
+#[export] Instance fin_cases_add `{FinCases n Tn, FinCases m Tm} :
+  FinCases (n + m) (Tn + Tm) :=
+  mk_FinCases (sum_map fin_cases fin_cases ∘ fin_sum_case)
+    (sum_rect _ (finL ∘ fin_cases_rev) (finR ∘ fin_cases_rev)).
+
+#[export] Instance fin_cases_prod `{FinCases n Tn, FinCases m Tm} :
+  FinCases (n * m) (Tn * Tm) :=
+  mk_FinCases (prod_map fin_cases fin_cases ∘ fin_split)
+    (uncurry fin_prod ∘ prod_map (fin_cases_rev) (fin_cases_rev)).
+
+Definition fin_mid_comm {n m o p} (i : fin ((n + m) + (o + p))) :
+  fin ((n + o) + (m + p)) :=
+  match fin_cases i with
+  | inl (inl i) => finL (finL i)
+  | inl (inr i) => finR (finL i)
+  | inr (inl i) => finL (finR i)
+  | inr (inr i) => finR (finR i)
+  end.
+
+Fixpoint vec_join {A n} (v : vec (option A) n) : option (vec A n) :=
+  match v with
+  | [#] => Some [#]
+  | h ::: v => h ≫= λ h, (h :::.) <$> vec_join v
+  end.
+
+Lemma vec_join_Some {A n} (v : vec (option A) n) u :
+  vec_join v = Some u <-> v = vmap Some u.
+Proof.
+  revert u; induction v; intros u.
+  - inv_all_vec_fin.
+    done.
+  - cbn.
+    inv_all_vec_fin.
+    cbn.
+    split.
+    + rewrite bind_Some.
+      intros (x' & -> & (u' & ->%IHv & [<- ->]%vcons_inj)%fmap_Some).
+      done.
+    + intros [-> ->]%vcons_inj.
+      cbn.
+      erewrite (IHv _).2 by done.
+      done.
+Qed.
+
+Definition nat_to_ofin (n i : nat) : option (fin n) :=
+  (@nat_to_fin i n) <$> guard (i < n)%nat.
+
+Lemma nat_to_ofin_fin {n} (i : fin n) : nat_to_ofin n i = Some i.
+Proof.
+  unfold nat_to_ofin.
+  pose proof (fin_to_nat_lt i).
+  case_guard; [|done].
+  cbn.
+  f_equal.
+  apply nat_to_fin_to_nat.
+Qed.
+
+Definition nat_fun_to_fin_perm (n m : nat) (f : nat -> nat) : option (fin n -> fin m) :=
+  (λ v, (v!!!.)) <$> vec_join (fun_to_vec (n:=n) (λ i, nat_to_ofin m (f i))).
+
+Lemma nat_lt_ind {n} (P : forall i : nat, Prop)
+  (HP : forall (i : fin n), P i) : forall i, i < n -> P i.
+Proof.
+  intros i Hi.
+  rewrite <- (fin_to_nat_to_fin _ _ Hi).
+  auto.
+Qed.
+
+
+
+Lemma fin_add_comm_L {n m} i : @fin_add_comm n m (finL i) = finR i.
+Proof.
+  unfold fin_add_comm.
+  now rewrite fin_sum_case_L.
+Qed.
+
+Lemma fin_add_comm_R {n m} i : @fin_add_comm n m (finR i) = finL i.
+Proof.
+  unfold fin_add_comm.
+  now rewrite fin_sum_case_R.
+Qed.
+
+
+(* FIXME: Move *)
+Definition fin_perm_inv_cast {n m} (Hnm : n = m) (f : fin n -> fin m) : 
+  fin m -> fin n :=
+  cast_fin_perm Hnm eq_refl (fin_perm_inv (cast_fin_perm eq_refl (eq_sym Hnm) f)).
+
+Lemma fin_perm_inv_cast_id {n} (Hn : n = n) (f : fin n -> fin n) : 
+  fin_perm_inv_cast Hn f = fin_perm_inv f.
+Proof.
+  unfold fin_perm_inv_cast.
+  rewrite 2 cast_fin_perm_refl.
+  done.
+Qed.

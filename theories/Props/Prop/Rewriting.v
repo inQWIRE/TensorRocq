@@ -423,7 +423,7 @@ Lemma PRO_quote_correct_graph_semantics `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
   EqT : Equiv T, EquivT : Equivalence T equiv,
   EqT' : Equiv T', EquivT' : Equivalence T' equiv}
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   (ft : T -> T') {Hft : Proper (equiv ==> equiv) ft}
   {n m} (qp : PRO Struct T n m) p : PRO_quote ft qp p ->
@@ -777,7 +777,7 @@ Lemma PRO_monog_quote_context_domainb_correct `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
   EquivStruct : forall n m, Equivalence (≡@{Struct n m}),
   EqT : Equiv T, EquivT : Equivalence T equiv, Countable T'}
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   (R : LawfulPRORewritingRelation Struct T)
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m))
@@ -878,7 +878,7 @@ Lemma PRO_monog_quote_rewrite_correct `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
   EquivStruct : forall n m, Equivalence (≡@{Struct n m}),
   EqT : Equiv T, EquivT : Equivalence T equiv, Countable T'}
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   (R : LawfulPRORewritingRelation Struct T)
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m))
@@ -944,7 +944,7 @@ Lemma LawfulProLike_PRO_monog_quote_rewrite_correct `{Countable T'}
   (RW : LawfulPRORewritingRelation Struct T :=
     LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
 
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{StructMon : !SubStruct Monoidal Struct,
     StructSymm : !SubStruct Symmetry Struct}
@@ -1173,7 +1173,7 @@ Lemma PRO_quote_context_domainb_correct `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
   EquivStruct : forall n m, Equivalence (≡@{Struct n m}),
   EqT : Equiv T, EquivT : Equivalence T equiv, Countable T'}
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{!SubStruct Autonomy Struct, !SubStructGraphable Autonomy Struct T}
   
@@ -1290,7 +1290,7 @@ Lemma PRO_gen_quote_rewrite_correct `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
   EquivStruct : forall n m, Equivalence (≡@{Struct n m}),
   EqT : Equiv T, EquivT : Equivalence T equiv, Countable T'}
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{!SubStruct Autonomy Struct, !SubStructGraphable Autonomy Struct T}
 
@@ -1384,7 +1384,7 @@ Lemma LawfulProLike_PRO_bimonog_quote_rewrite_correct `{Countable T'}
   (RW : LawfulPRORewritingRelation Struct T :=
     LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
 
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{StructMono : !SubStruct Monoidal Struct,
     StructSymm : !SubStruct Symmetry Struct,
@@ -1468,7 +1468,7 @@ Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
   (RW : LawfulPRORewritingRelation Struct T :=
     LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
 
-  {StructGProp : forall T (EqT : Equiv T) n m,
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{StructMono : !SubStruct Monoidal Struct,
     StructSymm : !SubStruct Symmetry Struct,

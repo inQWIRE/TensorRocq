@@ -523,104 +523,6 @@ Import Aux_stdpp vector.
 
 
 
-Lemma perm_tensor_ext `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
-  {n m} (f g : fin n -> fin m) (Hfg : forall i, f i = g i) :
-  perm_tensor f ≡@{@Tensor R n m A} perm_tensor g.
-Proof.
-  pose proof SR as [_ _ []].
-  intros v w _ _.
-  cbn.
-  apply Aux.eq_reflexivity.
-  apply decide_ext.
-  f_equiv.
-  apply vec_eq; intros i.
-  rewrite 2 lookup_fun_to_vec.
-  cbn.
-  now rewrite Hfg.
-Qed.
-
-Lemma perm_tensor_id' `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
-  {n} (f : fin n -> fin n) (Hf : forall i, f i = i) :
-  perm_tensor f ≡@{@Tensor R n n A} delta_tensor.
-Proof.
-  pose proof SR as [_ _ []].
-  intros v w _ _.
-  cbn.
-  replace (fun_to_vec _) with w; [apply SR|].
-  apply vec_eq; intros i.
-  rewrite lookup_fun_to_vec.
-  simpl.
-  now rewrite Hf.
-Qed.
-
-Lemma perm_tensor_compose `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
-  {n m o} (f : fin n -> fin m) (g : fin m -> fin o) :
-  compose_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor R n o A} perm_tensor (g ∘ f).
-Proof.
-  pose proof SR as [_ _ []].
-  intros v w Hv Hw.
-  cbn.
-  etransitivity;
-  [refine (
-    sum_of_unique' (SR:=SR) _ (fun_to_vec ((fun i => @lookup_total _ _ _ (vector_lookup_total _ _) i w) ∘ g))
-     _)|].
-  - intros b Hb Hne.
-    rewrite (decide_False (P:=b = _)) by done.
-    apply rmul_0_r.
-  - rewrite (decide_True (P:=fun_to_vec _ = _)) by done.
-    rewrite rmul_1_r.
-    apply Aux.eq_reflexivity.
-    apply decide_ext.
-    f_equiv.
-    apply vec_eq.
-    intros i.
-    rewrite 2 lookup_fun_to_vec.
-    cbn.
-    rewrite lookup_fun_to_vec.
-    done.
-Qed.
-
-
-Lemma perm_tensor_stack `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
-  {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m') :
-  stack_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor R _ _ A}
-  perm_tensor (fun i => sum_rect (λ _, fin (m + m'))
-    (Fin.L m' ∘ f) (Fin.R m ∘ g) (fin_sum_case i)).
-Proof.
-  pose proof SR as [_ _ []].
-  intros v w Hv Hw.
-  cbn.
-  induction v as [vl vr] using vec_add_inv.
-  induction w as [wl wr] using vec_add_inv.
-  rewrite 2 vsplitl_app, 2 vsplitr_app.
-  transitivity (if decide
-         (vl = fun_to_vec ((λ i : fin m, wl !!! i) ∘ f) /\
-          vr = fun_to_vec ((λ i : fin m', wr !!! i) ∘ g))
-        then rI else rO); [(repeat case_decide); first [easy | exfalso; tauto | apply SR]|].
-  apply Aux.eq_reflexivity, decide_ext.
-  rewrite vapp_eq_iff.
-  do 2 f_equiv.
-  - apply vec_eq; intros i.
-    rewrite lookup_vsplitl.
-    rewrite 2 lookup_fun_to_vec.
-    cbn.
-    rewrite lookup_vapp, fin_sum_case_L.
-    cbn.
-    rewrite fin_sum_case_L.
-    done.
-  - apply vec_eq; intros i.
-    rewrite lookup_vsplitr.
-    rewrite 2 lookup_fun_to_vec.
-    cbn.
-    rewrite lookup_vapp, fin_sum_case_R.
-    cbn.
-    rewrite fin_sum_case_R.
-    done.
-Qed.
 
 
 Lemma Monoidal_semantics `{SR : SemiRing R rO rI radd rmul req}
@@ -662,19 +564,19 @@ Proof.
     rewrite perm_tensor_stack.
     apply perm_tensor_ext.
     intros i.
+
     destruct (Monoidal_SPRO_eq _), (Monoidal_SPRO_eq _).
     induction i using fin_add_inv.
-    + rewrite fin_sum_case_L.
-      cbn.
+    + rewrite fin_perm_stack_L.
       apply fin_to_nat_inj.
       rewrite fin_to_nat_cast.
       rewrite 2 fin_to_nat_L, fin_to_nat_cast.
       done.
-    + rewrite fin_sum_case_R.
-      cbn.
+    + rewrite fin_perm_stack_R.
       apply fin_to_nat_inj.
-      rewrite fin_to_nat_cast, 2 fin_to_nat_R, fin_to_nat_cast.
-      done.
+      rewrite fin_to_nat_cast.
+      rewrite 2 fin_to_nat_R, fin_to_nat_cast.
+      lia.
   - cbn.
     etransitivity; [apply Monoidal_semantics|].
     erewrite (proof_irrel (Monoidal_SPRO_eq _)); reflexivity.
@@ -695,7 +597,7 @@ Lemma swap_tensor_perm_tensor `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
   {n m} :
   swap_tensor (n:=n) (m:=m) ≡@{@Tensor R _ _ A}
-  perm_tensor (λ i, sum_rect (λ _, fin _) (Fin.R _) (Fin.L _) (fin_sum_case i)).
+  perm_tensor fin_add_comm.
 Proof.
   pose proof SR as [_ _ []].
   intros v w Hv Hw.
@@ -703,13 +605,14 @@ Proof.
   induction v as [vl vr] using vec_add_inv.
   induction w as [wl wr] using vec_add_inv.
   rewrite vsplitl_app, vsplitr_app.
+  unfold permute_vec.
   rewrite fun_to_vec_plus.
   apply Aux.eq_reflexivity.
   apply decide_ext.
   f_equiv.
   f_equal; apply vec_eq; intros i;
   rewrite lookup_fun_to_vec; cbn;
-  [rewrite fin_sum_case_L|rewrite fin_sum_case_R]; cbn;
+  [rewrite fin_add_comm_L|rewrite fin_add_comm_R]; cbn;
   [rewrite lookup_vapp_R|rewrite lookup_vapp_L]; done.
 Qed.
 
@@ -1290,3 +1193,13 @@ Fixpoint copy_PRO
     d * copy_PRO k d ;;
     Pinvmul_S_r m k
   end.
+
+Fixpoint Pstack_n {Struct T} (k : nat) {n m} (d : PRO Struct T n m) : 
+  PRO Struct T (k * n) (k * m) :=
+  match k with
+  | 0 => Pid 0
+  | S k => d * Pstack_n k d
+  end.
+
+
+(* Lemma Pdelta_semantics_alt *)

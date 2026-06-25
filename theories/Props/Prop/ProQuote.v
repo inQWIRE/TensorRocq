@@ -10,7 +10,7 @@ Class PRO_quote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
   quote_pro : PRO_denote f p ≡ p'.
 
 Lemma mk_PRO_quote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{Equiv T'} (f : T -> T') {n m}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
   (p : PRO Struct T n m) (p' : PRO Struct T' n m) : 
   PRO_denote f p ≡ p' -> PRO_quote f p p'.
 Proof.
@@ -23,7 +23,7 @@ Class PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
   find_denote_pro : PRO_denote f p ≡ p'.
 
 Lemma mk_PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{Equiv T'} (f : T -> T') {n m}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
   (p : PRO Struct T n m) (p' : PRO Struct T' n m) : 
   PRO_denote f p ≡ p' -> PRO_unquote f p p'.
 Proof.
@@ -1462,10 +1462,11 @@ Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
     let ts := CC.of_evar_ended_list id cts in 
     let (ts', pi) := (intify_PRO ts p) in 
     let pi := map_PRO id id (fun x => CC.to_pos (Int.add x 1)) pi in 
-    let (_, _, cpi) := CC.to_PRO_safe struct_T t_T id id id pi in
+    let (_, _, cpi) := CC.to_PRO_safe struct_T '(positive) id id id pi in
     let cts := CC.extend_evar_ended_list ts' cts in 
     Std.unify cqp cpi;
-    refine '(mk_PRO_quote (interp_discrete_hg_inhab $cts) $cpi $cp _);
+    refine '(mk_PRO_quote 
+      (T:=positive) (T':=$t_T) (interp_discrete_hg_inhab $cts) $cpi $cp _);
     reflexivity
   end.
 
@@ -1517,6 +1518,46 @@ Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab' () :=
     refine '(mk_PRO_unquote (interp_discrete_hg_inhab $cts) $cqp $cp _);
     reflexivity
   end. *)
+
+
+(* 
+Local Instance Countable_Equiv `{Countable A} : Equiv A := eq.
+
+Local Instance nat_equiv : Equiv nat := eq.
+
+
+Goal True.
+eassert (H : PRO_quote (interp_discrete_hg_inhab _) _
+  (Pcomposes_square (replicate 1 
+    (Pgen 1 2 (10%nat) ;; Pgen 1 2 10%nat * Pgen 1 0 1%nat ;;
+    Psw [1;2] ;;
+    Pgen 1 0 O * Pid 1))%pro : PROP nat _ _)).
+
+Set Ltac2 Backtrace.
+mk_PRO_quote_interp_discrete_hg_inhab ().
+
+eassert (H : PRO_quote (interp_discrete_hg_inhab _) _
+  (Pcomposes_square (replicate 10 (Pgen 1 2 xH ;; Pgen 1 2 10%positive * Pgen 1 0 1%positive ;;
+    Psw [1;2] ;;
+    Pgen 1 0 5%positive * Pid 1))%pro : PROP positive _ _)).
+Time
+mk_PRO_quote_interp_discrete_hg_inhab ().
+Proof Mode "Classic".
+match type of H with
+| PRO_quote ?f ?qp _ => eassert (PRO_unquote f qp _)
+end.
+Proof Mode "Ltac2".
+(* Time mk_PRO_unquote_interp_discrete_hg_inhab' (). *)
+Time 
+refine '(mk_PRO_unquote _ _ _ _);
+ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab list_pth head list_drop_pos tail]);
+reflexivity.
+
+
+match! goal with
+
+  Time
+mk_PRO_unquote_interp_discrete_hg_inhab' (). *)
 
 
 

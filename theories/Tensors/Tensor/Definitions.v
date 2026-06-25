@@ -208,7 +208,7 @@ Section TensorOps.
   Definition perm_tensor `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m} (f : fin n -> fin m) : Tensor n m A :=
     fun v w =>
-    delta_tensor v (fun_to_vec $ (w !!!.) ∘ f).
+    delta_tensor v (permute_vec f w).
 
   Definition permute_tensor_l {A n m o} (f : fin n -> fin m) (t : Tensor n o A) : Tensor m o A :=
     fun v w => t (permute_vec f v) w.
