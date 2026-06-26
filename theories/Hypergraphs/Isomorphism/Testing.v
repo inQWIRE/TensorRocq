@@ -1105,7 +1105,7 @@ End dec_equiv.
 
 
 (* Change this for different iso tests - also TODO: Write a countable-focused iso test? *)
-Definition default_graph_iso_test `{Equiv T, Equivalence T equiv, 
+Definition default_graph_iso_test `{Equiv T, 
   !RelDecision (≡@{T})} {n m} (cohg cohg' : CospanHyperGraph T n m) : bool :=
   opt_weak_graph_iso_partial_test cohg cohg'.
 

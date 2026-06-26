@@ -505,6 +505,20 @@ Proof.
   now symmetry.
 Qed.
 
+Lemma pro_rewriting_relation_graph_syntax `{StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (R : LawfulPRORewritingRelation Struct T)
+  {n m} (p q : PRO Struct T n m) :
+    pro_rewriting_domain R p ->
+    pro_rewriting_domain R q ->
+    PRO_graph_semantics p ≡ₛ PRO_graph_semantics q ->
+    R n m p q.
+Proof.
+  intros Hp Hq Hpq.
+  apply (pro_rewriting_relation_graph_syntax_l R q p q); [done..|].
+  now apply pro_rewriting_relation_refl.
+Qed.
+
 
 
 
@@ -629,6 +643,141 @@ Import PropGraphTerm.
 
 
 
+
+
+
+Lemma LawfulProLike_PRO_quote_test_correct `{Countable T'}
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+
+  (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
+  {n m} (dlhs drhs : D n m) :
+  forall lhs rhs,
+  DiagramQuote dlhs lhs ->
+  DiagramQuote drhs rhs ->
+  forall Qlhs Qrhs,
+  PRO_quote f Qlhs lhs ->
+  PRO_quote f Qrhs rhs ->
+  default_countable_graph_iso_test (PRO_graph_semantics Qlhs)
+    (PRO_graph_semantics Qrhs) = true ->
+  dlhs ≡ drhs.
+Proof.
+  intros lhs rhs Hlhs Hrhs Qlhs Qrhs HQlhs HQrhs.
+  intros Hlr%default_countable_graph_iso_test_correct.
+
+  apply (PRO_quote_correct_graph_semantics _) in HQlhs as HQlhs'.
+  apply (PRO_quote_correct_graph_semantics _) in HQrhs as HQrhs'.
+  eapply (DiagramQuote_correct R A); [eauto..|].
+  rewrite <- 2 PRO_graph_semantics_correct.
+  apply graph_semantics_syntactic_eq.
+  rewrite HQlhs', HQrhs'.
+  f_equiv.
+  apply Hlr.
+Qed.
+
+
+
+Lemma LawfulProLike_RW_dom_of_Quote
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d : D n m) p :
+  DiagramQuote d p ->
+  RW.(pro_rewriting_domain) p.
+Proof.
+  intros [Hdp%(f_equiv is_Some)].
+  now apply Hdp.
+Qed.
+
+Lemma LawfulProLike_RW_dom_of_Denote
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d : D n m) p :
+  DiagramDenote d p ->
+  RW.(pro_rewriting_domain) p.
+Proof.
+  intros [Hdp%(f_equiv is_Some)].
+  now apply Hdp.
+Qed.
+
+
+
+Lemma LawfulProLike_equiv_of_RW_Quote
+  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  {Struct : Mor nat} {T : Type} {D : Mor nat}
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d d' : D n m) p p' :
+  DiagramQuote d p ->
+  DiagramQuote d' p' ->
+  RW n m p p' -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hdp'] (d1 & d1' & [Hd1] & [Hd1'] & Heq).
+  rewrite Hd1 in Hdp.
+  rewrite Hd1' in Hdp'.
+  apply (inj Some) in Hdp, Hdp'.
+  rewrite <- Hdp, <- Hdp'; done.
+Qed.
 
 
 
@@ -1005,6 +1154,68 @@ Qed.
 
 
 
+Lemma LawfulProLike_PRO_monog_quote_clean_correct `{Countable T'}
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+  `{StructMon : !SubStruct Monoidal Struct,
+    StructSymm : !SubStruct Symmetry Struct}
+  `{StructClean : CleanableStruct Struct,
+    StructComp : ComposableStruct Struct}
+  (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m)
+    := fun n m => graph_to_PROP')
+
+  (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
+  {n m} (dtgt : D n m) :
+  forall tgt,
+  DiagramQuote dtgt tgt ->
+  forall Qtgt,
+  PRO_quote f Qtgt tgt ->
+  forall Qres,
+    graph_to_term n m (PRO_graph_semantics Qtgt) = Some Qres ->
+  forall res, PRO_unquote f Qres res ->
+  forall dres, DiagramDenote dres res ->
+  dtgt ≡ dres.
+Proof.
+  intros tgt Htgt Qtgt HQtgt Qres HQres res Hres dres Hdres.
+  apply graph_to_PROP'_correct in HQres.
+  apply (PRO_quote_correct_graph_semantics _) in HQtgt as HQtgt'.
+  apply (PRO_quote_correct_graph_semantics _) in Hres as HQres'.
+  apply (f_equiv (graph_apply_hom f)) in HQres.
+  rewrite <- HQtgt', <- HQres' in HQres.
+  eapply (LawfulProLike_equiv_of_RW_Quote (LawPro)).
+  - eauto.
+  - apply DiagramQuote_iff_DiagramDenote; eauto.
+  - fold RW.
+    apply (pro_rewriting_relation_graph_syntax RW).
+    + eapply LawfulProLike_RW_dom_of_Quote; eauto.
+    + eapply LawfulProLike_RW_dom_of_Denote; eauto.
+    + done.
+Qed.
+
+
+
+
+
+
+
 
 Definition PRO_context_domainb `{StructGraphable Struct T, Countable T}
   (R : LawfulPRORewritingRelation Struct T)
@@ -1017,7 +1228,7 @@ Definition PRO_context_domainb `{StructGraphable Struct T, Countable T}
     _ ← guard (R.(pro_rewriting_domain) Pctx);
     Some true).
 
-Lemma PRO_context_domainb_correct `{Countable T} 
+Lemma PRO_context_domainb_correct `{Countable T}
   `{!SubStruct Autonomy Struct}
   `{!StructGraphable Struct T}
   `{!SubStructGraphable Autonomy Struct T}
@@ -1043,7 +1254,7 @@ Proof.
   cbn.
   intros _.
   intros lhs rhs Hlrhs tl tr HRtl HRtr Htl Htr.
-  eapply pro_rewriting_relation_graph_syntax_l with 
+  eapply pro_rewriting_relation_graph_syntax_l with
     (Pctx ;; (lhs * Pid j ;; Pcap j) * Pid m)%pro; [done|..].
   1: {
     cbn.
@@ -1052,7 +1263,7 @@ Proof.
     apply compose_graphs_cohg_syntactic_eq; [apply Hgraph_to_term, HPctx|].
     done.
   }
-  eapply pro_rewriting_relation_graph_syntax_r with 
+  eapply pro_rewriting_relation_graph_syntax_r with
     (Pctx ;; (rhs * Pid j ;; Pcap j) * Pid m)%pro; [done|..].
   2: {
     cbn.
@@ -1072,7 +1283,7 @@ Definition PRO_gen_rewrite `{StructGraphable Struct T, Countable T}
   (R : LawfulPRORewritingRelation Struct T)
   (graph_to_term : forall n m, CospanHyperGraph T n m -> option (PRO Struct T n m))
   (select_context : forall i j (lhs : CospanHyperGraph T i j)
-    n m (tgt : CospanHyperGraph T n m), nat -> nat -> 
+    n m (tgt : CospanHyperGraph T n m), nat -> nat ->
     option (CospanHyperGraph T n ((i + j) + m)))
   {i j} (lhs rhs : PRO Struct T i j) {n m} (tgt : PRO Struct T n m)
   (match_number : nat) (quotient_number : nat) :
@@ -1096,7 +1307,7 @@ Definition PRO_bimonog_rewrite `{StructGraphable Struct T, Countable T}
   {i j} (lhs rhs : PRO Struct T i j) {n m} (tgt : PRO Struct T n m)
   (match_number quotient_number : nat) :
   option (PRO Struct T n m) :=
-  PRO_gen_rewrite R graph_to_term (fun i j lhs n m tgt => 
+  PRO_gen_rewrite R graph_to_term (fun i j lhs n m tgt =>
     select_bimonog_context lhs tgt) lhs rhs tgt match_number quotient_number.
 
 
@@ -1106,11 +1317,11 @@ Definition PRO_frobenius_rewrite `{StructGraphable Struct T, Countable T}
   {i j} (lhs rhs : PRO Struct T i j) {n m} (tgt : PRO Struct T n m)
   (match_number quotient_number : nat) :
   option (PRO Struct T n m) :=
-  PRO_gen_rewrite R graph_to_term (fun i j lhs n m tgt => 
+  PRO_gen_rewrite R graph_to_term (fun i j lhs n m tgt =>
     select_frobenius_context lhs tgt) lhs rhs tgt match_number quotient_number.
 
 
-Lemma PRO_gen_rewrite_correct `{Countable T} 
+Lemma PRO_gen_rewrite_correct `{Countable T}
   `{!SubStruct Autonomy Struct}
   `{!StructGraphable Struct T}
   `{!SubStructGraphable Autonomy Struct T}
@@ -1119,13 +1330,13 @@ Lemma PRO_gen_rewrite_correct `{Countable T}
   (Hgraph_to_term : forall n m cohg p, graph_to_term n m cohg = Some p ->
     PRO_graph_semantics p ≡ₛ cohg)
   (select_context : forall i j (lhs : CospanHyperGraph T i j)
-    n m (tgt : CospanHyperGraph T n m), nat -> nat -> 
+    n m (tgt : CospanHyperGraph T n m), nat -> nat ->
     option (CospanHyperGraph T n ((i + j) + m)))
   {i j} (lhs rhs : PRO Struct T i j) {n m} (tgt : PRO Struct T n m)
   (match_number quotient_number : nat) :
   pro_rewriting_domain R tgt ->
   R i j lhs rhs ->
-  forall res, PRO_gen_rewrite R graph_to_term select_context 
+  forall res, PRO_gen_rewrite R graph_to_term select_context
     lhs rhs tgt match_number quotient_number = Some res ->
   R n m tgt res.
 Proof.
@@ -1176,7 +1387,7 @@ Lemma PRO_quote_context_domainb_correct `{FreeStructGraphable Struct,
   {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
     Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
   `{!SubStruct Autonomy Struct, !SubStructGraphable Autonomy Struct T}
-  
+
   (R : LawfulPRORewritingRelation Struct T)
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m))
   (Hgraph_to_term : forall n m cohg p, graph_to_term n m cohg = Some p ->
@@ -1269,7 +1480,7 @@ Definition PRO_gen_quote_rewrite `{FreeStructGraphable Struct, Countable T',
   (R : LawfulPRORewritingRelation Struct T)
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m))
   (select_context : forall i j (lhs : CospanHyperGraph T' i j)
-    n m (tgt : CospanHyperGraph T' n m), nat -> nat -> 
+    n m (tgt : CospanHyperGraph T' n m), nat -> nat ->
     option (CospanHyperGraph T' n ((i + j) + m)))
   (f : T' -> T)
   {i j} (Qlhs Qrhs : PRO Struct T' i j) {n m} (Qtgt : PRO Struct T' n m)
@@ -1319,7 +1530,7 @@ Proof.
   set (Glhs := PRO_graph_semantics Qlhs).
   set (Grhs := PRO_graph_semantics Qrhs).
   set (Gtgt := PRO_graph_semantics Qtgt).
-  
+
   destruct (select_context _ _ _  _ _ _  _ _) as [ctx|]; [|done].
   cbn.
   destruct (default_graph_iso_test_correct' Gtgt (make_pushout Glhs ctx))
@@ -1342,22 +1553,22 @@ Proof.
 Qed.
 
 (* FIXME: Move *)
-#[export] Instance substruct_symmetricg_of_monoidal_symmetry 
-  `{!SubStruct Monoidal Struct, !SubStruct Symmetry Struct} : 
+#[export] Instance substruct_symmetricg_of_monoidal_symmetry
+  `{!SubStruct Monoidal Struct, !SubStruct Symmetry Struct} :
   SubStruct SymmetricG Struct := fun n m s =>
   match s with
   | inl s | inr s => includeStruct s
   end.
 
-#[export] Instance substruct_autonomous_of_symmetricg_autonomy 
-  `{!SubStruct SymmetricG Struct, !SubStruct Autonomy Struct} : 
+#[export] Instance substruct_autonomous_of_symmetricg_autonomy
+  `{!SubStruct SymmetricG Struct, !SubStruct Autonomy Struct} :
   SubStruct Autonomous Struct := fun n m s =>
   match s with
   | inl s | inr s => includeStruct s
   end.
 
 #[export] Instance substruct_frobenius_of_autonomous_frobenial
-  `{!SubStruct Autonomous Struct, !SubStruct Frobenial Struct} : 
+  `{!SubStruct Autonomous Struct, !SubStruct Frobenial Struct} :
   SubStruct Frobenius Struct := fun n m s =>
   match s with
   | inl s | inr s => includeStruct s
@@ -1394,7 +1605,7 @@ Lemma LawfulProLike_PRO_bimonog_quote_rewrite_correct `{Countable T'}
     StructComp : ComposableStruct Struct}
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m)
     := fun n m => graph_to_APROP')
-  (select_context := fun i j lhs n m tgt => 
+  (select_context := fun i j lhs n m tgt =>
     select_bimonog_context lhs tgt)
 
   (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
@@ -1420,7 +1631,7 @@ Lemma LawfulProLike_PRO_bimonog_quote_rewrite_correct `{Countable T'}
 Proof.
   intros Hdlrhs lhs rhs tgt Hlhs Hrhs Htgt.
   specialize (PRO_gen_quote_rewrite_correct
-    RW graph_to_term (fun n m => graph_to_APROP'_correct) select_context 
+    RW graph_to_term (fun n m => graph_to_APROP'_correct) select_context
     f lhs rhs tgt match_number quotient_number) as Hrw.
   tspecialize Hrw. 1:{
     destruct Htgt as [Htgt].
@@ -1448,6 +1659,71 @@ Proof.
   rewrite Hdtgt_tgt', Hdres_res'.
   done.
 Qed.
+
+
+
+
+Lemma LawfulProLike_PRO_bimonog_quote_clean_correct `{Countable T'}
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+  `{StructMono : !SubStruct Monoidal Struct,
+    StructSymm : !SubStruct Symmetry Struct,
+    StructAuto : !SubStruct Autonomy Struct,
+    SubStructG : !SubStructGraphable Autonomy Struct T}
+  `{StructClean : CleanableStruct Struct,
+    StructComp : ComposableStruct Struct}
+  (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m)
+    := fun n m => graph_to_APROP')
+
+  (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
+  {n m} (dtgt : D n m) :
+  forall tgt,
+  DiagramQuote dtgt tgt ->
+  forall Qtgt,
+  PRO_quote f Qtgt tgt ->
+  forall Qres,
+    graph_to_term n m (PRO_graph_semantics Qtgt) = Some Qres ->
+  forall res, PRO_unquote f Qres res ->
+  forall dres, DiagramDenote dres res ->
+  dtgt ≡ dres.
+Proof.
+  intros tgt Htgt Qtgt HQtgt Qres HQres res Hres dres Hdres.
+  apply graph_to_APROP'_correct in HQres.
+  apply (PRO_quote_correct_graph_semantics _) in HQtgt as HQtgt'.
+  apply (PRO_quote_correct_graph_semantics _) in Hres as HQres'.
+  apply (f_equiv (graph_apply_hom f)) in HQres.
+  rewrite <- HQtgt', <- HQres' in HQres.
+  eapply (LawfulProLike_equiv_of_RW_Quote (LawPro)).
+  - eauto.
+  - apply DiagramQuote_iff_DiagramDenote; eauto.
+  - fold RW.
+    apply (pro_rewriting_relation_graph_syntax RW).
+    + eapply LawfulProLike_RW_dom_of_Quote; eauto.
+    + eapply LawfulProLike_RW_dom_of_Denote; eauto.
+    + done.
+Qed.
+
+
+
+
 
 Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
@@ -1479,7 +1755,7 @@ Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
     StructComp : ComposableStruct Struct}
   (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m)
     := fun n m => graph_to_FPROP')
-  (select_context := fun i j lhs n m tgt => 
+  (select_context := fun i j lhs n m tgt =>
     select_frobenius_context lhs tgt)
 
   (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
@@ -1505,7 +1781,7 @@ Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
 Proof.
   intros Hdlrhs lhs rhs tgt Hlhs Hrhs Htgt.
   specialize (PRO_gen_quote_rewrite_correct
-    RW graph_to_term (fun n m => graph_to_FPROP'_correct) select_context 
+    RW graph_to_term (fun n m => graph_to_FPROP'_correct) select_context
     f lhs rhs tgt match_number quotient_number) as Hrw.
   tspecialize Hrw. 1:{
     destruct Htgt as [Htgt].
@@ -1536,7 +1812,64 @@ Qed.
 
 
 
+Lemma LawfulProLike_PRO_frobenius_quote_clean_correct `{Countable T'}
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeStructGraphable Struct,
+    LawGraphS : !LawfulStructGraphable Struct T}
+  `{StructD : StructableDiagram Struct D,
+    LawStructD : !LawfulStructableDiagram R A Struct D}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
 
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+  `{StructMono : !SubStruct Monoidal Struct,
+    StructSymm : !SubStruct Symmetry Struct,
+    StructAuto : !SubStruct Autonomy Struct,
+    StructFrob : !SubStruct Frobenial Struct,
+    SubStructG : !SubStructGraphable Autonomy Struct T}
+  `{StructClean : CleanableStruct Struct,
+    StructComp : ComposableStruct Struct}
+  (graph_to_term : forall n m, CospanHyperGraph T' n m -> option (PRO Struct T' n m)
+    := fun n m => graph_to_FPROP')
+
+  (f : T' -> T) {Hf : Proper (equiv ==> equiv) f}
+  {n m} (dtgt : D n m) :
+  forall tgt,
+  DiagramQuote dtgt tgt ->
+  forall Qtgt,
+  PRO_quote f Qtgt tgt ->
+  forall Qres,
+    graph_to_term n m (PRO_graph_semantics Qtgt) = Some Qres ->
+  forall res, PRO_unquote f Qres res ->
+  forall dres, DiagramDenote dres res ->
+  dtgt ≡ dres.
+Proof.
+  intros tgt Htgt Qtgt HQtgt Qres HQres res Hres dres Hdres.
+  apply graph_to_FPROP'_correct in HQres.
+  apply (PRO_quote_correct_graph_semantics _) in HQtgt as HQtgt'.
+  apply (PRO_quote_correct_graph_semantics _) in Hres as HQres'.
+  apply (f_equiv (graph_apply_hom f)) in HQres.
+  rewrite <- HQtgt', <- HQres' in HQres.
+  eapply (LawfulProLike_equiv_of_RW_Quote (LawPro)).
+  - eauto.
+  - apply DiagramQuote_iff_DiagramDenote; eauto.
+  - fold RW.
+    apply (pro_rewriting_relation_graph_syntax RW).
+    + eapply LawfulProLike_RW_dom_of_Quote; eauto.
+    + eapply LawfulProLike_RW_dom_of_Denote; eauto.
+    + done.
+Qed.
 
 
 (*

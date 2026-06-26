@@ -1073,24 +1073,29 @@ Definition Pcompose'_raw {Struct T} {n m o}
   fun T n m o s s' => 
     Pcompose'_raw (cleanStruct T s) (cleanStruct T s').
 
-
-Definition Pcompose' {Struct T} `{ComposableStruct Struct} {n m o} 
-  (p : PRO Struct T n m) : PRO Struct T m o -> PRO Struct T n o :=
-  match p with
+Fixpoint Pcompose'_aux {Struct T} `{ComposableStruct Struct} {n m o} 
+  (p : PRO Struct T m o) : PRO Struct T n m -> PRO Struct T n o :=
+  match p in PRO _ _ m o return PRO Struct T n m -> PRO Struct T n o with
   | Pid _ => fun p' => p'
-  | Pstruct n m s => 
+  | Pstruct m o s => 
     fun p' => 
-    match p' in PRO _ _ m o return Struct _ m -> PRO Struct T _ o with
+    match p' in PRO _ _ n m return Struct m _ -> PRO Struct T _ o with
     | Pid _ => fun s => Pstruct _ _ s
-    | Pstruct _ _ s' => fun s => composeStruct T s s'
-    | p' => fun s => Pcompose (Pstruct _ _ s) p'
+    | Pstruct _ _ s' => fun s => composeStruct T s' s
+    | p' => fun s => Pcompose p' (Pstruct _ _ s)
     end s
-  | p => fun p' => 
-    match p' in PRO _ _ m o return PRO Struct T _ m -> PRO Struct T _ o with
+  | Pcompose p' p'' => 
+      fun p => Pcompose'_aux p'' (Pcompose'_aux p' p)
+  | p => fun p' =>
+    match p' in PRO _ _ n m return PRO Struct T _ _ -> PRO Struct T n _ with
     | Pid _ => fun p => p
-    | p' => fun p => p ;; p'
+    | p' => fun p => p' ;; p
     end%pro p
   end.
+
+Definition Pcompose' {Struct T} `{ComposableStruct Struct} {n m o}
+  (p : PRO Struct T n m) (p' : PRO Struct T m o) : PRO Struct T n o :=
+  Pcompose'_aux p' p.
 
 Fixpoint Pstack' {Struct T} {n m n' m'} 
   (p : PRO Struct T n m) (p' : PRO Struct T n' m') {struct p'} : PRO Struct T (n + n') (m + m') :=

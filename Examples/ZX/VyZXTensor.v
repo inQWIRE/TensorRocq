@@ -44,15 +44,6 @@ Proof.
     split; [intros []; congruence|intros ?%Vector.cons_inj; easy].
 Qed.
 
-(* FIXME: Move *) 
-Lemma rev_const {A n} (a : A) :
-  Vector.rev (Vector.const a n) = Vector.const a n.
-Proof.
-  apply Vector.to_list_inj.
-  rewrite Vector.to_list_rev, Vector.to_list_const.
-  rewrite rev_repeat.
-  reflexivity.
-Qed.
 
 Lemma allb_rev {n} (v : Vector.t bool n) b : 
   allb b (Vector.rev v) = allb b v.
@@ -68,13 +59,6 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma vlookup_eq_nth {A n} (v : vec A n) i : 
-  v !!! i = Vector.nth v i.
-Proof.
-  revert i; induction v; [apply fin_0_inv|apply fin_S_inv; [done|]].
-  intros i.
-  apply IHv.
-Qed.
 
 Lemma allb_false_nat_to_bits n i : (i < 2 ^ n)%nat -> 
   allb false (nat_to_bits n i) = (i =? 0).

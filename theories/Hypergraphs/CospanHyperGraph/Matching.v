@@ -994,7 +994,7 @@ Definition all_frobenius_contexts `{Countable T}
 
   '(me, mv, true_bnd) ← frobenius_graph_matchings subcohg cohg;
   let '(f_g_equiv_classes, exploded_interfaced_context) :=
-    exploded_interfaced_context subcohg cohg me mv true_bnd in
+    exploded_interfaced_context subcohg cohg me mv (map_img mv) in
   quotiented_contexts f_g_equiv_classes exploded_interfaced_context.
 
   
@@ -1014,7 +1014,7 @@ Definition select_frobenius_context `{Countable T}
 
   '(me, mv, true_bnd) ← frobenius_graph_matchings subcohg cohg !! match_number;
   let '(f_g_equiv_classes, exploded_interfaced_context) :=
-    exploded_interfaced_context subcohg cohg me mv true_bnd in
+    exploded_interfaced_context subcohg cohg me mv (map_img mv) in
   quotiented_contexts f_g_equiv_classes exploded_interfaced_context !! quotient_number.
 
 
@@ -1055,7 +1055,7 @@ Definition all_bimonog_contexts `{Countable T}
 
   '(me, mv, true_bnd) ← bimonog_graph_matchings subcohg cohg;
   let '(f_g_equiv_classes, exploded_interfaced_context) :=
-    exploded_interfaced_context subcohg cohg me mv true_bnd in
+    exploded_interfaced_context subcohg cohg me mv (map_img mv) in
   filter is_bimonogamousb $ quotiented_contexts f_g_equiv_classes exploded_interfaced_context.
 
 
@@ -1076,7 +1076,7 @@ Definition select_bimonog_context `{Countable T}
 
   '(me, mv, true_bnd) ← bimonog_graph_matchings subcohg cohg' !! match_number;
   let '(f_g_equiv_classes, exploded_interfaced_context) :=
-    exploded_interfaced_context subcohg cohg' me mv true_bnd in
+    exploded_interfaced_context subcohg cohg' me mv (map_img mv) in
   (filter is_bimonogamousb $ quotiented_contexts f_g_equiv_classes 
     exploded_interfaced_context) !! quotient_number.
 
@@ -1794,3 +1794,41 @@ End Example_bell.
 
 
 End PaperExample.
+
+
+Module Bug1.
+Local Open Scope positive_scope.
+Definition Glhs:=
+  mk_cohg (mk_hg {[ 1 := (1, [], [3; 5]) ]} ∅) [#] [#3; 5]
+  : CospanHyperGraph positive 0 2.
+Definition Gtgt := 
+  mk_cohg (mk_hg {[ 3 := (3, [5; 9], [7]); 4 := (1, [8], [138; 9]); 
+    42 := (3, [74; 138], []); 
+    66 := (1, [], [74; 5]) ]} {[ 5; 9; 74; 138 ]}) [#8] [#7]
+  : CospanHyperGraph positive 1 1.
+
+(* Compute bimonog_graph_rewriting_correctness Glhs Gtgt. *)
+(* Should be (1, true) *)
+
+
+(* Compute pretty $ bimonog_graph_matchings Glhs Gtgt.
+
+Definition me : Piso := mk_Piso'' {[ 1 := 66 ]}.
+Definition mv : Pmap positive := {[ 3 := 74; 5 := 5 ]}.
+
+Definition contexts := 
+  let '(f_g_equiv_classes, exploded_interfaced_context) :=
+    exploded_interfaced_context Glhs Gtgt me mv (map_img mv) in
+  quotiented_contexts f_g_equiv_classes exploded_interfaced_context.
+
+Compute is_bimonogamousb <$> (make_pushout Glhs <$> contexts).
+
+
+
+
+
+
+Compute bimonog_graph_rewriting_correctness Glhs Gtgt. *)
+
+
+End Bug1.
