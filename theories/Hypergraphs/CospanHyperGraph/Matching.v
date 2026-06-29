@@ -896,7 +896,8 @@ Definition exploded_interfaced_context {T}
   {n m} (cohg : CospanHyperGraph T n m)
   (me : Piso) (mv : Pmap positive) (true_bnd : Pset) :
   Pmap blocks * CospanHyperGraph T n ((i + j) + m) :=
-  let '(g_equiv_classes, exploded_context) := exploded_context subcohg cohg me mv true_bnd in
+  let '(g_equiv_classes, exploded_context) := 
+  exploded_context subcohg cohg me mv true_bnd in
 
   (* TODO: Fix this: Relabel to ensure disjointness with the added boundary *)
   let g_equiv_classes := fmap xI <$> g_equiv_classes in

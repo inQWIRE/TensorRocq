@@ -2707,11 +2707,63 @@ Qed.
 
 
 Definition delta_spider_graph {T} (n m : nat) : CospanHyperGraph T n m :=
-  mk_cohg ∅ (fun_to_vec (λ _, xH)) (fun_to_vec (λ _, xH)).
+  mk_cohg (mk_hg ∅ {[xH]}) (fun_to_vec (λ _, xH)) (fun_to_vec (λ _, xH)).
 
 Definition delta_spider_graph_bundled {T} (k n m : nat) : CospanHyperGraph T (n * k) (m * k) :=
-  mk_cohg ∅ (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))) (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
+  mk_cohg (mk_hg ∅ (list_to_set (Pos.of_succ_nat <$> seq 0 k)))
+  (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))) (fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
 
+Lemma vertices_empty_graph {T n m} (v : vec positive n) (w : vec positive m) :
+  vertices (@mk_cohg T n m ∅ v w) = list_to_set (v +++ w).
+Proof.
+  unfold vertices.
+  cbn.
+  change (vertices_hg _) with (∅ :> Pset).
+  rewrite union_empty_l_L.
+  now rewrite vec_to_list_app.
+Qed.
+
+Lemma vertices_almost_empty_graph {T n m} (v : vec positive n) (w : vec positive m) V :
+  vertices (@mk_cohg T n m (mk_hg ∅ V) v w) = V ∪ list_to_set (v +++ w).
+Proof.
+  unfold vertices.
+  cbn.
+  rewrite vertices_hg_decomp.
+  cbn.
+  change (referenced_vertices_hg _) with (∅ :> Pset).
+  rewrite union_empty_l_L.
+  now rewrite vec_to_list_app.
+Qed.
+
+
+Lemma vertices_delta_spider_graph {T} {n m} : 
+  vertices (@delta_spider_graph T n m) =
+  {[xH]}.
+Proof.
+  unfold delta_spider_graph.
+  rewrite vertices_almost_empty_graph.
+  apply leibniz_equiv_iff.
+  apply set_union_eq_l.
+  rewrite vec_to_list_app, 2 (vec_to_list_fun_to_vec (const xH)).
+  set_solver.
+Qed.
+
+Lemma vertices_delta_spider_graph_bundled {T} k n m :
+  vertices (@delta_spider_graph_bundled T k n m) =
+  list_to_set (Pos.of_succ_nat <$> seq 0 k).
+Proof.
+  unfold delta_spider_graph_bundled.
+  rewrite vertices_almost_empty_graph.
+  apply leibniz_equiv_iff.
+  apply set_union_eq_l.
+  rewrite vec_to_list_app, 2 (vec_to_list_fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
+  set_unfold.
+  setoid_rewrite elem_of_seq.
+  intros x.
+  assert (Hmod : forall x, k <> 0 -> x mod k < k) by (intros ?; apply Nat.mod_upper_bound).
+  intros [(y & -> & Hy) | (y & -> & Hy)];
+  exists (y mod k); naive_solver lia.
+Qed.
 
 
 Definition permute_graph {T n n' m m'}

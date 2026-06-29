@@ -266,6 +266,8 @@ Inductive Autonomy : nat -> nat -> Type :=
   | Cap n : Autonomy (n + n) 0.
 
 Inductive Frobenial : nat -> nat -> Type :=
+  | Delta0 : Frobenial 0 0
+  | Delta1 n m : Frobenial n m
   | Delta k n m : Frobenial (n * k) (m * k).
 
 
@@ -331,6 +333,8 @@ Definition autoToTensor (n m : nat) (p : Autonomy n m) : Tensor (R:=R) n m A :=
 
 Definition FrobeniusToTensor (n m : nat) (p : Frobenial n m) : Tensor (R:=R) n m A :=
   match p with
+  | Delta0 => delta_spider_tensor
+  | Delta1 n m => delta_spider_tensor
   | Delta k n m => delta_spider_tensor_bundled k
   end.
 
@@ -794,6 +798,11 @@ Definition Pcap {Struct T} {SubS : SubStruct Autonomy Struct} (n : nat) :
 Definition Pdelta {Struct T} `{!SubStruct Frobenial Struct}
   k n m : PRO Struct T (n * k) (m * k) := [str includeStruct (Delta k n m)].
 
+Definition Pdelta1 `{!SubStruct Frobenial Struct} {T} n m : PRO Struct T n m :=
+  [str includeStruct (Delta1 n m)].
+
+Definition Pdelta0 `{!SubStruct Frobenial Struct} {T} : PRO Struct T 0 0 :=
+  [str includeStruct Delta0].
 
 Definition cast_PRO {Struct T n m n' m'}
   (Hn : n = n') (Hm : m = m') (ap : PRO Struct T n m) : PRO Struct T n' m' :=
@@ -987,6 +996,12 @@ Qed.
 
 #[export] Instance cleanable_Frobenial : CleanableStruct Frobenial :=
   fun T n m s => match s with
+    | Delta0 => [str Delta0]
+    | Delta1 1 1 => Pid 1
+    | Delta1 0 0 => [str Delta0]
+    | Delta1 n m => [str Delta1 n m]
+    | Delta 0 n m => cast_PRO' (Nat.mul_0_r n) (Nat.mul_0_r m) [str Delta0]
+    | Delta _ 0 0 => [str Delta0]
     | Delta k 1 1 => cast_PRO' (Nat.mul_1_l k) (Nat.mul_1_l k) (Pid k)
     | Delta k n m => [str Delta k n m]
     end%pro.
@@ -997,6 +1012,14 @@ Qed.
     | inl s => map_PRO (λ _ _, inl) id (cleanStruct T s)
     | inr s => 
       match s with
+      | Delta0 => Pdelta0
+      | Delta1 1 1 => Pid 1
+      | Delta1 0 0 => Pdelta0
+      | Delta1 2 0 => Pcap 1
+      | Delta1 0 2 => Pcup 1
+      | Delta1 n m => Pdelta1 n m
+      | Delta 0 n m => cast_PRO' (Nat.mul_0_r n) (Nat.mul_0_r m) Pdelta0
+      | Delta _ 0 0 => Pdelta0
       | Delta k 1 1 => cast_PRO' (Nat.mul_1_l k) (Nat.mul_1_l k) (Pid k)
       | Delta k 0 2 => cast_PRO' (Nat.mul_0_l k) (f_equal (Nat.add k) (Nat.add_0_r k)) (Pcup k)
       | Delta k 2 0 => cast_PRO' (f_equal (Nat.add k) (Nat.add_0_r k)) (Nat.mul_0_l k) (Pcap k)
@@ -1071,7 +1094,9 @@ Definition Pcompose'_raw {Struct T} {n m o}
 
 #[export] Instance composeable_frobenius : ComposableStruct Frobenius :=
   fun T n m o s s' => 
-    Pcompose'_raw (cleanStruct T s) (cleanStruct T s').
+  (* TODO: We could do a better job here, but we shouldn't expect to 
+    actually compose frobeniuses *)
+    Pcompose'_raw ((* cleanStruct T *) [str s]) ((* cleanStruct T *) [str s']). (* Also, I'm pretty sure they're already clean*)
 
 Fixpoint Pcompose'_aux {Struct T} `{ComposableStruct Struct} {n m o} 
   (p : PRO Struct T m o) : PRO Struct T n m -> PRO Struct T n o :=

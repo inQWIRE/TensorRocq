@@ -148,7 +148,7 @@ Section TensorOps.
 
   Definition delta_spider_tensor `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m} : Tensor n m A :=
-    fun v w => if decide (Sorted.Sorted eq (v +++ w)) then rI else rO.
+    fun v w => ∑ a : A, if decide (Forall (eq a) (v +++ w)) then rI else rO.
 
   Definition delta_spider_tensor' `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n m}

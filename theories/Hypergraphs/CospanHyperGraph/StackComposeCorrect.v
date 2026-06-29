@@ -1473,40 +1473,6 @@ Qed.
 
 
 
-Lemma vertices_empty_graph {n m} (v : vec positive n) (w : vec positive m) :
-  vertices (@mk_cohg T n m ∅ v w) = list_to_set (v +++ w).
-Proof.
-  unfold vertices.
-  cbn.
-  change (vertices_hg _) with (∅ :> Pset).
-  rewrite union_empty_l_L.
-  now rewrite vec_to_list_app.
-Qed.
-
-
-Lemma vertices_delta_spider_graph {n m} : vertices (@delta_spider_graph T n m) =
-  if decide (n + m = 0)%nat then ∅ else {[xH]}.
-Proof.
-  unfold delta_spider_graph.
-  rewrite vertices_empty_graph.
-  case_decide.
-  1:{
-    replace n with 0 in * by lia.
-    replace m with 0 in * by lia.
-    reflexivity.
-  }
-  rewrite vec_to_list_app, 2 (vec_to_list_fun_to_vec (const xH)).
-  rewrite list_to_set_app_L.
-
-  apply leibniz_equiv_iff, set_subseteq_antisymm; [set_solver|].
-  apply singleton_subseteq_l.
-  destruct n.
-  - apply elem_of_union_r.
-    assert (pred m ∈ seq 0 m) by (apply elem_of_seq; lia).
-    set_solver.
-  - apply elem_of_union_l.
-    set_solver.
-Qed.
 
 Lemma stack_graphs_id_0_l {n m} (cohg : CospanHyperGraph T n m) :
   stack_graphs (id_graph 0) cohg ≡ᵢ cohg.
@@ -1537,13 +1503,16 @@ Qed.
 
 Lemma delta_spider_graph_alt n m k :
   isomorphic (T:=T) (delta_spider_graph n m)
-    (mk_cohg ∅ (fun_to_vec (λ _, k)) (fun_to_vec (λ _, k))).
+    (mk_cohg (mk_hg ∅ {[k]}) (fun_to_vec (λ _, k)) (fun_to_vec (λ _, k))).
 Proof.
   rewrite (iso_relabel_reindex (delta_spider_graph n m) (λ p, pos_add_N p (Pos.pred_N k)) id
     (Hfe:=(ltac:(intros ? ?; lia)))).
   apply eq_reflexivity.
   apply cohg_ext.
-  - done.
+  - apply hg_ext; [done|]. 
+    cbn -[set_map]. 
+    rewrite set_map_singleton_L. 
+    f_equal; lia.
   - apply vec_eq; intros i.
     cbn.
     rewrite vlookup_map, 2 lookup_fun_to_vec.
@@ -1557,21 +1526,10 @@ Qed.
 Lemma n_stack_delta_spider_graph_alt k n m :
   forall offset,
   n_stack_graphs k (delta_spider_graph (T:=T) n m) ≡ᵢ
-  mk_cohg ∅ (fun_to_vec (λ i, Pos.of_succ_nat (offset + i / n)))
+  mk_cohg (mk_hg ∅ (list_to_set (Pos.of_succ_nat <$> seq offset k)))
+    (fun_to_vec (λ i, Pos.of_succ_nat (offset + i / n)))
     (fun_to_vec (λ i, Pos.of_succ_nat (offset + i / m))).
 Proof.
-  destruct_decide (decide (n + m = 0)).
-  1:{
-    assert (n = 0) as -> by lia.
-    assert (m = 0) as -> by lia.
-    intros ?.
-    apply eq_reflexivity.
-    apply empty_graph_0_0_eq; [|done|lia|lia].
-    induction k; [done|].
-    cbn.
-    rewrite IHk.
-    done.
-  }
   induction k; [done|].
   cbn.
   intros offset.
@@ -1579,15 +1537,16 @@ Proof.
   rewrite (IHk (S offset)).
   rewrite <- stack_graphs_aux_to_stack_graphs_disjoint; [|done|].
   2:{
-    rewrite vertices_empty_graph.
+    rewrite vertices_almost_empty_graph.
     rewrite vec_to_list_app, 2 (vec_to_list_fun_to_vec (λ _, Pos.of_succ_nat offset)).
     rewrite list_to_set_app.
     rewrite 2 (fmap_const _ (Pos.of_succ_nat offset)).
-    rewrite vertices_empty_graph.
+    rewrite vertices_almost_empty_graph.
     rewrite vec_to_list_app, 2 (vec_to_list_fun_to_vec (λ i, Pos.of_succ_nat (_ + (i / _)))).
     set_unfold.
     intros ?.
     rewrite 2 elem_of_replicate.
+    setoid_rewrite elem_of_seq.
     set_unfold; naive_solver lia.
   }
   apply eq_reflexivity.

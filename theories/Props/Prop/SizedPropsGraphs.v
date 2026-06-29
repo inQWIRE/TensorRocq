@@ -502,7 +502,22 @@ Proof.
     split; [apply _|].
     split; [apply _|].
     rewrite eq_rect_r_to_cast_graph.
-    apply CospanHyperGraph.Definitions.cohg_ext; [done|..].
+    apply cohg_ext.
+    + apply hg_ext; [done|].
+      rewrite hedges_cast_graph.
+      unfold venlarge_graph.
+      cbn [hedges].
+      unfold enlarge_hypergraph.
+      cbn [hypervertices hedges delta_spider_graph].
+      rewrite set_bind_singleton_L.
+      cbn.
+      rewrite set_map_list_to_set_L.
+      f_equal.
+      rewrite <- vec_to_list_seq, <- 2 vec_to_list_map.
+      f_equal.
+      apply vec_eq; intros i.
+      rewrite lookup_fun_to_vec, 2 vlookup_map, vlookup_seq, pos_to_nat_pred_of_nat.
+      done.
     + cbn.
       apply vec_to_list_inj2.
       rewrite vec_to_list_cast.
@@ -577,7 +592,7 @@ Qed.
 
 Lemma graph_rel_cast_r {T} (R : forall n m, relation (CospanHyperGraph T n m))
   {n m n' m'} (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m')
-  Hn Hm : 
+  Hn Hm :
   R n m cohg (cast_graph Hn Hm cohg') <-> R n' m' (cast_graph (eq_sym Hn) (eq_sym Hm) cohg) cohg'.
 Proof.
   subst; now rewrite 2 cast_graph_id.
@@ -589,7 +604,7 @@ Lemma bw_sized_graph_to_graph_delta {N T} {B} f a (n m : btree B) :
       (delta_spider_graph_bundled (f a) (bsize n) (bsize m))).
 Proof.
   unfold bw_sized_graph_to_graph. cbn -[sized_graph_to_graph cast_graph].
-  pose proof (sized_graph_to_graph_delta_spider_sized_graph (T:=T) f a 
+  pose proof (sized_graph_to_graph_delta_spider_sized_graph (T:=T) f a
     (bsize ((λ _, a) <$> n)) (bsize ((λ _, a) <$> m))) as Hrw.
   eapply (fun H G => transitivity G H) in Hrw as Hrw'.
   2:{
@@ -835,7 +850,7 @@ Proof.
 Qed.
 
 (* FIXME: Move *)
-Lemma cast_gen_id {D} {n m} (Hn : n = n) (Hm : m = m) (d : D n m) : 
+Lemma cast_gen_id {D} {n m} (Hn : n = n) (Hm : m = m) (d : D n m) :
   cast_gen Hn Hm d = d.
 Proof.
   unfold cast_gen.

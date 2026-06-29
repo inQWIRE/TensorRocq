@@ -232,7 +232,7 @@ Section TensorOpsFacts.
     rewrite lookup_vjoin.
     apply _.
   Qed.
-  
+
   #[export] Instance vjoin'_SummedElement `{Summable A} {n m} (v : vec (vec A n) m) :
     SummedElement v -> SummedElement (vjoin' v).
   Proof.
@@ -266,8 +266,8 @@ Section TensorOpsFacts.
     rewrite lookup_vunjoin'.
     apply _.
   Qed.
-  
-  #[export] Instance permute_vec_SummedElement `{Summable A} {n m} 
+
+  #[export] Instance permute_vec_SummedElement `{Summable A} {n m}
     (f : fin n -> fin m) (v : vec A m) :
     SummedElement v -> SummedElement (permute_vec f v).
   Proof.
@@ -276,6 +276,16 @@ Section TensorOpsFacts.
     intros i.
     rewrite lookup_permute_vec.
     apply _.
+  Qed.
+
+  (* FIXME: Move *)
+  #[export] Instance vhd_SummedElement `{Summable A} {n} (v : vec A (S n)) :
+    SummedElement v -> SummedElement (vhd v).
+  Proof.
+    rewrite SummedElement_vlookup_iff.
+    intros Hv.
+    specialize (Hv 0%fin).
+    inv_all_vec_fin; done.
   Qed.
 
 
@@ -352,7 +362,7 @@ Section TensorOpsFacts.
     rewrite Hfg.
     apply Ht; apply _.
   Qed.
-  
+
   Add Parametric Morphism `{SA : Summable A,
     SR : SemiRing R rO rI radd rmul req} {n m o} :
     (permute_tensor_r (R:=R) (A:=A) (n:=n) (m:=m) (o := o)) with signature
@@ -364,11 +374,11 @@ Section TensorOpsFacts.
     rewrite Hfg.
     apply Ht; apply _.
   Qed.
-  
+
   Add Parametric Morphism `{SA : Summable A,
     SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
     (permute_tensor (R:=R) (A:=A) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
-    equiv ==> equiv ==> 
+    equiv ==> equiv ==>
       (≡) ==> (≡) as permute_tensor_mor.
   Proof.
     intros fl fl' Hfl fr fr' Hfr t t' Ht.
@@ -377,7 +387,7 @@ Section TensorOpsFacts.
     rewrite Hfl, Hfr.
     apply Ht; apply _.
   Qed.
-  
+
 
   #[export] Instance perm_tensor_proper
     `{SA : Summable A, EqA : EqDecision A, SR : SemiRing R rO rI radd rmul req}
@@ -610,14 +620,45 @@ Section TensorOpsFacts.
     now destruct (vec_cast_opt _ _).
   Qed.
 
-  Lemma delta_spider_tensor_alt {n m} :
+  Lemma delta_spider_tensor_alt {n m} `{!WFSummable A} : (n + m <> 0)%nat ->
     delta_spider_tensor (n:=n) (m:=m) ≡ (fun v w =>
     if decide (Forall (λ a, Some a = head (v +++ w)) (v +++ w)) then rI else rO).
   Proof.
+    intros Hnm.
+    intros v w Hv Hw.
+    unfold delta_spider_tensor.
+    assert (Hvw : SummedElement (v +++ w)) by apply _.
+    revert Hvw.
+    generalize (v +++ w).
+    revert Hnm.
+    generalize (n + m)%nat as nm.
+    intros [|nm]; [done|intros _].
+    intros t Ht.
+    rewrite (sum_of_unique' _ (vhd t)).
+    - apply eq_reflexivity.
+      apply decide_ext.
+      inv_all_vec_fin.
+      cbn.
+      apply Forall_iff.
+      naive_solver.
+    - intros b Hb Hne.
+      rewrite decide_False; [done|].
+      inv_all_vec_fin.
+      cbn.
+      rewrite Forall_cons.
+      naive_solver.
+  Qed.
+
+  Lemma delta_spider_tensor_alt_posdim {n m} `{!WFSummable A} : (n + m <> O)%nat ->
+    delta_spider_tensor (n:=n) (m:=m) ≡ (fun v w =>
+    if decide (Sorted.Sorted eq (v +++ w)) then rI else rO).
+  Proof.
+    intros Hnm.
+    rewrite delta_spider_tensor_alt by done.
     intros v w _ _.
     apply eq_reflexivity.
     apply decide_ext.
-    apply Sorted_eq_iff.
+    now rewrite Sorted_eq_iff.
   Qed.
 
   Lemma delta_spider_tensor'_alt {n m} vi wi :
@@ -649,9 +690,9 @@ Section TensorOpsFacts.
       cbn.
       apply Hall.
   Qed.
-  
 
-  Lemma n_stack_tensor_alt k {n m} (f : Tensor n m A) : 
+
+  Lemma n_stack_tensor_alt k {n m} (f : Tensor n m A) :
     n_stack_tensor k f ≡ fun v w => Rlist_prod (vzip_with f (vunjoin v) (vunjoin w)).
   Proof.
     induction k; [done|].
@@ -660,7 +701,7 @@ Section TensorOpsFacts.
     done.
   Qed.
 
-  Lemma copy_tensor_alt k {n m} (f : Tensor n m A) : 
+  Lemma copy_tensor_alt k {n m} (f : Tensor n m A) :
     copy_tensor k f ≡ permute_tensor fin_prod_comm fin_prod_comm (n_stack_tensor k f).
   Proof.
     rewrite n_stack_tensor_alt.
@@ -672,8 +713,8 @@ Section TensorOpsFacts.
 
   Lemma permute_tensor_compose {n n' n'' m m' m''}
     (fn : fin n -> fin n') (fn' : fin n' -> fin n'')
-    (fm : fin m -> fin m') (fm' : fin m' -> fin m'') 
-    (g : Tensor n m A) : 
+    (fm : fin m -> fin m') (fm' : fin m' -> fin m'')
+    (g : Tensor n m A) :
     permute_tensor fn' fm' (permute_tensor fn fm g) ≡
     permute_tensor (fn' ∘ fn) (fm' ∘ fm) g.
   Proof.
@@ -685,9 +726,9 @@ Section TensorOpsFacts.
 
 
   Lemma compose_perm_tensor_l `{WFA : !WFSummable A}
-    {n m o} (Hnm : n = m) 
+    {n m o} (Hnm : n = m)
     (f : fin n -> fin m) {Hf : Inj eq eq f}
-    (g : Tensor m o A) : compose_tensor (perm_tensor f) g ≡ 
+    (g : Tensor m o A) : compose_tensor (perm_tensor f) g ≡
     permute_tensor (fin_perm_inv_cast Hnm f) id g.
   Proof.
     subst m.
@@ -706,10 +747,10 @@ Section TensorOpsFacts.
       rewrite (permute_vec_cancel _ _ _) in Hbneq.
       done.
   Qed.
-  
+
   Lemma compose_perm_tensor_r `{WFA : !WFSummable A}
-    {n m o} (g : Tensor n m A) 
-    (f : fin m -> fin o) {Hf : Inj eq eq f} (Hmo : m = o) : compose_tensor g (perm_tensor f) ≡ 
+    {n m o} (g : Tensor n m A)
+    (f : fin m -> fin o) {Hf : Inj eq eq f} (Hmo : m = o) : compose_tensor g (perm_tensor f) ≡
     permute_tensor id f g.
   Proof.
     intros v w Hv Hw.
@@ -728,7 +769,7 @@ Section TensorOpsFacts.
     now apply perm_tensor_proper.
   Qed.
 
-  Lemma perm_tensor_id' 
+  Lemma perm_tensor_id'
     {n} (f : fin n -> fin n) (Hf : forall i, f i = i) :
     perm_tensor f ≡@{@Tensor n n A} delta_tensor.
   Proof.
@@ -795,6 +836,6 @@ Section TensorOpsFacts.
       done.
   Qed.
 
-    
+
 
 End TensorOpsFacts.

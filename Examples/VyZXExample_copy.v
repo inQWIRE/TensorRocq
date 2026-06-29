@@ -1743,12 +1743,13 @@ Ltac setup_zxsrw_lhs lem match_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_monog_quote_rewrite_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
-          (LawStructD:=ZX_SymmetricG_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end))|].
+
+Ltac zxsrw_visualize Hrw := idtac.
 
 Ltac zxsrw_lhs lem match_number :=
 
@@ -1766,7 +1767,6 @@ Ltac zxsrw_lhs lem match_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_monog_quote_rewrite_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
-          (LawStructD:=ZX_SymmetricG_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
@@ -1775,6 +1775,7 @@ Ltac zxsrw_lhs lem match_number :=
     (tryif timeout 3 (specialize (Hrw _ _ _ _ _ _)) then idtac else
       fail "Timed out trying to quote goal! Have you declared all necessary instances?");
     epose proof (Hrw _ _ _) as Hrw;
+    zxsrw_visualize Hrw;
     (do 3 (tspecialize Hrw by typeclasses eauto) || fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this." );
     epose proof (Hrw _) as Hrw;
     tspecialize Hrw;
@@ -1851,7 +1852,6 @@ Ltac zxsclean_lhs :=
     | |- ?R ?tgt _ =>
       specialize (LawfulProLike_PRO_monog_quote_clean_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
-          (LawStructD:=ZX_SymmetricG_lawstructable)
           (interp_discrete_hg_inhab lv) tgt) as Hrw
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
@@ -1892,7 +1892,6 @@ Ltac zxscat :=
   | |- ?R ?lhs ?rhs =>
     specialize (LawfulProLike_PRO_quote_test_correct
         _ _ _ _ _  (ZX_SymmetricG_lawpro)
-        (LawStructD:=ZX_SymmetricG_lawstructable)
         (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
@@ -2257,17 +2256,17 @@ End ZXquote_auto.
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
 
-#[export] Hint Extern 0 (DiagramQuote ⊂ _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) ⊂ _) =>
   exact (zx_quote_auto_cup) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote ⊃ _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) ⊃ _) =>
   exact (zx_quote_auto_cap) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (n_cup ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (n_cup ?n) _) =>
   exact (zx_quote_auto_n_cap n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (n_cap ?n) _) =>
-  exact (zx_quote_auto_cup n) : typeclass_instances.
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (n_cap ?n) _) =>
+  exact (zx_quote_auto_n_cup n) : typeclass_instances.
 
 #[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (?zx ↕ ?zx') _) =>
   notypeclasses refine (zx_quote_auto_stack zx zx' _ _ _ _) : typeclass_instances.
@@ -2485,7 +2484,6 @@ Ltac setup_zxarw_lhs lem match_number quotient_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (LawStructD:=ZX_Autonomous_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
@@ -2508,7 +2506,6 @@ Ltac zxarw_lhs lem match_number quotient_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (LawStructD:=ZX_Autonomous_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
@@ -2613,7 +2610,6 @@ Ltac zxaclean_lhs :=
     | |- ?R ?tgt _ =>
       specialize (LawfulProLike_PRO_bimonog_quote_clean_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (LawStructD:=ZX_Autonomous_lawstructable)
           (interp_discrete_hg_inhab lv) tgt) as Hrw
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
@@ -2654,7 +2650,6 @@ Ltac zxacat :=
   | |- ?R ?lhs ?rhs =>
     specialize (LawfulProLike_PRO_quote_test_correct
         _ _ _ _ _  (ZX_Autonomous_lawpro)
-        (LawStructD:=ZX_Autonomous_lawstructable)
         (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
@@ -2760,7 +2755,7 @@ Proof.
     zxarw_rhs (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl).
     now rewrite Rplus_0_l.
   }
-  rewrite Hrw1 at 1.
+  rewrite Hrw1 at 2.
   rewrite Hrw2 at 2.
   zxacat.
 Qed.
@@ -3118,7 +3113,7 @@ Proof.
   rewrite cup_Z.
   done.
 Qed.
-(* 
+(*
 #[export] Instance zx_quote_frob_X_cup :
   Quote (X 0 2 0) (Pcup 1) | 0.
 Proof.
@@ -3201,17 +3196,17 @@ Ltac zx_quote_frob_Z_tac := zx_quote_frob_Z_tac_step; repeat zx_quote_frob_Z_tac
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
 
-#[export] Hint Extern 0 (DiagramQuote ⊂ _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) ⊂ _) =>
   exact (zx_quote_frob_cup) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote ⊃ _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) ⊃ _) =>
   exact (zx_quote_frob_cap) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (n_cup ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (n_cup ?n) _) =>
   exact (zx_quote_frob_n_cap n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (n_cap ?n) _) =>
-  exact (zx_quote_frob_cup n) : typeclass_instances.
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (n_cap ?n) _) =>
+  exact (zx_quote_frob_n_cup n) : typeclass_instances.
 
 #[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (?zx ↕ ?zx') _) =>
   notypeclasses refine (zx_quote_frob_stack zx zx' _ _ _ _) : typeclass_instances.
@@ -3461,7 +3456,6 @@ Ltac setup_zxfrw_lhs lem match_number quotient_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (LawStructD:=ZX_Frobenius_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
@@ -3484,7 +3478,6 @@ Ltac zxfrw_lhs lem match_number quotient_number :=
       | ?R ?lhs ?rhs =>
         specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (LawStructD:=ZX_Frobenius_lawstructable)
           (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
@@ -3589,7 +3582,6 @@ Ltac zxfclean_lhs :=
     | |- ?R ?tgt _ =>
       specialize (LawfulProLike_PRO_frobenius_quote_clean_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (LawStructD:=ZX_Frobenius_lawstructable)
           (interp_discrete_hg_inhab lv) tgt) as Hrw
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
@@ -3630,7 +3622,6 @@ Ltac zxfcat :=
   | |- ?R ?lhs ?rhs =>
     specialize (LawfulProLike_PRO_quote_test_correct
         _ _ _ _ _  (ZX_Frobenius_lawpro)
-        (LawStructD:=ZX_Frobenius_lawstructable)
         (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
@@ -3718,6 +3709,152 @@ Proof.
   zxsclean_lhs.
   rewrite <- X_spider_1_1_fusion, <- Z_spider_1_1_fusion.
   rewrite Rplus_0_l.
+  zxfrw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
+
+
+  let e := constr:(![rw {box_compose}]) in
+  let l := fresh "l" in
+  let Hrw := fresh "Hrw" in
+  evar (l : list ZXCVERT);
+  let lv := eval unfold l in l in
+  specialize (LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct
+    (ZX_Frobenius_lawpro)
+    (interp_discrete_hg_inhab lv)) as Hrw;
+  epose proof (Hrw e _ _ _) as Hrw;
+  tspecialize Hrw.
+  1:{
+    
+    ltac2:(let hfree := Fresh.fresh (Fresh.Free.of_goal()) ident:(Hfree) in 
+    ltac1:(Hfree |- epose (ltac:(typeclasses eauto) : FreeStructGraphable Frobenius) as Hfree) 
+    (Ltac1.of_ident hfree)).
+      apply (RWS_of_expr_base_lemma (FreeGraphS:=Hfree) (LawPro := ZX_Frobenius_lawpro)).
+        (* (rw_base $e) *) $lhs $rhs $lem $match_num $quotient_num)
+
+    Import Rewriting.quote_RWS.
+    Import Ltac2.Ltac2.
+
+  ltac2:(solve_RWS_of_expr'()).
+
+    Close Scope ZX_scope.
+    Disable Notation "$ _ , _ ::: _ $ " (all).
+    From TensorRocq Require Import Rewriting.
+Ltac2 solve_RWS_of_expr' () : unit :=
+  lazy_match! goal with
+  | [|- @RWS_of_expr ?e ?struct ?t' ?hgraph ?eqt' ?countt' ?r
+    ?ms ?qs ?idx ?state ?err ?_rws] =>
+    lazy_match! e with
+    | rw_seq ?l ?r =>
+      refine '(RWS_of_expr_seq $l $r _ _  _ _)
+    | rw_try ?e =>
+      refine '(RWS_of_expr_try $e _  _)
+    | rw_repeat_k ?k ?e =>
+      refine '(RWS_of_expr_repeat_k $k $e _  _)
+    | rw_repeat_upto_k ?k ?e =>
+      refine '(RWS_of_expr_repeat_upto_k $k $e _  _)
+    | rw_repeat_star ?e =>
+      refine '(RWS_of_expr_repeat_star $e _  _)
+    | rw_with_par ?l ?r =>
+      refine '(RWS_of_expr_with_par $l $r _ _  _ _)
+    | rw_par_star ?e =>
+      refine '(RWS_of_expr_par_star $e _  _)
+    | rw_choice ?l ?r => 
+      refine '(RWS_of_expr_choice $l $r _ _  _ _)
+    | rw_none => 
+      refine '(RWS_of_expr_none)
+    | rw_base ?e => 
+      let (lhs, rhs, lem, match_num, quotient_num) := solve_RWS_of_expr_aux_base e in 
+      let lawpro := lazy_match! r with
+        | context [(LawfulProLike_LawfulPRORewritingRelation _ _ _ _ _ ?lawpro)] => 
+          lawpro
+        end in 
+      (* refine '(RWS_of_expr_base_change $lem _ _ _); *)
+      (* match! r with *)
+      let c := '(RWS_of_expr_base_lemma (LawPro := _ ) 
+        (rw_base $e) $lhs $rhs $lem $match_num $quotient_num) in 
+      apply c
+      (* apply (let lp := $lawpro in 
+        RWS_of_expr_base_lemma (LawPro := lp) 
+        (rw_base $e) $lhs $rhs $lem $match_num $quotient_num) *)
+    end
+  end.
+  (* apply RWS_of_expr_base_lemma'. *)
+  (* Arguments RWS_of_expr_base_lemma {_ _ _} 
+    {_ _ _ _ _ _ _} {_ _ _ _} {_ _ _ _} 
+    {_ _ _ _ _ _ _ _} {_ _ _}
+    {_ _} _ _ & _. *)
+  ltac2:(solve_RWS_of_expr()).
+  ltac2:(match! goal with
+  | [|- ?r = _ -> _] => 
+    lazy_match! r with
+    | context [(LawfulProLike_LawfulPRORewritingRelation _ _ _ _ _ ?lawpro)] => 
+      () (* generalize $lawpro *)
+    end
+  end).
+
+    ltac2:(Rewriting.quote_RWS.solve_RWS_of_expr()).
+  }
+
+  
+  lazymatch goal with
+  | |- ?R ?tgt _ =>
+    | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
+    end
+  | |- ?G => fail "cannot recognize goal as the application of a relation: " G
+  end.
+
+
+
+
+  zxarw_lhs <- cup_X.
+  transitivity (zx_of_const (/ √ 2)
+    ↕ (— ↕ ⊂ ↕ Z 0 1 0 ↕ ⊂ ⟷ (⨉ ↕ n_wire 4)
+      ⟷ (n_wire 2 ↕ (⨉ ↕ n_wire 2 ⟷ (— ↕ ⨉ ↕ —)))
+      ⟷ (□ ↕ □ ↕ □ ↕ □ ↕ n_wire 2)
+      ⟷ (— ↕ (zx_comm 4 1 ⟷ (n_wire 3 ↕ ⨉)))
+      ⟷ (Z 2 1 0 ↕ Z 3 0 0 ↕ Z 1 0 0)))
+  cbn -[n_wire].
+  zxarw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
+  transitivity (zx_of_const (/ √ 2)
+    ↕ (Z 0 1 0 ↕ —
+      ⟷ (⊂ ⟷ (Z 1 2 0 ↕ —) ↕ (⊂ ⟷ (X 1 0 0 ↕ —)) ↕ n_wire 2)
+      ⟷ (— ↕ zx_comm 2 1 ↕ n_wire 2) ⟷ (⊃ ↕ n_wire 4)
+      ⟷ (zx_comm 2 1 ↕ —) ⟷ (— ↕ zx_comm 2 1)
+      ⟷ (X 2 1 0 ↕ n_wire 2) ⟷ (— ↕ ⨉) ⟷ (⊃ ↕ —))).
+  specialize (Hrw _ _ _  _ _ _).
+  epose proof (Hrw _ _ _) as Hrw.
+  do 3 tspecialize Hrw by typeclasses eauto.
+  epose proof (Hrw _) as Hrw.
+  tspecialize Hrw. 1:{
+    unfold PRO_gen_quote_rewrite.
+    remember (@graph_to_APROP' _ _ _ _ _ _ _ _ _) as gr2A.
+    vm_compute.
+    Import stdpp.pretty.
+    Import Matching.
+    match goal with
+    |- context [gr2A _ ?G] =>
+      eassert (pretty G = _)
+    end.
+    vm_compute.
+    vm_compute.
+  }
+
+  zxarw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
+  transitivity (zx_of_const (/ √ 2)
+    ↕ (Z 0 1 0 ↕ — ⟷ X 2 1 0 ⟷ Z 1 2 0 ⟷ (X 1 0 0 ↕ —))).
+    zxacat.
+
+
+  rewrite 2 (cup_pullthrough_top _ —).
+  zxaclean_lhs.
+  cbn [transpose].
+  Set Typeclasses Debug.
+  Opaque n_cap n_cup.
+  eassert (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (n_cap 2) _).
+    apply zx_quote_auto_n_cap.
+    typeclasses eauto.
+  zxaclean_lhs.
+  rewrite 2 (cup_pullthrough_top_1 _ —).
+  zxsrw_lhs yank_r.
   zxsrw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)) at 0.
   unshelve (rewrite (X_wrap_under_bot_right 1)); [lia..|].
   zxfrw_lhs (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
@@ -3804,7 +3941,7 @@ End ZXfrob.
 
 
 (*
-(* 
+(*
 
 
 

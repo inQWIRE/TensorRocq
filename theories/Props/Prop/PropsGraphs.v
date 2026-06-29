@@ -114,6 +114,8 @@ Qed.
 
 #[export] Instance Frobenial_graphable {T} : StructGraphable Frobenial T :=
   fun n m mon => match mon with
+    | Delta0 => delta_spider_graph 0 0
+    | Delta1 n m => delta_spider_graph n m 
     | Delta k n m => delta_spider_graph_bundled k n m
     end.
 
@@ -184,9 +186,13 @@ Qed.
 Proof.
   constructor.
   intros n m mon.
-  induction mon as [n m].
-  cbn.
-  apply delta_spider_graph_bundled_semantics.
+  induction mon as [|n m|k n m].
+  - cbn.
+    apply delta_spider_graph_semantics.
+  - cbn.
+    apply delta_spider_graph_semantics.
+  - cbn.
+    apply delta_spider_graph_bundled_semantics.
 Qed.
 
 End lawful.

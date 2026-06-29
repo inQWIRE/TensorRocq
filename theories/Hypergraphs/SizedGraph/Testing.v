@@ -1444,3 +1444,49 @@ Definition nth_weak_sized_graph_monos {i j n m} (subscohg : SizedCospanHyperGrap
         scohg.(hedges).(hyperedges) (∅, (@empty _ WSPiso_empty)).
 
 End dec_equiv.
+
+Local Existing Instance Countable_Equiv.
+
+Definition default_countable_sized_graph_iso_test {N T}
+  `{EqDecision N} `{Countable T} {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) : bool :=
+  opt_weak_sized_graph_iso_partial_test scohg scohg'.
+
+Lemma default_countable_sized_graph_iso_test_correct {N T}
+  `{EqDecision N} `{Countable T} {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  default_countable_sized_graph_iso_test scohg scohg' = true -> scohg ≡ₛ scohg'.
+Proof.
+  apply opt_weak_sized_graph_iso_partial_test_correct.
+Qed.
+
+Lemma default_countable_sized_graph_iso_test_correct' {N T}
+  `{EqDecision N} `{Countable T} {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  BoolSpec (scohg ≡ₛ scohg) True (default_countable_sized_graph_iso_test scohg scohg').
+Proof.
+  pose proof (default_countable_sized_graph_iso_test_correct scohg scohg').
+  destruct (default_countable_sized_graph_iso_test _ _); constructor; done.
+Qed.
+
+
+Definition default_sized_graph_iso_test {N T}
+  `{EqDecision N} `{Equiv T, RelDecision T T equiv} 
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) : bool :=
+  opt_weak_sized_graph_iso_partial_test scohg scohg'.
+
+Lemma default_sized_graph_iso_test_correct {N T}
+  `{EqDecision N} `{Equiv T, RelDecision T T equiv, Equivalence T equiv} 
+  {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  default_sized_graph_iso_test scohg scohg' = true -> scohg ≡ₛ scohg'.
+Proof.
+  apply opt_weak_sized_graph_iso_partial_test_correct.
+Qed.
+
+Lemma default_sized_graph_iso_test_correct' {N T}
+  `{EqDecision N} `{Equiv T, RelDecision T T equiv, Equivalence T equiv} 
+    {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  BoolSpec (scohg ≡ₛ scohg) True (default_sized_graph_iso_test scohg scohg').
+Proof.
+  pose proof (default_sized_graph_iso_test_correct scohg scohg').
+  destruct (default_sized_graph_iso_test _ _); constructor; done.
+Qed.
+
+

@@ -233,6 +233,73 @@ Coercion mautonomous_inl : MAutonomous >-> MFrobenius.
 Coercion mfrobenial_inr : MFrobenial >-> MFrobenius.
 
 
+
+Section instances.
+
+Local Set Typeclasses Unique Instances.
+
+Context {A : Type}.
+
+Local Notation SubStruct := (@SubStruct (btree A)).
+
+#[global] Instance substruct_mmonoidal_msymmetric : SubStruct MMonoidal MSymmetric :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mmonoidal_mautonomous : SubStruct MMonoidal MAutonomous :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mmonoidal_mfrobenius : SubStruct MMonoidal MFrobenius :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_msymmetry_msymmetric : SubStruct MSymmetry MSymmetric :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_msymmetry_mautonomous : SubStruct MSymmetry MAutonomous :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_msymmetry_mfrobenius : SubStruct MSymmetry MFrobenius :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mautonomy_mautonomous : SubStruct MAutonomy MAutonomous :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mautonomy_mfrobenius : SubStruct MAutonomy MFrobenius :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mfrobenial_mfrobenius : SubStruct MFrobenial MFrobenius :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_msymmetric_mautonomous : SubStruct MSymmetric MAutonomous :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_msymmetric_mfrobenius : SubStruct MSymmetric MFrobenius :=
+  fun _ _ s => s.
+
+#[global] Instance substruct_mautonomous_mfrobenius : SubStruct MAutonomous MFrobenius :=
+  fun _ _ s => s.
+
+
+#[global] Instance substruct_msymmetric_mmonoidal `{!SubStruct MSymmetric Struct} : 
+  SubStruct MMonoidal Struct | 5 := substruct_trans MSymmetric.
+  
+#[global] Instance substruct_msymmetric_msymmetry `{!SubStruct MSymmetric Struct} : 
+  SubStruct MSymmetry Struct | 5 := substruct_trans MSymmetric.
+
+#[global] Instance substruct_mautonomous_msymmetric `{!SubStruct MAutonomous Struct} : 
+  SubStruct MSymmetric Struct | 5 := substruct_trans MAutonomous.
+
+#[global] Instance substruct_mautonomous_mautonomy `{!SubStruct MAutonomous Struct} : 
+  SubStruct MAutonomy Struct | 5 := substruct_trans MAutonomous.
+
+
+#[global] Instance substruct_mfrobenius_mautonomous `{!SubStruct MFrobenius Struct} : 
+  SubStruct MAutonomous Struct | 5 := substruct_trans MFrobenius.
+
+#[global] Instance substruct_mfrobenius_frobenial `{!SubStruct MFrobenius Struct} : 
+  SubStruct MFrobenial Struct | 5 := substruct_trans MFrobenius.
+
+End instances.
+
 Notation MPROP := (MPRO MSymmetric).
 Notation MAPROP := (MPRO MAutonomous).
 Notation MFPROP := (MPRO MFrobenius).
@@ -252,7 +319,7 @@ Notation "f ;; g" := (Mcompose f%mpro g%mpro) : mpro_scope.
 Notation "f * g" := (Mstack f%mpro g%mpro) : mpro_scope.
 
 Notation "'[str' s ']'" := (Mstruct _ _ s) : mpro_scope.
-Notation "'[gen' t n m ']'" := (Mgen n%nat m%nat t)
+Notation "'[gen' t n m ']'" := (Mgen n%btree m%btree t)
   (t at level 9, n at level 9, m at level 9) : mpro_scope.
 
 Local Open Scope mpro_scope.

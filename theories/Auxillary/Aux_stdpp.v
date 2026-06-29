@@ -769,3 +769,13 @@ Proof.
   rewrite 2 cast_fin_perm_refl.
   done.
 Qed.
+
+
+Fixpoint list_split {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
+  (l : list A) : list A * list A :=
+  match l with
+  | [] => ([], [])
+  | a :: l =>
+    let '(lP, lNP) := list_split P l in
+    if decide (P a) then (a :: lP, lNP) else (lP, a :: lNP)
+  end.

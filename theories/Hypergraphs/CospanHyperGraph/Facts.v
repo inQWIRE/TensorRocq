@@ -2463,7 +2463,20 @@ Proof.
   remember (_ <$> vec_to_list vi) as vi' eqn:Hvi'; clear Hvi'. *)
 
 
-
+(* FIXME: Move *)
+Lemma Rlist_prod_fmap_decide_Forall {I}
+  (P : I -> Prop) {Hf : forall i, Decision (P i)}
+  (l : list I) :
+  Rlist_prod ((λ i, if decide (P i) then rI else rO) <$> l) ==
+  if decide (Forall P l) then rI else rO.
+Proof.
+  induction l; [done|].
+  cbn.
+  rewrite IHl.
+  rewrite decide_rI_rO_mul.
+  apply eq_reflexivity, decide_ext.
+  now rewrite Forall_cons.
+Qed.
 
 
 Lemma delta_spider_graph_semantics {n m} :
@@ -2472,22 +2485,12 @@ Proof.
   unfold graph_semantics.
   cbn.
   rewrite fmap_empty.
-  rewrite delta_spider_tensor_alt.
+  (* rewrite delta_spider_tensor_alt. *)
   intros v w Hv Hw.
   unfold namedtensorlist_to_tensor.
   cbn.
   rewrite vertices_delta_spider_graph.
   assert (@tg_abstracts T ∅ = []) as -> by done.
-  cbn.
-  case_decide as Hnm.
-  1:{
-    assert (n = 0) as -> by lia.
-    assert (m = 0) as -> by lia.
-    rewrite elements_empty.
-    cbn.
-    inv_all_vec_fin.
-    apply rmul_1_l.
-  }
   rewrite elements_singleton.
   cbn.
   rewrite 2 (vec_to_list_fun_to_vec (const xH)).
@@ -2507,6 +2510,7 @@ Proof.
     cbn.
     unfold make_vecs_map.
     rewrite Rlist_prod_app at 1.
+    etransitivity. 1:{
     apply Rmul_proper.
     - apply eq_reflexivity.
       apply f_equal.
@@ -2561,112 +2565,48 @@ Proof.
       rewrite (inj_iff Some).
       split; [|now intros <-].
       now intros ?%vcons_inj.
-  }
-  erewrite (sum_of_ext' _ (fun a =>
-    if decide ((v +++ w) = fun_to_vec (λ _, a)) then rI else rO)). 2:{
-    intros a Ha.
-    unshelve erewrite decide_ext by (now
-        rewrite fun_to_vec_plus, vapp_eq_iff, vsplitl_app, vsplitr_app;
-        unfold compose); [apply _|].
-    rewrite <- decide_rI_rO_mul.
+    }
+    rewrite <- Rlist_prod_app at 1.
+    apply Rlist_prod_ext.
+    instantiate (1:= (λ i, if decide ((v ++ w) !! i = Some a) then rI else rO) <$> (seq 0 (n + m))).
+    rewrite seq_app, fmap_app.
     f_equiv.
-    - rewrite <- Rlist_prod_vec_if_eq.
-      f_equiv.
-      apply eq_reflexivity.
-      apply list_fmap_ext.
-      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
-      rewrite <- (fin_to_nat_to_fin _ _ Hi).
-      rewrite 2 lookup_vec_to_list_fin, lookup_fun_to_vec.
+    - apply Forall2_fmap, Forall_Forall2_diag.
+      apply Forall_seq.
+      intros i [_ Hi].
+      rewrite lookup_app_l by now rewrite length_vec_to_list.
       done.
-    - rewrite <- Rlist_prod_vec_if_eq.
-      f_equiv.
-      apply eq_reflexivity.
-      apply list_fmap_ext.
-      intros _ i [_ Hi]%elem_of_list_lookup_2%elem_of_seq.
-      rewrite <- (fin_to_nat_to_fin _ _ Hi).
-      rewrite 2 lookup_vec_to_list_fin, lookup_fun_to_vec.
+    - rewrite Nat.add_comm.
+      rewrite <- fmap_add_seq.
+      rewrite <- list_fmap_compose.
+      apply Forall2_fmap, Forall_Forall2_diag.
+      apply Forall_seq.
+      intros i [_ Hi].
+      cbn.
+      rewrite lookup_app_r by now rewrite length_vec_to_list; lia.
+      rewrite length_vec_to_list.
+      replace (n + i - n)%nat with i by lia.
       done.
   }
-  generalize (_ : SummedElement (v +++ w)).
-  generalize (v +++ w) as vw.
-  revert Hnm.
-  generalize (n + m)%nat as nm.
-  clear n m v w Hv Hw.
-  intros [|n] Hn v Hv; [done|].
-  rewrite (sum_of_unique' _ (v!!!0%fin)).
-  - apply eq_reflexivity, decide_ext.
-    inv_all_vec_fin.
+  apply sum_of_ext.
+  intros a.
+  rewrite Rlist_prod_fmap_decide_Forall.
+  apply eq_reflexivity, decide_ext.
+  rewrite Forall_vlookup.
+  rewrite Forall_seq.
+  split.
+  - intros Hnat i.
+    apply (inj Some).
+    rewrite <- lookup_vec_to_list_fin.
+    rewrite vec_to_list_app, Hnat; [done|].
+    pose proof (fin_to_nat_lt i); lia.
+  - intros Hfin j [_ Hj].
+    rewrite <- vec_to_list_app, lookup_vec_to_list.
+    case_guard; [|done].
     cbn.
-    unfold compose.
-    split.
-    + intros [_ ->]%vcons_inj.
-      constructor; [done|].
-      rewrite (vec_to_list_fun_to_vec (fun _ => _)).
-      rewrite Forall_fmap.
-      rewrite Forall_forall; easy.
-    + rewrite Forall_cons.
-      intros [_ Hveq].
-      f_equal.
-      apply vec_eq; intros i.
-      rewrite lookup_fun_to_vec.
-      rewrite Forall_vlookup in Hveq.
-      specialize (Hveq i).
-      congruence.
-  - intros b _.
-    inv_all_vec_fin.
-    cbn.
-    intros Hxb.
-    apply eq_reflexivity, decide_False.
-    intros [[]%Hxb _]%vcons_inj.
-Qed.
-
-
-Lemma vertices_delta_spider_graph_bundled k n m :
-  vertices (@delta_spider_graph_bundled T k n m) =
-  if decide (n + m = 0)%nat then ∅ else list_to_set (Pos.of_succ_nat <$> seq 0 k).
-Proof.
-  case_decide.
-  1:{
-    replace n with 0 in * by lia.
-    replace m with 0 in * by lia.
-    reflexivity.
-  }
-  unfold vertices.
-  cbn.
-  change (vertices_hg _) with (∅ :> Pset).
-  rewrite union_empty_l_L.
-  rewrite 2 (vec_to_list_fun_to_vec (λ i, Pos.of_succ_nat (i mod k))).
-  rewrite list_to_set_app_L.
-  transitivity (list_to_set
-    ((λ i, Pos.of_succ_nat (i `mod` k)) <$> seq 0 ((max n m) * k)) :> Pset).
-  1:{
-    rewrite <- 3 (set_map_list_to_set_L (SA:=gset nat)).
-    rewrite <- set_map_union_L.
     f_equal.
-    set_unfold.
-    setoid_rewrite elem_of_seq.
-    nia.
-  }
-  assert (n `max` m <> 0) by lia.
-  apply leibniz_equiv_iff, set_subseteq_antisymm.
-  - set_unfold.
-    setoid_rewrite elem_of_seq.
-    intros ? (x & -> & ?).
-    exists (x `mod` k).
-    split; [done|].
-    split; [lia|].
-    apply Nat.mod_upper_bound.
-    lia.
-  - destruct (n `max` m); [easy|].
-    cbn.
-    rewrite seq_app.
-    rewrite fmap_app, list_to_set_app_L.
-    apply union_subseteq_l'.
-    apply eq_reflexivity.
-    f_equal.
-    apply list_fmap_ext.
-    intros _ x Hx%elem_of_list_lookup_2%elem_of_seq.
-    now rewrite Nat.mod_small by apply Hx.
+    rewrite <- Hfin.
+    done.
 Qed.
 
 Lemma graph_semantics_n_stack_graphs k {n m} (cohg : CospanHyperGraph T n m) :
