@@ -779,3 +779,20 @@ Fixpoint list_split {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
     let '(lP, lNP) := list_split P l in
     if decide (P a) then (a :: lP, lNP) else (lP, a :: lNP)
   end.
+
+
+
+Notation "x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
+  (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
+
+Notation "' x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
+  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
+
+Notation "x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
+  (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
+
+Notation "' x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
+  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
+
+
+Infix "'<$>@{' M '}'" := (fmap (M:=M)) (at level 61, left associativity, only parsing) : stdpp_scope.

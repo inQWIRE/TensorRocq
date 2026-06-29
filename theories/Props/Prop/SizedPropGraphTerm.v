@@ -349,21 +349,6 @@ Notation "'(.≫=@{' M '}' f )" := (mbind (M:=M) f) (only parsing) : stdpp_scope
 Notation "'(≫=@{' M '})'" := (λ m f, mbind f m) (only parsing) : stdpp_scope.
 *)
 
-Notation "x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
-  (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-Notation "' x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
-  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-Notation "x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
-  (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-Notation "' x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
-  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-
-Infix "'<$>@{' M '}'" := (fmap (M:=M)) (at level 61, left associativity, only parsing) : stdpp_scope.
-
 
 
 Fixpoint Mobcomposes_aux {N} {Struct Struct'}

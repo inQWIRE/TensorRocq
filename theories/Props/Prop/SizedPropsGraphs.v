@@ -23,7 +23,7 @@ Proof.
   cbn; now rewrite sum_list_with_app; f_equal.
 Qed.
 
-Record BWSizedCospanHyperGraph {N T} {n m : btree N} := {
+Record BWSizedCospanHyperGraph {N T} {n m : btree N} := mk_bscohg {
   bw_scohg :> SizedCospanHyperGraph N T (bsize n) (bsize m);
   bw_inputs : sized_inputs bw_scohg = Some <$> (n :> list N);
   bw_outputs : sized_outputs bw_scohg = Some <$> (m :> list N);
