@@ -773,22 +773,6 @@ Proof.
 
 Require Import Ltac2.Ltac2.
   
-Ltac2 nat_of_constr (n : constr) : int :=
-  let rec go p :=
-  match! p with 
-  | O => 0
-  | S ?n => Int.add 1 (go n)
-  | _ =>
-    let n' := Std.eval_red n in 
-    if Constr.equal n' n then 
-      let n' := Std.eval_vm None n in 
-      if Constr.equal n' n then 
-      Control.throw_invalid_argument 
-        "nat_of_constr: argument is not reducible to a [nat] constant"
-      else go n'
-    else go n'
-  end in 
-  go n.
 
 Import Pp PpExtra.
 
@@ -841,7 +825,7 @@ Ltac2 mprop_to_box_code (c : constr) : message :=
   in go c.
   ltac2:(match! goal with
   | [ |- ?r (MProp_sized_graph_semantics ?lhs) (MProp_sized_graph_semantics ?rhs)] =>
-    print (mprop_to_box_code lhs)
+    print ( (mprop_to_box_code lhs))
   end).
 
   set (cast_mprop' := @cast_mprop _ _ _ _ _ _ _ _ _ _).

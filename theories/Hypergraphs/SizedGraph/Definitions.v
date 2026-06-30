@@ -2129,3 +2129,15 @@ Qed.
 
 End Compose.
 
+Definition cast_sized_graph {N T n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : SizedCospanHyperGraph N T n m) : SizedCospanHyperGraph N T n' m' :=
+  mk_scohg (cast_graph Hn Hm cohg) cohg.(sized_map).
+
+#[global] Arguments cast_sized_graph {_ _ _ _ _ _} _ _ !_ /.
+
+
+Lemma cast_sized_graph_id {N T n m} Hn Hm (cohg : SizedCospanHyperGraph N T n m) :
+  cast_sized_graph Hn Hm cohg = cohg.
+Proof.
+  now destruct cohg; cbn; rewrite cast_graph_id.
+Qed.

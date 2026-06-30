@@ -894,7 +894,7 @@ Ltac2 to_PRO_safe (struct_T : constr) (t_T : constr)
     end
   in go.
 
-Ltac2 to_PRO (to_n : 'n -> constr) (to_t : 't -> constr) (to_s : 's -> constr) :
+Ltac2 to_PRO (to_n : 'n -> constr) (to_s : 's -> constr) (to_t : 't -> constr) :
   ('n, 's, 't) PRO -> constr :=
   let rec go p :=
     match p with

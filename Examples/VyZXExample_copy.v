@@ -2948,7 +2948,7 @@ Lemma PRO_to_ZX_cast `{ProLike Struct T ZX}
   cast _ _ (eq_sym Hn) (eq_sym Hm) <$> PRO_to_diagram p.
 Proof.
   subst.
-  rewrite cast_pro_id.
+  rewrite cast_PRO_id.
   destruct (PRO_to_diagram _); [|done].
   done.
 Qed.
@@ -3569,6 +3569,70 @@ Tactic Notation "zxfrw" "<-" uconstr(lem) :=
   zxfrw (symmetry lem).
 
 
+Ltac zxfmrw_lhs rwe :=
+  (* let rwe := constr:(![rw {box_compose}]) in *)
+
+  etransitivity; [
+    (unshelve
+    (
+    etransitivity;
+    let l := fresh "l" in
+    let Hrw := fresh "Hrw" in
+    evar (l : list ZXCVERT);
+    let lv := eval unfold l in l in
+    specialize (LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct
+      (ZX_Frobenius_lawpro)
+      (interp_discrete_hg_inhab lv)) as Hrw;
+    epose proof (Hrw rwe _ _ _) as Hrw;
+    (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac else
+      fail "Timed out trying to quote the rewrite rule!");
+
+    lazymatch goal with
+    | |- ?R ?tgt _ =>
+      specialize (Hrw _ _ tgt)
+    | |- ?G => fail "cannot recognize goal as the application of a relation: " G
+    end;
+    (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+        fail "Timed out trying to quote goal! Have you declared all necessary instances?");
+    epose proof (Hrw _) as Hrw;
+    ((tspecialize Hrw by typeclasses eauto) || 
+      fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this." );
+    epose proof (Hrw _) as Hrw;
+    tspecialize Hrw; [
+      vm_compute; 
+      lazymatch goal with
+      | |- ?R (inl _) (inl _) => reflexivity
+      | |- ?R (inr ?e) _ => fail 
+        "rewriting failed, with the following error: " e
+      end
+      | ];
+      (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+        fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this error. ");
+
+      (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+        fail "Timed out trying to denote result! Have you declared all necessary instances?");
+
+      apply Hrw)); exact nil|].
+
+Ltac zxfmrw_rhs rwe :=
+  symmetry;
+  zxfmrw_lhs rwe;
+  symmetry.
+
+Ltac zxfmrw rwe :=
+  zxfmrw_lhs rwe + zxfmrw_rhs rwe.
+
+
+Tactic Notation "zxfmrw_lhs" uconstr(rwe) :=
+  zxfmrw_lhs rwe.
+
+Tactic Notation "zxfmrw_rhs" uconstr(rwe) :=
+  zxfmrw_rhs rwe.
+
+Tactic Notation "zxfmrw" uconstr(rwe) :=
+  zxfmrw rwe.
+
+
 Ltac zxfclean_lhs :=
   etransitivity; [
     (unshelve
@@ -3709,9 +3773,14 @@ Proof.
   zxsclean_lhs.
   rewrite <- X_spider_1_1_fusion, <- Z_spider_1_1_fusion.
   rewrite Rplus_0_l.
+  
+  zxfmrw_lhs ![rw {(to_gadget (proportional_by_sym bi_algebra_rule_Z_X))}].
+
   zxfrw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
-
-
+  zxfrw_lhs <- box_compose.
+  (* zxfrw_lhs box_compose. *)
+  zxfmrw_lhs (![rw try {box_compose}]).
+  etransitivity. 
   let e := constr:(![rw {box_compose}]) in
   let l := fresh "l" in
   let Hrw := fresh "Hrw" in
@@ -3721,86 +3790,36 @@ Proof.
     (ZX_Frobenius_lawpro)
     (interp_discrete_hg_inhab lv)) as Hrw;
   epose proof (Hrw e _ _ _) as Hrw;
-  tspecialize Hrw.
-  1:{
-    
-    ltac2:(let hfree := Fresh.fresh (Fresh.Free.of_goal()) ident:(Hfree) in 
-    ltac1:(Hfree |- epose (ltac:(typeclasses eauto) : FreeStructGraphable Frobenius) as Hfree) 
-    (Ltac1.of_ident hfree)).
-      apply (RWS_of_expr_base_lemma (FreeGraphS:=Hfree) (LawPro := ZX_Frobenius_lawpro)).
-        (* (rw_base $e) *) $lhs $rhs $lem $match_num $quotient_num)
+  (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac else
+    fail "Timed out trying to quote the rewrite rule!");
 
-    Import Rewriting.quote_RWS.
-    Import Ltac2.Ltac2.
-
-  ltac2:(solve_RWS_of_expr'()).
-
-    Close Scope ZX_scope.
-    Disable Notation "$ _ , _ ::: _ $ " (all).
-    From TensorRocq Require Import Rewriting.
-Ltac2 solve_RWS_of_expr' () : unit :=
-  lazy_match! goal with
-  | [|- @RWS_of_expr ?e ?struct ?t' ?hgraph ?eqt' ?countt' ?r
-    ?ms ?qs ?idx ?state ?err ?_rws] =>
-    lazy_match! e with
-    | rw_seq ?l ?r =>
-      refine '(RWS_of_expr_seq $l $r _ _  _ _)
-    | rw_try ?e =>
-      refine '(RWS_of_expr_try $e _  _)
-    | rw_repeat_k ?k ?e =>
-      refine '(RWS_of_expr_repeat_k $k $e _  _)
-    | rw_repeat_upto_k ?k ?e =>
-      refine '(RWS_of_expr_repeat_upto_k $k $e _  _)
-    | rw_repeat_star ?e =>
-      refine '(RWS_of_expr_repeat_star $e _  _)
-    | rw_with_par ?l ?r =>
-      refine '(RWS_of_expr_with_par $l $r _ _  _ _)
-    | rw_par_star ?e =>
-      refine '(RWS_of_expr_par_star $e _  _)
-    | rw_choice ?l ?r => 
-      refine '(RWS_of_expr_choice $l $r _ _  _ _)
-    | rw_none => 
-      refine '(RWS_of_expr_none)
-    | rw_base ?e => 
-      let (lhs, rhs, lem, match_num, quotient_num) := solve_RWS_of_expr_aux_base e in 
-      let lawpro := lazy_match! r with
-        | context [(LawfulProLike_LawfulPRORewritingRelation _ _ _ _ _ ?lawpro)] => 
-          lawpro
-        end in 
-      (* refine '(RWS_of_expr_base_change $lem _ _ _); *)
-      (* match! r with *)
-      let c := '(RWS_of_expr_base_lemma (LawPro := _ ) 
-        (rw_base $e) $lhs $rhs $lem $match_num $quotient_num) in 
-      apply c
-      (* apply (let lp := $lawpro in 
-        RWS_of_expr_base_lemma (LawPro := lp) 
-        (rw_base $e) $lhs $rhs $lem $match_num $quotient_num) *)
-    end
-  end.
-  (* apply RWS_of_expr_base_lemma'. *)
-  (* Arguments RWS_of_expr_base_lemma {_ _ _} 
-    {_ _ _ _ _ _ _} {_ _ _ _} {_ _ _ _} 
-    {_ _ _ _ _ _ _ _} {_ _ _}
-    {_ _} _ _ & _. *)
-  ltac2:(solve_RWS_of_expr()).
-  ltac2:(match! goal with
-  | [|- ?r = _ -> _] => 
-    lazy_match! r with
-    | context [(LawfulProLike_LawfulPRORewritingRelation _ _ _ _ _ ?lawpro)] => 
-      () (* generalize $lawpro *)
-    end
-  end).
-
-    ltac2:(Rewriting.quote_RWS.solve_RWS_of_expr()).
-  }
-
-  
   lazymatch goal with
   | |- ?R ?tgt _ =>
-    | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
-    end
+    specialize (Hrw _ _ tgt)
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
-  end.
+  end;
+  (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+      fail "Timed out trying to quote goal! Have you declared all necessary instances?").
+  epose proof (Hrw _) as Hrw;
+  ((tspecialize Hrw by typeclasses eauto) || 
+    fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this." ).
+  epose proof (Hrw _) as Hrw.
+  tspecialize Hrw; [
+    vm_compute; 
+    lazymatch goal with
+    | |- ?R (inl _) (inl _) => reflexivity
+    | |- ?R (inr ?e) _ => fail 
+      "rewriting failed, with the following error: " e
+    end
+    | ];
+    (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+      fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this error. ");
+
+    (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
+      fail "Timed out trying to denote result! Have you declared all necessary instances?").
+
+    apply Hrw.
+
 
 
 
@@ -6296,459 +6315,5 @@ Qed.
 From TensorRocq Require Import MProp.Automation.
 
 
-Ltac wild_prw_lhs' TensT APROPlikeD
-  to_equiv of_equiv
-  lem match_number :=
-  match goal with
-  |- ?R ?Targ _ =>
-    let Hrew := fresh "Hrew" in
-    unshelve (
-    epose proof (APROPlike_para_rewrite_helper'_correctness'
-      (TensT:=TensT)
-      (APROPlikeD:=APROPlikeD) match_number _ _ _ _
-
-      Targ (* Targ *)
-
-      (to_equiv lem) (* lem *)
-
-      _ _ _ _ _ _ _
-
-      ) as Hrew;
-    do 3 tspecialize Hrew by typeclasses eauto; (* DiagramQuote *)
-    do 2 tspecialize Hrew by typeclasses eauto; (* APropQuote *)
-    do 2 (tspecialize Hrew; [solve [quote_MP]|])
-    (* do 2 tspecialize Hrew by typeclasses eauto *)
-    );
-    [exact nil|exact nil|]; (* MProp_of_AProp *)
-    vm_eval (sized_term_rewrite_helper' _ _ _);
-    vm_eval (sized_graph_iso_partial_test _ _);
-    specialize (Hrew _ _ _ _ _ _);
-    specialize (Hrew eq_refl eq_refl eq_refl eq_refl);
-    rewrite 2? cast2_id in Hrew;
-    (* idtac *)
-    etransitivity; [apply (of_equiv Hrew)|];
-    cbn;
-    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn);
-    clear Hrew
-  end.
-
-Ltac vyzx_prw_lhs' lem match_number :=
-  wild_prw_lhs' constr:(ZXCCALC)
-    constr:(ZX_APROPlike)
-    open_constr:(id)
-    open_constr:(id)
-    lem match_number.
-
-(* FIXME: Move*)
-
-Ltac quote_MP :=
-  lazymatch goal with
-  | |- MProp_of_AProp _ ?apv =>
-    (* idtac "quoting" apv; *)
-    let step n := (* Placeholder argument to make this a function, to keep eval lazy *)
-      lazymatch apv with
-      | Agen ?t ?n ?m =>
-        (* idtac "  gen" t; *)
-        notypeclasses refine (mprop_of_aprop_gen _ _ n m _ _ _);
-        quote_msize(*  || fail 2 "couldn't quote size!" *)
-        (* first [quote_discrete|typeclasses eauto|idtac] *)
-      | Acompose ?apv1 ?apv2 =>
-        (* idtac "  compose" apv1 apv2; *)
-        notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
-        (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
-        quote_MP
-      | Astack ?apv1 ?apv2 =>
-        (* idtac "  stack" apv1 apv2; *)
-        notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
-        quote_MP
-      | Aid ?n =>
-        (* idtac "  id"; *)
-        notypeclasses refine (mprop_of_aprop_id _ n _);
-        quote_msize
-      | Acup ?n =>
-        notypeclasses refine (mprop_of_aprop_cup _ n _);
-        quote_msize
-      | Acap ?n =>
-        notypeclasses refine (mprop_of_aprop_cap _ n _);
-        quote_msize
-      | Aswap ?n ?m =>
-        notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
-        quote_msize
-      | cast_aprop ?Hn ?Hm ?ap =>
-        (* idtac "  cast" ap; *)
-        unshelve (notypeclasses refine (mprop_of_aprop_cast' _ ap Hn Hm _ _ _ _ _);
-        [quote_msize|quote_msize|quote_MP|..]);
-        lazymatch goal with
-        | |- equiv ?a ?b => msolve
-        | |- _ => shelve
-        end
-        (* [..|
-        compute_done || fail "NOT DONE" |
-        compute_done || fail "NOT DONE" ] *)
-
-      | ?ap =>
-        idtac "(quote_MP) TERM NOT FOUND!!!" ap;
-        fail 3
-        (* quote_MP *)
-      end in
-    first [step 0 |
-      unshelve (notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _);
-      [step 0|..]);
-      msolve | lazymatch goal with |- ?G => idtac "FAILED" G; fail end
-    ]
-  | |- ?G =>
-    idtac "(quote_MP) Goal not recognized!" G;
-    fail 2
-  end.
-
-From TensorRocqEx Require Import PrintingExtra.
-
-Theorem hopf_rule_Z_X_vert' n m top bot α β prf :
-  Z n (top + 2) α ↕ n_wire bot ⟷
-  cast _ _ prf eq_refl
-    (n_wire top ↕ X (2 + bot) m β) ∝[/ C2] Z n top α ↕ X bot m β.
-Proof.
-
-  rewrite <- (Rplus_0_l α), <- (dominated_Z_spider_fusion_bot_left _ 0).
-  rewrite <- (Rplus_0_l β), <- (dominated_X_spider_fusion_top_right _ 0).
-  apply prop_by_iff_zx_scale.
-  split; [|apply nonzero_div_nonzero; nonzero].
-(*
-
-
-
-  Arguments cast_mprop' {_ _ _ _ _ _ _ _ _}.
-  notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _).
-  quote_MP_step.
-  quote_MP_step.
-  quote_MP.
-  quote_MP.
-  quote_MP.
-  apply (subrel' struct_isomorphic).
-  (* Search AProp_semantics AProp_graph_eq. struct_isomorphic. *)
-  notypeclasses refine (AProp_iso_by_MProp_iso_correct_sum_decomp (FMD:=btree_free_monoid positive)
-    (@interp_discrete_hg_inhab _ Nat.inhabited ?[l]) _ _ _ _ _ _ _).
-  apply mprop_of_aprop_change_sizes
-  quote_MP_step.
-  quote_MP_step.
-  quote_MP_step.
-  quote_MP.
-  (* apply _. *)
-  quote_MP.
-  MProp_of_AProp
-
-  Close Scope aprop_scope.
-  Bind Scope nat with AProp.
-  Disable Notation all  : aprop_scope.
-  idtac. *)
-
-  (* rewrite stack_nwire_distribute_l.
-  rewrite cast_compose_distribute, CastRules.cast_id. *)
-  Timeout 60 vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
-  eapply (APROPlike_equiv (APROPlikeD:=ZX_APROPlike) _ _ _ _).
-    typeclasses eauto.
-    typeclasses eauto.
-  rewrite <- 2 AProp_graph_semantics_correct.
-  apply graph_semantics_syntactic_eq.
-  evar (l : list nat);
-  let l := eval unfold l in l in
-  notypeclasses refine (AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw
-    l _ _ _ _ _ _ _).
-  apply _.
-  quote_MP.
-  quote_MP.
-
-Require Import Ltac2.Ltac2.
-
-
-Import Pp PpExtra.
-
-Ltac2 rec bw_to_tys (c : constr) : int list :=
-  match! c with
-  | bempty => []
-  | bleaf None => [-1]
-  | bleaf (Some ?n) => [nat_of_constr n]
-  | bnode ?l ?r => List.append (bw_to_tys l) (bw_to_tys r)
-  | ?g => print (str "FAIL bw: " ++ of_constr g); Control.zero Match_failure
-  end.
-
-
-Ltac2 rec bw_to_code (c : constr) : message :=
-  let tys := bw_to_tys c in
-  surround_braket (prlist_with_sep pr_comma of_int tys).
-
-
-Ltac2 spider_to_box_code (gen : constr) (dom : constr) (cod : constr) : message :=
-  let dom := bw_to_code dom in
-  let cod := bw_to_code cod in
-  match! gen with
-  | None => str "Box('H', " ++ dom ++ str ", " ++ cod ++ str ")"
-  | Some (inr ?c) =>
-    str "gadget('" ++ of_constr c ++ str "')"
-  | Some (inl ?spi) =>
-    let is_X := match! spi with | (true, _) => str "True" | (false, _) => str "False" end in
-    let phase := match! spi with | (_, ?phase) => of_constr phase end in
-    str "spider('" ++ phase ++ str "', " ++ is_X ++ str ", " ++ dom ++ str ", " ++ cod ++ str ")"
-  | ?g => print (str "FAIL spi: " ++ of_constr g); Control.zero Match_failure
-  end.
-
-
-
-Ltac2 mprop_to_box_code (c : constr) : message :=
-  let rec go c :=
-    lazy_match! c with
-    | cast_mprop _ _ ?m => go m
-    | Mcast _ _ _ _ _ _ ?m => go m
-    | Mcompose ?l ?r =>
-      surround (go l) ++ str " >> " ++ surround (go r)
-    | Mstack ?l ?r =>
-      surround (go l) ++ str " @ " ++ surround (go r)
-    | Mid ?x => str "id(" ++ bw_to_code x ++ str ")"
-    | Mswap ?x ?y => str "swap(" ++ bw_to_code x ++ pr_comma() ++ bw_to_code y ++ str ")"
-    | Mgen ?gen ?dom ?cod =>
-      spider_to_box_code gen dom cod
-    | ?l => print (of_constr l); Control.zero Match_failure
-    end
-  in go c.
-  ltac2:(match! goal with
-  | [ |- ?r (MProp_sized_graph_semantics ?lhs) (MProp_sized_graph_semantics ?rhs)] =>
-    print ( (mprop_to_box_code lhs))
-  end).
-
-  set (cast_mprop' := @cast_mprop _ _ _ _ _ _ _ _ _ _).
-  set (cast_mprop'' := @cast_mprop _ _ _ _ _ _ _ _ _ _).
-  (* Check (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α). *)
-  vyzx_prw_lhs' (dominated_Z_spider_fusion_bot_left 0 0 top n 0 α) O.
-  vyzx_prw_lhs' (dominated_X_spider_fusion_top_right 0 0 bot m 0 β) O.
-  idtac.
-  notypeclasses refine (APROPlike_equiv (APROPlikeD:=ZX_APROPlike) _ _ _ _ _ _ _);
-  [typeclasses eauto..|].
-
-  AProp_syntax_eq_by_MProp_syntax_eq_correct_denote_nat_bw
-  psmcat.
-
-
-  wild_psmcat.
-Timeout 20
-  let TensT := constr:(ZXCCALC) in
-  let APROPlikeD := ZX_APROPlike in
-  let to_equiv := open_constr:(id) in
-  let of_equiv := open_constr:(id) in
-
-  let lem := constr:(dominated_Z_spider_fusion_bot_left 0 0 top n 0 α) in
-  let match_number := constr:(O) in
-  (* lem match_number := *)
-  match goal with
-  |- ?R ?Targ _ =>
-    (* idtac Targ *)
-
-
-    let Hrew := fresh "Hrew" in
-    (* unshelve  *)
-    (
-    epose proof (APROPlike_para_rewrite_helper'_correctness'
-      (TensT:=TensT)
-      (APROPlikeD:=APROPlikeD) match_number _ _ _ _
-
-      Targ (* Targ *)
-
-      (to_equiv lem) (* lem *)
-
-      _ _ _ _ _ _ _
-
-      ) as Hrew;
-    do 3 tspecialize Hrew by typeclasses eauto; (* DiagramQuote *)
-    do 2 tspecialize Hrew by typeclasses eauto; (* APropQuote *)
-    do 2 (tspecialize Hrew; [solve [quote_MP]|]) (* MProp_to_AProp *)
-    );
-    [exact nil|exact nil|]
-
-
-    (* idtac *)
-    end.
-    tspecialize Hrew.
-    quote_MP.
-    tspecialize Hrew.
-    quote_MP.
-    (* typeclasses eauto. *)
-    quote_MP_step.
-    (* quote_MP. *)
-    (* 2:quote_MP. *)
-    quote_MP_step.
-    quote_MP.
-    quote_MP_step.
-    quote_MP.
-
-Ltac quote_MP :=
-  match goal with
-  | |- MProp_of_AProp _ ?apv =>
-    idtac "quoting" apv;
-    let step n :=
-      lazymatch apv with
-      | Agen ?t ?n ?m =>
-        (* idtac "  gen" t; *)
-        notypeclasses refine (mprop_of_aprop_gen _ _ n m _ _ _);
-        quote_msize(*  || fail 2 "couldn't quote size!" *)
-        (* first [quote_discrete|typeclasses eauto|idtac] *)
-      | Acompose ?apv1 ?apv2 =>
-        (* idtac "  compose" apv1 apv2; *)
-        notypeclasses refine (mprop_of_aprop_compose _ _ apv1 apv2 _ _);
-        (* notypeclasses refine (aprop_quote_compose f ctx _ _ apv1 apv2 _ _); *)
-        quote_MP
-      | Astack ?apv1 ?apv2 =>
-        (* idtac "  stack" apv1 apv2; *)
-        notypeclasses refine (mprop_of_aprop_stack _ _ apv1 apv2 _ _);
-        quote_MP
-      | Aid ?n =>
-        (* idtac "  id"; *)
-        notypeclasses refine (mprop_of_aprop_id _ n _);
-        quote_msize
-      | Acup ?n =>
-        notypeclasses refine (mprop_of_aprop_cup _ n _);
-        quote_msize
-      | Acap ?n =>
-        notypeclasses refine (mprop_of_aprop_cap _ n _);
-        quote_msize
-      | Aswap ?n ?m =>
-        notypeclasses refine (mprop_of_aprop_swap _ _ n m _ _);
-        quote_msize
-      | cast_aprop ?Hn ?Hm ?ap =>
-        (* idtac "  cast" ap; *)
-        unshelve (notypeclasses refine (mprop_of_aprop_cast' _ ap Hn Hm _ _ _ _ _);
-        [quote_msize|quote_msize|quote_MP|..]);
-        lazymatch goal with
-        | |- equiv ?a ?b => msolve
-        | |- _ => shelve
-        end
-        (* [..|
-        compute_done || fail "NOT DONE" |
-        compute_done || fail "NOT DONE" ] *)
-
-      | ?ap =>
-        idtac "(quote_MP) TERM NOT FOUND!!!" ap;
-        fail 2
-        (* quote_MP *)
-      end in
-    first [step 0 |
-    idtac "changing!";
-      unshelve (notypeclasses refine (mprop_of_aprop_change_size _ _ _ _ _);
-      step 0);
-      msolve
-    ]
-  | |- ?G =>
-    idtac "(quote_MP) Goal not recognized!" G;
-    fail 2
-  end.
-  quote_MP.
-    quote_MP.
-    quote_MP.
-    quote_MP_step.
-    quote_MP.
-    2:{
-      quote_MP.
-    }
-    quote_MP.
-    quote_MP.
-      quote_MP_step.
-      quote_MP.
-      quote_MP_step.
-      quote_MP.
-    try try quote_MP.
-    do 3 tspecialize Hrew by typeclasses eauto.
-    tspecialize Hrew.
-    apply zx_quote_compose.
-    apply zx_quote_compose.
-    apply zx_quote_cast.
-    apply zx_quote_compose.
-    Timeout 15 typeclasses eauto.
-    apply zx_quote_cast.
-    apply zx_quote_compose.
-    2: typeclasses eauto.
-    apply zx_quote_cast.
-    apply zx_quote_compose.
-    #[global] Typeclasses Opaque zx_comm.
-    zx_quote_zx_comm
-    Set Typeclasses Debug.
-    Timeout 15 typeclasses eauto.
-
-    apply zx_quote_cast.
-
-    Timeout 15 typeclasses eauto.
-    Timeout 15 tspecialize Hrew by typeclasses eauto.
-
-    Timeout 5 vm_eval (sized_term_rewrite_helper' _ _ _) in Hrew.
-    Timeout 5 vm_eval (sized_graph_iso_partial_test _ _) in Hrew.
-    cbn [MProp_to_AProp map_mprop] in Hrew.
-    vm_compute interp_discrete_hg_inhab in Hrew.
-    cbn [denote_nat_bw btree_fold from_option compose
-      list_lookup lookup Datatypes.id] in Hrew.
-
-
-
-    (* Timeout 5 vm_compute [denote_nat_bw _ _] in Hrew. *)
-    Timeout 1 specialize (Hrew _ _ _ _ _ _).
-    specialize (Hrew eq_refl eq_refl eq_refl eq_refl).
-    rewrite 2? cast2_id in Hrew.
-    (* idtac *)
-    etransitivity; [apply (id Hrew)|].
-    cbn;
-    repeat (rewrite ?cast_aprop_cast_aprop, ?cast_aprop_id, ?map_aprop_cast; cbn);
-    clear Hrew.
-  end.
-  vyzx_prw_lhs' (to_gadget hopf_rule_Z_X) O.
-  rewrite stack_nwire_distribute_l.
-  rewrite stack_assoc_back_fwd, cast_compose_l, cast_contract_eq'.
-  rewrite cast_compose_distribute, CastRules.cast_id.
-  rewrite <- ComposeRules.compose_assoc.
-  rewrite <- stack_nwire_distribute_r.
-  rewrite ComposeRules.compose_assoc, <- stack_nwire_distribute_l.
-  zxrewrite hopf_rule_Z_X.
-  rewrite stack_nwire_distribute_l, <- compose_assoc.
-  rewrite stack_nwire_distribute_r.
-  rewrite compose_assoc.
-  rewrite stack_assoc_fwd, cast_contract_eq'.
-  rewrite cast_compose_eq_mid_join.
-  rewrite <- stack_nwire_distribute_l.
-  rewrite dominated_Z_spider_fusion_bot_left,
-    dominated_X_spider_fusion_top_right.
-  cbn.
-  rewrite cast_stack_distribute, cast_id.
-  rewrite <- stack_compose_distr.
-  rewrite cast_Z_contract_r, nwire_removal_r, cast_Z.
-  rewrite nwire_removal_l.
-  zxrefl.
-  Unshelve.
-  all: lia.
-Qed. *)
-Lemma zx_of_const_mult (c d : C) : zx_of_const (c * d) ∝=
-  zx_of_const c ↕ zx_of_const d.
-Proof.
-  rewrite 3 zx_of_const_to_scaled_empty.
-  distribute_zxscale.
-  rewrite Cmult_comm.
-  zxcat.
-Qed.
-
-Lemma _3_cnot_swap_is_swap : _3_CNOT_SWAP_ ∝[/ (C2 * √2)] ⨉.
-Proof.
-  apply prop_by_iff_zx_scale.
-  split. 2:{
-    apply nonzero_div_nonzero, Cmult_neq_0; nonzero.
-  }
-
-  rewrite cnot_is_swapp_notc at 2.
-  rewrite notc_is_notc_r.
-  zxrw (to_gadget bi_algebra_rule_X_over_Z).
-
-  zxrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
-  rewrite Rplus_0_l.
-  zxrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).
-  rewrite Rplus_0_l.
-  zxrw (to_gadget hopf_rule_Z_X_vert 1 1 1 1 0 0 eq_refl).
-  zxrw (symmetry (zx_of_const_mult (/ C2) (/ √ 2))).
-  rewrite Cinv_mult_distr.
-  rewrite Z_is_wire, X_0_is_wire.
-  zxcat.
-Qed.
-
  *)
+*)

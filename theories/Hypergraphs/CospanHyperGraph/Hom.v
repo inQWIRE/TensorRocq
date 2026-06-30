@@ -243,6 +243,15 @@ Proof.
   done.
 Qed.
 
+Lemma graph_apply_hom_cast_graph {n m n' m'} (Hn : n = n') (Hm : m = m') 
+  (cohg : CospanHyperGraph T n m) : 
+  graph_apply_hom f (cast_graph Hn Hm cohg) = 
+  cast_graph Hn Hm (graph_apply_hom f cohg).
+Proof.
+  subst.
+  now rewrite 2 cast_graph_id.
+Qed.
+
 Context {n m : nat}.
 
 Implicit Types cohg : CospanHyperGraph T n m.

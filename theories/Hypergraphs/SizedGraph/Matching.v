@@ -1,7 +1,7 @@
 From TensorRocq Require Import tc BW.
 From TensorRocq Require Import Isomorphism.IsoAux Isomorphism.Testing CospanHyperGraph.Definitions
   CospanHyperGraph.Ops SizedGraph.Definitions 
-  SizedGraph.Testing SizedGraph.ToUnsized SizedPropsGraphs SizedProps.
+  SizedGraph.Testing SizedGraph.ToUnsized SizedGraph.BWSized SizedProps.
 Require Ltac2.Ltac2.
 
 From TensorRocq Require Import CospanHyperGraph.Matching.
@@ -855,8 +855,6 @@ From stdpp Require Import strings.
 
 Local Open Scope positive_scope.
 
-(* FIXME: Move *)
-#[global] Arguments mk_bscohg {N T n m} & (bw_scohg bw_inputs bw_outputs) : assert.
 (* 
 Definition test_graph_33_lhs : BWSizedCospanHyperGraph positive string (!1) (!1) :=
   mk_bscohg (mk_scohg (mk_cohg ∅

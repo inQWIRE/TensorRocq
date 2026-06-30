@@ -2,7 +2,7 @@ From TensorRocq Require Import BW Props SizedProps.
 From TensorRocq Require Import SizedPropsGraphs.
 
 From TensorRocq Require Import PropGraphTermAux
-  SizedGraph.Definitions SizedGraph.Testing.
+  SizedGraph.Definitions SizedGraph.Testing SizedGraph.BWSized.
 
 Local Open Scope mpro_scope.
 Local Open Scope program_scope.

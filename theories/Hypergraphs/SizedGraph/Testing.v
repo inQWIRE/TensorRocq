@@ -1460,10 +1460,10 @@ Qed.
 
 Lemma default_countable_sized_graph_iso_test_correct' {N T}
   `{EqDecision N} `{Countable T} {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
-  BoolSpec (scohg ≡ₛ scohg) True (default_countable_sized_graph_iso_test scohg scohg').
+  BoolSpec (scohg ≡ₛ scohg') True (default_countable_sized_graph_iso_test scohg scohg').
 Proof.
   pose proof (default_countable_sized_graph_iso_test_correct scohg scohg').
-  destruct (default_countable_sized_graph_iso_test _ _); constructor; done.
+  destruct (default_countable_sized_graph_iso_test _ _); constructor; auto.
 Qed.
 
 
@@ -1483,10 +1483,10 @@ Qed.
 Lemma default_sized_graph_iso_test_correct' {N T}
   `{EqDecision N} `{Equiv T, RelDecision T T equiv, Equivalence T equiv} 
     {n m} (scohg scohg' : SizedCospanHyperGraph N T n m) :
-  BoolSpec (scohg ≡ₛ scohg) True (default_sized_graph_iso_test scohg scohg').
+  BoolSpec (scohg ≡ₛ scohg') True (default_sized_graph_iso_test scohg scohg').
 Proof.
   pose proof (default_sized_graph_iso_test_correct scohg scohg').
-  destruct (default_sized_graph_iso_test _ _); constructor; done.
+  destruct (default_sized_graph_iso_test _ _); constructor; auto.
 Qed.
 
 

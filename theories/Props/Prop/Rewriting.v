@@ -393,6 +393,14 @@ Proof.
   done.
 Qed.
 
+#[export] Instance substruct_graphable_symmetricg_frobenius
+  `{Equiv T, Equivalence T equiv} :
+  SubStructGraphable SymmetricG Frobenius T.
+Proof.
+  intros n m s.
+  done.
+Qed.
+
 #[export] Instance substruct_graphable_autonomous_frobenius
   `{Equiv T, Equivalence T equiv} :
   SubStructGraphable Autonomous Frobenius T.
@@ -460,6 +468,10 @@ Record LawfulPRORewritingRelation {Struct T} {StructG : StructGraphable Struct T
   pro_rewriting_relation n m : relation (PRO Struct T n m);
   pro_rewriting_domain {n m} : PRO Struct T n m -> Prop;
   pro_rewriting_domain_dec {n m} (p : PRO Struct T n m) :: Decision (pro_rewriting_domain p);
+  (* TODO: Refactor with this: 
+  pro_rewriting_domain_partial_dec {n m} (p : PRO Struct T n m) : bool;
+  pro_rewriting_domain_partial_dec_correct {n m} (p : PRO Struct T n m) : 
+    pro_rewriting_domain_partial_dec p = true -> pro_rewriting_domain p; *)
   pro_rewriting_domain_id n : pro_rewriting_domain (Pid n);
   pro_rewriting_domain_struct {n m} (s : Struct n m) : pro_rewriting_domain ([str s]);
   pro_rewriting_domain_compose {n m o} (p : PRO Struct T n m) (q : PRO Struct T m o) :
