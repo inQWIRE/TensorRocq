@@ -2262,57 +2262,6 @@ Section list_index.
 Context `{EqDecision A}.
 Implicit Type l : list A.
 
-Definition list_index (x : A) l :=
-  fst <$> list_find (eq x) l.
-
-Lemma list_index_is_Some x l :
-  is_Some (list_index x l) <-> x ∈ l.
-Proof.
-  unfold list_index.
-  rewrite fmap_is_Some.
-  split; [|intros Hx; apply (list_find_elem_of _ _ x Hx eq_refl)].
-  now intros [[] (?%elem_of_list_lookup_2 & <- & _)%list_find_Some].
-Qed.
-
-Lemma list_index_Some x l i :
-  list_index x l = Some i <->
-  l !! i = Some x /\ forall j y, l !! j = Some y -> j < i -> x <> y.
-Proof.
-  unfold list_index.
-  rewrite fmap_Some, exists_pair.
-  setoid_rewrite list_find_Some.
-  naive_solver.
-Qed.
-
-Lemma list_index_Some_NoDup x l i :
-  NoDup l ->
-  list_index x l = Some i <-> l !! i = Some x.
-Proof.
-  intros Hdup.
-  rewrite list_index_Some.
-  rewrite <- (and_True (l !! i = Some x)) at 2.
-  apply and_iff_from_l; [reflexivity|intros Hli _].
-  apply iff_True_1.
-  intros j y Hlj Hji ->.
-  enough (i = j) by lia.
-  revert Hli Hlj.
-  now apply NoDup_lookup.
-Qed.
-
-Lemma list_index_inj x y l i :
-  list_index x l = Some i -> list_index y l = Some i -> x = y.
-Proof.
-  rewrite 2 list_index_Some.
-  intros [] [].
-  congruence.
-Qed.
-
-Lemma list_index_lt x l i :
-  list_index x l = Some i -> i < length l.
-Proof.
-  now intros [?%lookup_lt_Some _]%list_index_Some.
-Qed.
-
 Lemma list_index_ppermute_NoDup x l f : posperm (lengthP l) f ->
   NoDup l ->
   list_index x (ppermute f l) =
@@ -2348,47 +2297,6 @@ Proof.
     now rewrite pos_to_nat_pred_of_nat.
 Qed.
 
-Lemma list_lookup_omap_all_is_Some `(f : A -> option B) (l : list A) (i : nat)
-  (Hf : forall a, a ∈ l -> is_Some (f a)) :
-  omap f l !! i = l !! i ≫= f.
-Proof.
-  rewrite <- Forall_forall in Hf.
-  revert i;
-  induction Hf; [now intros []|intros i].
-  cbn.
-  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
-  destruct i; [cbn; now rewrite Hfx|].
-  cbn.
-  apply IHHf.
-Qed.
-
-Lemma length_omap_all_is_Some `(f : A -> option B) (l : list A)
-  (Hf : forall a, a ∈ l -> is_Some (f a)) :
-  length (omap f l) = length l.
-Proof.
-  rewrite <- Forall_forall in Hf.
-  induction Hf; [done|cbn].
-  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
-  cbn.
-  f_equal; apply IHHf.
-Qed.
-
-Lemma omap_all_is_Some_default `(f : A -> option B) (l : list A) (g : A -> B)
-  (Hf : forall a, a ∈ l -> is_Some (f a)) :
-  omap f l = (λ i, default (g i) (f i)) <$> l.
-Proof.
-  apply (list_eq_same_length _ _ _ eq_refl).
-  - now rewrite length_fmap; apply length_omap_all_is_Some.
-  - intros i x y.
-    rewrite length_fmap.
-    intros Hi.
-    rewrite list_lookup_omap_all_is_Some by easy.
-    rewrite list_lookup_fmap.
-    destruct (l !! i) as [li|]; [|easy].
-    cbn.
-    destruct (f li); [|easy].
-    cbn; congruence.
-Qed.
 
 Lemma ppermute_alt_list_index_aux_Some f l : posbdd (lengthP l) f -> NoDup l ->
   forall x, x ∈ l ->
@@ -2540,6 +2448,33 @@ Proof.
   f_equal.
   f_equal.
   rewrite vzip_map.
+  done.
+Qed.
+
+
+Lemma propogate_subst_vmap_bcons_false_true_NoDup_l
+  {n} (v w : vec positive n) : NoDup v ->
+  propogate_subst (vmap (prod_map (bcons false) (bcons true)) (vzip v w)) =
+  vmap (prod_map (bcons false) (bcons true)) (vzip v w).
+Proof.
+  intros Hv.
+  induction n; [inv_all_vec_fin; done|].
+  inv_vec v; intros vh v.
+  inv_vec w; intros wh w.
+  cbn.
+  intros [Hvh Hv]%NoDup_cons.
+  f_equal.
+  rewrite <- IHn at 2 by done.
+  f_equal.
+  apply vmap_id'.
+  intros [k l].
+  rewrite vec_to_list_map, vec_to_list_zip_with.
+  rewrite elem_of_list_fmap.
+  intros ([i j] & [= -> ->] & Hij).
+  apply elem_of_zip_with in Hij as (i' & j' & [= <- <-] & Hi & Hj).
+  cbn.
+  rewrite fn_lookup_singleton_ne by set_solver.
+  rewrite fn_lookup_singleton_ne by lia.
   done.
 Qed.
 

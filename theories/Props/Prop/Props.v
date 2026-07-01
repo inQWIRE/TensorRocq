@@ -368,7 +368,7 @@ Notation FPROP := (PRO Frobenius).
 
 
 
-Definition cast_pro {Struct T n m n' m'}
+Definition cast_PRO {Struct T n m n' m'}
   (Hn : n = n') (Hm : m = m') (ap : PRO Struct T n m) : PRO Struct T n' m' :=
   match Nat.eq_dec n n' with
   | left Hn' =>
@@ -382,17 +382,17 @@ Definition cast_pro {Struct T n m n' m'}
   end.
 
 
-Notation cast_pro' Hn Hm ap :=
-  (cast_pro (eq_sym Hn) (eq_sym Hm) ap) (only parsing).
+Notation cast_PRO' Hn Hm ap :=
+  (cast_PRO (eq_sym Hn) (eq_sym Hm) ap) (only parsing).
 
-Lemma cast_pro_id {Struct T n m} (ap : PRO Struct T n m) Hn Hm : cast_pro Hn Hm ap = ap.
+Lemma cast_PRO_id {Struct T n m} (ap : PRO Struct T n m) Hn Hm : cast_PRO Hn Hm ap = ap.
 Proof.
-  unfold cast_pro.
+  unfold cast_PRO.
   do 2 (case_match; try done).
   now rewrite 2 (proof_irrel _ eq_refl).
 Qed.
 
-#[global] Arguments cast_pro {_ _} {!_ !_ !_ !_} !_ !_ _ / : assert.
+#[global] Arguments cast_PRO {_ _} {!_ !_ !_ !_} !_ !_ _ / : assert.
 
 Declare Scope pro_scope.
 Delimit Scope pro_scope with pro.
@@ -504,6 +504,73 @@ Lemma Pstruct'_semantics `{SR : SemiRing R rO rI radd rmul req}
 Proof.
   apply map_PRO_semantics; easy.
 Qed.
+
+
+
+Definition PRO_tensor_equiv {R A T : Type}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EqA : EqDecision A}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {Struct : nat -> nat -> Type}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
+    (TensT : TensorLike R A T)
+    (TensS : StrictTensorLike R A Struct)
+  (n m : nat) : relation (PRO Struct T n m) := 
+  fun p q =>
+  PRO_semantics p ≡ PRO_semantics q.
+
+Notation "p '≡ₜ@{' TensT ',' TensS '}' q" :=
+  (PRO_tensor_equiv TensT TensS _ _ p%pro q%pro) (at level 70, only parsing) : pro_scope.
+
+Notation "p '≡ₜ' q" :=
+  (PRO_tensor_equiv _ _ _ _ p%pro q%pro) (at level 70) : pro_scope.
+
+From TensorRocq Require Aux_relset.
+
+Section PRO_tensor_equiv.
+
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+Context  `{SA : Summable A, EqA : EqDecision A}.
+Context `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {Struct : nat -> nat -> Type}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
+    `{TensT : !TensorLike R A T}
+    `{TensS : !StrictTensorLike R A Struct}.
+
+#[export] Instance PRO_tensor_equiv_equiv {n m} : 
+  Equivalence (PRO_tensor_equiv TensT TensS n m) := Aux_relset.rel_preimage_equiv _ _ _.
+
+#[export] Instance Pcompose_tensor_equiv {n m o} : 
+  Proper (PRO_tensor_equiv TensT TensS n m ==> PRO_tensor_equiv TensT TensS m o 
+    ==> PRO_tensor_equiv TensT TensS n o) Pcompose.
+Proof.
+  intros p p' Hp q q' Hq.
+  unfold PRO_tensor_equiv.
+  cbn.
+  now apply compose_tensor_mor.
+Qed.
+
+#[export] Instance Pstack_tensor_equiv {n m n' m'} : 
+  Proper (PRO_tensor_equiv TensT TensS n m ==> PRO_tensor_equiv TensT TensS n' m'
+    ==> PRO_tensor_equiv TensT TensS _ _) Pstack.
+Proof.
+  intros p p' Hp q q' Hq.
+  unfold PRO_tensor_equiv.
+  cbn.
+  now apply stack_tensor_mor.
+Qed.
+
+End PRO_tensor_equiv.
+
+
+
+
+
+
+
 
 
 Lemma Monoidal_eq {n m} (p : Monoidal n m) : n = m.
@@ -804,31 +871,6 @@ Definition Pdelta1 `{!SubStruct Frobenial Struct} {T} n m : PRO Struct T n m :=
 Definition Pdelta0 `{!SubStruct Frobenial Struct} {T} : PRO Struct T 0 0 :=
   [str includeStruct Delta0].
 
-Definition cast_PRO {Struct T n m n' m'}
-  (Hn : n = n') (Hm : m = m') (ap : PRO Struct T n m) : PRO Struct T n' m' :=
-  match Nat.eq_dec n n' with
-  | left Hn' =>
-    match Nat.eq_dec m m' with
-    | left Hm' => match Hn', Hm' with
-      | eq_refl, eq_refl => ap
-      end
-    | right HFm => False_rect _ (HFm Hm)
-    end
-  | right HFn => False_rect _ (HFn Hn)
-  end.
-
-
-Notation cast_PRO' Hn Hm ap :=
-  (cast_PRO (eq_sym Hn) (eq_sym Hm) ap) (only parsing).
-
-Lemma cast_PRO_id {Struct T n m} (ap : PRO Struct T n m) Hn Hm : cast_PRO Hn Hm ap = ap.
-Proof.
-  unfold cast_PRO.
-  do 2 (case_match; try done).
-  now rewrite 2 (proof_irrel _ eq_refl).
-Qed.
-
-#[global] Arguments cast_PRO {_ _ _ _ _ _} !_ !_ _ / : assert.
 
 Definition Ptop_to_bottom {Struct T} {SubS : SubStruct Symmetry Struct} (n : nat) : PRO Struct T n n :=
   match n with

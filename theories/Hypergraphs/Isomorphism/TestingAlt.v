@@ -545,15 +545,6 @@ with vertex_map_based_iso_extend_by_edge_pair `{Equiv T, !RelDecision (≡@{T})}
     )
   end. *)
 
-(* FIXME: Move *)
-Notation "m ≫=@{ M } f" := (mbind (M:=M) f m) (at level 60, right associativity, only parsing) : stdpp_scope.
-
-Notation "x ←@{ A } y ; z" := (y ≫= (λ x : A, z))
-  (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
-Notation "' x ←@{ A } y ; z" := (y ≫= (λ x : A, z))
-  (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
-
 
 Definition vertex_map_based_iso_extend_by_vert_pair `{Equiv T, !RelDecision (≡@{T})}
   (vinc vinc' : Pmap (Pset * Pset))
@@ -568,12 +559,12 @@ Definition vertex_map_based_iso_extend_by_vert_pair `{Equiv T, !RelDecision (≡
   | S fuel =>
     let '(mhe, mv) := mhe_mv in
     default [] (
-      '(mv', unchanged) ←@{Piso * bool} pupdate' v v' mv;
+      '(mv', unchanged) ←@{option; Piso * bool} pupdate' v v' mv;
       if unchanged :> bool return option (list (Piso * Piso)) then
         Some [(mhe, mv)]
       else
-      '(v_ins, v_outs) ←@{Pset * Pset} vinc !! v;
-      '(v'_ins, v'_outs) ←@{Pset * Pset} vinc' !! v;
+      '(v_ins, v_outs) ←@{option; Pset * Pset} vinc !! v;
+      '(v'_ins, v'_outs) ←@{option; Pset * Pset} vinc' !! v;
       @Some (list _) (let v_ins' : list positive := filter (λ e, (mhe.(Piso_map) !! e) = None) (elements (v_ins :> Pset)) in
       let v_outs' : list positive := filter (λ e, (mhe.(Piso_map) !! e) = None) (elements (v_outs :> Pset)) in
       let v'_ins' : list positive := filter (λ e, (mhe.(Piso_invmap) !! e) = None) (elements (v'_ins :> Pset)) in
@@ -590,15 +581,15 @@ Definition vertex_map_based_iso_extend_by_vert_pair `{Equiv T, !RelDecision (≡
           mhe_mvs ≫= fun mhe_mv =>
             let '(mhe, mv) := mhe_mv in
             default [] (
-              '(mhe', unchanged) ←@{Piso * bool} pupdate' e e' mhe;
+              '(mhe', unchanged) ←@{option; Piso * bool} pupdate' e e' mhe;
               if unchanged :> bool then
                 Some [(mhe, mv)]
               else
-              '(t, ins, outs) ←@{T * list positive * list positive} einc !! e;
-              '(t', ins', outs') ←@{T * list positive * list positive} einc' !! e';
+              '(t, ins, outs) ←@{option; T * list positive * list positive} einc !! e;
+              '(t', ins', outs') ←@{option; T * list positive * list positive} einc' !! e';
               if decide_rel equiv t t' then
-                ins_ins' ←@{list _} mayzip ins ins';
-                outs_outs' ←@{list _} mayzip outs outs';
+                ins_ins' ←@{option; list _} mayzip ins ins';
+                outs_outs' ←@{option; list _} mayzip outs outs';
                 @Some (list _) (
               foldr (fun '(v, v') mhe_mvs =>
                   (mhe_mvs ≫=@{list} fun mhe_mv =>
@@ -674,12 +665,12 @@ Definition vertex_map_based_iso_extend_by_vert_pair' `{Equiv T, !RelDecision (�
   | S fuel =>
     let '(mhe, mv) := mhe_mv in
     default [] (
-      '(mv', unchanged) ←@{Piso * bool} pupdate' v v' mv;
+      '(mv', unchanged) ←@{option; Piso * bool} pupdate' v v' mv;
       if unchanged :> bool then
         Some [(mhe, mv)]
       else
-      '(v_ins, v_outs) ←@{list positive * list positive} vinc !! v;
-      '(v'_ins, v'_outs) ←@{list positive * list positive} vinc' !! v;
+      '(v_ins, v_outs) ←@{option; list positive * list positive} vinc !! v;
+      '(v'_ins, v'_outs) ←@{option; list positive * list positive} vinc' !! v;
       @Some (list _) (let v_ins' : list positive := filter (λ e, (mhe.(Piso_map) !! e) = None) (v_ins :> list positive) in
       let v_outs' : list positive := filter (λ e, (mhe.(Piso_map) !! e) = None) (v_outs :> list positive) in
       let v'_ins' : list positive := filter (λ e, (mhe.(Piso_invmap) !! e) = None) (v'_ins :> list positive) in
@@ -696,15 +687,15 @@ Definition vertex_map_based_iso_extend_by_vert_pair' `{Equiv T, !RelDecision (�
           mhe_mvs ≫=@{list} fun mhe_mv =>
             let '(mhe, mv) := mhe_mv in
             default [] (
-              '(mhe', unchanged) ←@{Piso * bool} pupdate' e e' mhe;
+              '(mhe', unchanged) ←@{option; Piso * bool} pupdate' e e' mhe;
               if unchanged :> bool then
                 Some [(mhe, mv)]
               else
-              '(t, ins, outs) ←@{T * list positive * list positive} einc !! e;
-              '(t', ins', outs') ←@{T * list positive * list positive} einc' !! e';
+              '(t, ins, outs) ←@{option; T * list positive * list positive} einc !! e;
+              '(t', ins', outs') ←@{option; T * list positive * list positive} einc' !! e';
               if decide_rel equiv t t' then
-                ins_ins' ←@{list (positive * positive)} mayzip ins ins';
-                outs_outs' ←@{list (positive * positive)} mayzip outs outs';
+                ins_ins' ←@{option; list (positive * positive)} mayzip ins ins';
+                outs_outs' ←@{option; list (positive * positive)} mayzip outs outs';
                 @Some (list _) (
               foldr (fun '(v, v') mhe_mvs =>
                   (mhe_mvs ≫=@{list} fun mhe_mv =>
@@ -862,7 +853,7 @@ Definition weak_vertex_map_based_iso_extend_by_vert_pair' `{Equiv T, !RelDecisio
   | S fuel =>
     let '(mhe, mv) := mhe_mv in
     default [] (
-      '(mv', unchanged) ←@{WPiso * bool} wpupdate' v v' mv;
+      '(mv', unchanged) ←@{option; WPiso * bool} wpupdate' v v' mv;
       if unchanged :> bool then
         Some [(mhe, mv)]
       else
@@ -884,7 +875,7 @@ Definition weak_vertex_map_based_iso_extend_by_vert_pair' `{Equiv T, !RelDecisio
           mhe_mvs ≫= fun mhe_mv =>
             let '(mhe, mv) := mhe_mv in
             default [] (
-              '(mhe', unchanged) ←@{WPiso * bool} wpupdate' e e' mhe;
+              '(mhe', unchanged) ←@{option; WPiso * bool} wpupdate' e e' mhe;
               if unchanged :> bool then
                 Some [(mhe, mv)]
               else

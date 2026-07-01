@@ -2818,3 +2818,12 @@ Definition copy_graph {T} k {n m} (cohg : CospanHyperGraph T n m) :
 
 
 
+(* FIXME: Move *)
+#[export] Instance struct_isomorphic_syntactic_eq `{Equiv T, Equivalence T equiv} {n m} :
+  subrelation (@struct_isomorphic T n m) cohg_syntactic_eq.
+Proof.
+  intros x y Heq.
+  hnf in Heq.
+  rewrite <- (norm_verts_vert_eq x), Heq.
+  apply (subrel (norm_verts_vert_eq y)).
+Qed.

@@ -2374,15 +2374,6 @@ Proof.
   apply _.
 Qed.
 
-(* FIXME: Move *)
-#[export] Instance struct_isomorphic_syntactic_eq {n m} :
-  subrelation (@struct_isomorphic T n m) cohg_syntactic_eq.
-Proof.
-  intros x y Heq.
-  hnf in Heq.
-  rewrite <- (norm_verts_vert_eq x), Heq.
-  apply (subrel (norm_verts_vert_eq y)).
-Qed.
 
 #[export] Instance struct_isomorphic_semantic_eq {n m} :
   subrelation (@struct_isomorphic T n m) cohg_semantic_eq.

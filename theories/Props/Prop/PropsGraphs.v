@@ -195,4 +195,25 @@ Proof.
     apply delta_spider_graph_bundled_semantics.
 Qed.
 
-End lawful.
+End lawful. 
+
+Lemma Monoidal_SPRO_graph_semantics
+  {n m} (p : SPRO Monoidal n m) : 
+  PRO_graph_semantics p ≡ᵢ cast_graph eq_refl (Monoidal_SPRO_eq p) (id_graph _).
+Proof.
+  induction p; cbn -[cast_graph].
+  - now rewrite cast_graph_id.
+  - rewrite IHp1, IHp2.
+    destruct (Monoidal_SPRO_eq _).
+    destruct (Monoidal_SPRO_eq _).
+    rewrite 2 cast_graph_id.
+    apply compose_graphs_id_graph_l.
+  - rewrite IHp1, IHp2.
+    destruct (Monoidal_SPRO_eq _).
+    destruct (Monoidal_SPRO_eq _).
+    rewrite 3 cast_graph_id.
+    now rewrite stack_graphs_id_graph.
+  - replace (Monoidal_SPRO_eq _) with (Monoidal_eq s) by apply proof_irrel.
+    done.
+  - done.
+Qed.

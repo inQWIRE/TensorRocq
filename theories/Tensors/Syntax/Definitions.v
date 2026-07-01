@@ -4411,27 +4411,6 @@ Qed.
 
 
 
-Lemma gmap_map_insert `{Countable A} (m : gmap A A) (a b : A) :
-  pointwise_relation A eq (gmap_map (<[a := b]> m))
-    (<[a := b]> (gmap_map m)).
-Proof.
-  intros c.
-  rewrite fn_lookup_insert_case.
-  unfold gmap_map.
-  rewrite lookup_insert_case.
-  now case_decide.
-Qed.
-
-
-Lemma gmap_map_empty `{Countable A} :
-  pointwise_relation A eq (gmap_map (∅ :> gmap A A))
-    id.
-Proof.
-  intros c.
-  unfold gmap_map.
-  now rewrite lookup_empty.
-Qed.
-
 (* FIXME: Move *)
 Add Parametric Morphism {A B} : (relabel_delt) with signature
   pointwise_relation A (@eq B) ==> eq ==>
@@ -4518,50 +4497,6 @@ Proof.
 
 (* Lemma simplify_ntl_deltas_cons  *)
 
-Lemma list_filter_all {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
-  (l : list A) :
-  (forall a, a ∈ l -> P a) ->
-  filter P l = l.
-Proof.
-  rewrite <- Forall_forall.
-  intros Hl.
-  induction Hl; [reflexivity|].
-  cbn.
-  rewrite decide_True by easy.
-  f_equal.
-  apply IHHl.
-Qed.
-
-Lemma list_filter_none {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
-  (l : list A) :
-  (forall a, a ∈ l -> ~ P a) ->
-  filter P l = [].
-Proof.
-  rewrite <- Forall_forall.
-  intros Hl.
-  induction Hl; [reflexivity|].
-  cbn.
-  rewrite decide_False by easy.
-  apply IHHl.
-Qed.
-
-Lemma NoDup_perm_filter_out `{EqDecision A} (l : list A) (a : A) :
-  NoDup l -> a ∈ l ->
-  l ≡ₚ a :: filter (.≠ a) l.
-Proof.
-  intros Hl Ha.
-  apply elem_of_list_split in Ha as Hspl.
-  destruct Hspl as (l1 & l2 & ->).
-  rewrite <- Permutation_middle in Hl |- *.
-  f_equiv.
-  apply NoDup_cons in Hl as [Hal Hdup].
-  cbn.
-  rewrite decide_False by easy.
-  symmetry.
-  apply eq_reflexivity.
-  apply list_filter_all.
-  congruence.
-Qed.
 
 
 

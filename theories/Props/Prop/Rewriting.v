@@ -2,6 +2,7 @@
   autonomous and frobenius categories *)
 
 From TensorRocq Require Import CospanHyperGraph.Definitions
+  CospanHyperGraph.Facts
   Isomorphism.IsoAux Isomorphism.Testing CospanHyperGraph.Matching
   Props.Prop.Props
   Props.Prop.PropsGraphs.
@@ -13,142 +14,8 @@ From TensorRocq Require Import CospanHyperGraph.Definitions
 
 Import StackComposeCorrect.
 
-#[export] Instance compose_graphs_alt_cohg_vert_eq {T}
-  {n m o} : Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq)
-    (@compose_graphs_alt T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  unfold compose_graphs_alt.
-  now do 2 f_equiv.
-Qed.
-
-#[export] Instance compose_graphs_alt_struct_isomorphic `{Equiv T, Equivalence T equiv}
-  {n m o} : Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic)
-    (@compose_graphs_alt T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  unfold compose_graphs_alt.
-  apply add_top_loops_struct_isomorphic.
-  now apply swapped_stack_graphs_struct_isomorphic.
-Qed.
-
-Import Facts.
-
-Lemma proper_cohg_syntactic_eq_of_struct_iso_eq_binary `{Equiv T1, Equivalence T1 equiv,
-  Equiv T2, Equivalence T2 equiv, Equiv T3, Equivalence T3 equiv} {n1 m1 n2 m2 n3 m3}
-  (f : CospanHyperGraph T1 n1 m1 -> CospanHyperGraph T2 n2 m2 ->
-    CospanHyperGraph T3 n3 m3) :
-  Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic) f ->
-  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) f ->
-  Proper (cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq) f.
-Proof.
-  intros Hfiso Hfcohg.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  induction Hcohg1 as [cohg1 cohg1' fv1 fe1 Hfv1 Hfe1 Hverteq1].
-  rewrite <- (subrel'' struct_isomorphic (norm_verts_vert_eq cohg1)).
-  rewrite (Hverteq1).
-  rewrite (subrel'' struct_isomorphic (norm_verts_vert_eq _)).
-  rewrite <- (subrel'' struct_isomorphic (iso_relabel_reindex _ _ _)) by done.
-  induction Hcohg2 as [cohg2 cohg2' fv2 fe2 Hfv2 Hfe2 Hverteq2].
-  rewrite <- (subrel'' struct_isomorphic (norm_verts_vert_eq cohg2)).
-  rewrite (Hverteq2).
-  rewrite (subrel'' struct_isomorphic (norm_verts_vert_eq _)).
-  rewrite <- (subrel'' struct_isomorphic (iso_relabel_reindex _ _ _)) by done.
-  done.
-Qed.
-
-#[export] Instance compose_graphs_alt_cohg_syntactic_eq `{Equiv T, Equivalence T equiv}
-  {n m o} : Proper (cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq)
-    (@compose_graphs_alt T n m o).
-Proof.
-  apply proper_cohg_syntactic_eq_of_struct_iso_eq_binary; apply _.
-Qed.
-
-#[export] Instance compose_graphs_cohg_vert_eq {T}
-  {n m o} : Proper (cohg_vert_eq ==> cohg_vert_eq ==> cohg_vert_eq)
-    (@compose_graphs T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  do 2 rewrite <- compose_graphs_alt_correct.
-  now do 2 f_equiv.
-Qed.
-
-#[export] Instance compose_graphs_struct_isomorphic `{Equiv T, Equivalence T equiv}
-  {n m o} : Proper (struct_isomorphic ==> struct_isomorphic ==> struct_isomorphic)
-    (@compose_graphs T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  do 2 rewrite <- compose_graphs_alt_correct.
-  now apply compose_graphs_alt_struct_isomorphic.
-Qed.
-
-#[export] Instance compose_graphs_cohg_syntactic_eq `{Equiv T, Equivalence T equiv}
-  {n m o} : Proper (cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq)
-    (@compose_graphs T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  rewrite <- 2 compose_graphs_alt_correct.
-  now apply compose_graphs_alt_cohg_syntactic_eq.
-Qed.
-
-#[export] Instance stack_graphs_cohg_syntactic_eq `{Equiv T, Equivalence T equiv}
-  {n m o p} : Proper (cohg_syntactic_eq ==> cohg_syntactic_eq ==> cohg_syntactic_eq)
-    (@stack_graphs T n m o p).
-Proof.
-  apply proper_cohg_syntactic_eq_of_iso_vert_eq_binary; apply _.
-Qed.
-
-
-
-
 From TensorRocq Require Import ProQuote.
 From TensorRocq Require Import CospanHyperGraph.Hom.
-
-(* FIXME: Move to Definitions *)
-Lemma cohg_eq_ind `{Equiv T} {n m} (P : CospanHyperGraph T n m -> CospanHyperGraph T n m -> Prop)
-  (HP : forall ins outs verts he he', map_equiv he he' ->
-    P (mk_cohg (mk_hg he verts) ins outs) (mk_cohg (mk_hg he' verts) ins outs)) :
-  forall cohg cohg', cohg ≡ₕ cohg' -> P cohg cohg'.
-Proof.
-  intros [[he verts] ins outs] [[he' verts'] ins' outs'] ([= <-] & [= <-] & [Hhe [= <-]]).
-  apply HP, Hhe.
-Qed.
-
-Lemma cohg_eq_ind' `{Equiv T} {n m} (P : CospanHyperGraph T n m -> CospanHyperGraph T n m -> Prop)
-  (HP : forall ins outs hg hg', hg ≡ hg' ->
-    P (mk_cohg hg ins outs) (mk_cohg hg' ins outs)) :
-  forall cohg cohg', cohg ≡ₕ cohg' -> P cohg cohg'.
-Proof.
-  intros [hg ins outs] [hg' ins' outs'] ([= <-] & [= <-] & Hhg).
-  apply HP, Hhg.
-Qed.
-
-#[export] Instance compose_graphs_aux_cohg_eq `{Equiv T} {n m o} :
-  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) (@compose_graphs_aux T n m o).
-Proof.
-  refine (cohg_eq_ind _ _).
-  intros ins1 outs1 verts1 he1 he1' Hhe1.
-  refine (cohg_eq_ind _ _).
-  intros ins2 outs2 verts2 he2 he2' Hhe2.
-  unfold compose_graphs_aux.
-  cbn.
-  f_equiv.
-  split_and!; [done..|].
-  cbn.
-  split; cbn.
-  - now apply fin_maps.union_proper.
-  - do 3 f_equal;
-    eapply vertices_hg_equiv; split; done.
-Qed.
-
-
-#[export] Instance compose_graphs_cohg_eq `{Equiv T} {n m o} :
-  Proper (cohg_eq ==> cohg_eq ==> cohg_eq) (@compose_graphs T n m o).
-Proof.
-  intros cohg1 cohg1' Hcohg1 cohg2 cohg2' Hcohg2.
-  rewrite 2 compose_graphs_to_compose_graphs_aux.
-  now apply compose_graphs_aux_cohg_eq; do 2 f_equiv.
-Qed.
 
 
 (* FIXME: Move *)

@@ -164,13 +164,6 @@ Definition Pmap_argminsN {A} (f : A -> N) (p : Pmap A) : Pmap A * Pmap A :=
   prod_map (from_option snd PEmpty) id $ Pmap_argminsN_aux (Pmap_ne_argminsN f) p.
 
 
-Fixpoint vec_index `{EqDecision A} (a : A) {n} (v : vec A n) : option (fin n) :=
-  match v with
-  | [#] => None
-  | a' ::: v =>
-    if decide (a = a') then Some 0%fin else
-      FS <$> vec_index a v
-  end.
 
 
 

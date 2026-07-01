@@ -6899,24 +6899,26 @@ Qed.
 
 (* FIXME: Move *)
 
-Definition map_relabel_one `{FinMap K M} {A} (a b : K) (m : M A) : M A :=
+Definition map_relabel_one `{PartialAlter K A M, Lookup K A M} (a b : K) (m : M) : M :=
   partial_alter (λ _, (m !! b)) a m.
 
-Fixpoint map_relabels `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m : M A), M A :=
+Fixpoint map_relabels `{EqDecision K, PartialAlter K A M, Lookup K A M} {n} : 
+  forall (abs : vec (K * K) n) (m : M), M :=
   match n with
-  | 0 => fun abs A m => m
-  | S n' => fun abs A m =>
+  | 0 => fun abs m => m
+  | S n' => fun abs m =>
     let a := (vhd abs).1 in
     let b := (vhd abs).2 in
-    map_relabel_one a b (map_relabels (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs))
+    map_relabel_one (M:=M) a b (map_relabels (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs))
     m)
   end.
 
 
-Fixpoint map_relabels_r `{FinMap K M} {n} : forall (abs : vec (K * K) n) {A} (m : M A), M A :=
+Fixpoint map_relabels_r `{EqDecision K, PartialAlter K A M, Lookup K A M} {n} : 
+  forall (abs : vec (K * K) n) (m : M), M :=
   match n with
-  | 0 => fun abs A m => m
-  | S n' => fun abs A m =>
+  | 0 => fun abs m => m
+  | S n' => fun abs m =>
     let a := (vhd abs).1 in
     let b := (vhd abs).2 in
     (map_relabels_r (vmap (prod_map {[a:=b]} {[a:=b]}) (vtl abs))

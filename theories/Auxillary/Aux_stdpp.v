@@ -397,7 +397,7 @@ Proof.
       lia.
 Qed.
 
-(* FIXME: Move *) 
+(* FIXME: Move *)
 Lemma rev_const {A n} (a : A) :
   Vector.rev (Vector.const a n) = Vector.const a n.
 Proof.
@@ -407,7 +407,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma vlookup_eq_nth {A n} (v : vec A n) i : 
+Lemma vlookup_eq_nth {A n} (v : vec A n) i :
   v !!! i = Vector.nth v i.
 Proof.
   revert i; induction v; [apply fin_0_inv|apply fin_S_inv; [done|]].
@@ -758,11 +758,11 @@ Qed.
 
 
 (* FIXME: Move *)
-Definition fin_perm_inv_cast {n m} (Hnm : n = m) (f : fin n -> fin m) : 
+Definition fin_perm_inv_cast {n m} (Hnm : n = m) (f : fin n -> fin m) :
   fin m -> fin n :=
   cast_fin_perm Hnm eq_refl (fin_perm_inv (cast_fin_perm eq_refl (eq_sym Hnm) f)).
 
-Lemma fin_perm_inv_cast_id {n} (Hn : n = n) (f : fin n -> fin n) : 
+Lemma fin_perm_inv_cast_id {n} (Hn : n = n) (f : fin n -> fin n) :
   fin_perm_inv_cast Hn f = fin_perm_inv f.
 Proof.
   unfold fin_perm_inv_cast.
@@ -782,17 +782,514 @@ Fixpoint list_split {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
 
 
 
-Notation "x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
+Notation "x '←@{' M '}' y ; z" := (mbind (M:=M%type) (λ x : _, z) y)
   (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
 
-Notation "' x '←@{' M '}' y ; z" := (mbind (M:=M) (λ x : _, z) y)
+Notation "' x '←@{' M '}' y ; z" := (mbind (M:=M%type) (λ x : _, z) y)
   (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
 
-Notation "x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
+Notation "x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : b%type, z) y)
   (at level 20, y at level 100, z at level 200, only parsing) : stdpp_scope.
 
-Notation "' x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : M%type b, z) y)
+Notation "' x '←@{' M ; b '}' y ; z" := (mbind (M:=M%type) (λ x : b%type, z) y)
   (at level 20, x pattern, y at level 100, z at level 200, only parsing) : stdpp_scope.
 
 
-Infix "'<$>@{' M '}'" := (fmap (M:=M)) (at level 61, left associativity, only parsing) : stdpp_scope.
+Infix "'<$>@{' M '}'" := (fmap (M:=M%type)) (at level 61, left associativity, only parsing) : stdpp_scope.
+
+(* FIXME: Move *)
+Notation "m ≫=@{ M } f" := (mbind (M:=M%type) f m) (at level 60, right associativity, only parsing) : stdpp_scope.
+
+Notation "m ≫=@{ M ; b } f" := (mbind (M:=M%type) (A:=b%type) f m) (at level 60, right associativity, only parsing) : stdpp_scope.
+
+
+
+Import stdpp.list.
+
+Lemma decide_ext' {P Q} `{Decision P, Decision Q}
+  {A} {R : relation A} {x y x' y' : A} :
+  (P <-> Q) ->
+  (P -> Q -> R x x') -> (~ P -> ~ Q -> R y y') ->
+  R (if decide P then x else y) (if decide Q then x' else y').
+Proof.
+  do 2 case_decide;
+  naive_solver.
+Qed.
+
+Lemma lookup_kmap_None_1 `{FinMap K1 M1, FinMap K2 M2}
+  (f : K1 -> K2) {Hf : Inj eq eq f} {A} (m : M1 A) (j : K2) :
+  (forall i, j = f i -> m !! i = None) -> (kmap f m :> M2 A) !! j = None.
+Proof.
+  now rewrite lookup_kmap_None.
+Qed.
+
+
+Lemma lookup_kmap_None_1' `{FinMap K1 M1, FinMap K2 M2}
+  (f : K1 -> K2) {Hf : Inj eq eq f} {A} (m : M1 A) (j : K2) :
+  (forall i, f i <> j) -> (kmap f m :> M2 A) !! j = None.
+Proof.
+  intros Hi; apply (lookup_kmap_None_1 f); now intros ? []%symmetry%Hi.
+Qed.
+
+
+
+
+Definition list_index `{EqDecision A} (x : A) : list A -> option nat :=
+  fix go l :=
+  match l with
+  | [] => None
+  | a :: l =>
+    if decide (x = a) then Some 0 else S <$> go l
+  end.
+
+Section list_index.
+
+
+Context `{EqDecision A}.
+Implicit Type l : list A.
+
+
+Lemma list_index_eq_find (x : A) l :
+  list_index x l = fst <$> list_find (eq x) l.
+Proof.
+  induction l; [done|].
+  cbn.
+  case_decide; [done|].
+  rewrite IHl.
+  now destruct (list_find _ _).
+Qed.
+
+Lemma list_index_is_Some x l :
+  is_Some (list_index x l) <-> x ∈ l.
+Proof.
+  rewrite list_index_eq_find.
+  rewrite fmap_is_Some.
+  split; [|intros Hx; apply (list_find_elem_of _ _ x Hx eq_refl)].
+  now intros [[] (?%elem_of_list_lookup_2 & <- & _)%list_find_Some].
+Qed.
+
+Lemma list_index_Some x l i :
+  list_index x l = Some i <->
+  l !! i = Some x /\ forall j y, l !! j = Some y -> j < i -> x <> y.
+Proof.
+  rewrite list_index_eq_find.
+  rewrite fmap_Some, exists_pair.
+  setoid_rewrite list_find_Some.
+  naive_solver.
+Qed.
+
+Lemma list_index_None x l :
+  list_index x l = None <-> x ∉ l.
+Proof.
+  rewrite <- list_index_is_Some.
+  now rewrite eq_None_not_Some.
+Qed.
+
+Lemma list_index_None_1 x l :
+  list_index x l = None -> x ∉ l.
+Proof.
+  now rewrite list_index_None.
+Qed.
+
+Lemma list_index_None_2 x l :
+  x ∉ l -> list_index x l = None.
+Proof.
+  now rewrite list_index_None.
+Qed.
+
+
+Lemma list_index_Some_NoDup x l i :
+  NoDup l ->
+  list_index x l = Some i <-> l !! i = Some x.
+Proof.
+  intros Hdup.
+  rewrite list_index_Some.
+  rewrite <- (and_True (l !! i = Some x)) at 2.
+  apply and_iff_from_l; [reflexivity|intros Hli _].
+  apply iff_True_1.
+  intros j y Hlj Hji ->.
+  enough (i = j) by lia.
+  revert Hli Hlj.
+  now apply NoDup_lookup.
+Qed.
+
+Lemma list_index_inj x y l i :
+  list_index x l = Some i -> list_index y l = Some i -> x = y.
+Proof.
+  rewrite 2 list_index_Some.
+  intros [] [].
+  congruence.
+Qed.
+
+Lemma list_index_lt x l i :
+  list_index x l = Some i -> i < length l.
+Proof.
+  now intros [?%lookup_lt_Some _]%list_index_Some.
+Qed.
+
+Lemma list_index_app x l l' :
+  list_index x (l ++ l') =
+  list_index x l ∪ (Nat.add (length l) <$> list_index x l').
+Proof.
+  induction l; [cbn; now destruct (list_index _ _)|].
+  cbn.
+  case_decide; [now rewrite union_Some_l|].
+  rewrite IHl.
+  unfold union, option_union, union_with, option_union_with.
+  repeat (destruct (list_index _ _)); reflexivity.
+Qed.
+
+Lemma list_index_fmap_gen `{EqDecision B} (f : A -> B) x l :
+  list_index x (f <$> l) = fst <$> list_find (λ y, x = f y) l.
+Proof.
+  induction l; [done|].
+  cbn.
+  case_decide; [done|].
+  rewrite IHl.
+  now destruct (list_find _ _).
+Qed.
+
+Lemma list_index_fmap `{EqDecision B} (f : A -> B) {Hf : Inj eq eq f} x l :
+  list_index (f x) (f <$> l) = list_index x l.
+Proof.
+  induction l; [done|].
+  cbn.
+  apply decide_ext'; [|intros; now f_equal..].
+  apply (inj_iff f).
+Qed.
+
+Lemma list_index_fmap' `{EqDecision B} (x : A) (f : A -> B) {Hf : Inj eq eq f} y l :
+  y = f x -> list_index y (f <$> l) = list_index x l.
+Proof.
+  intros ->.
+  apply (list_index_fmap f).
+Qed.
+
+End list_index.
+
+Lemma list_lookup_omap_all_is_Some `(f : A -> option B) (l : list A) (i : nat)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l !! i = l !! i ≫= f.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  revert i;
+  induction Hf; [now intros []|intros i].
+  cbn.
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  destruct i; [cbn; now rewrite Hfx|].
+  cbn.
+  apply IHHf.
+Qed.
+
+Lemma length_omap_all_is_Some `(f : A -> option B) (l : list A)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  length (omap f l) = length l.
+Proof.
+  rewrite <- Forall_forall in Hf.
+  induction Hf; [done|cbn].
+  destruct (f x) as [fx|] eqn:Hfx; [|now rewrite is_Some_alt in *].
+  cbn.
+  f_equal; apply IHHf.
+Qed.
+
+Lemma omap_all_is_Some_default `(f : A -> option B) (l : list A) (g : A -> B)
+  (Hf : forall a, a ∈ l -> is_Some (f a)) :
+  omap f l = (λ i, default (g i) (f i)) <$> l.
+Proof.
+  apply (list_eq_same_length _ _ _ eq_refl).
+  - now rewrite length_fmap; apply length_omap_all_is_Some.
+  - intros i x y.
+    rewrite length_fmap.
+    intros Hi.
+    rewrite list_lookup_omap_all_is_Some by easy.
+    rewrite list_lookup_fmap.
+    destruct (l !! i) as [li|]; [|easy].
+    cbn.
+    destruct (f li); [|easy].
+    cbn; congruence.
+Qed.
+
+
+Lemma nat_to_ofin_S_S n i : nat_to_ofin (S n) (S i) = FS <$> nat_to_ofin n i.
+Proof.
+  unfold nat_to_ofin.
+  apply (inj (fmap fin_to_nat)).
+  do 2 case_guard; [|exfalso; lia..|]; [|done].
+  cbn.
+  now rewrite 2 fin_to_nat_to_fin.
+Qed.
+
+
+
+Definition vec_find {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
+  : forall {n} (v : vec A n), option (fin n * A) :=
+  fix go n v :=
+  match v with
+  | [#] => None
+  | a ::: v =>
+    if decide (P a) then Some (0%fin, a) else
+      prod_map FS id <$> go _ v
+  end.
+
+
+Fixpoint vec_index `{EqDecision A} (a : A) {n} (v : vec A n) : option (fin n) :=
+  match v with
+  | [#] => None
+  | a' ::: v =>
+    if decide (a = a') then Some 0%fin else
+      FS <$> vec_index a v
+  end.
+
+Lemma fin_to_nat_vec_index `{EqDecision A} (a : A) {n} (v : vec A n) :
+  fin_to_nat <$> (vec_index a v) = list_index a v.
+Proof.
+  induction n; inv_all_vec_fin; [done|].
+  cbn.
+  case_decide; [done|].
+  rewrite <- IHn.
+  now destruct (vec_index _ _).
+Qed.
+
+Lemma vec_index_to_list_index `{EqDecision A} (a : A) {n} (v : vec A n) :
+  vec_index a v = list_index a v ≫= nat_to_ofin n.
+Proof.
+  rewrite <- fin_to_nat_vec_index.
+  destruct (vec_index _ _) as [i|]; [|done].
+  cbn.
+  rewrite nat_to_ofin_fin.
+  done.
+Qed.
+
+
+
+(* FIXME: Move *)
+Lemma vmap_vzip_with {A B C D} (f : C -> D) (g : A -> B -> C) {n}
+  (v w : vec _ n) :
+  vmap f (vzip_with g v w) = vzip_with (λ a b, f (g a b)) v w.
+Proof.
+  induction n; inv_all_vec_fin; cbn in *; congruence.
+Qed.
+Lemma fst_vzip {A} {n} (v w : vec A n) :
+  vmap fst (vzip_with pair v w) = v.
+Proof.
+  induction n; inv_all_vec_fin; cbn in *; congruence.
+Qed.
+Lemma snd_vzip {A} {n} (v w : vec A n) :
+  vmap snd (vzip_with pair v w) = w.
+Proof.
+  induction n; inv_all_vec_fin; cbn in *; congruence.
+Qed.
+
+
+(* FIXME: Move *)
+Fixpoint vimap {A B} {n} : forall (f : fin n -> A -> B) (v : vec A n), vec B n :=
+  match n with
+  | 0 => fun _ _ => [#]
+  | S n =>
+    fun f v => (f 0%fin (vhd v)) ::: vimap (λ i, f (FS i)) (vtl v)
+  end.
+
+Lemma vlookup_imap {A B} {n} (f : fin n -> A -> B) (v : vec A n) (i : fin n) :
+  vimap f v !!! i = f i (v !!! i).
+Proof.
+  induction n; inv_all_vec_fin; cbn; [done|].
+  apply IHn.
+Qed.
+
+Lemma vimap_ext {A B} {n} f g (v : vec A n) :
+  (forall i, f i (v !!! i) = g i (v !!! i)) ->
+  vimap f v =@{vec B n} vimap g v.
+Proof.
+  intros Hfg.
+  induction n; inv_all_vec_fin; cbn; [done|].
+  f_equal; [apply Hfg|].
+  apply IHn; intros; apply Hfg.
+Qed.
+
+Notation vmap_map := (Vector.map_map _ _ _).
+
+Lemma vimap_to_vfinseq {A B} {n} (f : fin n -> B) (v : vec A n) :
+  vimap (λ i _, f i) v = vmap f (vfinseq n).
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_map, vlookup_imap, lookup_vfinseq.
+  done.
+Qed.
+
+Lemma vimap_to_vmap {A B} (f : A -> B) {n} (v : vec A n) :
+  vimap (λ _, f) v = vmap f v.
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_map, vlookup_imap.
+  done.
+Qed.
+
+Lemma vimap_vmap {A B C} {n} (f : fin n -> B -> C) (g : A -> B) v :
+  vimap f (vmap g v) = vimap (λ i a, f i (g a)) v.
+Proof.
+  apply vec_eq; intros i.
+  rewrite 2 vlookup_imap, vlookup_map.
+  done.
+Qed.
+
+Lemma vmap_vimap {A B C} (g : B -> C) {n} (f : fin n -> A -> B) v :
+  vmap g (vimap f v) = vimap (λ i a, g (f i a)) v.
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_map, 2 vlookup_imap.
+  done.
+Qed.
+
+Lemma vec_to_vmap_lookup_vfinseq {A n} (v : vec A n) :
+  v = vmap (v!!!.) (vfinseq n).
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_map, lookup_vfinseq.
+  done.
+Qed.
+
+Lemma vimap_vfinseq {A} {n} (f : fin n -> fin n -> A) :
+  vimap f (vfinseq n) = vmap (λ i, f i i) (vfinseq n).
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_imap, vlookup_map, lookup_vfinseq.
+  done.
+Qed.
+
+Lemma vimap_to_vmap_vfinseq_lookup {A B} {n} (f : fin n -> A -> B) v :
+  vimap f v = vmap (λ i, f i (v !!! i)) (vfinseq n).
+Proof.
+  rewrite (vec_to_vmap_lookup_vfinseq v), vimap_vmap at 1.
+  rewrite vimap_vfinseq.
+  done.
+Qed.
+
+(* Lemma vimap_vzip_with {A B C D} {n} (f : fin n -> C -> D) (g : A -> B -> C) *)
+
+Lemma vec_prod_eta {A B n} (v : vec (A * B) n) :
+  v = vzip (vmap fst v) (vmap snd v).
+Proof.
+  apply vec_eq; intros i.
+  rewrite vlookup_zip_with, 2 vlookup_map.
+  apply surjective_pairing.
+Qed.
+
+Fixpoint vcount {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
+  {n} (v : vec A n) : nat :=
+  match v with
+  | [#] => 0
+  | a ::: v =>
+    if decide (P a) then S (vcount P v) else vcount P v
+  end.
+
+(* Fixpoint vfilter {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
+  {n} (v : vec A n) : vec A (vcount P ) *)
+
+
+
+
+Lemma gmap_map_insert `{Countable A} (m : gmap A A) (a b : A) :
+  pointwise_relation A eq (gmap_map (<[a := b]> m))
+    (<[a := b]> (gmap_map m)).
+Proof.
+  intros c.
+  rewrite fn_lookup_insert_case.
+  unfold gmap_map.
+  rewrite lookup_insert_case.
+  now case_decide.
+Qed.
+
+
+Lemma gmap_map_empty `{Countable A} :
+  pointwise_relation A eq (gmap_map (∅ :> gmap A A))
+    id.
+Proof.
+  intros c.
+  unfold gmap_map.
+  now rewrite lookup_empty.
+Qed.
+
+Lemma list_filter_all {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  (forall a, a ∈ l -> P a) ->
+  filter P l = l.
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; [reflexivity|].
+  cbn.
+  rewrite decide_True by easy.
+  f_equal.
+  apply IHHl.
+Qed.
+
+Lemma list_filter_none {A} {P : A -> Prop} `{HP : forall a, Decision (P a)}
+  (l : list A) :
+  (forall a, a ∈ l -> ~ P a) ->
+  filter P l = [].
+Proof.
+  rewrite <- Forall_forall.
+  intros Hl.
+  induction Hl; [reflexivity|].
+  cbn.
+  rewrite decide_False by easy.
+  apply IHHl.
+Qed.
+
+Lemma NoDup_perm_filter_out `{EqDecision A} (l : list A) (a : A) :
+  NoDup l -> a ∈ l ->
+  l ≡ₚ a :: filter (.≠ a) l.
+Proof.
+  intros Hl Ha.
+  apply elem_of_list_split in Ha as Hspl.
+  destruct Hspl as (l1 & l2 & ->).
+  rewrite <- Permutation_middle in Hl |- *.
+  f_equiv.
+  apply NoDup_cons in Hl as [Hal Hdup].
+  cbn.
+  rewrite decide_False by easy.
+  symmetry.
+  apply eq_reflexivity.
+  apply list_filter_all.
+  congruence.
+Qed.
+
+(* FIXME: Move *)
+Lemma filter_nil_iff {A} (P : A -> Prop) {HP : forall x, Decision (P x)}
+  (l : list A) : filter P l = [] <-> (forall x, x ∈ l -> ~ P x).
+Proof.
+  split; [|now eauto using list_filter_none].
+  unfold not.
+  intros;
+  eapply filter_nil_not_elem_of; eauto.
+Qed.
+
+Lemma vtake_vmap {A B} (f : A -> B) {n} (i : fin n) (v : vec A n) :
+  vtake i (vmap f v) = vmap f (vtake i v).
+Proof.
+  induction i; inv_all_vec_fin; cbn; f_equal; done.
+Qed.
+
+Lemma filter_fmap_prod_map_id_r {A B C} (P : C -> Prop) {HP : forall x, Decision (P x)}
+  (f : A -> B) (l : list (A * C)) :
+  filter (λ i, P i.2) (prod_map f id <$> l) =
+  prod_map f id <$> filter (λ i, P i.2) l.
+Proof.
+  induction l; [done|].
+  cbn; simpl.
+  case_decide; cbn; f_equal; done.
+Qed.
+
+Lemma list_filter_ext_lookup {A} (P Q : A -> Prop)
+  {HP : forall x, Decision (P x)} {HQ : forall x, Decision (Q x)}
+  (l l' : list A) :
+  Forall2 (λ x y, (P x <-> Q y) /\ (P x -> Q y -> x = y)) l l' ->
+  filter P l = filter Q l'.
+Proof.
+  intros Hl.
+  induction Hl; [done|].
+  destruct_and!.
+  cbn.
+  apply decide_ext'; [done|now intros; f_equal; auto|..].
+  intros; done.
+Qed.

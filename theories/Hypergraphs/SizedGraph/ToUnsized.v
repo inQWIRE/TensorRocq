@@ -4204,3 +4204,170 @@ Proof.
     rewrite (right_id_L None _).
     now rewrite pos_to_nat_pred_of_nat.
 Qed.
+
+Lemma lookup_map_relabels_pos
+  {n} (v : vec (positive * positive) n) {A} (m : Pmap A) k :
+  map_relabels v m !! k =
+  m !! subst_by_vec (propogate_subst v) k.
+Proof.
+  revert m k; induction n as [|n IHn]; intros m k; [done|].
+  inv_vec v; intros [i j] v.
+  cbn -[map_relabel_one].
+  rewrite lookup_map_relabel_one.
+  rewrite IHn.
+  reflexivity.
+Qed.
+
+Lemma map_relabel_one_idemp `{FinMap K M}
+  (k k' : K) {A} (m : M A) :
+  m !! k = m !! k' -> map_relabel_one k k' m = m.
+Proof.
+  intros Hmk.
+  apply map_eq.
+  intros i.
+  unfold map_relabel_one.
+  rewrite lookup_partial_alter_case.
+  case_decide; [now subst|done].
+Qed.
+
+Lemma map_relabels_r_idemp_vmap_bcons_false_true
+  {n} (v w : vec positive n) {A} (m : Pmap A) :
+  Forall2 (λ i j, m !! i~0 = m !! j~1) v w ->
+  NoDup v ->
+  map_relabels_r (vmap (prod_map (bcons false) (bcons true)) (vzip v w))
+  m = m.
+Proof.
+  revert m; induction n; intros m; [inv_all_vec_fin; done|].
+  inv_vec v; intros i v.
+  inv_vec w; intros j w.
+  cbn -[map_relabel_one].
+  rewrite Forall2_cons.
+  intros [Hij Hvw].
+  intros [Hi Hv]%NoDup_cons.
+  rewrite map_relabel_one_idemp by done.
+  rewrite vmap_id'. 2:{
+    intros [i'' j''].
+    rewrite vec_to_list_map, vec_to_list_zip_with.
+    rewrite elem_of_list_fmap.
+    intros ((i' & j') & [= -> ->] & (i_ & j_ & [= <- <-] & Hi' & Hj')%elem_of_zip_with).
+    cbn.
+    f_equal; apply fn_lookup_singleton_ne; set_solver.
+  }
+  apply IHn; done.
+Qed.
+
+
+
+
+
+Lemma compose_sized_graphs_id_sized_graph_l_aux {N T}
+  {n m} (v : vec N n) (scohg : SizedCospanHyperGraph N T n m) :
+  sized_inputs scohg = Some <$> (vec_to_list v) ->
+  compose_sized_graphs (id_sized_graph v) scohg ≡ᵥ
+  relabel_sized_graph (bcons true)
+    (reindex_sized_graph (bcons true) scohg).
+Proof.
+  intros Hins.
+  split; [apply compose_graphs_id_graph_l_aux|].
+  change (sized_cospan _) with (compose_graphs (id_graph n) scohg).
+  rewrite <- vertices_norm_verts, compose_graphs_id_graph_l_aux, vertices_norm_verts.
+  rewrite vertices_relabel_graph, (vertices_reindex_graph _).
+  intros _ (k & -> & Hk)%elem_of_map.
+  cbn -[bcons].
+  rewrite (lookup_kmap _).
+  rewrite vzip_map.
+  rewrite map_relabels_r_idemp_vmap_bcons_false_true;
+    [| | rewrite vec_to_list_map, vec_to_list_seq;
+    apply (NoDup_fmap _), NoDup_seq].
+  2:{
+    rewrite Forall2_vlookup.
+    intros i.
+    rewrite lookup_union.
+    rewrite (lookup_kmap (bcons false) _).
+    rewrite vlookup_map, vlookup_seq.
+    rewrite lookup_list_to_map_imap_to_pos.
+    rewrite pos_to_nat_pred_of_nat.
+    cbn.
+    rewrite lookup_vec_to_list_fin.
+    cbn.
+    rewrite union_Some_l.
+    rewrite lookup_union.
+    rewrite (lookup_kmap_None _ _ _).2 by lia.
+    rewrite (left_id_L None _).
+    rewrite (lookup_kmap _).
+    apply (f_equal (.!! (i:>nat))) in Hins.
+    unfold sized_inputs in Hins.
+    rewrite 2 list_lookup_fmap, 2 lookup_vec_to_list_fin in Hins.
+    cbn in Hins.
+    congruence.
+  }
+  rewrite lookup_union.
+  rewrite (lookup_kmap_None _ _ _).2 by lia.
+  rewrite (left_id_L None _).
+  rewrite (lookup_kmap _).
+  done.
+Qed.
+
+
+Lemma compose_sized_graphs_id_sized_graph_l {N T}
+  {n m} (v : vec N n) (scohg : SizedCospanHyperGraph N T n m) :
+  sized_inputs scohg = Some <$> (vec_to_list v) ->
+  compose_sized_graphs (id_sized_graph v) scohg ≡ᵢ
+  scohg.
+Proof.
+  intros ->%compose_sized_graphs_id_sized_graph_l_aux.
+  rewrite <- sized_iso_relabel_reindex; [done|apply _..].
+Qed.
+
+
+Lemma stack_sized_graphs_id_sized_graph {N T}
+  {n m} (v : vec N n) (w : vec N m) :
+  sized_isomorphic (stack_sized_graphs (T:=T) (id_sized_graph v) (id_sized_graph w))
+  (id_sized_graph (v +++ w)).
+Proof.
+  symmetry.
+  apply sized_isomorphic_exists.
+  set (f := (fun i => if decide (pos_to_nat_pred i < n) then i~0 else (pos_sub_N i (N.of_nat n))~1)).
+  assert (Hf : Inj eq eq f) by (subst f; intros ? ?; do 2 case_decide; lia).
+  exists f, id.
+
+  split_and!; [apply _..|].
+  eenough (Hen : _ /\ _) by (apply scohg_ext, Hen.2; apply cohg_ext; [reflexivity|..]; apply Hen.1).
+  subst f.
+  split.
+  - cbn.
+    apply vec_eq.
+    intros i.
+    induction i as [i|i] using fin_add_inv.
+    + rewrite lookup_vapp_L.
+      rewrite 4 vlookup_map, 2 vlookup_seq.
+      pose proof (fin_to_nat_lt i).
+      rewrite fin_to_nat_L.
+      case_decide; [|lia].
+      done.
+    + rewrite lookup_vapp_R.
+      rewrite 4 vlookup_map, 2 vlookup_seq.
+      pose proof (fin_to_nat_lt i).
+      rewrite fin_to_nat_R.
+      case_decide; lia.
+  - cbn.
+    rewrite vec_to_list_app, imap_app, list_to_map_app.
+    rewrite (kmap_union _).
+    rewrite 4 (kmap_list_to_map _).
+    do 2 f_equal.
+    + rewrite 2 fmap_imap.
+      apply imap_ext.
+      intros i ? Hi%lookup_lt_Some.
+      rewrite length_vec_to_list in Hi.
+      cbn.
+      rewrite decide_True by lia.
+      done.
+    + rewrite 2 fmap_imap.
+      apply imap_ext.
+      intros i ? Hi%lookup_lt_Some.
+      rewrite length_vec_to_list in Hi.
+      cbn.
+      rewrite length_vec_to_list.
+      rewrite decide_False by lia.
+      f_equal; lia.
+Qed.

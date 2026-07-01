@@ -1,1 +1,1 @@
-From TensorRocq.Hypergraphs.SizedGraph Require Export Definitions Facts Testing ToUnsized.
+From TensorRocq.Hypergraphs.SizedGraph Require Export Definitions Facts StackComposeCorrect Hom BWSized Testing ToUnsized.
