@@ -312,7 +312,7 @@ Notation MFPROP := (MPRO MFrobenius).
 
 Declare Scope mpro_scope.
 Delimit Scope mpro_scope with mpro.
-Bind Scope mpro_scope with PRO.
+Bind Scope mpro_scope with MPRO.
 
 Notation "g ∘ f" := (Mcompose f%mpro g%mpro) : mpro_scope.
 Notation "f ;; g" := (Mcompose f%mpro g%mpro) : mpro_scope.

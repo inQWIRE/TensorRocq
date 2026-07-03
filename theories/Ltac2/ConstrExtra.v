@@ -222,22 +222,44 @@ Module CC.
 
 Import Ltac2.Notations PArith.
 
+
+Import Message.
+
+Ltac2 mk_of (fn_name : string) (type : string) (of : constr -> 'a) : constr -> 'a :=
+  fun c => 
+  Notations.orelse
+    (fun _ => of c)
+    (fun e => 
+      let c' := Std.eval_hnf c in 
+      (* Message.print (Message.concat (Message.of_string "mk_of reduced: ") 
+        (Message.of_constr c')); *)
+      if Constr.equal c c' then
+        Control.zero e
+      else
+        Notations.orelse (fun _ => of c')
+        (fun e' => 
+          Control.throw_invalid_argument
+          (String.concat "" [fn_name; ": argument is not parseable as a [";
+            type; "] constant: "; to_string (of_constr c);
+            " (reduced to "; to_string (of_constr c');
+            "; parser failed first with error "; 
+            to_string (of_exn e);
+            ", then with error ";
+            to_string (of_exn e')]))
+      ).
+
 Ltac2 of_nat (n : constr) : int :=
+  mk_of "of_nat" "nat" (fun n =>
   let rec go p :=
-  match! p with 
+  lazy_match! p with 
   | O => 0
   | S ?n => Int.add 1 (go n)
-  | _ =>
-    let n' := Std.eval_red n in 
-    if Constr.equal n' n then 
-      let n' := Std.eval_vm None n in 
-      if Constr.equal n' n then 
-      Control.throw_invalid_argument 
-        "nat_of_constr: argument is not reducible to a [nat] constant"
-      else go n'
-    else go n'
+  (* | ?n + ?m => Int.add (go n) (go m) *)
+  | _ => let p' := Std.eval_hnf p in 
+    if Constr.equal p p' then Control.throw_invalid_argument "not nat constant" 
+    else go p'
   end in 
-  go n.
+  go n) n.
 
 
 Ltac2 rec to_nat (i : int) : constr :=
@@ -247,6 +269,10 @@ Ltac2 rec to_nat (i : int) : constr :=
     let n' := to_nat (Int.sub i 1) in 
     '(S $n').
 
+Ltac2 of_unit (_ : constr) : unit :=
+  ().
+
+Ltac2 to_unit () : constr := 'tt.
 
 (* Ltac2 of_list (f : constr -> 'a) : constr -> 'a list :=
   let rec go l :=

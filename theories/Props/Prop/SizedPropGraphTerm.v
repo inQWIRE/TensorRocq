@@ -88,7 +88,7 @@ Fixpoint btree_of_list'_aux {A} (acc : btree A) (l : list A) : btree A :=
   end.
 
 Definition btree_of_list' {A} (l : list A) : btree A :=
-  match l with 
+  match l with
   | [] => 0
   | x :: l => btree_of_list'_aux (!x) l
   end.
@@ -930,7 +930,7 @@ Qed.
 
 
 
-(* 
+(*
 Definition new_hyperedge_to_bundled_MAPROP {Struct T}
   (inputs : list positive) (ioh : IdxOrHyperEdge T) : {lr & @MPRO positive Struct T lr.1 lr.2} :=
   match ioh with
@@ -1141,12 +1141,57 @@ Notation "p ';;'' q" :=
     (at level 100) : mpro_scope.
 
 
+Local Open Scope mpro_scope.
+
+Fixpoint MPRO_to_SMPRO {N MStruct T} {n m : btree N} (mp : MPRO MStruct T n m) : option (SMPRO MStruct n m) :=
+  match mp with
+  | Mid _ => Some (Mid _)
+  | Mgen _ _ _ => None
+  | Mstruct _ _ s => Some (Mstruct _ _ s)
+  | l ;; r => omap2 Mcompose (MPRO_to_SMPRO l) (MPRO_to_SMPRO r)
+  | l * r => omap2 Mstack (MPRO_to_SMPRO l) (MPRO_to_SMPRO r)
+  end.
+
+Lemma MPRO_to_SMPRO_correct {N MStruct T} {n m : btree N} (mp : MPRO MStruct T n m) smp :
+  MPRO_to_SMPRO mp = Some smp ->
+  Mstruct' smp = mp.
+Proof.
+  induction mp; cbn; try (intros [=<-]; done);
+  rewrite omap2_Some; intros (? & ? & <-%IHmp1 & <-%IHmp2 & <-); done.
+Qed.
+
+Fixpoint MPRO_to_bind_SMPRO {N MStruct T} {n m : btree N} (mp : MPRO MStruct T n m) : MPRO MStruct T n m :=
+  match MPRO_to_SMPRO mp with
+  | Some smp => Mstruct' smp
+  | None =>
+    match mp with
+    | Mid _ => Mid _
+    | Mgen _ _ t => Mgen _ _ t
+    | Mstruct _ _ s => Mstruct _ _ s
+    | l ;; r => MPRO_to_bind_SMPRO l ;; MPRO_to_bind_SMPRO r
+    | l * r => MPRO_to_bind_SMPRO l * MPRO_to_bind_SMPRO r
+    end
+  end.
+
+Lemma MPRO_to_bind_SMPRO_correct {N MStruct T} {n m : btree N} (mp : MPRO MStruct T n m) :
+  MPRO_to_bind_SMPRO mp = mp.
+Proof.
+  set (mp' := mp);
+  induction mp; [done| | |done..]; cbn;
+  (case_match eqn:Hmp; [now apply (MPRO_to_SMPRO_correct mp') in Hmp|]);
+  now f_equal.
+Qed.
+
+Local Notation "'[STR'  n  '->'  m ']'" :=
+  (Mstruct' (n:=n%btree) (m:=m%btree) _) (only printing).
+
+
 
 Local Open Scope positive_scope.
 
 Section Example.
 
-Let MFPROP := (@MPRO positive MFrobenius).
+(* Notation MFPROP := (@MPRO positive MFrobenius) (only parsing). *)
 
 Let Equiv_bool : Equiv bool := eq.
 
@@ -1164,9 +1209,9 @@ Local Notation "'correct''' ap" :=
   (from_option (λ t, MPRO_graph_eq t ap) False (bw_sized_graph_to_MFPROP'' (MPRO_graph_semantics ap)))
   (at level 10, only parsing).
 
-Example ftest_cup : correct (Mcup (!1) :> MFPROP bool _ _).
+Example ftest_cup : correct' (Mcup (!1) :> MFPROP bool _ _).
 Proof.
-  vm_eval (bw_sized_graph_to_MFPROP _).
+  vm_eval (bw_sized_graph_to_MFPROP' _).
   cbn.
   apply default_sized_graph_iso_test_correct; vm_compute; done.
 Qed.
@@ -1230,12 +1275,12 @@ Proof.
         cbv delta [new_graph_to_bundled_MFPROP_layers_aux] fix beta match in *.
         unfold hg at 1.
         ereplace (get_extractable_edges _ _)
-      
-        
+
+
       }
       vm_compute in layers.
 
-      
+
       vm_eval (size hg).
       cbv zeta.
 
@@ -1314,16 +1359,19 @@ Proof.
 Qed.
 
 
-Example test_wrap : correct (Mid (!1) * Mcup (!1) ;;' [gen true (!1 + !1) (!1)] * Mid (!1) :> MAPROP bool _ _).
+Example test_wrap : correct' (Mid (!1) * Mcup (!1) ;;' [gen true (!1 + !1) (!1)] * Mid (!1) :> MAPROP bool _ _).
 Proof.
-  vm_eval (bw_sized_graph_to_MAPROP _).
+  vm_eval (bw_sized_graph_to_MAPROP' _).
   cbn.
   apply default_sized_graph_iso_test_correct; vm_compute; done.
 Qed.
 
-Example test_wrap_alt : correct (Mid (!1) * Mcup (!1) ;;' [gen true (!1 + !1) (!1)] * Mid (!1) ;; Mcap (!1) :> MAPROP bool _ _).
+Example test_wrap_alt : correct' (Mid (!1) * Mcup (!1) ;;' [gen true (!1 + !1) (!1)] * Mid (!1) ;; Mcap (!1) :> MAPROP bool _ _).
 Proof.
-  vm_eval (bw_sized_graph_to_MAPROP _).
+  vm_eval (bw_sized_graph_to_MAPROP' _).
+  rewrite <- (MPRO_to_bind_SMPRO_correct (n:=!1 + 0) (m:=!1 + 0)) at 1.
+
+  cbn [MPRO_to_bind_SMPRO MPRO_to_SMPRO omap2].
   cbn.
   apply default_sized_graph_iso_test_correct; vm_compute; done.
 Qed.
@@ -1337,7 +1385,7 @@ Qed.
 
 
 Example maprop_unoptimized_case_1 :
-  let G : BWSizedCospanHyperGraph positive positive (!1 + !2) (!3) := 
+  let G : BWSizedCospanHyperGraph positive positive (!1 + !2) (!3) :=
   {| bw_scohg := (mk_scohg ((([#19%positive; 22%positive] :> vec positive (bsize (!1 + !2))) ->
    {|
      hyperedges :=
@@ -1378,8 +1426,8 @@ Proof.
 Qed.
 
 Example maprop_unoptimized_case_2 :
-  let G : BWSizedCospanHyperGraph positive positive (!1) (!2) := 
-  {| bw_scohg := 
+  let G : BWSizedCospanHyperGraph positive positive (!1) (!2) :=
+  {| bw_scohg :=
     mk_scohg (n:=bsize (!_)) (m:=bsize (!_)) (mk_cohg (mk_hg {[ 26 := (2, [13], []); 32 := (1, [], [145]);
     33 := (3, [], []); 81 := (2, [145; 273], [177]);
     113 := (1, [177], [13; 7]) ]} {[ 7; 13 ]}) [#273] [#7])%positive
@@ -1442,9 +1490,12 @@ Qed.
 
 
 Example test_HG2T_sw120_alt :
-  correct (Mswap 1 1 * Mid 1 ;;' Mid (!1) * Mswap 1 1 :> MPROP bool _ _).
+  correct' (Mswap 1 1 * Mid 1 ;;' Mid (!1) * Mswap 1 1 :> MPROP bool _ _).
 Proof.
-  vm_eval (bw_sized_graph_to_MPROP _).
+  vm_eval (bw_sized_graph_to_MPROP' _).
+  unfold pbleaf.
+  rewrite <- (MPRO_to_bind_SMPRO_correct (((_ * _) ;; _) ;; (Mid 1 * _))).
+  cbn [MPRO_to_bind_SMPRO MPRO_to_SMPRO omap2].
   unfold from_option.
   apply default_sized_graph_iso_test_correct; vm_compute; done.
 Qed.
@@ -1510,7 +1561,7 @@ Proof.
   intros [= <-].
   apply default_sized_graph_iso_test_correct; vm_compute; done.
 Qed. *)
-(* 
+(*
 
 Example bug_case_1 :
   let G := ([#74%positive; 19%positive] ->

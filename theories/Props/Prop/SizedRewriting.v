@@ -313,8 +313,8 @@ Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
   PRO_quote f Qlhs lhs ->
   PRO_quote f Qrhs rhs ->
   forall (fN : positive -> nat) a b (Mlhs Mrhs : MPRO MStruct T' a b),
-  MPRO_of_PRO (MStruct:=MStruct) fN Mlhs Qlhs ->
-  MPRO_of_PRO (MStruct:=MStruct) fN Mrhs Qrhs ->
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mlhs Qlhs ->
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mrhs Qrhs ->
   default_countable_sized_graph_iso_test (MPRO_graph_semantics Mlhs)
     (MPRO_graph_semantics Mrhs) = true ->
   dlhs ≡ drhs.
@@ -327,7 +327,7 @@ Proof.
   apply (PRO_quote_correct_graph_semantics _) in HQlhs as HQlhs'.
   apply (PRO_quote_correct_graph_semantics _) in HQrhs as HQrhs'.
   assert (Hlr : (PRO_graph_semantics Qlhs ≡ₛ PRO_graph_semantics Qrhs)%cohg). 1:{
-    eapply MPRO_of_PRO_correct_graph_semantics_mor, HMlr; eauto.
+    eapply MPRO_PRO_quote_correct_graph_semantics_mor, HMlr; eauto.
   }
   eapply (DiagramQuote_correct R A); [eauto..|].
   rewrite <- 2 PRO_graph_semantics_correct.
@@ -494,8 +494,8 @@ Lemma MPRO_monog_quote_context_domainb_correct
   forall Qlhs Qrhs,
   PRO_quote f Qlhs lhs -> PRO_quote f Qrhs rhs ->
   forall (* bi bj  *)(Mlhs Mrhs : MPRO MStruct T' i j),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
 
   forall n' m' (tl tr : PRO Struct T n' m'),
     RW.(pro_rewriting_domain) tl ->
@@ -503,7 +503,7 @@ Lemma MPRO_monog_quote_context_domainb_correct
     forall Qtl Qtr,
     PRO_quote f Qtl tl -> PRO_quote f Qtr tr ->
     forall (* bn bm  *)(Mtl Mtr : MPRO MStruct T' n m),
-    MPRO_of_PRO fN Mtl Qtl -> MPRO_of_PRO fN Mtr Qtr ->
+    MPRO_PRO_quote fN Mtl Qtl -> MPRO_PRO_quote fN Mtr Qtr ->
     MPRO_graph_semantics Mtl ≡ₛ make_bw_sized_monog_pushout (MPRO_graph_semantics Mlhs) ctx ->
     MPRO_graph_semantics Mtr ≡ₛ make_bw_sized_monog_pushout (MPRO_graph_semantics Mrhs) ctx ->
     RW n' m' tl tr.
@@ -532,16 +532,16 @@ Proof.
   apply (PRO_quote_correct_graph_semantics f) in HQrhs as HQrhs'.
   apply (PRO_quote_correct_graph_semantics f) in HQtl as HQtl'.
   apply (PRO_quote_correct_graph_semantics f) in HQtr as HQtr'.
-  apply MPRO_of_PRO_size in HMtl as Hnm'.
+  apply MPRO_PRO_quote_size in HMtl as Hnm'.
   destruct Hnm' as (-> & ->).
-  apply MPRO_of_PRO_correct_graph_semantics' in HMtl, HMtr.
-  (* rewrite MPRO_of_PRO_refl in HMtl, HMtr.
+  apply MPRO_PRO_quote_correct_graph_semantics' in HMtl, HMtr.
+  (* rewrite MPRO_PRO_quote_refl in HMtl, HMtr.
   subst Qtl Qtr. *)
 
-  apply MPRO_of_PRO_size in HMlhs as Hij'.
+  apply MPRO_PRO_quote_size in HMlhs as Hij'.
   destruct Hij' as (-> & ->).
-  apply MPRO_of_PRO_correct_graph_semantics' in HMlhs, HMrhs.
-  (* rewrite MPRO_of_PRO_refl in HMlhs, HMrhs.
+  apply MPRO_PRO_quote_correct_graph_semantics' in HMlhs, HMrhs.
+  (* rewrite MPRO_PRO_quote_refl in HMlhs, HMrhs.
   subst Qlhs Qrhs. *)
 
   assert (HC1 : (PRO_graph_semantics C1 ≡ₛ bw_sized_graph_to_graph fN GC1)%cohg). 1:{
@@ -678,9 +678,9 @@ Lemma MPRO_monog_quote_rewrite_correct
   PRO_quote f Qtgt tgt ->
   forall (fN : positive -> nat) bi bj bn bm
     (Mlhs Mrhs : MPRO MStruct T' bi bj) (Mtgt : MPRO MStruct T' bn bm),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
 
   forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
@@ -688,7 +688,7 @@ Lemma MPRO_monog_quote_rewrite_correct
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
   forall Qres,
-  MPRO_of_PRO fN Mres Qres ->
+  MPRO_PRO_quote fN Mres Qres ->
 
 
   forall res, PRO_unquote f Qres res ->
@@ -777,16 +777,16 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
   PRO_quote f Qtgt tgt ->
   forall (fN : positive -> nat) bi bj bn bm
     (Mlhs Mrhs : MPRO (MStruct positive) T' bi bj) (Mtgt : MPRO (MStruct positive) T' bn bm),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
 
   forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
     MPRO_monog_quote_rewrite RW sized_graph_to_term concr_asgn f
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
-  forall Qres, MPRO_of_PRO fN Mres Qres ->
+  forall Qres, MPRO_PRO_quote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -872,13 +872,13 @@ Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
   forall Qtgt,
   PRO_quote f Qtgt tgt ->
   forall fN bn bm Mtgt,
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
     forall Mres,
 
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_of_PRO fN Mres Qres ->
+    MPRO_PRO_quote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -898,9 +898,9 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
-      apply MPRO_of_PRO_size in HQres as Hnm.
+      apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
-      apply MPRO_of_PRO_correct_graph_semantics' in HQres, HMtgt.
+      apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.
       rewrite HMtgt, HQres.
       done.
 Qed.
@@ -968,8 +968,8 @@ Lemma MPRO_quote_context_domainb_correct
   forall Qlhs Qrhs,
   PRO_quote f Qlhs lhs -> PRO_quote f Qrhs rhs ->
   forall (* bi bj  *)(Mlhs Mrhs : MPRO MStruct T' i j),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
 
   forall n' m' (tl tr : PRO Struct T n' m'),
     RW.(pro_rewriting_domain) tl ->
@@ -977,7 +977,7 @@ Lemma MPRO_quote_context_domainb_correct
     forall Qtl Qtr,
     PRO_quote f Qtl tl -> PRO_quote f Qtr tr ->
     forall (* bn bm  *)(Mtl Mtr : MPRO MStruct T' n m),
-    MPRO_of_PRO fN Mtl Qtl -> MPRO_of_PRO fN Mtr Qtr ->
+    MPRO_PRO_quote fN Mtl Qtl -> MPRO_PRO_quote fN Mtr Qtr ->
     MPRO_graph_semantics Mtl ≡ₛ make_bw_sized_pushout (MPRO_graph_semantics Mlhs) ctx ->
     MPRO_graph_semantics Mtr ≡ₛ make_bw_sized_pushout (MPRO_graph_semantics Mrhs) ctx ->
     RW n' m' tl tr.
@@ -1002,16 +1002,16 @@ Proof.
   apply (PRO_quote_correct_graph_semantics f) in HQrhs as HQrhs'.
   apply (PRO_quote_correct_graph_semantics f) in HQtl as HQtl'.
   apply (PRO_quote_correct_graph_semantics f) in HQtr as HQtr'.
-  apply MPRO_of_PRO_size in HMtl as Hnm'.
+  apply MPRO_PRO_quote_size in HMtl as Hnm'.
   destruct Hnm' as (-> & ->).
-  apply MPRO_of_PRO_correct_graph_semantics' in HMtl, HMtr.
-  (* rewrite MPRO_of_PRO_refl in HMtl, HMtr.
+  apply MPRO_PRO_quote_correct_graph_semantics' in HMtl, HMtr.
+  (* rewrite MPRO_PRO_quote_refl in HMtl, HMtr.
   subst Qtl Qtr. *)
 
-  apply MPRO_of_PRO_size in HMlhs as Hij'.
+  apply MPRO_PRO_quote_size in HMlhs as Hij'.
   destruct Hij' as (-> & ->).
-  apply MPRO_of_PRO_correct_graph_semantics' in HMlhs, HMrhs.
-  (* rewrite MPRO_of_PRO_refl in HMlhs, HMrhs.
+  apply MPRO_PRO_quote_correct_graph_semantics' in HMlhs, HMrhs.
+  (* rewrite MPRO_PRO_quote_refl in HMlhs, HMrhs.
   subst Qlhs Qrhs. *)
 
   assert (Hctx : (PRO_graph_semantics Pctx ≡ₛ bw_sized_graph_to_graph fN ctx)%cohg). 1:{
@@ -1172,9 +1172,9 @@ Lemma MPRO_gen_quote_rewrite_correct
   PRO_quote f Qtgt tgt ->
   forall (fN : positive -> nat) bi bj bn bm
     (Mlhs Mrhs : MPRO MStruct T' bi bj) (Mtgt : MPRO MStruct T' bn bm),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
 
   forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
@@ -1182,7 +1182,7 @@ Lemma MPRO_gen_quote_rewrite_correct
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
   forall Qres,
-  MPRO_of_PRO fN Mres Qres ->
+  MPRO_PRO_quote fN Mres Qres ->
 
 
   forall res, PRO_unquote f Qres res ->
@@ -1302,16 +1302,16 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
   PRO_quote f Qtgt tgt ->
   forall (fN : positive -> nat) bi bj bn bm
     (Mlhs Mrhs : MPRO (MStruct positive) T' bi bj) (Mtgt : MPRO (MStruct positive) T' bn bm),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
 
   forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
     MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
-  forall Qres, MPRO_of_PRO fN Mres Qres ->
+  forall Qres, MPRO_PRO_quote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -1397,13 +1397,13 @@ Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
   forall Qtgt,
   PRO_quote f Qtgt tgt ->
   forall fN bn bm Mtgt,
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
     forall Mres,
 
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_of_PRO fN Mres Qres ->
+    MPRO_PRO_quote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -1423,9 +1423,9 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
-      apply MPRO_of_PRO_size in HQres as Hnm.
+      apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
-      apply MPRO_of_PRO_correct_graph_semantics' in HQres, HMtgt.
+      apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.
       rewrite HMtgt, HQres.
       done.
 Qed.
@@ -1492,16 +1492,16 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
   PRO_quote f Qtgt tgt ->
   forall (fN : positive -> nat) bi bj bn bm
     (Mlhs Mrhs : MPRO (MStruct positive) T' bi bj) (Mtgt : MPRO (MStruct positive) T' bn bm),
-    MPRO_of_PRO fN Mlhs Qlhs ->
-    MPRO_of_PRO fN Mrhs Qrhs ->
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mlhs Qlhs ->
+    MPRO_PRO_quote fN Mrhs Qrhs ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
 
   forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
     MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
-  forall Qres, MPRO_of_PRO fN Mres Qres ->
+  forall Qres, MPRO_PRO_quote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -1587,13 +1587,13 @@ Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
   forall Qtgt,
   PRO_quote f Qtgt tgt ->
   forall fN bn bm Mtgt,
-    MPRO_of_PRO fN Mtgt Qtgt ->
+    MPRO_PRO_quote fN Mtgt Qtgt ->
     forall Mres,
 
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_of_PRO fN Mres Qres ->
+    MPRO_PRO_quote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -1613,9 +1613,9 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
-      apply MPRO_of_PRO_size in HQres as Hnm.
+      apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
-      apply MPRO_of_PRO_correct_graph_semantics' in HQres, HMtgt.
+      apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.
       rewrite HMtgt, HQres.
       done.
 Qed.

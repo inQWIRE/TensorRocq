@@ -713,13 +713,15 @@ Ltac2 Type 'n Autonomy := [
   | Cap ('n)
 ].
 
-Ltac2 Type 'n Frobenial := [
-  | Delta ('n, int, int)
+Ltac2 Type ('k, 'i) Frobenial := [
+  | Delta0
+  | Delta1 ('i, 'i)
+  | Delta ('k, 'i, 'i)
 ].
 
 Ltac2 Type 'n SymmetricG := ('n Monoidal, 'n Symmetry) Sum.
 Ltac2 Type 'n Autonomous := ('n SymmetricG, 'n Autonomy) Sum.
-Ltac2 Type 'n Frobenius := ('n Autonomous, 'n Frobenial) Sum.
+Ltac2 Type ('n, 'k, 'i) Frobenius := ('n Autonomous, ('k, 'i) Frobenial) Sum.
 
 Import Ltac2.FSetExtra.
 
@@ -822,6 +824,16 @@ Ltac2 dim_Autonomy (nzero : 'n) (nplus : 'n -> 'n -> 'n)
     (nplus (ns n) (ns n), nzero)
   end.
 
+Ltac2 dim_SymmetricG (nzero : 'n) (nplus : 'n -> 'n -> 'n)
+  (ns : 'm -> 'n)
+  (m : 'm SymmetricG) : 'n * 'n :=
+  sum_elim (dim_Monoidal nzero nplus ns) (dim_Symmetry nzero nplus ns) m.
+
+Ltac2 dim_Autonomous (nzero : 'n) (nplus : 'n -> 'n -> 'n)
+  (ns : 'm -> 'n)
+  (m : 'm Autonomous) : 'n * 'n :=
+  sum_elim (dim_SymmetricG nzero nplus ns) (dim_Autonomy nzero nplus ns) m.
+
 
 Ltac2 json_of_Monoidal (of_n : 'n -> JSON)
   (p : 'n Monoidal) : JSON :=
@@ -846,14 +858,17 @@ Ltac2 json_of_Autonomy (of_n : 'n -> JSON)
     "type" : Jstring name;
     "size" : of_n n}).
 
-Ltac2 json_of_Frobenial (of_n : 'n -> JSON)
-  (p : 'n Frobenial) : JSON :=
-  let (k, n, m) := match p with | Delta k n m => (k, n, m) end in
+Ltac2 json_of_Frobenial (of_k : 'k -> JSON) (of_i : 'i -> JSON)
+  (p : ('k, 'i) Frobenial) : JSON :=
+  let (j_k, j_n, j_m) := match p with 
+    | Delta0 => (Jint 0, Jint 0, Jint 0)
+    | Delta1 n m => (Jint 1, of_i n, of_i m)
+    | Delta k n m => (of_k k, of_i n, of_i m) end in
   Jobject (!Map(string_tag) {
     "type" : Jstring "delta";
-    "spidertype" : of_n k; (* TODO: Fix when we have proper sense of sized deltas *)
-    "insize" : Jint n;
-    "outsize" : Jint m}).
+    "spidertype" : j_k; (* TODO: Fix when we have proper sense of sized deltas *)
+    "insize" : j_n;
+    "outsize" : j_m}).
 
 Ltac2 json_of_SymmetricG (of_n : 'n -> JSON)
   (p : 'n SymmetricG) : JSON :=
@@ -863,14 +878,63 @@ Ltac2 json_of_Autonomous (of_n : 'n -> JSON)
   (p : 'n Autonomous) : JSON :=
   sum_elim (json_of_SymmetricG of_n) (json_of_Autonomy of_n) p.
 
-Ltac2 json_of_Frobenius (of_n : 'n -> JSON)
-  (p : 'n Frobenius) : JSON :=
-  sum_elim (json_of_Autonomous of_n) (json_of_Frobenial of_n) p.
+Ltac2 json_of_Frobenius (of_n : 'n -> JSON) (of_k : 'k -> JSON) (of_i : 'i -> JSON)
+  (p : ('n, 'k, 'i) Frobenius) : JSON :=
+  sum_elim (json_of_Autonomous of_n) (json_of_Frobenial of_k of_i) p.
 
 
 Module CC.
 
 Export ConstrExtra.CC.
+
+
+(* FIXME: Move *)
+Ltac2 of_bool (c : constr) : bool :=
+  let rec go p :=
+    let step p :=
+      match! p with
+      | true => true
+      | false => false
+      end
+    in
+    match! p with
+    | ?p => step p
+    | _ =>
+        let p' := Std.eval_hnf p in
+        if Constr.equal p' p then
+          Control.throw_invalid_argument
+            (String.app
+              "of_bool: argument is not reducible to a [bool] constant: " 
+              (Message.to_string (Message.of_constr p)))
+        else step p'
+    end
+  in go c.
+
+Ltac2 to_bool (b : bool) : constr :=
+  match b with
+  | true => '(Datatypes.true)
+  | false => '(Datatypes.false)
+  end.
+
+Ltac2 rec extend_evar_ended_list (cs : constr list) (cls : constr) : constr :=
+  match! cls with
+  | ?cl :: ?cls' => 
+    match cs with
+    | [] => cls
+    | _ :: cs' =>
+      let cs_cls := extend_evar_ended_list cs' cls' in 
+      '(cons $cl $cs_cls)
+    end
+  | ?cls => 
+    match cs with
+    | [] => cls
+    | c :: cs => 
+      Std.unify '($c :: _) cls;
+      extend_evar_ended_list (c :: cs) cls
+    end
+  end.
+
+
 
 Ltac2 to_PRO_safe (struct_T : constr) (t_T : constr)
   (to_n : 'n -> constr) (to_s : 's -> constr)
@@ -925,16 +989,16 @@ Ltac2 of_PRO_safe
       lazy_match! p with
       | Pid ?n => let cn := of_n n in (cn, cn, (Pid cn))
       | Pcompose ?l ?r =>
-        let (nl, _ml, cl) := go l with (_nr, mr, cr) := go r in
+        let (nl, _ml, cl) := go l in let (_nr, mr, cr) := go r in
         (nl, mr, (Pcompose cl cr))
       | Pstack ?l ?r =>
-        let (nl, ml, cl) := go l with (nr, mr, cr) := go r in
+        let (nl, ml, cl) := go l in let (nr, mr, cr) := go r in
         (nadd nl nr, nadd ml mr, (Pstack cl cr))
       | Pstruct ?n ?m ?s =>
-        let cn := of_n n with cm := of_n m with cs := of_s s in
+        let cn := of_n n in let cm := of_n m in let cs := of_s s in
         (cn, cm, (Pstruct cn cm cs))
       | Pgen ?n ?m ?t =>
-        let cn := of_n n with cm := of_n m with ct := of_t t in
+        let cn := of_n n in let cm := of_n m in let ct := of_t t in
         (cn, cm, (Pgen cn cm ct))
       end
     in
@@ -964,17 +1028,22 @@ Ltac2 of_PRO
       lazy_match! p with
       | Pid ?n => let cn := of_n n in (Pid cn)
       | Pcompose ?l ?r =>
-        let cl := go l with cr := go r in
+        let cl := go l in let cr := go r in
         (Pcompose cl cr)
       | Pstack ?l ?r =>
-        let cl := go l with cr := go r in
+        let cl := go l in let cr := go r in
         Pstack cl cr
       | Pstruct ?n ?m ?s =>
-        let cn := of_n n with cm := of_n m with cs := of_s s in
+        let cn := of_n n in let cm := of_n m in let cs := of_s s in
         Pstruct cn cm cs
       | Pgen ?n ?m ?t =>
-        let cn := of_n n with cm := of_n m with ct := of_t t in
+        let cn := of_n n in let cm := of_n m in let ct := of_t t in
         Pgen cn cm ct
+      | _ => let p' := Std.eval_hnf p in 
+        if Constr.equal p p' then 
+          Control.throw_invalid_argument "not PRO constant"
+        else
+          go p'
       end
     in
     Notations.orelse (fun _ => step p)
@@ -1034,83 +1103,8 @@ Ltac2 of_PRO_safe_with
   in go.
 
 
-(* FIXME: Move *)
-Ltac2 of_bool (c : constr) : bool :=
-  let rec go p :=
-    let step p :=
-      match! p with
-      | true => true
-      | false => false
-      end
-    in
-    match! p with
-    | ?p => step p
-    | _ =>
-      let p' := Std.eval_red p in
-      if Constr.equal p' p then
-        let p' := Std.eval_hnf p in
-        if Constr.equal p' p then
-          Control.throw_invalid_argument
-            (String.app
-              "of_bool: argument is not reducible to a [bool] constant: " 
-              (Message.to_string (Message.of_constr p)))
-        else step p'
-      else step p'
-    end
-  in go c.
-
-Ltac2 to_bool (b : bool) : constr :=
-  match b with
-  | true => '(Datatypes.true)
-  | false => '(Datatypes.false)
-  end.
-
-Ltac2 rec extend_evar_ended_list (cs : constr list) (cls : constr) : constr :=
-  match! cls with
-  | ?cl :: ?cls' => 
-    match cs with
-    | [] => cls
-    | _ :: cs' =>
-      let cs_cls := extend_evar_ended_list cs' cls' in 
-      '(cons $cl $cs_cls)
-    end
-  | ?cls => 
-    match cs with
-    | [] => cls
-    | c :: cs => 
-      Std.unify '($c :: _) cls;
-      extend_evar_ended_list (c :: cs) cls
-    end
-  end.
-
-
-Import Message.
-
-Ltac2 mk_of (fn_name : string) (type : string) (of : constr -> 'a) : constr -> 'a :=
-  fun c => 
-  Notations.orelse
-    (fun _ => of c)
-    (fun e => 
-      let c' := Std.eval_hnf c in 
-      (* Message.print (Message.concat (Message.of_string "mk_of reduced: ") 
-        (Message.of_constr c')); *)
-      if Constr.equal c c' then
-        Control.zero e
-      else
-        Notations.orelse (fun _ => of c')
-        (fun e' => 
-          Control.throw_invalid_argument
-          (String.concat "" [fn_name; ": argument is not parseable as a [";
-            type; "] constant: "; to_string (of_constr c);
-            " (reduced to "; to_string (of_constr c');
-            "; parser failed first with error "; 
-            to_string (of_exn e);
-            ", then with error ";
-            to_string (of_exn e')]))
-      ).
-
-Ltac2 of_Monoidal (of_n : constr -> 'n) (c : constr) : 'n Monoidal :=
-  mk_of "of_Monoidal" "Monoidal"
+Ltac2 of_Monoidal_gen (of_n : constr -> 'n) (c : constr) : 'n Monoidal :=
+  mk_of "of_Monoidal_gen" "Monoidal"
   (
   let rec go c :=
     lazy_match! c with
@@ -1153,8 +1147,8 @@ Ltac2 of_Monoidal (of_n : constr -> 'n) (c : constr) : 'n Monoidal :=
       (String.app "of_Monoidal: error with argument " (to_string (of_constr c)))
   end. *)
 
-Ltac2 of_Symmetry (of_n : constr -> 'n) (c : constr) : 'n Symmetry :=
-  mk_of "of_Symmetry" "Symmetry" (let rec go c :=
+Ltac2 of_Symmetry_gen (of_n : constr -> 'n) (c : constr) : 'n Symmetry :=
+  mk_of "of_Symmetry_gen" "Symmetry" (let rec go c :=
     lazy_match! c with
     | @Swap ?n ?m => 
       let n' := of_n n in 
@@ -1178,8 +1172,8 @@ Ltac2 of_Symmetry (of_n : constr -> 'n) (c : constr) : 'n Symmetry :=
       (String.app "of_Symmetry: error with argument " (to_string (of_constr c)))
   end. *)
 
-Ltac2 of_Autonomy (of_n : constr -> 'n) (c : constr) : 'n Autonomy :=
-  mk_of "of_Autonomy" "Autonomy" (let rec go c :=
+Ltac2 of_Autonomy_gen (of_n : constr -> 'n) (c : constr) : 'n Autonomy :=
+  mk_of "of_Autonomy_gen" "Autonomy" (let rec go c :=
     lazy_match! c with
     | @Cup ?n => 
       let n' := of_n n in 
@@ -1204,16 +1198,23 @@ Ltac2 of_Autonomy (of_n : constr -> 'n) (c : constr) : 'n Autonomy :=
       (String.app "of_Autonomy: error with argument " (to_string (of_constr c)))
   end. *)
 
-Ltac2 of_Frobenial (of_n : constr -> 'n) (c : constr) : 'n Frobenial :=
-  mk_of "of_Frobenial" "Frobenial" (let rec go c :=
+Ltac2 of_Frobenial_gen (of_k : constr -> 'k) (of_i : constr -> 'i) (c : constr) : ('k, 'i) Frobenial :=
+  mk_of "of_Frobenial_gen" "Frobenial" (let rec go c :=
     lazy_match! c with
+    | Delta0 => Delta0
+    | Delta1 ?n ?m => 
+      let n' := of_i n in
+      let m' := of_i m in
+      Delta1 n' m'
+
     | @Delta ?k ?n ?m => 
-      let k' := of_n k in 
-      let n' := of_nat n in
-      let m' := of_nat m in
+      let k' := of_k k in 
+      let n' := of_i n in
+      let m' := of_i m in
       (* let n' := of_n n in 
       let m' := of_n m in  *)
       Delta k' n' m'
+      (* TODO: FIXME: Add the other types of Frobenial here!!! *)
     end in go) c.
   (* match! c with
   | ?m => go m
@@ -1233,17 +1234,17 @@ Ltac2 of_Frobenial (of_n : constr -> 'n) (c : constr) : 'n Frobenial :=
 
 
 
-Ltac2 of_SymmetricG (of_n : constr -> 'n) (c : constr) : 'n SymmetricG :=
-  mk_of "of_SymmetricG" "SymmetricG" (let rec go c :=
+Ltac2 of_SymmetricG_gen (of_n : constr -> 'n) (c : constr) : 'n SymmetricG :=
+  mk_of "of_SymmetricG_gen" "SymmetricG" (let rec go c :=
     lazy_match! c with
     | monoidal_inl ?m => 
-      inl (of_Monoidal of_n m)
+      inl (of_Monoidal_gen of_n m)
     | inl ?m => 
-      inl (of_Monoidal of_n m)
+      inl (of_Monoidal_gen of_n m)
     | symmetry_inr ?m => 
-      inr (of_Symmetry of_n m)
+      inr (of_Symmetry_gen of_n m)
     | inr ?m => 
-      inr (of_Symmetry of_n m)
+      inr (of_Symmetry_gen of_n m)
     end in go) c.
   (* match! c with
   | ?m => go m
@@ -1262,17 +1263,17 @@ Ltac2 of_SymmetricG (of_n : constr -> 'n) (c : constr) : 'n SymmetricG :=
   end. *)
 
 
-Ltac2 of_Autonomous (of_n : constr -> 'n) (c : constr) : 'n Autonomous :=
-  mk_of "of_Autonomous" "Autonomous" (let rec go c :=
+Ltac2 of_Autonomous_gen (of_n : constr -> 'n) (c : constr) : 'n Autonomous :=
+  mk_of "of_Autonomous_gen" "Autonomous" (let rec go c :=
     lazy_match! c with
     | symmetric_inl ?m => 
-      inl (of_SymmetricG of_n m)
+      inl (of_SymmetricG_gen of_n m)
     | inl ?m => 
-      inl (of_SymmetricG of_n m)
+      inl (of_SymmetricG_gen of_n m)
     | autonomy_inr ?m => 
-      inr (of_Autonomy of_n m)
+      inr (of_Autonomy_gen of_n m)
     | inr ?m => 
-      inr (of_Autonomy of_n m)
+      inr (of_Autonomy_gen of_n m)
     end in go) c.
   (* match! c with
   | ?m => go m
@@ -1290,17 +1291,18 @@ Ltac2 of_Autonomous (of_n : constr -> 'n) (c : constr) : 'n Autonomous :=
       (String.app "of_Autonomous: error with argument " (to_string (of_constr c)))
   end. *)
 
-Ltac2 of_Frobenius (of_n : constr -> 'n) (c : constr) : 'n Frobenius :=
-  mk_of "of_Frobenius" "Frobenius" (let rec go c :=
+Ltac2 of_Frobenius_gen (of_n : constr -> 'n) (of_k : constr -> 'k) 
+  (of_i : constr -> 'i) (c : constr) : ('n, 'k, 'i) Frobenius :=
+  mk_of "of_Frobenius_gen" "Frobenius" (let rec go c :=
     lazy_match! c with
     | autonomous_inl ?m => 
-      inl (of_Autonomous of_n m)
+      inl (of_Autonomous_gen of_n m)
     | inl ?m => 
-      inl (of_Autonomous of_n m)
+      inl (of_Autonomous_gen of_n m)
     | frobenial_inr ?m => 
-      inr (of_Frobenial of_n m)
+      inr (of_Frobenial_gen of_k of_i m)
     | inr ?m => 
-      inr (of_Frobenial of_n m)
+      inr (of_Frobenial_gen of_k of_i m)
     end in go) c.
   (* match! c with
   | ?m => go m
@@ -1318,33 +1320,33 @@ Ltac2 of_Frobenius (of_n : constr -> 'n) (c : constr) : 'n Frobenius :=
       (String.app "of_Frobenius: error with argument " (to_string (of_constr c)))
   end. *)
 
-Ltac2 to_Monoidal (to_n : 'n -> constr) (m : 'n Monoidal) : constr :=
+Ltac2 to_Monoidal_gen (to_n : 'n -> constr) (m : 'n Monoidal) : constr :=
   match m with
   | Associator n m o => 
     let n' := to_n n in 
     let m' := to_n m in 
     let o' := to_n o in 
-    '(Associator $n' $m' $o')
+    '(@Associator $n' $m' $o')
   | InvAssociator n m o => 
     let n' := to_n n in 
     let m' := to_n m in 
     let o' := to_n o in 
-    '(InvAssociator $n' $m' $o')
+    '(@InvAssociator $n' $m' $o')
   | LUnit n => 
     let n' := to_n n in 
-    '(LUnit $n')
+    '(@LUnit $n')
   | InvLUnit n => 
     let n' := to_n n in 
-    '(InvLUnit $n')
+    '(@InvLUnit $n')
   | RUnit n => 
     let n' := to_n n in 
-    '(RUnit $n')
+    '(@RUnit $n')
   | InvRUnit n => 
     let n' := to_n n in 
-    '(InvRUnit $n')
+    '(@InvRUnit $n')
   end.
 
-Ltac2 to_Symmetry (to_n : 'n -> constr) (m : 'n Symmetry) : constr :=
+Ltac2 to_Symmetry_gen (to_n : 'n -> constr) (m : 'n Symmetry) : constr :=
   match m with
   | Swap n m => 
     let n' := to_n n in 
@@ -1352,7 +1354,7 @@ Ltac2 to_Symmetry (to_n : 'n -> constr) (m : 'n Symmetry) : constr :=
     '(Swap $n' $m')
   end.
 
-Ltac2 to_Autonomy (to_n : 'n -> constr) (m : 'n Autonomy) : constr :=
+Ltac2 to_Autonomy_gen (to_n : 'n -> constr) (m : 'n Autonomy) : constr :=
   match m with
   | Cup n => 
     let n' := to_n n in 
@@ -1362,23 +1364,45 @@ Ltac2 to_Autonomy (to_n : 'n -> constr) (m : 'n Autonomy) : constr :=
     '(Cap $n')
   end.
 
-Ltac2 to_Frobenial (to_n : 'n -> constr) (m : 'n Frobenial) : constr :=
+Ltac2 to_Frobenial_gen (to_k : 'k -> constr) (to_i : 'i -> constr) 
+  (m : ('k, 'i) Frobenial) : constr :=
   match m with
+  | Delta0 => '(Delta0)
+  | Delta1 n m =>
+    let n' := to_i n in 
+    let m' := to_i m in 
+    '(Delta1 $n' $m')
   | Delta k n m => 
-    let k' := to_n k in 
-    let n' := to_nat n in 
-    let m' := to_nat m in 
+    let k' := to_k k in 
+    let n' := to_i n in 
+    let m' := to_i m in 
     '(Delta $k' $n' $m')
   end.
 
-Ltac2 to_SymmetricG (to_n : 'n -> constr) (m : 'n SymmetricG) : constr :=
-  sum_elim (to_Monoidal to_n) (to_Symmetry to_n) m.
+Ltac2 to_SymmetricG_gen (to_n : 'n -> constr) (m : 'n SymmetricG) : constr :=
+  sum_elim (fun m => 
+    let cm := to_Monoidal_gen to_n m in 
+    '(monoidal_inl $cm))
+    (fun m => 
+    let cm := to_Symmetry_gen to_n m in 
+    '(symmetry_inr $cm)) m.
 
-Ltac2 to_Autonomous (to_n : 'n -> constr) (m : 'n Autonomous) : constr :=
-  sum_elim (to_SymmetricG to_n) (to_Autonomy to_n) m.
+Ltac2 to_Autonomous_gen (to_n : 'n -> constr) (m : 'n Autonomous) : constr :=
+  sum_elim (fun m => 
+    let cm := to_SymmetricG_gen to_n m in 
+    '(symmetric_inl $cm))
+    (fun m => 
+    let cm := to_Autonomy_gen to_n m in 
+    '(autonomy_inr $cm)) m.
 
-Ltac2 to_Frobenius (to_n : 'n -> constr) (m : 'n Frobenius) : constr :=
-  sum_elim (to_Autonomous to_n) (to_Frobenial to_n) m.
+Ltac2 to_Frobenius_gen (to_n : 'n -> constr) (to_k : 'k -> constr)
+  (to_i : 'i -> constr) (m : ('n, 'k, 'i) Frobenius) : constr :=
+  sum_elim (fun m => 
+    let cm := to_Autonomous_gen to_n m in 
+    '(autonomous_inl $cm))
+    (fun m => 
+    let cm := to_Frobenial_gen to_k to_i m in 
+    '(frobenial_inr $cm)) m.
 
 
 (* Goal True.
@@ -1414,6 +1438,51 @@ Ltac2 of_evar_ended_list (pA : constr -> 'a) (c : constr) : 'a list :=
 
 
 
+
+Ltac2 of_Monoidal (c : constr) := of_Monoidal_gen of_nat c.
+Ltac2 of_Symmetry (c : constr) := of_Symmetry_gen of_nat c.
+Ltac2 of_Autonomy (c : constr) := of_Autonomy_gen of_nat c.
+Ltac2 of_Frobenial (c : constr) := of_Frobenial_gen of_nat of_nat c.
+
+Ltac2 of_SymmetricG (c : constr) := of_SymmetricG_gen of_nat c.
+Ltac2 of_Autonomous (c : constr) := of_Autonomous_gen of_nat c.
+Ltac2 of_Frobenius (c : constr) := of_Frobenius_gen of_nat of_nat of_nat c.
+
+
+
+Ltac2 of_Monoidal_PRO (of_t : constr -> 't) (c : constr) : (int, int Monoidal, 't) PRO :=
+  of_PRO of_nat of_Monoidal of_t c.
+Ltac2 of_SymmetricG_PRO (of_t : constr -> 't) (c : constr) : (int, int SymmetricG, 't) PRO :=
+  of_PRO of_nat of_SymmetricG of_t c.
+Ltac2 of_Autonomous_PRO (of_t : constr -> 't) (c : constr) : (int, int Autonomous, 't) PRO :=
+  of_PRO of_nat of_Autonomous of_t c.
+Ltac2 of_Frobenius_PRO (of_t : constr -> 't) (c : constr) : (int, (int, int, int) Frobenius, 't) PRO :=
+  of_PRO of_nat of_Frobenius of_t c.
+
+
+
+Ltac2 to_Monoidal (m : int Monoidal) := to_Monoidal_gen to_nat m.
+Ltac2 to_Symmetry (m : int Symmetry) := to_Symmetry_gen to_nat m.
+Ltac2 to_Autonomy (m : int Autonomy) := to_Autonomy_gen to_nat m.
+Ltac2 to_Frobenial (m : (int, int) Frobenial) := to_Frobenial_gen to_nat to_nat m.
+
+Ltac2 to_SymmetricG (m : int SymmetricG) := to_SymmetricG_gen to_nat m.
+Ltac2 to_Autonomous (m : int Autonomous) := to_Autonomous_gen to_nat m.
+Ltac2 to_Frobenius (m : (int, int, int) Frobenius) := to_Frobenius_gen to_nat to_nat to_nat m.
+
+
+
+Ltac2 to_Monoidal_PRO (to_t : 't -> constr) (m : (int, int Monoidal, 't) PRO) : constr :=
+  to_PRO to_nat to_Monoidal to_t m.
+Ltac2 to_SymmetricG_PRO (to_t : 't -> constr) (m : (int, int SymmetricG, 't) PRO) : constr :=
+  to_PRO to_nat to_SymmetricG to_t m.
+Ltac2 to_Autonomous_PRO (to_t : 't -> constr) (m : (int, int Autonomous, 't) PRO) : constr :=
+  to_PRO to_nat to_Autonomous to_t m.
+Ltac2 to_Frobenius_PRO (to_t : 't -> constr) (m : (int, (int, int, int) Frobenius, 't) PRO) : constr :=
+  to_PRO to_nat to_Frobenius to_t m.
+
+
+
 End CC.
 
 
@@ -1441,6 +1510,164 @@ Ltac2 rec map_PRO_with (fn : 'state -> 'n1 -> 'state * 'n2)
     end
   in
   go st p.
+
+
+Ltac2 map_Monoidal_with (f : 'st -> 'n -> 'st * 'm) 
+  (st : 'st) (m : 'n Monoidal) : 'st * 'm Monoidal :=
+  match m with
+  | Associator n m o =>
+    let (st, n') := f st n in
+    let (st, m') := f st m in
+    let (st, o') := f st o in 
+    (st, Associator n' m' o')
+  | InvAssociator n m o =>
+    let (st, n') := f st n in
+    let (st, m') := f st m in
+    let (st, o') := f st o in 
+    (st, InvAssociator n' m' o')
+  | LUnit n =>
+    let (st, n') := f st n in
+    (st, LUnit n')
+  | InvLUnit n =>
+    let (st, n') := f st n in
+    (st, InvLUnit n')
+  | RUnit n =>
+    let (st, n') := f st n in
+    (st, RUnit n')
+  | InvRUnit n =>
+    let (st, n') := f st n in
+    (st, InvRUnit n')
+  end.
+
+Ltac2 map_Symmetry_with (f : 'st -> 'n -> 'st * 'm) 
+  (st : 'st) (m : 'n Symmetry) : 'st * 'm Symmetry :=
+  match m with
+  | Swap n m => 
+    let (st, n') := f st n in
+    let (st, m') := f st m in
+    (st, Swap n' m')
+  end.
+
+Ltac2 map_Autonomy_with (f : 'st -> 'n -> 'st * 'm) 
+  (st : 'st) (m : 'n Autonomy) : 'st * 'm Autonomy :=
+  match m with
+  | Cup n => 
+    let (st, n') := f st n in
+    (st, Cup n')
+  | Cap n => 
+    let (st, n') := f st n in
+    (st, Cap n')
+  end.
+
+Ltac2 map_Frobenial_with (fk : 'st -> 'k -> 'st * 'l) (fi : 'st -> 'i -> 'st * 'j)
+  (st : 'st) (m : ('k, 'i) Frobenial) : 'st * ('l, 'j) Frobenial :=
+  match m with
+  | Delta0 => (st, Delta0)
+  | Delta1 n m =>
+    let (st, n') := fi st n in 
+    let (st, m') := fi st m in 
+    (st, Delta1 n' m')
+  | Delta k n m =>
+    let (st, k') := fk st k in
+    let (st, n') := fi st n in 
+    let (st, m') := fi st m in
+    (st, Delta k' n' m')
+  end.
+
+Ltac2 map_sum_with (f : 'st -> 'n -> 'st * 'n') (g : 'st -> 'm -> 'st * 'm') 
+  (st : 'st) :
+  ('n, 'm) Sum -> 'st * ('n', 'm') Sum := 
+  sum_elim (fun n => let (st, n') := f st n in (st, inl n'))
+    (fun n => let (st, n') := g st n in (st, inr n')).
+
+Ltac2 map_SymmetricG_with (f : 'st -> 'n -> 'st * 'm) 
+  (st : 'st) (m : 'n SymmetricG) : 'st * 'm SymmetricG :=
+  map_sum_with (map_Monoidal_with f) (map_Symmetry_with f) st m.
+
+Ltac2 map_Autonomous_with (f : 'st -> 'n -> 'st * 'm) 
+  (st : 'st) (m : 'n Autonomous) : 'st * 'm Autonomous :=
+  map_sum_with (map_SymmetricG_with f) (map_Autonomy_with f) st m.
+
+Ltac2 map_Frobenius_with (fn : 'st -> 'n -> 'st * 'm) 
+  (fk : 'st -> 'k -> 'st * 'l) (fi : 'st -> 'i -> 'st * 'j)
+  (st : 'st) (m : ('n, 'k, 'i) Frobenius) : 'st * ('m, 'l, 'j) Frobenius :=
+  map_sum_with (map_Autonomous_with fn) (map_Frobenial_with fk fi) st m.
+
+
+Ltac2 map_Monoidal (f : 'n -> 'm) 
+  (m : 'n Monoidal) : 'm Monoidal :=
+  match m with
+  | Associator n m o =>
+    let n' := f n in
+    let m' := f m in
+    let o' := f o in 
+    Associator n' m' o'
+  | InvAssociator n m o =>
+    let n' := f n in
+    let m' := f m in
+    let o' := f o in 
+    InvAssociator n' m' o'
+  | LUnit n =>
+    let n' := f n in
+    LUnit n'
+  | InvLUnit n =>
+    let n' := f n in
+    InvLUnit n'
+  | RUnit n =>
+    let n' := f n in
+    RUnit n'
+  | InvRUnit n =>
+    let n' := f n in
+    InvRUnit n'
+  end.
+
+Ltac2 map_Symmetry (f : 'n -> 'm) 
+  (m : 'n Symmetry) : 'm Symmetry :=
+  match m with
+  | Swap n m => 
+    let n' := f n in
+    let m' := f m in
+    Swap n' m'
+  end.
+
+Ltac2 map_Autonomy (f : 'n -> 'm) 
+  (m : 'n Autonomy) : 'm Autonomy :=
+  match m with
+  | Cup n => 
+    let n' := f n in
+    Cup n'
+  | Cap n => 
+    let n' := f n in
+    Cap n'
+  end.
+
+Ltac2 map_Frobenial (fk : 'k -> 'l) (fi : 'i -> 'j)
+  (m : ('k, 'i) Frobenial) : ('l, 'j) Frobenial :=
+  match m with
+  | Delta0 => Delta0
+  | Delta1 n m =>
+    let n' := fi n in 
+    let m' := fi m in 
+    Delta1 n' m'
+  | Delta k n m =>
+    let k' := fk k in
+    let n' := fi n in 
+    let m' := fi m in 
+    Delta k' n' m'
+  end.
+
+Ltac2 map_SymmetricG (f : 'n -> 'm) 
+  (m : 'n SymmetricG) : 'm SymmetricG :=
+  sum_map (map_Monoidal f) (map_Symmetry f) m.
+
+Ltac2 map_Autonomous (f : 'n -> 'm) 
+  (m : 'n Autonomous) : 'm Autonomous :=
+  sum_map (map_SymmetricG f) (map_Autonomy f) m.
+
+Ltac2 map_Frobenius (fn : 'n -> 'm) (fk : 'k -> 'l) (fi : 'i -> 'j)
+  (m : ('n, 'k, 'i) Frobenius) : ('m, 'l, 'j) Frobenius :=
+  sum_map (map_Autonomous fn) (map_Frobenial fk fi) m.
+
 
 From TensorRocq Require Import BWQuote.
 
@@ -1481,6 +1708,114 @@ Global Hint Extern 0 (PRO_quote (interp_discrete_hg_inhab _) _ _) =>
 
 Global Hint Extern 0 (PRO_unquote (interp_discrete_hg_inhab _) _ _) => 
   ltac2:(mk_PRO_unquote_interp_discrete_hg_inhab()) : typeclass_instances.
+
+
+
+
+Module testing.
+
+Notation "!( x )" := (existT (_, _) x).
+
+Local Open Scope pro_scope.
+
+Ltac2 of_bundled (of_n : constr -> 'n) (c : constr) : 'n :=
+  CC.mk_of "of_bundled" "sigT" (
+    fun c =>
+    lazy_match! c with
+    | existT (_, _) ?n => of_n n
+    end
+  ) c.
+
+Definition monoidal_test_diags : list {nm & PRO Monoidal positive nm.1 nm.2} := [
+  !(Passoc 1 2 3);
+  !(Pid 1);
+  !(Pinvassoc 1 2 3);
+  !(Pid 0);
+  !([str @LUnit 1]);
+  !([str @RUnit 1]);
+  !(Pid 0 ;; [str InvLUnit])
+].
+
+Ltac2 Eval 
+  let ms := CC.of_list (of_bundled id) '(monoidal_test_diags) in 
+  List.iter (fun c =>
+    let pc := CC.of_Monoidal_PRO CC.of_pos c in 
+    let c' := CC.to_Monoidal_PRO CC.to_pos pc in
+    Std.unify c c') ms.
+
+
+Definition symmetricg_test_diags : list {nm & PRO SymmetricG positive nm.1 nm.2} := [
+  !(Passoc 1 2 3);
+  !(Pid 1);
+  !(Pinvassoc 1 2 3);
+  !(Pid 0);
+  !([str monoidal_inl (@LUnit 1)]);
+  !([str monoidal_inl (@RUnit 1)]);
+  !(Pid 0 ;; [str (monoidal_inl InvLUnit)]);
+  !(Pswap 1 1 * Pid 2 ;; Passoc 1 1 2 ;; Pid 1 * Pswap 1 2)
+].
+
+Ltac2 Eval 
+  let ms := CC.of_list (of_bundled id) '(symmetricg_test_diags) in 
+  List.iter (fun c =>
+    let pc := CC.of_SymmetricG_PRO CC.of_pos c in 
+    let c' := CC.to_SymmetricG_PRO CC.to_pos pc in
+    Std.unify c c') ms.
+
+Definition autonomous_test_diags : list {nm & PRO Autonomous positive nm.1 nm.2} := [
+  !(Passoc 1 2 3);
+  !(Pid 1);
+  !(Pinvassoc 1 2 3);
+  !(Pid 0);
+  !([str symmetric_inl (monoidal_inl (@LUnit 1))]);
+  !([str symmetric_inl (monoidal_inl (@RUnit 1))]);
+  !(Pid 0 ;; [str (symmetric_inl (monoidal_inl InvLUnit))]);
+  !(Pswap 1 1 * Pid 2 ;; Passoc 1 1 2 ;; Pid 1 * Pswap 1 2);
+  !(Pswap 1 1 * Pid 2 ;; Passoc 1 1 2 ;; Pid 1 * Pswap 1 2 ;; Pcap 1 * Pid 2 ;; Pcap 1);
+  !(Pcup 1 * Pid 2 ;; Pid 1 * Pswap 1 1 * Pid 1 ;; PRO_of_sw _ [0;2;3;1]);
+  !(Pcup 1 * Pid 2 ;; Pid 1 * Pswap 1 1 * Pid 1 ;; Psw [0;2;3;1])
+
+].
+
+Ltac2 Eval 
+  let ms := CC.of_list (of_bundled id) '(autonomous_test_diags) in 
+  List.iter (fun c =>
+    let pc := CC.of_Autonomous_PRO CC.of_pos c in 
+    let c' := CC.to_Autonomous_PRO CC.to_pos pc in
+    (* Message.print (PrintingExtra.of_bool (Constr.equal ) *)
+    Std.unify c c') ms.
+
+Definition frobenius_test_diags : list {nm & PRO Frobenius positive nm.1 nm.2} := [
+  !(Passoc 1 2 3);
+  !(Pid 1);
+  !(Pinvassoc 1 2 3);
+  !(Pid 0);
+  !([str autonomous_inl (symmetric_inl (monoidal_inl (@LUnit 1)))]);
+  !([str autonomous_inl (symmetric_inl (monoidal_inl (@RUnit 1)))]);
+  !(Pid 0 ;; [str (autonomous_inl (symmetric_inl (monoidal_inl InvLUnit)))]);
+  !(Pswap 1 1 * Pid 2 ;; Passoc 1 1 2 ;; Pid 1 * Pswap 1 2);
+  !(Pswap 1 1 * Pid 2 ;; Passoc 1 1 2 ;; Pid 1 * Pswap 1 2 ;; Pcap 1 * Pid 2 ;; Pcap 1);
+  !(Pcup 1 * Pid 2 ;; Pid 1 * Pswap 1 1 * Pid 1 ;; PRO_of_sw _ [0;2;3;1]);
+  !(Pcup 1 * Pid 2 ;; Pid 1 * Pswap 1 1 * Pid 1 ;; Psw [0;2;3;1]);
+  !(Pdelta1 2 3);
+  !([str inr Delta0]);
+  !([str includeStruct Delta0]);
+  !([str includeStruct (Delta1 4 5)]);
+  !(Pdelta 3 4 5)
+].
+
+Ltac2 Eval 
+  let ms := CC.of_list (of_bundled id) '(frobenius_test_diags) in 
+  List.iter (fun c =>
+    let pc := CC.of_Frobenius_PRO CC.of_pos c in 
+    let c' := CC.to_Frobenius_PRO CC.to_pos pc in
+    (* Message.print (PrintingExtra.of_bool (Constr.equal ) *)
+    Std.unify c c') ms.
+
+
+End testing.
+
+
 
 (* Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab () :=
   match! goal with
