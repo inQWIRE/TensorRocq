@@ -203,5 +203,5 @@ Ltac2 intro_letin2 (pat : (ident option * unit option * preterm option * preterm
 Ltac2 Notation "intro_lets" patnames(list1(seq(
     opt(seq(opt(ident), opt("_"), opt(seq(":=", preterm)), opt(seq(":", preterm)))),
     opt(seq("as", ident))), ",")) :=
-  List.iter (fun (pat, name) => intro_letin2 pat name) patnames.g
+  List.iter (fun (pat, name) => intro_letin2 pat name) patnames.
 
