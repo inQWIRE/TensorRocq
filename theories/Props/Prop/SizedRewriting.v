@@ -688,7 +688,7 @@ Lemma MPRO_monog_quote_rewrite_correct
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
   forall Qres,
-  MPRO_PRO_quote fN Mres Qres ->
+  MPRO_PRO_denote fN Mres Qres ->
 
 
   forall res, PRO_unquote f Qres res ->
@@ -717,6 +717,7 @@ Proof.
   destruct (sized_graph_to_term _ _ _) as [Mres|] eqn:HMres_eq; [|done].
   intros _ [= <-].
   intros Qres HMres res HQres Hres%bool_decide_spec.
+  apply MPRO_PRO_denote_iff_quote in HMres.
   apply (Hpush _ _ lhs rhs Hlrhs Qlhs Qrhs HQlhs HQrhs Mlhs Mrhs HMlhs HMrhs
     _ _ _ _ Htgt Hres Qtgt Qres HQtgt HQres _ _ _ _).
   - done.
@@ -786,7 +787,7 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
     MPRO_monog_quote_rewrite RW sized_graph_to_term concr_asgn f
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
-  forall Qres, MPRO_PRO_quote fN Mres Qres ->
+  forall Qres, MPRO_PRO_denote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -878,7 +879,7 @@ Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_PRO_quote fN Mres Qres ->
+    MPRO_PRO_denote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -898,6 +899,7 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
+      apply MPRO_PRO_denote_iff_quote in HQres.
       apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
       apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.
@@ -1182,7 +1184,7 @@ Lemma MPRO_gen_quote_rewrite_correct
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
   forall Qres,
-  MPRO_PRO_quote fN Mres Qres ->
+  MPRO_PRO_denote fN Mres Qres ->
 
 
   forall res, PRO_unquote f Qres res ->
@@ -1211,6 +1213,7 @@ Proof.
   destruct (sized_graph_to_term _ _ _) as [Mres|] eqn:HMres_eq; [|done].
   intros _ [= <-].
   intros Qres HMres res HQres Hres%bool_decide_spec.
+  apply MPRO_PRO_denote_iff_quote in HMres.
   apply (Hpush _ _ lhs rhs Hlrhs Qlhs Qrhs HQlhs HQrhs Mlhs Mrhs HMlhs HMrhs
     _ _ _ _ Htgt Hres Qtgt Qres HQtgt HQres _ _ _ _).
   - done.
@@ -1311,7 +1314,7 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
     MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
-  forall Qres, MPRO_PRO_quote fN Mres Qres ->
+  forall Qres, MPRO_PRO_denote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -1403,7 +1406,7 @@ Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_PRO_quote fN Mres Qres ->
+    MPRO_PRO_denote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -1423,6 +1426,7 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
+      apply MPRO_PRO_denote_iff_quote in HQres.
       apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
       apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.
@@ -1501,7 +1505,7 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
     MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
-  forall Qres, MPRO_PRO_quote fN Mres Qres ->
+  forall Qres, MPRO_PRO_denote fN Mres Qres ->
 
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
@@ -1593,7 +1597,7 @@ Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
     sized_graph_to_term bn bm (MPRO_graph_semantics Mtgt) = Some Mres ->
 
   forall Qres,
-    MPRO_PRO_quote fN Mres Qres ->
+    MPRO_PRO_denote fN Mres Qres ->
   forall res, PRO_unquote f Qres res ->
   forall dres, DiagramDenote dres res ->
   dtgt ≡ dres.
@@ -1613,6 +1617,7 @@ Proof.
     + rewrite HQtgt', HQres'.
       f_equiv.
       apply (bw_sized_graph_to_graph_scohg_syntactic_eq fN) in HMres_eq.
+      apply MPRO_PRO_denote_iff_quote in HQres.
       apply MPRO_PRO_quote_size in HQres as Hnm.
       destruct Hnm as [-> ->].
       apply MPRO_PRO_quote_correct_graph_semantics' in HQres, HMtgt.

@@ -548,6 +548,94 @@ Ltac2 print_goal (s : string) : unit :=
   Message.print (Message.of_constr g).
 
 
+Ltac2 Notation l(thunk(self)) "||>" r(thunk(self)) : 2 :=
+  orelse l (fun e => r() e).
+
+
+Ltac2 mk_MPRO_PRO_chain_prf_gen_aux
+  genprf structprf idprf stackprf composeprf compose_reassocprf
+  (to_s : 's -> int btree * int btree * constr) (to_t : 't -> constr)
+  (mp : (int btree, 's, 't) PRO) : 
+  int btree * int btree * constr :=
+  let to_btree := CC.to_btree_typed constr:(positive) CC.to_pos in
+  let rec go mp :=
+    match mp with
+    | Pstruct _ _ s =>
+      let (ins, outs, cs) := to_s s in
+      let cins := to_btree ins in
+      let couts := to_btree outs in
+      (ins, outs, constr:($structprf $cins $couts $cs))
+    | Pgen ins outs t =>
+      let ct := to_t t in
+      let cins := to_btree ins in
+      let couts := to_btree outs in
+      (ins, outs, constr:($genprf $cins $couts $ct))
+    | Pid i =>
+      let ci := to_btree i in
+      (i, i, constr:($idprf $ci))
+    | Pstack t b =>
+      let (tn, tm, tprf) := go t in
+      let (bn, bm, bprf) := go b in
+      let ctn := to_btree tn in
+      let ctm := to_btree tm in
+      let cbn := to_btree bn in
+      let cbm := to_btree bm in
+      (Bnode tn bn, Bnode tm bm, 
+        constr:($stackprf $ctn $ctm $cbn $cbm _ _ 
+          _ _ _ _  _ _  $tprf $bprf))
+    | Pcompose l r =>
+      let (ln, lm, lprf) := go l in
+      let (rm, ro, rprf) := go r in
+      let cln := to_btree ln in
+      let clm := to_btree lm in
+      let cro := to_btree ro in
+
+      if btree_eq Int.equal lm rm then
+        (ln, ro, 
+          constr:($composeprf $cln $clm $cro _ _
+            _ _ _  _ _  $lprf $rprf))
+      else
+        (* TODO: Is this route better? *)
+        (* let chp := constr:(ltac:(compute_done) : is_Some (BW.may_bpath $clm $crm)) in *)
+        let crm := to_btree rm in
+        let cp := match! Std.eval_vm None constr:(BW.may_bpath $clm $crm) with
+          | Some ?cp => cp
+          | None => Control.throw_invalid_argument "mk_MPRO_PRO_chain_prf_gen_aux: unresolvable path!!"
+          end in
+        let crm := to_btree rm in
+        (ln, ro, constr:($compose_reassocprf $cln $clm $crm $cro ($cp) _ _
+          _ _ _  _ _ $lprf $rprf))
+    end
+  in go mp.
+
+
+Ltac2 mk_MPRO_PRO_chain_prf_gen
+  (to_s : 's -> int btree * int btree * constr) (to_t : 't -> constr)
+  (mp : (int btree, 's, 't) PRO) : 
+  constr :=
+  lazy_match! goal with
+  | [|- @MPRO_PRO_chain ?n ?eqN ?mstruct ?struct ?t ?teq
+    ?eqmstruct ?eqstruct ?interp ?subm ?fN _ _ _ _ _ _] =>
+    let genprf := constr:(@MPC_gen $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+    let structprf := constr:(@MPC_struct $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+    let idprf := constr:(@MPC_id $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+    let stackprf := constr:(@MPC_stack $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+    let composeprf := constr:(@MPC_compose $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+    let compose_reassocprf := constr:(@MPC_compose_reassoc $n $eqN $mstruct $struct $t $teq
+      $eqmstruct $eqstruct $interp $subm $fN) in 
+
+    let (_, _, prf) := mk_MPRO_PRO_chain_prf_gen_aux genprf structprf idprf stackprf 
+      composeprf compose_reassocprf to_s to_t mp in 
+    prf
+  | [|- ?g] => Control.throw_invalid_argument (String.concat "" ["mk_MPRO_PRO_chain_prf_gen was called on a goal it does not recognize: "
+    ; Message.to_string (Message.of_constr g)])
+  end. 
+
 
 Ltac2 mk_MPRO_PRO_chain_gen (cfN : constr)
   (to_s : 's -> int btree * int btree * constr) (to_t : 't -> constr)
@@ -561,6 +649,17 @@ Ltac2 mk_MPRO_PRO_chain_gen (cfN : constr)
     lazy_match! goal with
     | [|- ?g] => Control.throw_invalid_argument (String.concat "" ["bad goal ("; s; ")! "
       ; Message.to_string (Message.of_constr g)])
+    end in
+  let bad_goal_err (s : string) (e : exn) :=
+    (* lazy_match! goal with
+    | [|- ?g] => Message.print (Message.of_string (String.concat "" ["bad goal ("; s; ")! "
+      ; Message.to_string (Message.of_constr g)]));
+      Control.shelve()
+    end in *)
+    lazy_match! goal with
+    | [|- ?g] => Control.throw_invalid_argument (String.concat "" ["bad goal ("; s; ")! Tactic failed with exception: ";
+      Message.to_string (Message.of_exn e); " on goal ";
+      Message.to_string (Message.of_constr g)])
     end in
   let to_btree := CC.to_btree_typed constr:(positive) CC.to_pos in
   let rec go mp :=
@@ -613,7 +712,7 @@ Ltac2 mk_MPRO_PRO_chain_gen (cfN : constr)
             _ _   _ _) 
            > [(* print_goal "compose";  *)Control.shelve()..|l_tac()|r_tac()]
 
-            )|| bad_goal "compose")
+            )||> bad_goal_err "compose")
       else
         (* TODO: Is this route better? *)
         (* let chp := constr:(ltac:(compute_done) : is_Some (BW.may_bpath $clm $crm)) in *)
@@ -626,7 +725,7 @@ Ltac2 mk_MPRO_PRO_chain_gen (cfN : constr)
             _ _   _ _)
            > [Control.shelve()..|l_tac()|r_tac()]
 
-            )|| bad_goal "compose_reassoc")
+            )||> bad_goal_err "compose_reassoc")
     end
   in go mp.
 
@@ -646,7 +745,7 @@ Ltac2 mk_MPRO_PRO_chain_Monoidal_go cfN (m : (int btree, int btree Monoidal, con
   tac().
 
 
-Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
+Ltac2 mk_MPRO_PRO_quote_Monoidal_tac () :=
   lazy_match! goal with
   | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (@interp_discrete_hg_inhab _ ?inhab ?cts) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_Monoidal_gen id) id cp) in
@@ -656,8 +755,28 @@ Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
         (map_Monoidal_with map_btree) pair ts p in
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
     apply MPRO_PRO_quote_of_chain >
-    [Control.throw_invalid_argument "mk_MPRO_PRO_quote_Monoidal: Extra goals! Are all typeclasses declared?"..|
+    [Control.throw_invalid_argument "mk_MPRO_PRO_quote_Monoidal_tac: Extra goals! Are all typeclasses declared?"..|
     mk_MPRO_PRO_chain_Monoidal_go constr:(@interp_discrete_hg_inhab _ $inhab $cts) mp]
+  end.
+
+Ltac2 mk_MPRO_PRO_chain_prf_Monoidal (m : (int btree, int btree Monoidal, constr) PRO) : constr :=
+  mk_MPRO_PRO_chain_prf_gen (fun s =>
+    let (ins, outs) := dim_Monoidal Bempty bnode id s in
+    let cs := CC.to_MMonoidal CC.to_pos s in
+    (ins, outs, cs)) id m.
+
+Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
+  lazy_match! goal with
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+    let p := once (CC.of_PRO id (CC.of_Monoidal_gen id) id cp) in
+    let ts := CC.of_evar_ended_list id cts in
+    let map_btree := parse_nat_btree_to_pos in
+    let (ts', mp) := map_PRO_with map_btree
+        (map_Monoidal_with map_btree) pair ts p in
+    let _cts := once (CC.extend_evar_ended_list ts' cts) in
+    apply MPRO_PRO_quote_of_chain;
+    let prf := mk_MPRO_PRO_chain_prf_Monoidal mp in 
+    exact $prf
   end.
 
 
@@ -689,7 +808,7 @@ Ltac2 mk_MPRO_PRO_chain_SymmetricG_go cfN (m : (int btree, int btree SymmetricG,
   tac().
 
 
-Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
+Ltac2 mk_MPRO_PRO_quote_SymmetricG_tac () :=
   lazy_match! goal with
   | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (@interp_discrete_hg_inhab _ ?inhab ?cts) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id cp) in
@@ -703,6 +822,25 @@ Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
     mk_MPRO_PRO_chain_SymmetricG_go constr:(@interp_discrete_hg_inhab _ $inhab $cts) mp]
   end.
 
+Ltac2 mk_MPRO_PRO_chain_prf_SymmetricG (m : (int btree, int btree SymmetricG, constr) PRO) : constr :=
+  mk_MPRO_PRO_chain_prf_gen (fun s =>
+    let (ins, outs) := dim_SymmetricG Bempty bnode id s in
+    let cs := CC.to_MSymmetric CC.to_pos s in
+    (ins, outs, cs)) id m.
+
+Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
+  lazy_match! goal with
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+    let p := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id cp) in
+    let ts := CC.of_evar_ended_list id cts in
+    let map_btree := parse_nat_btree_to_pos in
+    let (ts', mp) := map_PRO_with map_btree
+        (map_SymmetricG_with map_btree) pair ts p in
+    let _cts := once (CC.extend_evar_ended_list ts' cts) in
+    apply MPRO_PRO_quote_of_chain;
+    let prf := mk_MPRO_PRO_chain_prf_SymmetricG mp in 
+    exact $prf
+  end.
 
 Ltac2 mk_MPRO_PRO_denote_SymmetricG () :=
   lazy_match! goal with
@@ -732,7 +870,7 @@ Ltac2 mk_MPRO_PRO_chain_Autonomous_go cfN (m : (int btree, int btree Autonomous,
   tac().
 
 
-Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
+Ltac2 mk_MPRO_PRO_quote_Autonomous_tac () :=
   lazy_match! goal with
   | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (@interp_discrete_hg_inhab _ ?inhab ?cts) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_Autonomous_gen id) id cp) in
@@ -746,6 +884,25 @@ Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
     mk_MPRO_PRO_chain_Autonomous_go constr:(@interp_discrete_hg_inhab _ $inhab $cts) mp]
   end.
 
+Ltac2 mk_MPRO_PRO_chain_prf_Autonomous (m : (int btree, int btree Autonomous, constr) PRO) : constr :=
+  mk_MPRO_PRO_chain_prf_gen (fun s =>
+    let (ins, outs) := dim_Autonomous Bempty bnode id s in
+    let cs := CC.to_MAutonomous CC.to_pos s in
+    (ins, outs, cs)) id m.
+
+Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
+  lazy_match! goal with
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+    let p := once (CC.of_PRO id (CC.of_Autonomous_gen id) id cp) in
+    let ts := CC.of_evar_ended_list id cts in
+    let map_btree := parse_nat_btree_to_pos in
+    let (ts', mp) := map_PRO_with map_btree
+        (map_Autonomous_with map_btree) pair ts p in
+    let _cts := once (CC.extend_evar_ended_list ts' cts) in
+    apply MPRO_PRO_quote_of_chain;
+    let prf := mk_MPRO_PRO_chain_prf_Autonomous mp in 
+    exact $prf
+  end.
 
 Ltac2 mk_MPRO_PRO_denote_Autonomous () :=
   lazy_match! goal with
@@ -849,8 +1006,8 @@ Ltac2 autonomous_roundtrip_test l (cm : constr) :=
 
   ) (Ltac1.of_ident l) (Ltac1.of_constr cm).
 
-Goal forall (n : nat), True.
-intros n.
+Goal forall (n m o p : nat), True.
+intros n m o p.
 Proof Mode "Classic".
 evar (l : list nat).
 
@@ -873,13 +1030,7 @@ ltac2:(monoidal_roundtrip_test @l constr:((Passoc 1 1 n ;; Passoc 1 1 n :> PRO M
 
 ltac2:(
 let cmon := CC.of_list (of_bundled id) 'autonomous_test_diags in
-List.iteri (fun i c => 
-  (* FIXME: Bad hack!! Instead, refactor to make the quote maker take the parsed constr
-  as well so it can give all arguments (and at that point maybe make it generate a constr
-  proof rather than tactic one?)*)
-  if Bool.and (Int.le 9 i) (Int.le i 10) then () (* skip tests involving Psw... *)
-  else 
-  (autonomous_roundtrip_test @l c)) cmon).
+List.iter ((autonomous_roundtrip_test @l)) cmon).
 
 
 
@@ -901,6 +1052,28 @@ cbn [gbpath_to_MPRO] in Hq;
 lazymatch goal with
 | H : MPRO_PRO_quote ?f ?m _ |- _ => eassert (Hq' : MPRO_PRO_denote f m _) by ltac2:(mk_MPRO_PRO_denote_Autonomous())
 end; clear Hq Hq'.
+
+
+let lv := eval unfold l in l in
+eassert (Hq : MPRO_PRO_quote (interp_discrete_hg_inhab lv) _
+  (([gen 1%positive n m];; [gen 2%positive m o]);;
+   [gen 3%positive o p] :> PRO Autonomous positive _ _))
+    by ltac2:(mk_MPRO_PRO_quote_Autonomous());
+cbn [gbpath_to_MPRO] in Hq;
+lazymatch goal with
+| H : MPRO_PRO_quote ?f ?m _ |- _ => eassert (Hq' : MPRO_PRO_denote f m _) by ltac2:(mk_MPRO_PRO_denote_Autonomous())
+end; clear Hq Hq'.
+
+let lv := eval unfold l in l in
+eassert (Hq : MPRO_PRO_quote (interp_discrete_hg_inhab lv) _
+  (([gen 1%positive n m];; [gen 2%positive m o]);;
+   [gen 3%positive o p] :> PRO SymmetricG positive _ _))
+    by ltac2:(mk_MPRO_PRO_quote_SymmetricG());
+cbn [gbpath_to_MPRO] in Hq;
+lazymatch goal with
+| H : MPRO_PRO_quote ?f ?m _ |- _ => eassert (Hq' : MPRO_PRO_denote f m _) by ltac2:(mk_MPRO_PRO_denote_SymmetricG())
+end; clear Hq Hq'.
+
 
 close_evar_ended_list l.
 done.
