@@ -1306,10 +1306,38 @@ Qed.
 
 From TensorRocq Require Import Props.Prop.Rewriting.
 Import Definitions PropsGraphs.
+From TensorRocq Require SizedProQuote. (* For visualization *)
+
+Module GeneratorNotations.
+
+Notation "'const' a" := (Some (inr a)) (a at level 9, only printing, at level 1).
+
+Notation "'Z' a" := (Some (inl (false, a))) (a at level 9, only printing, at level 1).
+Notation "'Z'" := (Some (inl (false, IZR 0))) (only printing, at level 1).
+
+Notation "'X' a" := (Some (inl (true, a))) (a at level 9, only printing, at level 1).
+Notation "'X'" := (Some (inl (true, IZR 0))) (only printing, at level 1).
+
+Notation "'H'" := ((None :> ZXCVERT)) (only printing, at level 1).
+
+End GeneratorNotations.
+
+(* FIXME: Move *)
+Lemma zx_of_const_mult' (c d : C) : zx_of_const (c * d) ∝=
+  zx_of_const c ⟷ zx_of_const d.
+Proof.
+  rewrite 3 zx_of_const_to_scaled_empty.
+  distribute_zxscale.
+  rewrite Cmult_comm, compose_empty_r.
+  done.
+Qed.
+
 
 
 
 Module ZXsymm.
+
+Export GeneratorNotations.
 
 Section ZXquote_symm.
 
@@ -1702,7 +1730,19 @@ Ltac setup_zxsrw_lhs lem match_number :=
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end))|].
 
-Ltac zxsrw_visualize Hrw := idtac.
+
+Ltac zxsviz :=
+  SizedProQuote.prop_visualize_goal ZX_SymmetricG_ProLike.
+
+Ltac zxsviz_lhs :=
+  SizedProQuote.prop_visualize_lhs ZX_SymmetricG_ProLike.
+
+Ltac zxsviz_rhs :=
+  SizedProQuote.prop_visualize_rhs ZX_SymmetricG_ProLike.
+
+(* Redefine this to enable/disable printing after rewriting *)
+Ltac zxsrw_visualize_after :=
+  zxsviz.
 
 Ltac zxsrw_lhs lem match_number :=
 
@@ -1728,7 +1768,6 @@ Ltac zxsrw_lhs lem match_number :=
     (tryif timeout 3 (specialize (Hrw _ _ _ _ _ _)) then idtac else
       fail "Timed out trying to quote goal! Have you declared all necessary instances?");
     epose proof (Hrw _ _ _) as Hrw;
-    zxsrw_visualize Hrw;
     (do 3 (tspecialize Hrw by typeclasses eauto) || fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this." );
     epose proof (Hrw _) as Hrw;
     tspecialize Hrw;
@@ -1756,7 +1795,8 @@ Ltac zxsrw lem match_number :=
 
 
 Tactic Notation "zxsrw_lhs" uconstr(lem) "at" constr(n) :=
-  zxsrw_lhs lem n.
+  zxsrw_lhs lem n;
+  zxsrw_visualize_after.
 
 Tactic Notation "zxsrw_lhs" uconstr(lem) :=
   zxsrw_lhs lem at O.
@@ -1768,7 +1808,8 @@ Tactic Notation "zxsrw_lhs" "<-" uconstr(lem) :=
   zxsrw_lhs (symmetry lem).
 
 Tactic Notation "zxsrw_rhs" uconstr(lem) "at" constr(n) :=
-  zxsrw_rhs lem n.
+  zxsrw_rhs lem n;
+  zxsrw_visualize_after.
 
 Tactic Notation "zxsrw_rhs" uconstr(lem) :=
   zxsrw_rhs lem at O.
@@ -1780,7 +1821,8 @@ Tactic Notation "zxsrw_rhs" "<-" uconstr(lem) :=
   zxsrw_rhs (symmetry lem).
 
 Tactic Notation "zxsrw" uconstr(lem) "at" constr(n) :=
-  zxsrw lem n.
+  zxsrw lem n;
+  zxsrw_visualize_after.
 
 Tactic Notation "zxsrw" uconstr(lem) :=
   zxsrw lem at O.
@@ -1791,8 +1833,11 @@ Tactic Notation "zxsrw" "<-" uconstr(lem) "at" constr(n) :=
 Tactic Notation "zxsrw" "<-" uconstr(lem) :=
   zxsrw (symmetry lem).
 
+  (* Redefine this to enable/disable printing after cleaning *)
+Ltac zxsclean_visualize_after :=
+  zxsviz.
 
-Ltac zxsclean_lhs :=
+Ltac zxsclean_lhs_aux :=
   etransitivity; [
     (unshelve
 
@@ -1828,12 +1873,21 @@ Ltac zxsclean_lhs :=
 
     apply Hrw)); exact nil|].
 
-Ltac zxsclean_rhs :=
-  symmetry; zxsclean_lhs; symmetry.
+Ltac zxsclean_lhs :=
+  zxsclean_lhs_aux;
+  zxsclean_visualize_after.
 
-Ltac zxsclean := zxsclean_lhs; zxsclean_rhs.
+Ltac zxsclean_rhs :=
+  symmetry; zxsclean_lhs_aux; symmetry;
+  zxsclean_visualize_after.
+
+Ltac zxsclean := zxsclean_lhs_aux; zxsclean_rhs.
+
+Ltac zxscat_visualize_before :=
+  zxsviz.
 
 Ltac zxscat :=
+  zxscat_visualize_before;
   (unshelve
 
   (
@@ -1862,6 +1916,9 @@ Ltac zxscat :=
   apply Hrw)); exact nil.
 
 
+
+
+
 Module Examples.
 
 
@@ -1872,8 +1929,7 @@ Theorem hopf_rule_Z_X :
 Proof.
   apply prop_by_iff_zx_scale.
   split; [|intros ?%(f_equal fst); cbn in *; lra].
-
-
+  zxsviz.
   rewrite <- (@nwire_removal_r 2).
   cbv delta [n_wire]; simpl.
   rewrite stack_empty_r_fwd.
@@ -1903,10 +1959,9 @@ Proof.
   zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
   rewrite Rplus_0_r.
   zxsrw (cup_pullthrough_top (X 1 0 0) —).
-  rewrite 2 zx_of_const_to_scaled_empty.
-  distribute_zxscale.
-  replace (_ * / √ 2)%C with (/ C2)%C
-    by (cbn; autorewrite with RtoC_db; C_field).
+  rewrite <- zx_of_const_mult'.
+  replace (zx_of_const _)%C with (zx_of_const (/ C2))%C 
+    by (apply (f_equal zx_of_const); cbn; autorewrite with RtoC_db; C_field).
   zxscat.
 Qed.
 
@@ -1999,6 +2054,8 @@ End ZXsymm.
 
 
 Module ZXauto.
+
+Export GeneratorNotations.
 
 Section ZXquote_auto.
 
@@ -2423,6 +2480,20 @@ End ZXdenote_auto.
 #[export] Hint Extern 1 (DiagramDenote (ProD:=ZX_Autonomous_ProLike) _ ([str inl (inr (Swap ?n ?m))])) =>
   exact (zx_denote_auto_zx_comm n m) : typeclass_instances.
 
+
+
+Ltac zxaviz :=
+  SizedProQuote.aprop_visualize_goal ZX_Autonomous_ProLike.
+
+Ltac zxaviz_lhs :=
+  SizedProQuote.aprop_visualize_lhs ZX_Autonomous_ProLike.
+
+Ltac zxaviz_rhs :=
+  SizedProQuote.aprop_visualize_rhs ZX_Autonomous_ProLike.
+
+Ltac zxarw_visualize_after :=
+  zxaviz.
+
 Ltac setup_zxarw_lhs lem match_number quotient_number :=
   etransitivity; [
     (
@@ -2494,7 +2565,8 @@ Ltac zxarw lem match_number quotient_number :=
 
 
 Tactic Notation "zxarw_lhs" uconstr(lem) "at" constr(n) "quotient" constr(q) :=
-  zxarw_lhs lem n q.
+  zxarw_lhs lem n q;
+  zxarw_visualize_after.
 
 Tactic Notation "zxarw_lhs" uconstr(lem) "at" constr(n) :=
   zxarw_lhs lem at n quotient O.
@@ -2513,7 +2585,8 @@ Tactic Notation "zxarw_lhs" "<-" uconstr(lem) :=
 
 
 Tactic Notation "zxarw_rhs" uconstr(lem) "at" constr(n) "quotient" constr(q) :=
-  zxarw_rhs lem n q.
+  zxarw_rhs lem n q;
+  zxarw_visualize_after.
 
 Tactic Notation "zxarw_rhs" uconstr(lem) "at" constr(n) :=
   zxarw_rhs lem at n quotient O.
@@ -2532,7 +2605,8 @@ Tactic Notation "zxarw_rhs" "<-" uconstr(lem) :=
 
 
 Tactic Notation "zxarw" uconstr(lem) "at" constr(n) "quotient" constr(q) :=
-  zxarw lem n q.
+  zxarw lem n q;
+  zxarw_visualize_after.
 
 Tactic Notation "zxarw" uconstr(lem) "at" constr(n) :=
   zxarw lem at n quotient O.
@@ -2550,7 +2624,11 @@ Tactic Notation "zxarw" "<-" uconstr(lem) :=
   zxarw (symmetry lem).
 
 
-Ltac zxaclean_lhs :=
+Ltac zxaclean_visualize_after :=
+  zxaviz.
+
+
+Ltac zxaclean_lhs_aux :=
   etransitivity; [
     (unshelve
 
@@ -2586,12 +2664,22 @@ Ltac zxaclean_lhs :=
 
     apply Hrw)); exact nil|].
 
-Ltac zxaclean_rhs :=
-  symmetry; zxaclean_lhs; symmetry.
+Ltac zxaclean_lhs :=
+  zxaclean_lhs_aux;
+  zxaclean_visualize_after.
 
-Ltac zxaclean := zxaclean_lhs; zxaclean_rhs.
+
+Ltac zxaclean_rhs :=
+  symmetry; zxaclean_lhs_aux; symmetry;
+  zxaclean_visualize_after.
+
+Ltac zxaclean := zxaclean_lhs_aux; zxaclean_rhs.
+
+Ltac zxacat_visualize_before :=
+  zxaviz.
 
 Ltac zxacat :=
+  zxacat_visualize_before;
   (unshelve
 
   (
@@ -2630,8 +2718,7 @@ Theorem hopf_rule_Z_X :
 Proof.
   apply prop_by_iff_zx_scale.
   split; [|intros ?%(f_equal fst); cbn in *; lra].
-
-
+  zxaviz.
   rewrite <- (@nwire_removal_r 2).
   cbv delta [n_wire]; simpl.
   rewrite stack_empty_r_fwd.
@@ -3841,7 +3928,7 @@ End ZXfrob.
 
 
 
-From TensorRocq Require Import BW BWSized SizedProps SizedPropsGraphs SizedProLike SizedRewriting SizedProQuote.
+From TensorRocq Require Import BW BWSized SizedProps PropsGraphs SizedPropsGraphs SizedProLike SizedRewriting SizedProQuote.
 
 Open Scope nat_scope.
 
@@ -3924,6 +4011,137 @@ Notation SizedProLike' MS S T D :=
 
 Module ZXmsymm.
 
+Section ZXquote_symm.
+
+Local Set Typeclasses Unique Instances.
+
+Local Notation Quote := (DiagramQuote (ProD:=ZX_SymmetricG_ProLike)).
+
+Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
+  btree_size f a = btree_size f b.
+Proof.
+  rewrite <- 2 sum_list_with_btree_elems.
+  f_equal.
+  now apply btree_elems_bpath in p.
+Qed.
+
+(* FIXME: Move!!! *)
+Lemma cast_n_wire_l {n m o}
+  (Hm : m = n) (Ho : o = n) :
+  cast _ _ Hm Ho (n_wire n) =
+  cast _ _ eq_refl (eq_trans Ho (eq_sym Hm)) (n_wire m).
+Proof.
+  subst; now rewrite 2 cast_id_eq.
+Qed.
+Lemma cast_n_wire_r {n m o}
+  (Hm : m = n) (Ho : o = n) :
+  cast _ _ Hm Ho (n_wire n) =
+  cast _ _ (eq_trans Hm (eq_sym Ho)) eq_refl (n_wire o).
+Proof.
+  subst; now rewrite 2 cast_id_eq.
+Qed.
+
+Lemma zx_quote_symm_cast_nwire_bpath_aux (f : positive -> nat)
+  (a b : btree positive)
+  (p : bpath a b) :
+  Quote (cast _ _
+  (btree_size_eq_path p) eq_refl (n_wire (btree_size f b)))
+  ((MPRO_to_PRO f (gbpath_to_MPRO p))).
+Proof.
+  induction p.
+  - rewrite cast_id_eq.
+    cbn.
+    done.
+  - cbn.
+    constructor.
+    cbn.
+    f_equiv.
+    cast_irrelevance.
+  - cbn.
+    rewrite <- n_wire_stack.
+    rewrite cast_stack_distribute.
+    exact (quote_stack _ _ _ _ IHp1 IHp2).
+  - erewrite cast_simplify_eq by reflexivity.
+    rewrite <- (cast_n_wire_r (n:=btree_size f b)).
+
+    rewrite <- (nwire_removal_l (n_wire _)).
+    rewrite cast_compose_distribute.
+    cbn -[cast].
+    unshelve refine (quote_compose _ _ _ _ IHp1 _).
+    rewrite cast_n_wire_r.
+    eapply DiagramQuote_proper_equiv, IHp2; [cast_irrelevance|done].
+  Unshelve.
+    symmetry; apply btree_size_eq_path; assumption.
+Qed.
+
+
+Lemma zx_quote_symm_cast_nwire_bpath (f : positive -> nat)
+  (a b : btree positive)
+  (Hab : a =@{list _} b)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
+  Quote (cast _ _ Han Hbn (n_wire n)) (MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Hab))).
+Proof.
+  eapply DiagramQuote_proper_equiv; [|done|apply zx_quote_symm_cast_nwire_bpath_aux].
+  rewrite cast_n_wire_r.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_symm_cast_bpath (f : positive -> nat)
+  (a b a' b' : btree positive)
+  (Ha : a =@{list _} a') (Hb : b' =@{list _} b)
+  (zx : ZX (btree_size f a') (btree_size f b')) p
+  (Hasize : btree_size f a = btree_size f a')
+  (Hbsize : btree_size f b = btree_size f b') :
+  Quote zx p ->
+  Quote (cast _ _ Hasize Hbsize zx) (MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) ;;
+    p ;; MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Hb)))%pro.
+Proof.
+  intros Hzx.
+  rewrite <- (nwire_removal_l zx).
+  rewrite cast_compose_distribute.
+  rapply @quote_compose;
+  [apply zx_quote_symm_cast_nwire_bpath|].
+  rewrite <- (nwire_removal_r zx).
+  rewrite cast_compose_distribute.
+  rapply @quote_compose.
+  apply zx_quote_symm_cast_nwire_bpath.
+Qed.
+
+
+
+
+End ZXquote_symm.
+
+Module QuoteCast.
+
+Import Ltac2.
+Import ConstrExtra.
+
+Ltac2 solve_zx_symm_quote_cast () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) _] =>
+    let (cs, bn) := parse_nat_btree_to_pos [] n in
+    let (cs, bn') := parse_nat_btree_to_pos cs n' in
+    let (cs, bm) := parse_nat_btree_to_pos cs m in
+    let (cs, bm') := parse_nat_btree_to_pos cs m' in
+    let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
+    let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
+    let cbn' := CC.to_btree_typed 'positive CC.to_pos bn' in
+    let cbm' := CC.to_btree_typed 'positive CC.to_pos bm' in
+    let ccs := CC.mk_list_typed 'nat cs in
+    let prf := '(zx_quote_symm_cast_bpath (interp_discrete_hg_inhab $ccs)
+      $cbn $cbm $cbn' $cbm' eq_refl eq_refl $zx _ $hn $hm) in
+    refine '(id $prf _)
+  end.
+
+End QuoteCast.
+
+#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike)
+  (cast _ _ _ _ _) _) =>
+  ltac2:(QuoteCast.solve_zx_symm_quote_cast()) : typeclass_instances.
+
+
+
 
 Import ZXsymm.
 
@@ -3974,6 +4192,132 @@ Ltac zxpscat :=
   | |- _ => fail "(zxspcat) Unexpected goal when trying to compute isomorphism test! Please report this unexpected error."
   end|fail "(zxspcat) Unexpected additional goal! Please report this unexpected error."..].
 
+
+Ltac zxpsrw_lhs lem match_number :=
+
+  let Hrw := fresh "Hrw" in
+  time? "zxpsrw_lhs setup tactic" specialize (zxpsrw_lhs_lemma) as Hrw;
+
+  let le := fresh "le" in evar (le : list ZXCVERT);
+  let lev := eval unfold le in le in
+  specialize (Hrw (interp_discrete_hg_inhab lev));
+
+  let lemT := type of lem in
+  lazymatch lemT with
+  | ?R ?dlhs ?drhs =>
+    specialize (Hrw _ _ dlhs drhs)
+  | _ =>
+    fail "cannot recognize lemma (type) as the application of a relation: " lemT
+  end;
+
+
+  lazymatch goal with
+  | |- ?R ?dtgt _ =>
+    specialize (Hrw _ _ dtgt)
+  | |- ?G => fail "cannot recognize goal as the application of a relation: " G
+  end;
+
+  specialize (Hrw match_number);
+  specialize (Hrw lem);
+
+  epose proof (Hrw _ _ _) as Hrw;
+
+  time? "zxpsrw_lhs quote lem to PRO" (
+  do 2 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
+    else fail "Timed out trying to quote lemma! Have you declared all necessary instances?"));
+  time? "zxpsrw_lhs quote goal to PRO" (
+  do 1 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
+    else fail "Timed out trying to quote goal! Have you declared all necessary instances?"));
+
+  time? "zxpsrw_lhs quote to positive PRO" (epose proof (Hrw _ _ _) as Hrw;
+  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
+    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error.")); (* TODO: maybe replace with just tactic? *)
+
+  let ln := fresh "ln" in evar (ln : list nat);
+  let lnv := eval unfold ln in ln in
+  specialize (Hrw (interp_discrete_hg_inhab lnv));
+  epose proof (Hrw _ _ _ _   _ _ _) as Hrw;
+  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
+    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.");
+
+  specialize_with_concr_asgn_list Hrw lnv;
+  time? "zxpsrw_lhs prove correctness of concrete assignment" (
+    tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac
+    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error");
+
+  epose proof (Hrw _) as Hrw;
+  time? "zxpsrw_lhs compute rewrite" (tspecialize Hrw; [vm_compute;
+    lazymatch goal with
+    | |- ?R (Some _) (Some _) => reflexivity
+    | |- ?R None _ => fail "could not find the specified rewrite!"
+    end
+    | ]);
+
+  time? "zxpsrw_lhs MPRO to PRO" (epose proof (Hrw _) as Hrw;
+  (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
+    else fail "Failed interpreting resulting sized MPRO as a PRO! Please report this unexpected error."));
+
+  time? "zxpsrw_lhs denote from positive PRO" (epose proof (Hrw _) as Hrw;
+  (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac else
+    fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this."));
+
+  time? "zxpsrw_lhs denote PRO to goal" (epose proof (Hrw _) as Hrw;
+  (tryif timeout 10 (tspecialize Hrw by typeclasses eauto) then idtac else
+    fail "Timed out trying to denote result! Have you declared all necessary instances?"));
+  close_evar_ended_list le; close_evar_ended_list ln;
+  subst le ln;
+  etransitivity; [apply Hrw|clear Hrw].
+
+
+Ltac zxpsrw_rhs lem match_number :=
+  symmetry;
+  zxpsrw_lhs lem match_number;
+  symmetry.
+
+Ltac zxpsrw lem match_number :=
+  zxpsrw_lhs lem match_number || zxpsrw_rhs lem match_number.
+
+
+Tactic Notation "zxpsrw_lhs" uconstr(lem) "at" constr(n) :=
+  zxpsrw_lhs lem n.
+
+Tactic Notation "zxpsrw_lhs" uconstr(lem) :=
+  zxpsrw_lhs lem at O.
+
+Tactic Notation "zxpsrw_lhs" "<-" uconstr(lem) "at" constr(n) :=
+  zxpsrw_lhs (symmetry lem) at n.
+
+Tactic Notation "zxpsrw_lhs" "<-" uconstr(lem) :=
+  zxpsrw_lhs (symmetry lem).
+
+Tactic Notation "zxpsrw_rhs" uconstr(lem) "at" constr(n) :=
+  zxpsrw_rhs lem n.
+
+Tactic Notation "zxpsrw_rhs" uconstr(lem) :=
+  zxpsrw_rhs lem at O.
+
+Tactic Notation "zxpsrw_rhs" "<-" uconstr(lem) "at" constr(n) :=
+  zxpsrw_rhs (symmetry lem) at n.
+
+Tactic Notation "zxpsrw_rhs" "<-" uconstr(lem) :=
+  zxpsrw_rhs (symmetry lem).
+
+Tactic Notation "zxpsrw" uconstr(lem) "at" constr(n) :=
+  zxpsrw lem n.
+
+Tactic Notation "zxpsrw" uconstr(lem) :=
+  zxpsrw lem at O.
+
+Tactic Notation "zxpsrw" "<-" uconstr(lem) "at" constr(n) :=
+  zxpsrw (symmetry lem) at n.
+
+Tactic Notation "zxpsrw" "<-" uconstr(lem) :=
+  zxpsrw (symmetry lem).
+
+
+
+
+
 Lemma parametric_associativity_example {n m o p} {α β γ} :
   Z n m α ⟷ X m o β ⟷ Z o p γ ∝=
   Z n m α ⟷ (X m o β ⟷ Z o p γ).
@@ -4001,13 +4345,36 @@ Proof.
   apply Z_absolute_fusion.
 Qed.
 
-  
+(* FIXME: Add quote instances too *)
+#[export] Instance zx_denote_symm_monoidal {n m} (s : Monoidal n m) :
+  DiagramDenote (ProD:=ZX_SymmetricG_ProLike)
+    (cast _ _ (Monoidal_eq s) eq_refl (n_wire m))
+    [str monoidal_inl s].
+Proof.
+  constructor; done.
+Qed.
+
+
+Lemma Z_absolute_fusion : forall {n m o} α β,
+	(Z n (S m) α ⟷ Z (S m) o β) ∝=
+	Z n o (α + β).
+Proof.
+  intros. (* Figure 19a *)
+  induction m.
+  - apply Z_spider_1_1_fusion.
+  - rewrite grow_Z_top_right, grow_Z_top_left.
+    zxpsrw (Z_1_2_1_fusion 0 0).
+    rewrite Rplus_0_l.
+    zxpsrw IHm.
+    zxpscat.
+Qed.
+
 
 
 Lemma parametric_rewriting_example {n m o p : nat} {α β γ : R} : m <> 0 -> n <> 0 ->
   Z n (p + (m + n)) α ⟷ (n_wire p ↕ (Z m n α ↕ Z n m β)) ⟷
   (n_wire p ↕ zx_comm _ _) ⟷ (n_wire p ↕ (Z m n α ↕ Z n m α)) ⟷
-  Z (p + (n + m)) p 0 ∝ Z _ _ 0.
+  Z (p + (n + m)) p 0 ∝= Z _ _ 0.
 Proof.
   intros Hm Hn.
 
@@ -4030,75 +4397,15 @@ Proof.
 
 
   (* TODO: etc... let lem := lem *)
+  zxpsrw_lhs (@Z_absolute_fusion' m n m α α Hn).
+  zxpsrw_lhs (@Z_absolute_fusion' m n m α α Hn).
 
   set (lem := @Z_absolute_fusion' m n m α α Hn).
   set (match_number := 0) in n.
 
-  let Hrw := fresh "Hrw" in
-  time? "zxpsrw_lhs setup tactic" specialize (zxpsrw_lhs_lemma) as Hrw.
-
-  let le := fresh "le" in evar (le : list ZXCVERT);
-  let lev := eval unfold le in le in
-  specialize (Hrw (interp_discrete_hg_inhab lev)).
-
-  let lemT := type of lem in
-  lazymatch lemT with
-  | ?R ?dlhs ?drhs =>
-    specialize (Hrw _ _ dlhs drhs)
-  | _ =>
-    fail "cannot recognize lemma (type) as the application of a relation: " lemT
-  end.
-
-
-  lazymatch goal with
-  | |- ?R ?dtgt _ =>
-    specialize (Hrw _ _ dtgt)
-  | |- ?G => fail "cannot recognize goal as the application of a relation: " G
-  end.
-
-  specialize (Hrw match_number).
-  specialize (Hrw lem).
-
-  epose proof (Hrw _ _ _) as Hrw.
-
-  time? "zxpsrw_lhs quote lem to PRO" (
-  do 2 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Timed out trying to quote lemma! Have you declared all necessary instances?")).
-  time? "zxpsrw_lhs quote goal to PRO" (
-  do 1 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Timed out trying to quote goal! Have you declared all necessary instances?")).
-
-
-  time? "zxpsrw_lhs quote to positive PRO" (epose proof (Hrw _ _ _) as Hrw;
-  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error.")). (* TODO: maybe replace with just tactic? *)
-
-  let ln := fresh "ln" in evar (ln : list nat);
-  let lnv := eval unfold ln in ln in
-  specialize (Hrw (interp_discrete_hg_inhab lnv)).
-  epose proof (Hrw _ _ _ _   _ _ _) as Hrw.
-  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.").
-  let lnv := eval unfold ln in ln in 
-  specialize_with_concr_asgn_list Hrw ln.
-  time? "zxpsrw_lhs prove correctness of concrete assignment" (
-    tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac 
-    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error").
-  epose proof (Hrw _) as Hrw.
-  time? "zxpsrw_lhs compute rewrite" (tspecialize Hrw; [vm_compute;
-    lazymatch goal with
-    | |- ?R (Some _) (Some _) => reflexivity
-    | |- ?R None _ => fail "could not find the specified rewrite!"
-    end
-    | ]).
-  epose proof ()
-    (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
-      fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this.");
-
-    (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
-      fail "Timed out trying to denote result! Have you declared all necessary instances?");
-
-    apply Hrw)); exact nil|].
+  rewrite ?cast_id_eq.
+  Print Grammar tactic.
+  cleanup_permlike. )); exact nil|].
     vm_compute.
 
   }
@@ -4109,14 +4416,14 @@ Proof.
     vm_compute.
     apply bool_decide_eq_true.
     compute_done.
-  } 
+  }
   (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
     else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.").
   (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
     else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.").
   tspecialize Hrw.
-  
-  
+
+
   ltac2:(mk_MPRO_PRO_quote_SymmetricG()).
   (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
     else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.").

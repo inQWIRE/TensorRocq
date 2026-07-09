@@ -496,10 +496,19 @@ Ltac2 parse_nat_btree_to_pos (ns : constr list)
   let (ns, n_one) := constr_get_nth ns '(1:>nat) in
   (ns, btree_map (Ltac2.Option.map_default (Int.add 1) (Int.add 1 n_one)) b).
 
+Ltac2 parse_nat_btree_to_int (ns : constr list)
+  (c : constr) : constr list * int btree :=
+  let (ns, b) := parse_nat_btree ns c in
+  let (ns, n_one) := constr_get_nth ns '(1:>nat) in
+  (ns, btree_map (Ltac2.Option.default n_one) b).
 
-Local Ltac2 pair : 'a -> 'b -> 'a * 'b := fun a b => (a, b).
-
-Local Ltac2 id : 'a -> 'a := fun a => a.
+(* FIXME: Move *)
+Ltac2 pair : 'a -> 'b -> 'a * 'b := fun a b => (a, b).
+Ltac2 id : 'a -> 'a := fun a => a.
+Ltac2 btree_elems (b : 'a btree) : 'a list :=
+  btree_fold [] (fun a => [a]) List.append b.
+Ltac2 json_of_btree (of_a : 'a -> JSON) (b : 'a btree) : JSON :=
+  JSON.jlist (List.map of_a (btree_elems b)).
 
 Ltac2 posify_MPRO_sizes (fs : constr list -> 's -> constr list * 's')
   (ns : constr list)
@@ -1112,6 +1121,218 @@ End testing.
     Control.throw_invalid_argument "ERROR: Sized rewriting with Frobenius is not available yet!")
     (* ltac2:(mk_MPRO_PRO_quote_Frobenius()) *)
   else fail : typeclass_instances.
+
+
+
+(* FIXME: Move *)
+Ltac2 jint (i : int) : JSON := Jint i.
+Ltac2 jconstr (c : constr) : JSON := Jstring (Message.to_string (Message.of_constr c)).
+
+Import PrintingExtra Pp.
+
+Ltac2 prop_to_JSON_message (cp : constr) : message := 
+  let p := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id cp) in
+  let map_btree := parse_nat_btree_to_int in
+  let (ts, mp) := map_PRO_with map_btree
+      (map_SymmetricG_with map_btree) pair [] p in
+  let jbtree := json_of_btree jint in
+  let jmp := json_of_PRO jbtree  
+    (json_of_SymmetricG jbtree) jconstr mp in
+  let jtypes := List.map jconstr ts in
+  let jdiag := json_of_diagram jmp jtypes "symmetric" in
+  let jmsg := JSON.print_JSON jdiag in
+  str "RENDER PRO:" ++ spc() ++ jmsg.
+
+Ltac2 aprop_to_JSON_message (cp : constr) : message := 
+  let p := once (CC.of_PRO id (CC.of_Autonomous_gen id) id cp) in
+  let map_btree := parse_nat_btree_to_int in
+  let (ts, mp) := map_PRO_with map_btree
+      (map_Autonomous_with map_btree) pair [] p in
+  let jbtree := json_of_btree jint in
+  let jmp := json_of_PRO jbtree  
+    (json_of_Autonomous jbtree) jconstr mp in
+  let jtypes := List.map jconstr ts in
+  let jdiag := json_of_diagram jmp jtypes "autonomous" in
+  let jmsg := JSON.print_JSON jdiag in
+  str "RENDER PRO:" ++ spc() ++ jmsg.
+
+(* Ltac2 fprop_to_JSON_message (cp : constr) : message := 
+  let p := once (CC.of_PRO id (CC.of_Frobenius_gen id) id cp) in
+  let map_btree := parse_nat_btree_to_int in
+  let (ts, mp) := map_PRO_with map_btree
+      (map_Frobenius_with map_btree) pair [] p in
+  let jbtree := json_of_btree jint in
+  let jmp := json_of_PRO jbtree  
+  CC.of_MFrobenius_MPRO
+    (json_of_Frobenius jbtree) jconstr mp in
+  let jtypes := List.map jconstr ts in
+  let jdiag := json_of_diagram jmp jtypes "frobenius" in
+  let jmsg := JSON.print_JSON jdiag in
+  str "RENDER PRO:" ++ spc() ++ jmsg. *)
+
+Ltac2 prop_equation_to_JSON_message (clhs : constr) (crhs : constr) : message := 
+  let lhs := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id clhs) in
+  let rhs := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id crhs) in
+  let map_btree := parse_nat_btree_to_int in
+  let (ts, mlhs) := map_PRO_with map_btree
+      (map_SymmetricG_with map_btree) pair [] lhs in
+  let (ts, mrhs) := map_PRO_with map_btree
+      (map_SymmetricG_with map_btree) pair ts rhs in
+  let jbtree := json_of_btree jint in
+  let jmlhs := json_of_PRO jbtree  
+    (json_of_SymmetricG jbtree) jconstr mlhs in
+  let jmrhs := json_of_PRO jbtree  
+    (json_of_SymmetricG jbtree) jconstr mrhs in
+  let jtypes := List.map jconstr ts in
+  let jdiag := json_of_equation jmlhs jmrhs jtypes "symmetric" in
+  let jmsg := JSON.print_JSON jdiag in
+  str "RENDER PRO:" ++ spc() ++ jmsg.
+
+Ltac2 aprop_equation_to_JSON_message (clhs : constr) (crhs : constr) : message := 
+  let lhs := once (CC.of_PRO id (CC.of_Autonomous_gen id) id clhs) in
+  let rhs := once (CC.of_PRO id (CC.of_Autonomous_gen id) id crhs) in
+  let map_btree := parse_nat_btree_to_int in
+  let (ts, mlhs) := map_PRO_with map_btree
+      (map_Autonomous_with map_btree) pair [] lhs in
+  let (ts, mrhs) := map_PRO_with map_btree
+      (map_Autonomous_with map_btree) pair ts rhs in
+  let jbtree := json_of_btree jint in
+  let jmlhs := json_of_PRO jbtree  
+    (json_of_Autonomous jbtree) jconstr mlhs in
+  let jmrhs := json_of_PRO jbtree  
+    (json_of_Autonomous jbtree) jconstr mrhs in
+  let jtypes := List.map jconstr ts in
+  let jdiag := json_of_equation jmlhs jmrhs jtypes "autonomous" in
+  let jmsg := JSON.print_JSON jdiag in
+  str "RENDER PRO:" ++ spc() ++ jmsg.
+
+Ltac2 get_quoted_diagram (proD : constr) (cd : constr) : constr :=
+  let h := Fresh.fresh (Fresh.Free.of_goal()) @H in
+  eassert ($h : ProLike.DiagramQuote (ProD:=$proD) $cd _) by 
+    ltac1:(once typeclasses eauto);
+  let cp := lazy_match! Constr.type (Control.hyp h) with
+  | ProLike.DiagramQuote _ ?cp => cp
+  end in
+  Std.clear [h];
+  cp.
+
+Ltac2 prop_visualize_diag (proD : constr) (cd : constr) : unit := 
+  let cp := get_quoted_diagram proD cd in
+  Message.print (prop_to_JSON_message cp).
+
+Ltac prop_visualize_diag proD cd :=
+  let go := ltac2:(proD cd |- 
+    prop_visualize_diag 
+      (Option.get (Ltac1.to_constr proD))
+      (Option.get (Ltac1.to_constr cd))) in
+  go proD cd.
+
+Ltac2 prop_visualize_equation (proD : constr) (cdlhs : constr) (cdrhs : constr) : unit := 
+  let clhs := get_quoted_diagram proD cdlhs in
+  let crhs := get_quoted_diagram proD cdrhs in
+  Message.print (prop_equation_to_JSON_message clhs crhs).
+
+Ltac prop_visualize_equation proD cdlhs cdrhs :=
+  let go := ltac2:(proD cdlhs cdrhs |- 
+    prop_visualize_equation
+      (Option.get (Ltac1.to_constr proD))
+      (Option.get (Ltac1.to_constr cdlhs))
+      (Option.get (Ltac1.to_constr cdrhs))) in
+  go proD cdlhs cdrhs.
+
+
+Ltac2 prop_visualize_lhs (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?lhs ?_rhs] =>
+    prop_visualize_diag proD lhs
+  end.
+
+Ltac2 prop_visualize_rhs (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?_lhs ?rhs] =>
+    prop_visualize_diag proD rhs
+  end.
+
+Ltac2 prop_visualize_goal (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?lhs ?rhs] =>
+    prop_visualize_equation proD lhs rhs
+  end.
+
+
+Ltac prop_visualize_lhs proD :=
+  let go := ltac2:(proD |- 
+    prop_visualize_lhs (Option.get (Ltac1.to_constr proD))) in
+  go proD.
+
+Ltac prop_visualize_rhs proD :=
+  let go := ltac2:(proD |- 
+    prop_visualize_rhs (Option.get (Ltac1.to_constr proD))) in
+  go proD.
+
+Ltac prop_visualize_goal proD :=
+  let go := ltac2:(proD |- 
+    prop_visualize_goal (Option.get (Ltac1.to_constr proD))) in
+  go proD.
+
+Ltac2 aprop_visualize_diag (proD : constr) (cd : constr) : unit := 
+  let cp := get_quoted_diagram proD cd in
+  Message.print (aprop_to_JSON_message cp).
+
+Ltac aprop_visualize_diag proD cd :=
+  let go := ltac2:(proD cd |- 
+    aprop_visualize_diag 
+      (Option.get (Ltac1.to_constr proD))
+      (Option.get (Ltac1.to_constr cd))) in
+  go proD cd.
+
+Ltac2 aprop_visualize_equation (proD : constr) (cdlhs : constr) (cdrhs : constr) : unit := 
+  let clhs := get_quoted_diagram proD cdlhs in
+  let crhs := get_quoted_diagram proD cdrhs in
+  Message.print (aprop_equation_to_JSON_message clhs crhs).
+
+Ltac aprop_visualize_equation proD cdlhs cdrhs :=
+  let go := ltac2:(proD cdlhs cdrhs |- 
+    aprop_visualize_equation
+      (Option.get (Ltac1.to_constr proD))
+      (Option.get (Ltac1.to_constr cdlhs))
+      (Option.get (Ltac1.to_constr cdrhs))) in
+  go proD cdlhs cdrhs.
+
+
+Ltac2 aprop_visualize_lhs (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?lhs ?_rhs] =>
+    aprop_visualize_diag proD lhs
+  end.
+
+Ltac2 aprop_visualize_rhs (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?_lhs ?rhs] =>
+    aprop_visualize_diag proD rhs
+  end.
+
+Ltac2 aprop_visualize_goal (proD : constr) : unit := 
+  lazy_match! goal with
+  | [|- ?_r ?lhs ?rhs] =>
+    aprop_visualize_equation proD lhs rhs
+  end.
+
+
+Ltac aprop_visualize_lhs proD :=
+  let go := ltac2:(proD |- 
+    aprop_visualize_lhs (Option.get (Ltac1.to_constr proD))) in
+  go proD.
+
+Ltac aprop_visualize_rhs proD :=
+  let go := ltac2:(proD |- 
+    aprop_visualize_rhs (Option.get (Ltac1.to_constr proD))) in
+  go proD.
+
+Ltac aprop_visualize_goal proD :=
+  let go := ltac2:(proD |- 
+    aprop_visualize_goal (Option.get (Ltac1.to_constr proD))) in
+  go proD.
 
 
 (*

@@ -101,8 +101,8 @@ Class DiagramDenote `{ProD : ProLike Struct T D}
   diagram_denote : PRO_to_diagram p ≡ Some d;
 }.
 
-#[global] Hint Mode DiagramQuote  - ! - -   - -  + - : typeclass_instances.
-#[global] Hint Mode DiagramDenote - ! - -   - -  - + : typeclass_instances.
+#[global] Hint Mode DiagramQuote  - ! - -   - -  ! - : typeclass_instances.
+#[global] Hint Mode DiagramDenote - ! - -   - -  - ! : typeclass_instances.
 
 Lemma DiagramQuote_iff `{ProD : ProLike Struct T D}
   {n m} (d : D n m) (p : PRO Struct T n m) :

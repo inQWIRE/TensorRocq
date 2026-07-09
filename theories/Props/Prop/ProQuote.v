@@ -1815,7 +1815,22 @@ Ltac2 Eval
 
 End testing.
 
+Ltac2 json_of_diagram (diag : JSON) (types : JSON list) (diag_type : string) : JSON :=
+  Jobject (!Map(string_tag){
+    "type" : Jstring "diagram";
+    "types" : JSON.jlist types;
+    "diagramtype" : Jstring diag_type;
+    "data" : diag
+  }).
 
+
+Ltac2 json_of_equation (lhs : JSON) (rhs : JSON) (types : JSON list) (diag_type : string) : JSON :=
+  Jobject (!Map(string_tag){
+    "type" : Jstring "equation";
+    "types" : JSON.jlist types;
+    "diagramtype" : Jstring diag_type;
+    "data" : JSON.jlist [lhs;rhs]
+  }).
 
 (* Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab () :=
   match! goal with
