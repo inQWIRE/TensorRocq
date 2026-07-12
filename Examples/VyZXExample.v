@@ -1,9 +1,10 @@
 From VyZX Require Export ZXRules ZXpermFacts CoreRules DiagramRules GateRules.
 From TensorRocq Require Export SemanticRewriting.
+(* Print LoadPath. *)
 From TensorRocqEx Require Export VyZXTensor.
 
 (** In this file, we demonstrate the usage of our rewriting tactics
-  with an existing project, VyZX. 
+  with an existing project, VyZX.
   Prior to this, in the folder ZX we have established the necessary
   background, namely a small theory of the tensor definitions of the
   Z and X spiders in [ZXCore.v], a relationship between QuantumLib's
@@ -11,17 +12,17 @@ From TensorRocqEx Require Export VyZXTensor.
   between the semantics of VyZX's ZX diagrams as QuantumLib's [Matrix]
   and a tensor semantics [ZX_tensor_semantics], in [VyZXTensor.v].
   The key lemma is [ZX_tensor_semantics_correct], establishing that the
-  matrix semantics of a diagram is equal to the matrix of the tensor 
-  semantics. 
+  matrix semantics of a diagram is equal to the matrix of the tensor
+  semantics.
   *)
 
 (* The file [Rmodeq] contains a small theory of [R] modulo some positive value,
   in our case [2*PI]. *)
 From TensorRocqEx Require Import Rmodeq.
 
-(* First, we must define the data assocated to generators. In our case, 
+(* First, we must define the data assocated to generators. In our case,
   we use [option (bool * R + C)] with [None] being the hadamard box,
-  [Some (inl (false, α))] being a Z spider with phase [α], 
+  [Some (inl (false, α))] being a Z spider with phase [α],
   [Some (inl (true, α))] being a X spider with phase [α], and
   [Some (inr c)] being a constant gadget with value [c]. *)
 Definition ZXCVERT := option (bool * R + C).
@@ -485,95 +486,14 @@ Tactic Notation "zxrw" "<-" uconstr(lem) :=
 (* Below are examples of mixed use of our tactics and existing tactics. *)
 
 
-Theorem hopf_rule_Z_X :
-  (Z_Spider 1 2 0) ⟷ (X_Spider 2 1 0) ∝[/C2] (Z_Spider 1 0 0) ⟷ (X_Spider 0 1 0).
-Proof.
-  apply prop_by_iff_zx_scale.
-  split; [|intros ?%(f_equal fst); cbn in *; lra].
+Section BackgroundLemmas.
 
- 
-  rewrite <- (@nwire_removal_r 2).
-  cbv delta [n_wire]; simpl.
-  rewrite stack_empty_r_fwd.
-  simpl_casts.
-  rewrite wire_loop at 1.
-  rewrite cap_Z.
-  rewrite cup_X.
-  replace (0%R) with (0 + 0)%R by lra.
-  rewrite <- (@Z_spider_1_1_fusion 0 2).
-  rewrite <- X_spider_1_1_fusion.
-  replace (0 + 0)%R with 0%R by lra.
-
-  zxrw (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
-
-  unshelve (rewrite (X_wrap_under_bot_right 1)); [lia..|].
-  zxclean_lhs.
-  rewrite cup_Z.
-  
-  zxrw (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
-  
-  rewrite <- Z_0_is_wire at 1.
-  zxrw (symmetry (@Z_add_l 0 1 0 0 0 0)).
-  rewrite 2 Rplus_0_r.
-  zxrw (@Z_spider_1_1_fusion 0 2 0 0).
-  rewrite Rplus_0_r.
-  rewrite <- cap_Z.
-  rewrite cap_X.
-  rewrite <- X_0_is_wire at 2.
-  zxrw (symmetry (@X_add_r 0 0 1 0 0 0)).
-  rewrite 2 Rplus_0_r.
-  rewrite 2 zx_of_const_to_scaled_empty.
-  distribute_zxscale.
-  replace (_ * / √ 2)%C with (/ C2)%C by (autorewrite with RtoC_db; C_field).
-  zxcat.
-Qed.
-
-
-Theorem bi_algebra_rule_X_over_Z :
-  X 1 2 0 ↕ — ⟷ (— ↕ Z 2 1 0) ⟷ ⨉
-  ⟷ (X 1 2 0 ↕ —) ⟷ (— ↕ Z 2 1 0) ∝[/ (√2)%R]
-  Z 1 2 0 ↕ — ⟷ (— ↕ X 2 1 0).
-Proof.
-  zxsymmetry.
-  apply prop_by_iff_zx_scale.
-  split; [|nonzero].
-  rewrite (Z_wrap_over_top_right).
-  rewrite (X_wrap_under_bot_right 1 1 0 eq_refl eq_refl).
-  rewrite cap_Z, cup_Z.
-
-  zxrw (to_gadget bi_algebra_rule_X_Z).
-  assert (Hrw1 : X 1 2 0 ∝= — ↕ ⊂ ⟷ (— ↕ X 1 2 0 ↕ —) ⟷ (⊃ ↕ n_wire 2)). 1:{
-    rewrite cup_X, cap_X.
-    zxrw (dominated_X_spider_fusion_top_left 2 0 1 0 0 0).
-    rewrite Rplus_0_l.
-    zxrw (X_spider_fusion_bot_left_top_right 1 0 2 0 0 0 0 eq_refl eq_refl).
-    now rewrite Rplus_0_l.
-  }
-  (* rewrite <- cap_Z, <- cup_Z. *)
-  assert (Hrw2 : Z 2 1 0 ∝= (n_wire 2 ↕ ⊂) ⟷ (— ↕ Z 2 1 0 ↕ —) ⟷ (⊃ ↕ —)). 1:{
-    rewrite cup_Z, cap_Z.
-    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 0 1 0 0 eq_refl eq_refl).
-    rewrite Rplus_0_l.
-    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl).
-    now rewrite Rplus_0_l.
-  }
-  rewrite Hrw1 at 1.
-  rewrite Hrw2 at 2.
-  rewrite <- cap_Z, <- cup_Z.
-  zxcat.
-Qed.
-
-Lemma cnot_is_swapp_notc : _CNOT_ ∝= ⨉ ⟷ _NOTC_ ⟷ ⨉. 
-Proof.
-  rewrite notc_is_swapp_cnot.
-  zxcat.
-Qed.
 
 Import CastRules ComposeRules.
 
-Theorem hopf_rule_Z_X_vert n m top bot α β prf : 
+Theorem hopf_rule_Z_X_vert n m top bot α β prf :
   Z n (top + 2) α ↕ n_wire bot ⟷
-  cast _ _ prf eq_refl 
+  cast _ _ prf eq_refl
     (n_wire top ↕ X (2 + bot) m β) ∝[/ C2] Z n top α ↕ X bot m β.
 Proof.
   rewrite <- (Rplus_0_l α), <- (dominated_Z_spider_fusion_bot_left _ 0).
@@ -612,17 +532,297 @@ Proof.
   zxcat.
 Qed.
 
+
+
+
+End BackgroundLemmas.
+
+
+
+Section ExampleProofs.
+
+From VyZX Require Import CoreData CoreRules CastRules ComposeRules ZXpermFacts.
+
+Local Coercion INR : nat >-> R.
+
+(* We use Rocq's Ltac Profiling mechanism to time the proof execution. *)
+Set Ltac Profiling.
+
+
+
+Theorem bi_algebra_rule_X_over_Z :
+  X 1 2 0 ↕ — ⟷ (— ↕ Z 2 1 0) ⟷ ⨉
+  ⟷ (X 1 2 0 ↕ —) ⟷ (— ↕ Z 2 1 0) ∝[/ (√2)%R]
+  Z 1 2 0 ↕ — ⟷ (— ↕ X 2 1 0).
+Proof.
+  Reset Ltac Profile.
+  zxsymmetry.
+  apply prop_by_iff_zx_scale.
+  split; [|nonzero].
+  rewrite (Z_wrap_over_top_right).
+  rewrite (X_wrap_under_bot_right 1 1 0 eq_refl eq_refl).
+  rewrite cap_Z, cup_Z.
+  zxrw (to_gadget bi_algebra_rule_X_Z).
+  assert (Hrw1 : X 1 2 0 ∝= — ↕ ⊂ ⟷ (— ↕ X 1 2 0 ↕ —) ⟷ (⊃ ↕ n_wire 2)). 1:{
+    rewrite cup_X, cap_X.
+    zxrw (dominated_X_spider_fusion_top_left 2 0 1 0 0 0).
+    rewrite Rplus_0_l.
+    zxrw (X_spider_fusion_bot_left_top_right 1 0 2 0 0 0 0 eq_refl eq_refl).
+    now rewrite Rplus_0_l.
+  }
+  assert (Hrw2 : Z 2 1 0 ∝= (n_wire 2 ↕ ⊂) ⟷ (— ↕ Z 2 1 0 ↕ —) ⟷ (⊃ ↕ —)). 1:{
+    rewrite cup_Z, cap_Z.
+    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 0 1 0 0 eq_refl eq_refl).
+    rewrite Rplus_0_l.
+    zxrw (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl).
+    now rewrite Rplus_0_l.
+  }
+  rewrite Hrw1 at 1.
+  rewrite Hrw2 at 2.
+  rewrite <- cap_Z, <- cup_Z.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+Theorem hopf_rule_Z_X :
+  (Z_Spider 1 2 0) ⟷ (X_Spider 2 1 0) ∝[/C2] (Z_Spider 1 0 0) ⟷ (X_Spider 0 1 0).
+Proof.
+  Reset Ltac Profile.
+  apply prop_by_iff_zx_scale.
+  split; [|intros ?%(f_equal fst); cbn in *; lra].
+  rewrite <- (@nwire_removal_r 2).
+  cbv delta [n_wire]; simpl.
+  rewrite stack_empty_r_fwd.
+  simpl_casts.
+  rewrite wire_loop at 1.
+  rewrite cap_Z.
+  rewrite cup_X.
+  replace (0%R) with (0 + 0)%R by lra.
+  rewrite <- (@Z_spider_1_1_fusion 0 2).
+  rewrite <- X_spider_1_1_fusion.
+  replace (0 + 0)%R with 0%R by lra.
+  zxrw (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
+  unshelve (rewrite (X_wrap_under_bot_right 1)); [lia..|].
+  zxclean_lhs.
+  rewrite cup_Z.
+  zxrw (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
+  rewrite <- Z_0_is_wire at 1.
+  zxrw (symmetry (@Z_add_l 0 1 0 0 0 0)).
+  rewrite 2 Rplus_0_r.
+  zxrw (@Z_spider_1_1_fusion 0 2 0 0).
+  rewrite Rplus_0_r.
+  rewrite <- cap_Z.
+  rewrite cap_X.
+  rewrite <- X_0_is_wire at 2.
+  zxrw (symmetry (@X_add_r 0 0 1 0 0 0)).
+  rewrite 2 Rplus_0_r.
+  rewrite 2 zx_of_const_to_scaled_empty.
+  distribute_zxscale.
+  replace (_ * / √ 2)%C with (/ C2)%C by (autorewrite with RtoC_db; C_field).
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+
+
+
+Definition bell_state_prep :=
+  (((X 0 1 0) ↕ (X 0 1 0)) ⟷ (□ ↕ —) ⟷
+  ((Z 1 2 0 ↕ —) ⟷ (— ↕ X 2 1 0))).
+
+Lemma bell_state_prep_correct : bell_state_prep ∝= ⊂.
+Proof.
+  Reset Ltac Profile.
+  zxrw <- (colorswap_is_bihadamard (X 0 1 0)).
+  zxrw (@Z_spider_1_1_fusion 0 2 0 0).
+  zxrw (X_spider_fusion_bot_left_top_right 1 0 0 0 1 0 0 eq_refl eq_refl).
+  rewrite Rplus_0_r.
+  rewrite <- cap_Z, X_0_is_wire.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+
+Definition teleportation (a b : nat) :=
+  (⊂ ↕ Z 1 2 0) ⟷ ((X 1 1 (INR b * PI) ⟷ Z 1 1 (INR a * PI)) ↕
+    (((X 2 1 0) ↕ (Z 1 0 (INR a * PI)) ⟷ (□ ⟷ Z 1 0 (INR b * PI))))).
+
+
+Lemma teleportation_correct : forall a b, teleportation a b ∝= —.
+Proof.
+  Reset Ltac Profile.
+  intros a b.
+  unfold teleportation.
+  rewrite cap_X.
+  zxrw <- (colorswap_is_bihadamard (Z 1 0 (INR b * PI))).
+  zxrw (@X_spider_1_1_fusion 2 0 0 (INR b * PI)).
+  zxrw (X_spider_fusion_bot_left_top_right 0 0 1 0 1 0 (INR b * PI) eq_refl eq_refl).
+  rewrite <- (X_zxperm_absorbtion_right _ _ _ _ ⨉) by auto_zxperm.
+  rewrite <- (X_zxperm_absorbtion_left _ _ _ _ ⨉) by auto_zxperm.
+  (* rewrite <- (X_) *)
+  (* zxrw (reflexivity _ : Z 1 0 (INR a * PI) ∝= _). *)
+  rewrite Rplus_0_l, Rplus_0_r.
+  zxrw (X_spider_fusion_bot_left_top_right 1 0 1 0 0 (b * PI) (b * PI) eq_refl eq_refl).
+  replace ((INR b * PI + INR b * PI))%R with (INR b * 2 * PI)%R by lra.
+  rewrite X_2_PI, X_0_is_wire.
+  zxrw <- (@Z_add_r 1 1 0 (a * PI) 0 (a * PI)).
+  replace ((INR a * PI + 0 + INR a * PI))%R with (INR a * 2 * PI)%R by lra.
+  rewrite Z_2_PI, Z_0_is_wire.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+
+Definition bell_measurement (a b : nat) :=
+  (_CNOT_ ⟷ (((Z 1 0 ((INR a) * PI))) ↕ (X 1 0 ((INR b) * PI)))).
+
+Lemma bell_measurement_eq : forall a b,
+  bell_measurement a b ∝= (Z 1 1 (INR a * PI) ⟷ X 1 1 (INR b * PI)) ↕ — ⟷ ⊃.
+Proof.
+  Set Ltac Profiling.
+  Reset Ltac Profile.
+  intros a b.
+  zxrw (@X_spider_1_1_fusion 2 0 0 (INR b * PI)).
+  zxrw <- (Z_appendix_rot_r 1 1 0 (INR a * PI)).
+  rewrite Rplus_0_l, Rplus_0_r.
+  rewrite cup_X.
+  zxrw (X_spider_fusion_top_left_bot_right 0 0 1 1 0 (INR b * PI) 0 eq_refl eq_refl).
+  rewrite Rplus_0_r.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+Definition teleportation_2
+  (a b : nat) :=
+  (— ↕ bell_state_prep) ⟷ ((bell_measurement a b) ↕
+                          (X 1 1 (INR b * PI) ⟷ (Z 1 1 (INR a * PI)))).
+
+Lemma teleportation_2_correct : forall (a b : nat), teleportation_2 a b ∝= —.
+Proof.
+  Set Ltac Profiling.
+  Reset Ltac Profile.
+  intros a b.
+  zxrw (bell_measurement_eq a b).
+  rewrite cup_X.
+  zxrw (bell_state_prep_correct).
+  rewrite cap_X.
+  rewrite <- (X_zxperm_absorbtion_right _ _ _ _ ⨉) by auto_zxperm.
+  zxrw (X_spider_fusion_bot_left_top_right 0 0 1 0 1 0 (INR b * PI) eq_refl eq_refl).
+  zxrw (X_spider_fusion_top_left_bot_right 0 0 1 1 0 (INR b * PI) 0 eq_refl eq_refl).
+  rewrite Rplus_0_r.
+  rewrite <- (X_zxperm_absorbtion_left _ _ _ _ ⨉) by auto_zxperm.
+  zxrw (X_spider_fusion_top_left_bot_right 1 0 1 0 0 (INR b * PI) (INR b * PI) eq_refl eq_refl).
+  replace ((INR b * PI + INR b * PI))%R with (INR b * 2 * PI)%R by lra.
+  rewrite X_2_PI, X_0_is_wire.
+  zxrw (@Z_spider_1_1_fusion 1 1 (INR a * PI) (INR a * PI)).
+  replace ((INR a * PI + INR a * PI))%R with (INR a * 2 * PI)%R by lra.
+  rewrite Z_2_PI, Z_0_is_wire.
+  reflexivity.
+  Show Ltac Profile.
+Time Qed.
+
+
+
+
+
+
+
+
+Lemma cnot_involutive : _CNOT_R ⟷ _CNOT_ ∝[/ C2] n_wire 2.
+Proof.
+  Reset Ltac Profile.
+  apply prop_by_iff_zx_scale; split; [|apply nonzero_div_nonzero; nonzero].
+  zxrw (@Z_spider_1_1_fusion 2 2 0 0).
+  rewrite (X_wrap_over_top_left 1 1).
+  rewrite (X_wrap_over_top_right 1 1) at 1.
+  rewrite cap_X, cup_X.
+  zxrw (@X_spider_1_1_fusion 2 2 0 0).
+  rewrite Rplus_0_l.
+  zxrw (X_spider_fusion_top_left_bot_right 1 0 1 0 2 0 0 eq_refl eq_refl).
+  rewrite <- cup_X, cup_Z.
+  zxrw (Z_spider_fusion_top_left_bot_right 1 0 1 2 0 0 0 eq_refl eq_refl).
+  rewrite Rplus_0_r.
+  zxrw (reflexivity _ : X 1 3 0 ≡ X 1 3 0)%stdpp.
+  rewrite grow_X_top_right, (@grow_Z_bot_left 1 2).
+  zxrw (to_gadget hopf_rule_X_Z).
+  zxrw <- (X_appendix_rot_r 1 1 0 0).
+  zxrw <- (@grow_Z_bot_left 1 0 1 0).
+  rewrite Rplus_0_r.
+  rewrite X_0_is_wire, Z_0_is_wire.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+
+Lemma cnot_is_cnot_r : _CNOT_ ∝= _CNOT_R.
+Proof.
+  Reset Ltac Profile.
+  rewrite (Z_wrap_under_bot_left 1 1 _ eq_refl eq_refl).
+  rewrite (X_wrap_over_top_left 1 1).
+  cbn.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+
+Lemma cnot_inv_is_swapped_cnot : _CNOT_inv_ ∝= ⨉ ⟷ _CNOT_ ⟷ ⨉.
+Proof.
+  Reset Ltac Profile.
+  zxrw <- (colorswap_is_bihadamard _CNOT_).
+  rewrite cnot_is_cnot_r.
+  rewrite <- (Z_zxperm_absorbtion_left _ _ _ _ ⨉) at 1 by auto_zxperm.
+  rewrite <- (X_zxperm_absorbtion_right _ _ _ _ ⨉) at 1 by auto_zxperm.
+  zxcat.
+  Show Ltac Profile.
+Time Qed.
+
+(* Immediate consequences of the above, used in final proof: *)
+
+Lemma notc_is_swapp_cnot : _NOTC_ ∝= ⨉ ⟷ _CNOT_ ⟷ ⨉.
+Proof.
+  rewrite <- cnot_inv_is_swapped_cnot.
+  rewrite compose_assoc.
+  rewrite <- colorswap_is_bihadamard.
+  rewrite cnot_is_cnot_r.
+  easy.
+Qed.
+
+Lemma cnot_is_swapp_notc : _CNOT_ ∝= ⨉ ⟷ _NOTC_ ⟷ ⨉.
+Proof.
+  rewrite notc_is_swapp_cnot.
+  rewrite compose_assoc, (compose_assoc _ ⨉).
+  rewrite swap_compose, nwire_removal_r.
+  rewrite <- compose_assoc.
+  now rewrite swap_compose, nwire_removal_l.
+Qed.
+
+Lemma notc_r_is_swapp_cnot_r : _NOTC_R ∝= ⨉ ⟷ _CNOT_R ⟷ ⨉.
+Proof.
+  rewrite <- cnot_is_cnot_r.
+  rewrite <- cnot_inv_is_swapped_cnot.
+  rewrite compose_assoc.
+  rewrite <- colorswap_is_bihadamard.
+  easy.
+Qed.
+
+Lemma notc_is_notc_r : _NOTC_ ∝= _NOTC_R.
+Proof.
+  rewrite notc_is_swapp_cnot.
+  rewrite cnot_is_cnot_r.
+  rewrite <- notc_r_is_swapp_cnot_r.
+  easy.
+Qed.
+
+
+
 Lemma _3_cnot_swap_is_swap : _3_CNOT_SWAP_ ∝[/ (C2 * √2)] ⨉.
 Proof.
+  Reset Ltac Profile.
   apply prop_by_iff_zx_scale.
-  split. 2:{
-    apply nonzero_div_nonzero, Cmult_neq_0; nonzero.
-  }
-  
+  split; [|apply nonzero_div_nonzero, Cmult_neq_0; nonzero].
   rewrite cnot_is_swapp_notc at 2.
   rewrite notc_is_notc_r.
   zxrw (to_gadget bi_algebra_rule_X_over_Z).
-  
   zxrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
   rewrite Rplus_0_l.
   zxrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).
@@ -632,6 +832,7 @@ Proof.
   rewrite Cinv_mult_distr.
   rewrite Z_is_wire, X_0_is_wire.
   zxcat.
-Qed.
+  Show Ltac Profile.
+Time Qed.
 
-
+End ExampleProofs.
