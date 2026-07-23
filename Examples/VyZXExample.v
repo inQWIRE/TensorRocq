@@ -543,7 +543,7 @@ Section ExampleProofs.
 
 From VyZX Require Import CoreData CoreRules CastRules ComposeRules ZXpermFacts.
 
-Local Coercion INR : nat >-> R.
+(* Local Coercion INR : nat >-> R. *)
 
 (* We use Rocq's Ltac Profiling mechanism to time the proof execution. *)
 Set Ltac Profiling.
