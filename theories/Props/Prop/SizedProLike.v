@@ -37,7 +37,7 @@ Class SizedProLike {N} (MStruct : Mor (btree N))
   `{EqMStruct : forall n m, Equiv (MStruct n m)}
   `{EqStruct : forall n m, Equiv (Struct n m)} := {
   #[global] SPL_PL :: ProLike Struct T D;
-  #[global] SPL_test :: SizedOfTensorSomeTestable T D;
+  (* #[global] SPL_test :: SizedOfTensorSomeTestable T D; *)
   #[global] SPL_interp :: InterpStruct MStruct Struct
 }.
 

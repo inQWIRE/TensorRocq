@@ -28,7 +28,14 @@ Local Existing Instance Countable_Equiv.
 Local Open Scope positive_scope.
 
 
-
+(* FIXME: Move *)
+Lemma InA_alt {A} (eqA : A -> A -> Prop) (x : A) l :
+  InA eqA x l <-> exists y, eqA x y /\ y ∈ l.
+Proof.
+  rewrite InA_alt.
+  setoid_rewrite elem_of_list_In.
+  done.
+Qed.
 
 
 Local Existing Instance Countable_Equiv.
@@ -44,14 +51,10 @@ Record LawfulMPRORewritingRelation {MStruct Struct T}
    := mk_LawfulMPRORewritingRelation {
   LPRR :>
     LawfulPRORewritingRelation Struct T;
-  mpro_rewriting_domain_partial_dec (concrete_assignments : Pmap nat)
-    {n m} (mp : MPRO MStruct T n m) :
-    bool;
-  mpro_rewriting_domain_partial_dec_correct
-    (concrete_assignments : Pmap nat) {n m} (mp : MPRO MStruct T n m) :
-    mpro_rewriting_domain_partial_dec concrete_assignments mp = true ->
-    forall fN, map_Forall (λ k v, fN k = v) concrete_assignments ->
-    LPRR.(pro_rewriting_domain) (MPRO_to_PRO fN mp);
+  pro_rewriting_domain_mono_strong {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    (forall nmt, nmt ∈ PRO_tensors p -> InA (prod_relation eq equiv) nmt (PRO_tensors p')) ->
+    LPRR.(pro_rewriting_domain) p' -> LPRR.(pro_rewriting_domain) p;
   mpro_rewriting_relation_graph_syntax_l {n m} (mp mp' mq : MPRO MStruct T n m)  :
     MPRO_graph_semantics mp ≡ₛ MPRO_graph_semantics mp' ->
     forall fN,
@@ -62,7 +65,113 @@ Record LawfulMPRORewritingRelation {MStruct Struct T}
 
 Global Arguments LawfulMPRORewritingRelation (_ _ _) {_ _ _ _ _ _ _} : assert.
 
-Lemma mpro_rewriting_domain_partial_dec_correct_alt {MStruct Struct T}
+
+Lemma pro_rewriting_domain_mono {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    PRO_tensors p ⊆ PRO_tensors p' ->
+    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
+Proof.
+  intros Htens.
+  apply pro_rewriting_domain_mono_strong.
+  intros nmt Hnmt%Htens%elem_of_list_In.
+  apply (In_InA _).
+  done.
+Qed.
+
+Lemma pro_rewriting_domain_mono_inclA {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    inclA (prod_relation eq equiv) (PRO_tensors p) (PRO_tensors p') ->
+    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
+Proof.
+  intros Hpp'.
+  apply pro_rewriting_domain_mono_strong.
+  intros nmt Hnmt.
+  apply Hpp'.
+  apply (In_InA _), elem_of_list_In.
+  done.
+Qed.
+
+
+
+(* FIXME: Move *)
+Fixpoint MPRO_tensors {N Struct T} {n m}
+  (mp : @MPRO N Struct T n m) : list (btree N * btree N * T) :=
+  match mp with
+  | Mid _ | Mstruct _ _ _ => []
+  | Mcompose ml mr | Mstack ml mr => MPRO_tensors ml ++ MPRO_tensors mr
+  | Mgen n m t => [(n, m, t)]
+  end.
+
+Definition MPRO_tensors_lists {N Struct T} {n m}
+  (mp : @MPRO N Struct T n m) : list (list N * list N * T) :=
+  prod_map (prod_map btree_elems btree_elems) id <$> MPRO_tensors mp.
+
+Definition MPRO_tensors_encoded {N Struct T} `{Countable N, Countable T}
+  {n m} (mp : @MPRO N Struct T n m) : list positive :=
+  encode ∘ prod_map (prod_map btree_elems btree_elems) id <$> MPRO_tensors mp.
+
+Fixpoint MPRO_tensors_set {N Struct T} `{Countable N, Countable T}
+  {n m} (mp : @MPRO N Struct T n m) : Pset :=
+  match mp with
+  | Mid _ | Mstruct _ _ _ => ∅
+  | Mcompose ml mr | Mstack ml mr => MPRO_tensors_set ml ∪ MPRO_tensors_set mr
+  | Mgen n m t => {[encode (btree_elems n, btree_elems m, t)]}
+  end.
+
+Lemma list_to_set_MPRO_tensors_encoded {N Struct T} `{Countable N, Countable T}
+  {n m} (mp : @MPRO N Struct T n m) :
+  list_to_set (MPRO_tensors_encoded mp) = MPRO_tensors_set mp.
+Proof.
+  induction mp; [done
+    | cbn; rewrite fmap_app, list_to_set_app_L; f_equal; auto..
+    | done
+    | apply leibniz_equiv_iff, list_to_set_singleton].
+Qed.
+
+Lemma PRO_tensors_MPRO_to_PRO {N MStruct Struct T}
+  `{InterpStruct N MStruct Struct}
+  (fN : N -> nat) {n m}
+  (mp : @MPRO N MStruct T n m) : PRO_tensors (MPRO_to_PRO fN mp) =
+  prod_map (prod_map (btree_size fN) (btree_size fN)) id <$>
+  MPRO_tensors mp.
+Proof.
+  induction mp; [done| | |done..];
+  cbn; rewrite fmap_app; now f_equal.
+Qed.
+
+Lemma PRO_tensors_MPRO_to_PRO_lists {N MStruct Struct T}
+  `{InterpStruct N MStruct Struct}
+  (fN : N -> nat) {n m}
+  (mp : @MPRO N MStruct T n m) : PRO_tensors (MPRO_to_PRO fN mp) =
+  prod_map (prod_map (sum_list_with fN) (sum_list_with fN)) id <$>
+  MPRO_tensors_lists mp.
+Proof.
+  rewrite PRO_tensors_MPRO_to_PRO.
+  unfold MPRO_tensors_lists.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [[i o] t] _.
+  cbn.
+  now rewrite 2 sum_list_with_btree_elems.
+Qed.
+
+Lemma mpro_rewriting_domain_mono {MStruct Struct T}
   {MStructG : @SizedStructGraphable positive MStruct T}
   {EqStruct : forall n m, Equiv (Struct n m)}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
@@ -70,17 +179,166 @@ Lemma mpro_rewriting_domain_partial_dec_correct_alt {MStruct Struct T}
   {StructG : StructGraphable Struct T}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  concrete_assignments {n m} (mp : MPRO MStruct T n m) :
-  RR.(mpro_rewriting_domain_partial_dec) concrete_assignments mp = true ->
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors mp ⊆ MPRO_tensors mp' ->
   forall fN,
-  RR.(pro_rewriting_domain) (MPRO_to_PRO (λ p,
-    default (fN p) (concrete_assignments !! p)) mp).
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
 Proof.
-  intros Hdec fN.
-  eapply mpro_rewriting_domain_partial_dec_correct; [done|].
-  intros k v Hkv.
-  rewrite Hkv.
-  done.
+  intros Hmp fN.
+  apply pro_rewriting_domain_mono.
+  rewrite 2 PRO_tensors_MPRO_to_PRO.
+  now apply list_fmap_subseteq.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_lists {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_lists mp ⊆ MPRO_tensors_lists mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp fN.
+  apply pro_rewriting_domain_mono.
+  rewrite 2 PRO_tensors_MPRO_to_PRO_lists.
+  now apply list_fmap_subseteq.
+Qed.
+
+(* FIXME: Move *)
+Lemma list_fmap_subseteq_inv {A B} (f : A -> B) {Hf : Inj eq eq f}
+  (l l' : list A) :
+  f <$> l ⊆ f <$> l' -> l ⊆ l'.
+Proof.
+  set_solver.
+Qed.
+#[export] Instance Forall_subseteq_proper {A} :
+  Proper (pointwise_relation A iff ==> subseteq --> impl) (@Forall A).
+Proof.
+  intros P P' HP l l' Hl.
+  rewrite 2 Forall_forall.
+  hnf in *.
+  naive_solver.
+Qed.
+Lemma Forall_subseteq_proper_inv {A} (l l' : list A)
+  (Hl : forall P, Forall P l -> Forall P l') : l' ⊆ l.
+Proof.
+  specialize (Hl (.∈ l)).
+  rewrite 2 Forall_forall in Hl.
+  hnf.
+  naive_solver.
+Qed.
+
+
+
+Lemma mpro_rewriting_domain_mono_encoded {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Countable T}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_encoded mp ⊆ MPRO_tensors_encoded mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp.
+  apply mpro_rewriting_domain_mono_lists.
+  apply (list_fmap_subseteq_inv encode).
+  unfold MPRO_tensors_lists.
+  rewrite <- 2 list_fmap_compose.
+  exact Hmp.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_set {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Countable T}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp.
+  apply mpro_rewriting_domain_mono_encoded.
+  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
+  now apply list_to_set_subseteq in Hmp.
+Qed.
+
+(* FIXME: Move *)
+Lemma PRO_tensors_PRO_denote {Struct T T'} (f : T -> T')
+  {n m} (p : PRO Struct T n m) :
+  PRO_tensors (PRO_denote f p) = prod_map id f <$> PRO_tensors p.
+Proof.
+  induction p; cbn; rewrite ? fmap_app; f_equal; auto.
+Qed.
+Definition denote_MPRO {N} {MStruct} {T T'}
+  (f : T -> T') {n m : btree N} (mp : MPRO MStruct T n m) : MPRO MStruct T' n m :=
+  map_MPRO (λ _ _ s, s) f mp.
+Lemma MPRO_to_PRO_denote_MPRO {N} {MStruct} {Struct}
+  `{InterpM : InterpStruct N MStruct Struct} {T T'}
+  (f : T -> T') fN {n m : btree N} (mp : MPRO MStruct T n m) :
+  MPRO_to_PRO fN (denote_MPRO f mp) = PRO_denote f (MPRO_to_PRO fN mp).
+Proof.
+  induction mp; cbn; f_equal; done.
+Qed.
+Lemma MPRO_tensors_denote_MPRO {A MStruct T T'} (f : T -> T')
+  {n m : btree A} (mp : MPRO MStruct T n m) :
+  MPRO_tensors (denote_MPRO f mp) = prod_map id f <$> MPRO_tensors mp.
+Proof.
+  induction mp; cbn; rewrite ? fmap_app; f_equal; auto.
+Qed.
+Lemma MPRO_tensors_lists_denote_MPRO {A MStruct T T'} (f : T -> T')
+  {n m : btree A} (mp : MPRO MStruct T n m) :
+  MPRO_tensors_lists (denote_MPRO f mp) = prod_map id f <$> MPRO_tensors_lists mp.
+Proof.
+  induction mp; cbn; rewrite ? fmap_app; f_equal; auto.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_set_quoted {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Equiv T, Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  `{Countable T'} (f : T' -> T)
+  {n m} (mp : MPRO MStruct T' n m)
+    {n' m'} (mp' : MPRO MStruct T' n' m') :
+    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp')) ->
+    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp)).
+Proof.
+  intros Hmp fN.
+  rewrite <- 2 MPRO_to_PRO_denote_MPRO.
+  apply mpro_rewriting_domain_mono_lists.
+  rewrite 2 MPRO_tensors_lists_denote_MPRO.
+  apply list_fmap_subseteq.
+  apply (list_fmap_subseteq_inv encode).
+  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
+  unfold MPRO_tensors_lists.
+  rewrite <- 2 list_fmap_compose.
+  now apply list_to_set_subseteq in Hmp.
 Qed.
 
 Lemma mpro_rewriting_relation_graph_syntax_r {MStruct Struct T}
@@ -134,26 +392,6 @@ Qed.
   (RR : LawfulMPRORewritingRelation MStruct Struct T concrete_assignments) *)
 
 
-(* FIXME: Move *)
-Fixpoint MPRO_tensors {N Struct T} {n m}
-  (mp : @MPRO N Struct T n m) : list (btree N * btree N * T) :=
-  match mp with
-  | Mid _ | Mstruct _ _ _ => []
-  | Mcompose ml mr | Mstack ml mr => MPRO_tensors ml ++ MPRO_tensors mr
-  | Mgen n m t => [(n, m, t)]
-  end.
-
-Lemma PRO_tensors_MPRO_to_PRO {N MStruct Struct T}
-  `{InterpStruct N MStruct Struct}
-  (fN : N -> nat) {n m}
-  (mp : @MPRO N MStruct T n m) : PRO_tensors (MPRO_to_PRO fN mp) =
-  prod_map (prod_map (btree_size fN) (btree_size fN)) id <$>
-  MPRO_tensors mp.
-Proof.
-  induction mp; [done| | |done..];
-  cbn; rewrite fmap_app; now f_equal.
-Qed.
-
 
 Program Definition LawfulProLike_LawfulMPRORewritingRelation
   (MStruct : Mor (btree positive))
@@ -168,7 +406,7 @@ Program Definition LawfulProLike_LawfulMPRORewritingRelation
   {SizedProD : SizedProLike MStruct Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
+  (* (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test)) *)
   {MStructG : @SizedStructGraphable positive MStruct T}
   {StructG : StructGraphable Struct T}
   {TensStruct : StrictTensorLike R A Struct}
@@ -177,29 +415,29 @@ Program Definition LawfulProLike_LawfulMPRORewritingRelation
   (LawPro : LawfulProLike R A Struct T D)
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
+  {LawTensD : LawfulTensorableDiagram R A T D }
+  (* {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D} *)
   : LawfulMPRORewritingRelation MStruct Struct T := {|
   LPRR := LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro;
-  mpro_rewriting_domain_partial_dec concrete_assignments n m mp :=
-    forallb (uncurry3 (sized_ofTensor_some concrete_assignments))
-      (MPRO_tensors mp);
   (* pro_rewriting_relation n m :=
     λ p q, exists d1 d2, DiagramDenote d1 p /\ DiagramDenote d2 q /\ d1 ≡ d2;
   pro_rewriting_domain n m p := is_Some (PRO_to_diagram p); *)
 |}.
 Next Obligation.
-  intros until mp.
+  intros until p'.
+  intros Hp.
   cbn.
-  rewrite <- Is_true_true, forallb_True.
-  intros Hmp fN HfN.
-  apply PRO_to_diagram_is_Some.
-  rewrite PRO_tensors_MPRO_to_PRO.
-  rewrite Forall_fmap.
-  eapply Forall_impl; [apply Hmp|].
-  intros ((n', m'), t).
-  cbn.
-  intros Hsome%Is_true_true.
-  apply (sized_ofTensor_some_correct _ _ _ _ fN) in Hsome; done.
+  rewrite 2 PRO_to_diagram_is_Some.
+  rewrite 2 Forall_forall.
+  intros Hp'.
+  intros ((i, o), t) Htio%Hp%InA_alt.
+  destruct Htio as ([[i' o'] t'] & [[= <- <-] Hts] & Ht').
+  simpl in Hts.
+  erewrite (f_equiv is_Some).
+  2:{
+    apply (LawTensD.(ofTensor_proper R A)), Hts.
+  }
+  now apply (Hp' (i, o, t')).
 Qed.
 Next Obligation.
   intros until mp.
@@ -285,7 +523,6 @@ Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
   {SizedProD : SizedProLike MStruct Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive MStruct T}
   {FreeMStructG : FreeSizedStructGraphable MStruct}
   {StructG : forall T, StructGraphable Struct T}
@@ -297,7 +534,6 @@ Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
   {LawGraphM' : LawfulSizedStructGraphable MStruct Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation MStruct Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation MStruct LawPro)
   {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
@@ -422,17 +658,903 @@ Qed. *)
 (* FIXME: Move *)
 Delimit Scope lazy_bool_scope with lazy.
 
-Definition denote_MPRO {N} {MStruct} {T T'}
-  (f : T -> T') {n m : btree N} (mp : MPRO MStruct T n m) : MPRO MStruct T' n m :=
-  map_MPRO (λ _ _ s, s) f mp.
 
-Lemma MPRO_to_PRO_denote_MPRO {N} {MStruct} {Struct}
-  `{InterpM : InterpStruct N MStruct Struct} {T T'}
-  (f : T -> T') fN {n m : btree N} (mp : MPRO MStruct T n m) :
-  MPRO_to_PRO fN (denote_MPRO f mp) = PRO_denote f (MPRO_to_PRO fN mp).
+
+
+(* FIXME: Move *)
+Lemma Forall2_of_impl {A B} (P Q : A -> B -> Prop) l l' :
+  Forall2 (λ a b, P a b -> Q a b) l l' ->
+  Forall2 P l l' -> Forall2 Q l l'.
 Proof.
-  induction mp; cbn; f_equal; done.
+  intros Hll'.
+  induction Hll'; [easy|].
+  rewrite 2 Forall2_cons.
+  tauto.
 Qed.
+
+Lemma Forall_of_impl {A} (P Q : A -> Prop) l :
+  Forall (λ a, P a -> Q a) l ->
+  Forall P l -> Forall Q l.
+Proof.
+  intros Hll'.
+  induction Hll'; [easy|].
+  rewrite 2 Forall_cons.
+  tauto.
+Qed.
+(* FIXME: Move *)
+Lemma Forall_zip_with_Forall2 {A B C} (P : C -> Prop)
+  (f : A -> B -> C) l l' :
+  length l = length l' ->
+  Forall P (zip_with f l l') <-> Forall2 (λ a b, P (f a b)) l l'.
+Proof.
+  intros Hll'%Forall2_same_length.
+  induction Hll'; [easy|].
+  cbn.
+  rewrite Forall_cons, Forall2_cons.
+  f_equiv.
+  done.
+Qed.
+
+Lemma Forall2_Forall_zip {A B} (P : A -> B -> Prop) l l' :
+  length l = length l' ->
+  Forall2 (λ a b, P a b) l l' <-> Forall (λ ab, P ab.1 ab.2) (zip l l').
+Proof.
+  intros Hlen.
+  rewrite Forall_zip_with_Forall2 by done.
+  done.
+Qed.
+
+Lemma elem_of_zip_lr {A B} (a : A) (b : B) l l' :
+  (a, b) ∈ zip l l' -> a ∈ l /\ b ∈ l'.
+Proof.
+  intros Hab.
+  apply elem_of_zip_l in Hab as Ha.
+  apply elem_of_zip_r in Hab as Hb.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Lemma simpl {P Q : Prop} {HPQ : TCSimpl P Q} :
+  P -> Q.
+Proof.
+  hnf in HPQ.
+  induction HPQ.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Definition sized_graph_tensors {N T} {n m}
+  (scohg : SizedCospanHyperGraph N T n m) : list (list N * list N * T) :=
+  let smap : list positive -> list N := omap (scohg.(sized_map)!!.) in
+  (λ '(_, (t, i, o)), (smap i, smap o, t)) <$>
+  map_to_list scohg.(hyperedges).
+
+
+
+Lemma sized_graph_tensors_scohg_syntactic_eq {N T}
+  `{Equiv T, Equivalence T equiv} {n m}
+  (scohg scohg' : SizedCospanHyperGraph N T n m) :
+  scohg ≡ₛ scohg' ->
+  PermutationA (prod_relation eq equiv)
+    (sized_graph_tensors scohg)
+    (sized_graph_tensors scohg').
+Proof.
+  intros Hscohg.
+  induction Hscohg as [scohg scohg' fv fe Hfv Hfe Heq].
+  unfold sized_graph_tensors.
+  cbn.
+  etransitivity. 2:{
+    apply (Permutation_PermutationA _).
+    rewrite map_to_list_fmap, (map_to_list_kmap fe).
+    rewrite <- 2 list_fmap_compose.
+    rewrite (list_fmap_ext _ (let smap : list positive -> list N :=
+      omap (scohg'.(sized_map)!!.) in
+      (λ '(_, (t, i, o)), (smap i, smap o, t)))). 2:{
+      intros _ [k [ [t i] o]] _.
+      simpl.
+      rewrite 2 list_omap_fmap.
+      f_equal.
+      f_equal; apply list_omap_ext, Forall_Forall2_diag;
+      rewrite Forall_forall;
+      intros p _;
+      cbn;
+      rewrite (lookup_kmap _); done.
+    }
+    done.
+  }
+  apply eqlistA_PermutationA.
+  specialize Heq.1.2.2.1 as Heq'.
+  cbn in Heq'.
+  apply (f_equiv map_to_list) in Heq'.
+  rewrite eqlistA_altdef in Heq' |- *.
+  rewrite Forall2_fmap.
+  eapply Forall2_of_impl, Heq'.
+  apply Forall2_length in Heq' as Hlen.
+  rewrite Forall2_Forall_zip in Heq' |- * by done.
+  rewrite Forall_forall.
+  intros [[k [[t i] o]] [k' [[t' i'] o']]] [Hktio Hktio']%elem_of_zip_lr.
+  cbn.
+  intros [[= <-] [[Hts%simpl [= <-]] [= <-]]].
+  split; [|done].
+  cbn.
+  specialize Heq.2 as Hmap.
+  eenough (Forall _ (i ++ o)) as Hen.
+  1:{
+    apply Forall_app in Hen as [Hi Ho].
+    f_equal; apply list_omap_ext, Forall_Forall2_diag; done.
+  }
+  rewrite Forall_forall.
+  intros v Hvio.
+  assert (Hv : v ∈ vertices scohg). 1:{
+    apply elem_of_vertices.
+    left.
+    apply elem_of_app in Hvio.
+    exists k, (t, i, o).
+    split; [now apply elem_of_map_to_list|].
+    done.
+  }
+  assert (Hv' : v ∈ vertices scohg'). 1:{
+    apply elem_of_vertices.
+    left.
+    apply elem_of_app in Hvio.
+    exists k, (t', i, o).
+    split; [now apply elem_of_map_to_list|].
+    done.
+  }
+  apply (f_equal (.!! v)) in Hmap.
+  cbn in Hmap.
+  rewrite 2 map_lookup_filter in Hmap.
+  cbn in Hmap.
+  do 2 (case_guard; [|contradiction]).
+  cbn in Hmap.
+  rewrite 2 bind_with_Some in Hmap.
+  done.
+Qed.
+
+#[export] Instance sized_graph_tensors_scohg_vert_eq {N T n m} :
+  Proper (scohg_vert_eq ==> eq) (@sized_graph_tensors N T n m).
+Proof.
+  intros scohg scohg' Hscohg%scohg_vert_eq_alt.
+  unfold sized_graph_tensors.
+  rewrite <- Hscohg.2.2.1.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] Hktio%elem_of_list_lookup_2%elem_of_map_to_list.
+  f_equal.
+
+  eenough (Forall _ (i ++ o)) as Hen.
+  1:{
+    apply Forall_app in Hen as [Hi Ho].
+    f_equal; apply list_omap_ext, Forall_Forall2_diag; done.
+  }
+  rewrite Forall_forall.
+  intros v Hvio.
+  assert (Hv : v ∈ vertices scohg). 1:{
+    apply elem_of_vertices.
+    left.
+    apply elem_of_app in Hvio.
+    exists k, (t, i, o).
+    done.
+  }
+  apply Hscohg.2.2.2.2.
+  now apply elem_of_union_l.
+Qed.
+
+Lemma sized_graph_tensors_sized_add_top_loop {N T n m}
+  (scohg : SizedCospanHyperGraph N T (S n) (S m)) :
+  head (sized_inputs scohg) = head (sized_outputs scohg) ->
+  sized_graph_tensors (sized_add_top_loop scohg) = sized_graph_tensors scohg.
+Proof.
+  intros Hio.
+  unfold sized_graph_tensors.
+  cbn.
+  rewrite map_to_list_fmap, <- list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] Hktio%elem_of_list_lookup_2%elem_of_map_to_list.
+  cbn.
+  f_equal.
+  rewrite 2 list_omap_fmap.
+
+  eenough (Forall _ (i ++ o)) as Hen.
+  1:{
+    apply Forall_app in Hen as [Hi Ho].
+    f_equal; apply list_omap_ext, Forall_Forall2_diag; done.
+  }
+  rewrite Forall_forall.
+  intros v Hvio.
+  unfold sized_inputs in Hio.
+  unfold sized_outputs in Hio.
+  destruct scohg as [[hg ins outs] smap].
+  cbn in *.
+  revert Hio.
+  inv_vec ins; intros hi ins.
+  inv_vec outs; intros ho outs.
+  intros [= Hio].
+  cbn -[map_relabel_one].
+  rewrite lookup_map_relabel_one.
+  rewrite (fn_lookup_singleton_case _ _ v).
+  case_decide; [subst v; now rewrite fn_lookup_singleton|].
+  rewrite (fn_lookup_singleton_case _ _ v).
+  case_decide; [subst v|]; done.
+Qed.
+
+Lemma sized_graph_tensors_sized_add_top_loops {N T n m o}
+  (scohg : SizedCospanHyperGraph N T (n + m) (n + o)) :
+  take n $ sized_inputs scohg = take n $ sized_outputs scohg ->
+  sized_graph_tensors (sized_add_top_loops scohg) = sized_graph_tensors scohg.
+Proof.
+  intros Hio.
+  induction n; [done|].
+    cbn in Hio.
+  cbn.
+  fold Nat.add.
+  rewrite IHn.
+  2:{
+    rewrite sized_inputs_add_top_loop, sized_outputs_add_top_loop by
+      (rewrite <- (lookup_take _ (S n)), Hio, lookup_take by lia; done).
+    rewrite 2 tail_is_drop, 2 firstn_skipn_comm.
+    cbn.
+    rewrite Hio.
+    done.
+  }
+  rewrite sized_graph_tensors_sized_add_top_loop; [done|].
+  rewrite 2 head_lookup.
+  rewrite <- (lookup_take _ (S n)), Hio, lookup_take by lia; done.
+Qed.
+
+Lemma sized_graph_tensors_stack_sized_graphs {N T n m n' m'}
+  (scohg : SizedCospanHyperGraph N T n m) (scohg' : SizedCospanHyperGraph N T n' m') :
+  sized_graph_tensors (stack_sized_graphs scohg scohg') ≡ₚ
+  sized_graph_tensors scohg ++ sized_graph_tensors scohg'.
+Proof.
+  unfold sized_graph_tensors.
+  cbn.
+  rewrite map_to_list_disj_union by
+    now apply map_disjoint_fmap, (kmap_inj2_disjoint _).
+  rewrite fmap_app.
+  rewrite 2 map_to_list_fmap, 2 (map_to_list_kmap _).
+  rewrite <- 4 list_fmap_compose.
+  f_equiv; apply eq_reflexivity, list_fmap_ext;
+  intros _ [k [[t i] o]] _; cbn; f_equal;
+
+  rewrite 2 list_omap_fmap;
+  (
+  eenough (Forall _ (i ++ o)) as Hen;
+  [
+    apply Forall_app in Hen as [Hi Ho];
+    f_equal; apply list_omap_ext, Forall_Forall2_diag; done|];
+  rewrite Forall_forall;
+  intros v _;
+  cbn -[bcons]).
+  - rewrite lookup_union, (lookup_kmap _), (lookup_kmap_None_1 _) by lia.
+    apply (right_id_L _ _).
+  - rewrite lookup_union, (lookup_kmap _), (lookup_kmap_None_1 _) by lia.
+    apply (left_id_L _ _).
+Qed.
+
+Lemma sized_graph_tensors_swapped_stack_sized_graphs {N T n m n' m'}
+  (scohg : SizedCospanHyperGraph N T n m) (scohg' : SizedCospanHyperGraph N T n' m') :
+  sized_graph_tensors (swapped_stack_sized_graphs scohg scohg') ≡ₚ
+  sized_graph_tensors scohg ++ sized_graph_tensors scohg'.
+Proof.
+  unfold sized_graph_tensors.
+  cbn.
+  rewrite map_to_list_disj_union by
+    now apply map_disjoint_fmap, (kmap_inj2_disjoint _).
+  rewrite fmap_app.
+  rewrite 2 map_to_list_fmap, 2 (map_to_list_kmap _).
+  rewrite <- 4 list_fmap_compose.
+  f_equiv; apply eq_reflexivity, list_fmap_ext;
+  intros _ [k [[t i] o]] _; cbn; f_equal;
+
+  rewrite 2 list_omap_fmap;
+  (
+  eenough (Forall _ (i ++ o)) as Hen;
+  [
+    apply Forall_app in Hen as [Hi Ho];
+    f_equal; apply list_omap_ext, Forall_Forall2_diag; done|];
+  rewrite Forall_forall;
+  intros v _;
+  cbn -[bcons]).
+  - rewrite lookup_union,
+   (lookup_kmap _), (lookup_kmap_None_1 _) by lia.
+    apply (right_id_L _ _).
+  - rewrite lookup_union, (lookup_kmap _), (lookup_kmap_None_1 _) by lia.
+    apply (left_id_L _ _).
+Qed.
+
+Lemma sized_graph_tensors_compose_sized_graphs {N T n m o}
+  (scohg : SizedCospanHyperGraph N T n m) (scohg' : SizedCospanHyperGraph N T m o) :
+  sized_outputs scohg = sized_inputs scohg' ->
+  sized_graph_tensors (compose_sized_graphs scohg scohg') ≡ₚ
+  sized_graph_tensors scohg ++ sized_graph_tensors scohg'.
+Proof.
+  intros Hoi.
+  rewrite <- compose_sized_graphs_alt_correct.
+  rewrite sized_graph_tensors_sized_add_top_loops, sized_graph_tensors_swapped_stack_sized_graphs;
+  [done|].
+  rewrite sized_inputs_swapped_stack_sized_graphs, sized_outputs_swapped_stack_sized_graphs.
+  rewrite <- (length_sized_inputs scohg') at 1.
+  rewrite take_app_length.
+  rewrite <- (length_sized_outputs scohg) at 2.
+  rewrite take_app_length.
+  done.
+Qed.
+
+Lemma sized_graph_tensors_sized_graph_apply_hom {N T T' n m}
+  (f : T -> T') (scohg : SizedCospanHyperGraph N T n m) :
+  sized_graph_tensors (sized_graph_apply_hom f scohg) =
+  prod_map id f <$> (sized_graph_tensors scohg).
+Proof.
+  unfold sized_graph_tensors.
+  cbn.
+  rewrite map_to_list_fmap, <- 2 list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] _; done.
+Qed.
+
+Lemma sized_graph_tensors_empty {N n m}
+  (scohg : SizedCospanHyperGraph N Empty_set n m) :
+  sized_graph_tensors scohg = [].
+Proof.
+  destruct (sized_graph_tensors _) as [|[? []]]; done.
+Qed.
+
+Lemma sized_graph_tensors_sized_graph_of_tensor {N T}
+  (t : T) {n m} (v : vec N n) (w : vec N m) :
+  sized_graph_tensors (sized_graph_of_tensor t v w) =
+  [(vec_to_list v, vec_to_list w, t)].
+Proof.
+  unfold sized_graph_tensors.
+  cbn -[union singletonM insert].
+  setoid_rewrite map_to_list_singleton.
+  cbn.
+  do 2 f_equal.
+  f_equal.
+  - rewrite list_omap_fmap.
+    eenough (Hall : _).
+    apply (list_eq_same_length _ _ _ eq_refl).
+    1:{
+      rewrite length_omap_all_is_Some, length_vec_to_list, length_seq; [reflexivity|].
+      apply Hall.
+    }
+    2:{
+      intros a [_ Ha]%elem_of_seq.
+      cbn [compose].
+      rewrite lookup_union.
+      rewrite (lookup_list_to_map_imap (bcons false ∘ Pos.of_succ_nat) _ _ a).
+      rewrite option_fmap_id.
+      rewrite union_is_Some.
+      rewrite lookup_lt_is_Some.
+      rewrite length_vec_to_list.
+      now left.
+    }
+    intros i x y Hi.
+    rewrite length_vec_to_list in Hi.
+    rewrite list_lookup_omap_all_is_Some by done.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    rewrite lookup_union.
+    setoid_rewrite (lookup_list_to_map_imap (xO ∘ Pos.of_succ_nat)).
+    rewrite option_fmap_id.
+    rewrite lookup_vec_to_list.
+    case_guard; [|done].
+    cbn.
+    rewrite union_Some_l.
+    congruence.
+  - rewrite list_omap_fmap.
+    eenough (Hall : _).
+    apply (list_eq_same_length _ _ _ eq_refl).
+    1:{
+      rewrite length_omap_all_is_Some, length_vec_to_list, length_seq; [reflexivity|].
+      apply Hall.
+    }
+    2:{
+      intros a [_ Ha]%elem_of_seq.
+      cbn [compose].
+      rewrite lookup_union.
+      rewrite union_is_Some.
+      right.
+      rewrite (lookup_list_to_map_imap (bcons true ∘ Pos.of_succ_nat) _ _ a).
+      rewrite option_fmap_id.
+      rewrite lookup_lt_is_Some.
+      rewrite length_vec_to_list.
+      done.
+    }
+    intros i x y Hi.
+    rewrite length_vec_to_list in Hi.
+    rewrite list_lookup_omap_all_is_Some by done.
+    rewrite lookup_seq_lt by done.
+    cbn.
+    rewrite lookup_union.
+    setoid_rewrite (lookup_list_to_map_imap (xI ∘ Pos.of_succ_nat)).
+    rewrite option_fmap_id.
+    rewrite lookup_vec_to_list.
+    case_guard; [|done].
+    cbn.
+    rewrite (not_elem_of_list_to_map _ _).1. 2:{
+      rewrite fmap_imap.
+      rewrite elem_of_lookup_imap.
+      cbn.
+      naive_solver.
+    }
+    rewrite (left_id_L None _).
+    congruence.
+Qed.
+
+Lemma sized_graph_tensors_MPRO_graph_semantics
+  {A} {MStruct : Mor (btree A)}
+  {MStructG : forall T, @SizedStructGraphable A MStruct T}
+  {FreeMStructG : FreeSizedStructGraphable MStruct}
+  {T}
+  {n m} (mp : MPRO MStruct T n m) :
+  sized_graph_tensors (MPRO_graph_semantics mp) ≡ₚ
+  MPRO_tensors_lists mp.
+Proof.
+  induction mp.
+  - done.
+  - cbn.
+    rewrite sized_graph_tensors_compose_sized_graphs, fmap_app; [now f_equiv|].
+    rewrite bw_outputs, bw_inputs.
+    done.
+  - cbn.
+    rewrite sized_graph_tensors_stack_sized_graphs, fmap_app; now f_equiv.
+  - cbn.
+    rewrite sized_graph_of_struct_free.
+    cbn.
+    rewrite sized_graph_tensors_sized_graph_apply_hom.
+    rewrite sized_graph_tensors_empty.
+    done.
+  - cbn.
+    rewrite sized_graph_tensors_sized_graph_of_tensor.
+    now rewrite 2 btree_to_vec_to_list.
+Qed.
+
+
+(* FIXME: Move *)
+Definition graph_tensors {T} {n m}
+  (scohg : CospanHyperGraph T n m) : list (nat * nat * T) :=
+  (λ '(_, (t, i, o)), (length i, length o, t)) <$>
+  map_to_list scohg.(hyperedges).
+
+
+
+Lemma graph_tensors_cohg_syntactic_eq {T}
+  `{Equiv T, Equivalence T equiv} {n m}
+  (cohg cohg' : CospanHyperGraph T n m) :
+  (cohg ≡ₛ cohg')%cohg ->
+  PermutationA (prod_relation eq equiv)
+    (graph_tensors cohg)
+    (graph_tensors cohg').
+Proof.
+  intros Hcohg.
+  induction Hcohg as [cohg cohg' fv fe Hfv Hfe Heq].
+  unfold graph_tensors.
+  cbn.
+  etransitivity. 2:{
+    apply (Permutation_PermutationA _).
+    rewrite map_to_list_fmap, (map_to_list_kmap fe).
+    rewrite <- 2 list_fmap_compose.
+    rewrite (list_fmap_ext _
+      (λ '(_, (t, i, o)), (length i, length o, t))). 2:{
+      intros _ [k [ [t i] o]] _.
+      simpl.
+      rewrite 2 length_fmap; done.
+    }
+    done.
+  }
+  apply eqlistA_PermutationA.
+  specialize Heq.2.2.1 as Heq'.
+  cbn in Heq'.
+  apply (f_equiv map_to_list) in Heq'.
+  rewrite eqlistA_altdef in Heq' |- *.
+  rewrite Forall2_fmap.
+  eapply Forall2_of_impl, Heq'.
+  apply Forall2_length in Heq' as Hlen.
+  rewrite Forall2_Forall_zip in Heq' |- * by done.
+  rewrite Forall_forall.
+  intros [[k [[t i] o]] [k' [[t' i'] o']]] [Hktio Hktio']%elem_of_zip_lr.
+  cbn.
+  intros [[= <-] [[Hts%simpl [= <-]] [= <-]]].
+  done.
+Qed.
+
+#[export] Instance graph_tensors_cohg_vert_eq {T n m} :
+  Proper (cohg_vert_eq ==> eq) (@graph_tensors T n m).
+Proof.
+  intros cohg cohg' Hcohg%cohg_vert_eq_alt.
+  unfold graph_tensors.
+  rewrite <- Hcohg.2.2.1.
+  done.
+Qed.
+
+Lemma graph_tensors_relabel_graph {T n m} f
+  (cohg : CospanHyperGraph T n m) :
+  graph_tensors (relabel_graph f cohg) = graph_tensors cohg.
+Proof.
+  unfold graph_tensors.
+  cbn.
+  rewrite map_to_list_fmap.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] _.
+  cbn.
+  now rewrite 2 length_fmap.
+Qed.
+
+Lemma graph_tensors_add_top_loop {T n m}
+  (cohg : CospanHyperGraph T (S n) (S m)) :
+  graph_tensors (add_top_loop cohg) = graph_tensors cohg.
+Proof.
+  unfold add_top_loop.
+  rewrite graph_tensors_relabel_graph.
+  done.
+Qed.
+
+Lemma graph_tensors_add_top_loops {T n m o}
+  (cohg : CospanHyperGraph T (n + m) (n + o)) :
+  graph_tensors (add_top_loops cohg) = graph_tensors cohg.
+Proof.
+  induction n; [done|].
+  cbn.
+  fold Nat.add.
+  rewrite IHn.
+  rewrite graph_tensors_add_top_loop; done.
+Qed.
+
+Lemma graph_tensors_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  graph_tensors (stack_graphs cohg cohg') ≡ₚ
+  graph_tensors cohg ++ graph_tensors cohg'.
+Proof.
+  unfold graph_tensors.
+  cbn.
+  rewrite map_to_list_disj_union by
+    now apply map_disjoint_fmap, (kmap_inj2_disjoint _).
+  rewrite fmap_app.
+  rewrite 2 map_to_list_fmap, 2 (map_to_list_kmap _).
+  rewrite <- 4 list_fmap_compose.
+  f_equiv; apply eq_reflexivity, list_fmap_ext;
+  intros _ [k [[t i] o]] _; cbn; now rewrite 2 length_fmap.
+Qed.
+
+Lemma graph_tensors_swapped_stack_graphs {T n m n' m'}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T n' m') :
+  graph_tensors (swapped_stack_graphs cohg cohg') ≡ₚ
+  graph_tensors cohg ++ graph_tensors cohg'.
+Proof.
+  unfold graph_tensors.
+  cbn.
+  rewrite map_to_list_disj_union by
+    now apply map_disjoint_fmap, (kmap_inj2_disjoint _).
+  rewrite fmap_app.
+  rewrite 2 map_to_list_fmap, 2 (map_to_list_kmap _).
+  rewrite <- 4 list_fmap_compose.
+  f_equiv; apply eq_reflexivity, list_fmap_ext;
+  intros _ [k [[t i] o]] _; cbn; now rewrite 2 length_fmap.
+Qed.
+
+Lemma graph_tensors_compose_graphs {T n m o}
+  (cohg : CospanHyperGraph T n m) (cohg' : CospanHyperGraph T m o) :
+  graph_tensors (compose_graphs cohg cohg') ≡ₚ
+  graph_tensors cohg ++ graph_tensors cohg'.
+Proof.
+  rewrite <- compose_graphs_alt_correct.
+  rewrite graph_tensors_add_top_loops, graph_tensors_swapped_stack_graphs;
+  done.
+Qed.
+
+Lemma graph_tensors_graph_apply_hom {T T' n m}
+  (f : T -> T') (cohg : CospanHyperGraph T n m) :
+  graph_tensors (graph_apply_hom f cohg) =
+  prod_map id f <$> (graph_tensors cohg).
+Proof.
+  unfold graph_tensors.
+  cbn.
+  rewrite map_to_list_fmap, <- 2 list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] _; done.
+Qed.
+
+Lemma graph_tensors_empty {n m}
+  (cohg : CospanHyperGraph Empty_set n m) :
+  graph_tensors cohg = [].
+Proof.
+  destruct (graph_tensors _) as [|[? []]]; done.
+Qed.
+
+Lemma graph_tensors_graph_of_tensor {T}
+  (t : T) n m :
+  graph_tensors (graph_of_tensor t n m) =
+  [(n, m, t)].
+Proof.
+  unfold graph_tensors.
+  cbn -[union singletonM insert].
+  setoid_rewrite map_to_list_singleton.
+  cbn.
+  rewrite 2 length_fmap, 2 length_seq.
+  done.
+Qed.
+
+Lemma graph_tensors_PRO_graph_semantics
+  {Struct}
+  {StructG : forall T, StructGraphable Struct T}
+  {FreeMStructG : FreeStructGraphable Struct}
+  {T}
+  {n m} (mp : PRO Struct T n m) :
+  graph_tensors (PRO_graph_semantics mp) ≡ₚ
+  PRO_tensors mp.
+Proof.
+  induction mp.
+  - done.
+  - cbn.
+    rewrite graph_tensors_compose_graphs.
+    now f_equiv.
+  - cbn.
+    rewrite graph_tensors_stack_graphs.
+    now f_equiv.
+  - cbn.
+    rewrite graph_of_struct_free.
+    cbn.
+    rewrite graph_tensors_graph_apply_hom.
+    rewrite graph_tensors_empty.
+    done.
+  - cbn.
+    rewrite graph_tensors_graph_of_tensor.
+    done.
+Qed.
+
+(* FIXME: Move *)
+Lemma length_list_bind {A B} (f : A -> list B) l :
+  length (l ≫= f) = sum_list_with (length ∘ f) l.
+Proof.
+  induction l; cbn; [done|].
+  now rewrite length_app; f_equal.
+Qed.
+
+Lemma graph_tensors_sized_graph_to_graph {N T n m}
+  (f : N -> nat) (scohg : SizedCospanHyperGraph N T n m) :
+  graph_tensors (sized_graph_to_graph f scohg) =
+  prod_map (prod_map (sum_list_with f) (sum_list_with f)) id <$>
+  sized_graph_tensors scohg.
+Proof.
+  unfold graph_tensors.
+  cbn.
+  rewrite map_to_list_fmap.
+  unfold sized_graph_tensors.
+  rewrite <- 2 list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] _.
+  cbn.
+  f_equal.
+  rewrite 2 length_list_bind.
+  eenough (forall l, _ l =@{nat} sum_list_with f (_ l)) as Hen.
+  1:{
+    f_equal.
+    - exact (Hen i).
+    - exact (Hen o).
+  }
+  clear i o.
+  intros l.
+  induction l; [done|].
+  cbn.
+  case_match eqn:Heq.
+  - cbn.
+    rewrite length_vec_to_list.
+    f_equal.
+    done.
+  - done.
+Qed.
+
+(* FIXME: Move *)
+#[export] Instance Permutation_PermutationA_subrelation {A} (R : relation A) {HR : Equivalence R} :
+  subrelation Permutation (PermutationA R).
+Proof.
+  intros ? ?.
+  now apply Permutation_PermutationA.
+Qed.
+
+Lemma graph_tensors_cast_graph {T n m n' m'}
+  (Hn : n = n') (Hm : m = m') (cohg : CospanHyperGraph T n m) :
+  graph_tensors (cast_graph Hn Hm cohg) = graph_tensors cohg.
+Proof.
+  subst.
+  rewrite cast_graph_id.
+  done.
+Qed.
+
+
+Lemma MPRO_PRO_quote_correct_tensors_lists {N}
+  {MStruct : Mor (btree N)} {Struct : Mor nat} {T}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
+  {InterpS : InterpStruct MStruct Struct}
+  {StructG : forall T, StructGraphable Struct T}
+  {FreeStructG : FreeStructGraphable Struct}
+  {MStructG : forall T, SizedStructGraphable MStruct T}
+  {FreeMStructG : FreeSizedStructGraphable MStruct}
+  {LawStruct : LawfulSizedStructGraphable MStruct Struct T}
+  (fN : N -> nat)
+
+  {a b : btree N} (mp : MPRO MStruct T a b) {n m} (p : PRO Struct T n m) :
+  MPRO_PRO_quote fN mp p ->
+  PermutationA (prod_relation eq equiv)
+    (prod_map (prod_map (sum_list_with fN) (sum_list_with fN)) id <$> MPRO_tensors_lists mp)
+    (PRO_tensors p).
+Proof.
+  intros Hmp.
+  apply MPRO_PRO_quote_size in Hmp as Hnm.
+  destruct Hnm as [-> ->].
+  apply MPRO_PRO_quote_correct_graph_semantics' in Hmp.
+  apply graph_tensors_cohg_syntactic_eq in Hmp.
+  rewrite (graph_tensors_PRO_graph_semantics p) in Hmp.
+  rewrite Hmp.
+  unfold bw_sized_graph_to_graph.
+  rewrite graph_tensors_cast_graph.
+  rewrite graph_tensors_sized_graph_to_graph.
+  rewrite sized_graph_tensors_MPRO_graph_semantics.
+  done.
+Qed.
+
+Lemma PRO_quote_correct_tensors {Struct} `{forall n m, Equiv (Struct n m)} {T T'} `{Equiv T', Equivalence T' equiv}
+  (f : T -> T') {n m} (qp : PRO Struct T n m) p :
+  PRO_quote f qp p ->
+  eqlistA (prod_relation eq equiv) (prod_map id f <$> PRO_tensors qp) (PRO_tensors p).
+Proof.
+  intros Hqp.
+  hnf in Hqp.
+  unfold PRO_denote in Hqp.
+  apply PRO_equiv_fun_correct' in Hqp.
+  induction qp.
+  - destruct p; destruct Hqp as [].
+    done.
+  - destruct p as [|n m' o p1 p2| | |]; first [destruct Hqp as [ Hp1 Hp2]|destruct Hqp as []].
+    apply PRO_equiv_fun_correct_dim in Hp1 as Hdims.
+    destruct Hdims as [_ <-].
+    cbn.
+    rewrite fmap_app.
+    f_equiv; eauto.
+  - destruct p; destruct Hqp as [].
+    cbn.
+    select (PRO_equiv_fun _ p1) (fun H => apply PRO_equiv_fun_correct_dim in H as Hdims; destruct Hdims as [<- <-]).
+    select (PRO_equiv_fun _ p2) (fun H => apply PRO_equiv_fun_correct_dim in H as Hdims; destruct Hdims as [<- <-]).
+    rewrite fmap_app.
+    f_equiv; eauto.
+  - destruct p; destruct Hqp as [].
+    done.
+  - destruct p; destruct Hqp as [].
+    destruct_and!.
+    cbn.
+    constructor; done.
+Qed.
+
+(* FIXME: Move *)
+Lemma InA_eqA {A} {R : relation A} {HRS : Symmetric R}
+  {HRT : Transitive R} (x y : A) l :
+  R x y -> InA R x l <-> InA R y l.
+Proof.
+  intros Hxy.
+  induction l; [easy|].
+  rewrite 2 InA_cons.
+  f_equiv; [|done].
+  naive_solver.
+Qed.
+
+#[export] Instance InA_eqlistA {A} {R : relation A} {HRS : Symmetric R}
+  {HRT : Transitive R} :
+  Proper (R ==> eqlistA R ==> iff) (InA R).
+Proof.
+  intros x y Hxy l l' Hl.
+  rewrite <- (InA_eqA _ _ _ Hxy).
+  clear y Hxy.
+  induction Hl; [done|].
+  rewrite 2 InA_cons.
+  f_equiv; [|done].
+  naive_solver.
+Qed.
+
+
+#[export] Instance inclA_eqlistA {A} {R : relation A} {HR : Equivalence R} :
+  Proper (eqlistA R ==> eqlistA R ==> iff) (inclA R).
+Proof.
+  intros l0 l0' Hl0 l1 l1' Hl1.
+  unfold inclA.
+  apply forall_iff; intros a.
+  rewrite Hl0, Hl1.
+  done.
+Qed.
+
+Lemma InA_fmap {A B} {RA : relation A} {RB : relation B} {HRA : Reflexive RA}
+  {HRB : Transitive RB}
+  (f : A -> B) {Hf : Proper (RA ==> RB) f} x l :
+  InA RB x (f <$> l) <-> exists y, RB x (f y) /\ InA RA y l.
+Proof.
+  induction l.
+  - cbn.
+    split; [easy|].
+    intros []; easy.
+  - cbn.
+    setoid_rewrite InA_cons.
+    rewrite IHl.
+    naive_solver.
+Qed.
+
+
+#[export] Instance list_fmap_inclA {A B} {RA : relation A} {RB : relation B}
+  {HRA : Equivalence RA} {HRB : Equivalence RB}
+  f {Hf : Proper (RA ==> RB) f} : Proper (inclA RA ==> inclA RB) (fmap f).
+Proof.
+  intros l l' Hl x.
+  assert (HRA' : Reflexive RA) by apply _.
+  rewrite 2 (InA_fmap f).
+  intros (y & Hxy & Hyl).
+  apply Hl in Hyl.
+  eauto.
+Qed.
+
+#[export] Instance inclA_cons {A} {R : relation A} {HR : Transitive R} :
+  Proper (R ==> inclA R ==> inclA R) cons.
+Proof.
+  intros x y Hxy l l' Hl.
+  intros z.
+  rewrite 2 InA_cons.
+  rewrite Hxy.
+  naive_solver.
+Qed.
+
+#[export] Instance inclA_trans {A} {R : relation A} {HR : Transitive R} :
+  Transitive (inclA R).
+Proof.
+  intros l l' l''.
+  unfold inclA.
+  naive_solver.
+Qed.
+
+#[export] Instance inclA_refl {A} {R : relation A} :
+  Reflexive (inclA R).
+Proof.
+  easy.
+Qed.
+
+#[export] Instance PermutationA_inclA {A} {R : relation A} {HR : Transitive R} :
+  subrelation (PermutationA R) (inclA R).
+Proof.
+  intros l l' Hl.
+  induction Hl.
+  - easy.
+  - f_equiv; done.
+  - intros z.
+    rewrite 4 InA_cons.
+    tauto.
+  - etransitivity; eauto.
+Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 Definition MPRO_monog_quote_context_domainb
@@ -447,8 +1569,7 @@ Definition MPRO_monog_quote_context_domainb
   `{Countable T'}
   (RW : LawfulMPRORewritingRelation MStruct Struct T)
   (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> option (MPRO MStruct T' n m))
-  (concr_asgn : Pmap nat)
-  (f : T' -> T)
+  (valid_tensors : Pset)
   {i j n m}
   (ctx : {k & BWSizedCospanHyperGraph positive T' n (k + i) *
     BWSizedCospanHyperGraph positive T' (k + j) m}%type) :
@@ -457,8 +1578,7 @@ Definition MPRO_monog_quote_context_domainb
     let '(existT k (GC1, GC2)) := ctx in
     C1 ←@{option} sized_graph_to_term _ _ GC1;
     C2 ← sized_graph_to_term _ _ GC2;
-    Some (RW.(mpro_rewriting_domain_partial_dec) concr_asgn (denote_MPRO f C1) &&&
-      RW.(mpro_rewriting_domain_partial_dec) concr_asgn (denote_MPRO f C2))%lazy).
+    Some (Pset_subseteqb (MPRO_tensors_set C1 ∪ MPRO_tensors_set C2) valid_tensors)).
 
 Lemma MPRO_monog_quote_context_domainb_correct
   {MStruct Struct T}
@@ -482,14 +1602,16 @@ Lemma MPRO_monog_quote_context_domainb_correct
   (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> option (MPRO MStruct T' n m))
   (Hsized_graph_to_term : forall n m bscohg p, sized_graph_to_term n m bscohg = Some p ->
     MPRO_graph_semantics p ≡ₛ bscohg)
-  concr_asgn
+  (valid_tensors : Pset)
   (fN : positive -> nat)
-  (HfN : map_Forall (λ k v, fN k = v) concr_asgn)
   (f : T' -> T)
+  (HfN : forall (i o : btree positive) (mp : MPRO MStruct T' i o),
+    MPRO_tensors_set mp ⊆ valid_tensors ->
+    RW.(pro_rewriting_domain) (PRO_denote f $ MPRO_to_PRO fN mp))
   {i j n m}
   (ctx : {k & BWSizedCospanHyperGraph positive T' n (k + i) *
     BWSizedCospanHyperGraph positive T' (k + j) m}%type) :
-  MPRO_monog_quote_context_domainb RW sized_graph_to_term concr_asgn f ctx ->
+  MPRO_monog_quote_context_domainb RW sized_graph_to_term valid_tensors ctx ->
   forall i' j' lhs rhs, RW i' j' lhs rhs ->
   forall Qlhs Qrhs,
   PRO_quote f Qlhs lhs -> PRO_quote f Qrhs rhs ->
@@ -517,13 +1639,9 @@ Proof.
   set (C2 := MPRO_to_PRO fN MC2).
 
   cbn -[bw_scohg make_bw_sized_monog_pushout].
-  intros (HdenC1%Is_true_true & HdenC2%Is_true_true)%lazy_andb_True.
-
-  specialize (RW.(mpro_rewriting_domain_partial_dec_correct) concr_asgn _ HdenC1 fN HfN)
-    as HdenC1'.
-  specialize (RW.(mpro_rewriting_domain_partial_dec_correct) concr_asgn _ HdenC2 fN HfN)
-    as HdenC2'.
-  rewrite MPRO_to_PRO_denote_MPRO in HdenC1', HdenC2'.
+  rewrite Pset_subseteqb_correct.
+  rewrite union_subseteq.
+  intros (HdenC1'%HfN & HdenC2'%HfN).
 
 
   intros i' j' lhs rhs Hlrhs Qlhs Qrhs HQlhs HQrhs Mlhs Mrhs HMlhs HMrhs.
@@ -630,18 +1748,19 @@ Definition MPRO_monog_quote_rewrite {MStruct Struct T}
   (RW : LawfulMPRORewritingRelation MStruct Struct T)
   {MStructG' : @SizedStructGraphable positive MStruct T'}
   (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> option (MPRO MStruct T' n m))
-  concr_asgn
   (f : T' -> T)
   {i j} (Mlhs Mrhs : MPRO MStruct T' i j) {n m} (Mtgt : MPRO MStruct T' n m)
   (match_number : nat) : option (MPRO MStruct T' n m) :=
+  let valid_tensors := MPRO_tensors_set Mlhs ∪ MPRO_tensors_set Mrhs ∪ MPRO_tensors_set Mtgt in
   let Glhs := MPRO_graph_semantics Mlhs in let Gtgt := MPRO_graph_semantics Mtgt in
   ctx ← select_bw_sized_monog_context Glhs Gtgt match_number;
   if negb (default_countable_sized_graph_iso_test
     Gtgt (make_bw_sized_monog_pushout Glhs ctx)) then None else
   (* '(existT k (GC1, GC2)) ← select_monog_context Glhs Gtgt match_number; *)
-  if negb (MPRO_monog_quote_context_domainb RW sized_graph_to_term concr_asgn f ctx) then None else
+  if negb (MPRO_monog_quote_context_domainb RW sized_graph_to_term valid_tensors ctx) then None else
   let Grhs := MPRO_graph_semantics Mrhs in
   sized_graph_to_term n m (make_bw_sized_monog_pushout Grhs ctx).
+
 
 
 Lemma MPRO_monog_quote_rewrite_correct
@@ -682,9 +1801,8 @@ Lemma MPRO_monog_quote_rewrite_correct
     MPRO_PRO_quote fN Mrhs Qrhs ->
     MPRO_PRO_quote fN Mtgt Qtgt ->
 
-  forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
-    MPRO_monog_quote_rewrite RW sized_graph_to_term concr_asgn f
+    MPRO_monog_quote_rewrite RW sized_graph_to_term f
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
   forall Qres,
@@ -698,7 +1816,7 @@ Proof.
   assert (Hf : Proper (equiv ==> equiv) f) by now intros ? ? [= <-].
   intros Htgt Hlrhs Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt.
   intros fN bi bj bn bm Mlhs Mrhs Mtgt HMlhs HMrhs HMtgt.
-  intros concr_asgn HfN.
+  (* intros concr_asgn HfN. *)
   unfold MPRO_monog_quote_rewrite.
   set (Glhs := MPRO_graph_semantics Mlhs).
   set (Grhs := MPRO_graph_semantics Mrhs).
@@ -709,11 +1827,50 @@ Proof.
     (make_bw_sized_monog_pushout Glhs ctx))
     as [Hctx|]; [|done].
   cbn.
-  destruct (MPRO_monog_quote_context_domainb _ _ _ _ _) as [|] eqn:Hdom; [|done].
+  destruct (MPRO_monog_quote_context_domainb _ _ _ _) as [|] eqn:Hdom; [|done].
   cbn.
-  specialize (MPRO_monog_quote_context_domainb_correct RW sized_graph_to_term Hsized_graph_to_term
-    concr_asgn fN HfN f
+  specialize (fun HfN => MPRO_monog_quote_context_domainb_correct RW sized_graph_to_term Hsized_graph_to_term
+    _ fN f HfN
     ctx (Is_true_true_2 _ Hdom)) as Hpush.
+  apply pro_rewriting_relation_to_domain in Hlrhs as Hlrdom.
+  destruct Hlrdom as [Hldom Hrdom].
+  tspecialize Hpush. 1:{
+    intros ins outs mp.
+    change (_ ∪ _ ∪ _) with (MPRO_tensors_set (Mlhs * Mrhs * Mtgt)%mpro).
+    intros Hmp.
+    apply (mpro_rewriting_domain_mono_set_quoted RW f _ _ Hmp fN).
+    cbn [MPRO_to_PRO].
+    do 2 change (PRO_denote f (?l * ?r)) with (PRO_denote f l * PRO_denote f r)%pro.
+
+    apply pro_rewriting_domain_stack; [apply pro_rewriting_domain_stack|].
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMlhs.
+      apply PRO_quote_correct_tensors in HQlhs.
+      eapply pro_rewriting_domain_mono_inclA, Hldom.
+      rewrite <- HQlhs.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMrhs.
+      apply PRO_quote_correct_tensors in HQrhs.
+      eapply pro_rewriting_domain_mono_inclA, Hrdom.
+      rewrite <- HQrhs.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMtgt.
+      apply PRO_quote_correct_tensors in HQtgt.
+      eapply pro_rewriting_domain_mono_inclA, Htgt.
+      rewrite <- HQtgt.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+  }
   destruct (sized_graph_to_term _ _ _) as [Mres|] eqn:HMres_eq; [|done].
   intros _ [= <-].
   intros Qres HMres res HQres Hres%bool_decide_spec.
@@ -739,7 +1896,6 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -752,7 +1908,6 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
@@ -782,9 +1937,8 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
     MPRO_PRO_quote fN Mrhs Qrhs ->
     MPRO_PRO_quote fN Mtgt Qtgt ->
 
-  forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
-    MPRO_monog_quote_rewrite RW sized_graph_to_term concr_asgn f
+    MPRO_monog_quote_rewrite RW sized_graph_to_term f
       Mlhs Mrhs Mtgt match_number = Some Mres ->
 
   forall Qres, MPRO_PRO_denote fN Mres Qres ->
@@ -807,9 +1961,9 @@ Proof.
     (exists dlhs, drhs; split_and!;
       [apply DiagramQuote_iff_DiagramDenote..|]; done).
   intros Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN bi bj bn bm Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt concr_asgn HfN Mres HMres_eq Qres HMres res HQres dres Hdres.
+    HMlhs HMrhs HMtgt (* concr_asgn HfN *) Mres HMres_eq Qres HMres res HQres dres Hdres.
   specialize (Hrw Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN _ _ _ _ Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt _ HfN Mres HMres_eq Qres HMres res HQres).
+    HMlhs HMrhs HMtgt Mres HMres_eq Qres HMres res HQres).
   tspecialize Hrw. 1:{
     apply bool_decide_spec.
     destruct Hdres as [Hdres].
@@ -841,7 +1995,6 @@ Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -854,7 +2007,6 @@ Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
@@ -927,13 +2079,13 @@ Definition MPRO_quote_context_domainb
   `{Countable T'}
   (RW : LawfulMPRORewritingRelation MStruct Struct T)
   (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> option (MPRO MStruct T' n m))
-  (concr_asgn : Pmap nat)
+  (valid_tensors : Pset)
   (f : T' -> T)
   {i j n m}
   (ctx : BWSizedCospanHyperGraph positive T' n ((i + j) + m)) : bool :=
   default false (
     Mctx ←@{option} sized_graph_to_term _ _ ctx;
-    Some (RW.(mpro_rewriting_domain_partial_dec) concr_asgn (denote_MPRO f Mctx))).
+    Some (Pset_subseteqb (MPRO_tensors_set Mctx) valid_tensors)).
 
 Lemma MPRO_quote_context_domainb_correct
   {MStruct Struct T}
@@ -959,13 +2111,15 @@ Lemma MPRO_quote_context_domainb_correct
   (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> option (MPRO MStruct T' n m))
   (Hsized_graph_to_term : forall n m bscohg p, sized_graph_to_term n m bscohg = Some p ->
     MPRO_graph_semantics p ≡ₛ bscohg)
-  concr_asgn
   (fN : positive -> nat)
-  (HfN : map_Forall (λ k v, fN k = v) concr_asgn)
   (f : T' -> T)
+  valid_tensors
+  (HfN : forall (i o : btree positive) (mp : MPRO MStruct T' i o),
+    MPRO_tensors_set mp ⊆ valid_tensors ->
+    RW.(pro_rewriting_domain) (PRO_denote f $ MPRO_to_PRO fN mp))
   {i j n m}
   (ctx : BWSizedCospanHyperGraph positive T' n ((i + j) + m)) :
-  MPRO_quote_context_domainb RW sized_graph_to_term concr_asgn f ctx ->
+  MPRO_quote_context_domainb RW sized_graph_to_term valid_tensors f ctx ->
   forall i' j' lhs rhs, RW i' j' lhs rhs ->
   forall Qlhs Qrhs,
   PRO_quote f Qlhs lhs -> PRO_quote f Qrhs rhs ->
@@ -990,12 +2144,8 @@ Proof.
   set (Pctx := MPRO_to_PRO fN Mctx).
 
   cbn -[bw_scohg make_bw_sized_pushout].
-  intros HdenMctx%Is_true_true.
-
-  specialize (RW.(mpro_rewriting_domain_partial_dec_correct) concr_asgn _ HdenMctx fN HfN)
-    as Hdenctx.
-
-  rewrite MPRO_to_PRO_denote_MPRO in Hdenctx.
+  rewrite Pset_subseteqb_correct.
+  intros Hdenctx%HfN.
 
 
   intros i' j' lhs rhs Hlrhs Qlhs Qrhs HQlhs HQrhs Mlhs Mrhs HMlhs HMrhs.
@@ -1114,26 +2264,26 @@ Definition MPRO_gen_quote_rewrite {MStruct Struct T}
   `{Countable T'}
   (RW : LawfulMPRORewritingRelation MStruct Struct T)
   {MStructG' : @SizedStructGraphable positive MStruct T'}
-  (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> 
+  (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m ->
     option (MPRO MStruct T' n m))
   (select_context : forall i j (lhs : BWSizedCospanHyperGraph positive T' i j)
     n m (tgt : BWSizedCospanHyperGraph positive T' n m), nat -> nat ->
     option (BWSizedCospanHyperGraph positive T' n ((i + j) + m)))
-  concr_asgn
   (f : T' -> T)
   {i j} (Mlhs Mrhs : MPRO MStruct T' i j) {n m} (Mtgt : MPRO MStruct T' n m)
   (match_number quotient_number : nat) : option (MPRO MStruct T' n m) :=
+  let valid_tensors := MPRO_tensors_set Mlhs ∪ MPRO_tensors_set Mrhs ∪ MPRO_tensors_set Mtgt in
   let Glhs := MPRO_graph_semantics Mlhs in let Gtgt := MPRO_graph_semantics Mtgt in
   ctx ← select_context _ _ Glhs _ _ Gtgt match_number quotient_number;
   if negb (default_countable_sized_graph_iso_test
     Gtgt (make_bw_sized_pushout Glhs ctx)) then None else
   (* '(existT k (GC1, GC2)) ← select_monog_context Glhs Gtgt match_number; *)
-  if negb (MPRO_quote_context_domainb RW sized_graph_to_term concr_asgn f ctx) then None else
+  if negb (MPRO_quote_context_domainb RW sized_graph_to_term valid_tensors f ctx) then None else
   let Grhs := MPRO_graph_semantics Mrhs in
   sized_graph_to_term n m (make_bw_sized_pushout Grhs ctx).
 
 
-Lemma MPRO_gen_quote_rewrite_correct 
+Lemma MPRO_gen_quote_rewrite_correct
   {MStruct Struct T}
   `{FreeStructGraphable Struct,
   EqStruct : forall n m, Equiv (Struct n m),
@@ -1155,14 +2305,14 @@ Lemma MPRO_gen_quote_rewrite_correct
   {StructAG : SubStructGraphable Autonomy Struct T}
 
 
-  (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m -> 
+  (sized_graph_to_term : forall n m, BWSizedCospanHyperGraph positive T' n m ->
     option (MPRO MStruct T' n m))
   (Hsized_graph_to_term : forall n m bscohg p, sized_graph_to_term n m bscohg = Some p ->
     MPRO_graph_semantics p ≡ₛ bscohg)
   (select_context : forall i j (lhs : BWSizedCospanHyperGraph positive T' i j)
     n m (tgt : BWSizedCospanHyperGraph positive T' n m), nat -> nat ->
     option (BWSizedCospanHyperGraph positive T' n ((i + j) + m)))
-  
+
   (f : T' -> T)
   {i j} (lhs rhs : PRO Struct T i j) {n m} (tgt : PRO Struct T n m)
   (match_number quotient_number : nat) :
@@ -1178,9 +2328,8 @@ Lemma MPRO_gen_quote_rewrite_correct
     MPRO_PRO_quote fN Mrhs Qrhs ->
     MPRO_PRO_quote fN Mtgt Qtgt ->
 
-  forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
-    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
+    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
   forall Qres,
@@ -1194,7 +2343,7 @@ Proof.
   assert (Hf : Proper (equiv ==> equiv) f) by now intros ? ? [= <-].
   intros Htgt Hlrhs Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt.
   intros fN bi bj bn bm Mlhs Mrhs Mtgt HMlhs HMrhs HMtgt.
-  intros concr_asgn HfN.
+  (* intros concr_asgn HfN. *)
   unfold MPRO_gen_quote_rewrite.
   set (Glhs := MPRO_graph_semantics Mlhs).
   set (Grhs := MPRO_graph_semantics Mrhs).
@@ -1207,9 +2356,49 @@ Proof.
   cbn.
   destruct (MPRO_quote_context_domainb _ _ _ _ _) as [|] eqn:Hdom; [|done].
   cbn.
-  specialize (MPRO_quote_context_domainb_correct RW sized_graph_to_term Hsized_graph_to_term
-    concr_asgn fN HfN f
+  specialize (fun HfN => MPRO_quote_context_domainb_correct RW sized_graph_to_term Hsized_graph_to_term
+    (* concr_asgn *) fN f _ HfN
     ctx (Is_true_true_2 _ Hdom)) as Hpush.
+  
+  apply pro_rewriting_relation_to_domain in Hlrhs as Hlrdom.
+  destruct Hlrdom as [Hldom Hrdom].
+  tspecialize Hpush. 1:{
+    intros ins outs mp.
+    change (_ ∪ _ ∪ _) with (MPRO_tensors_set (Mlhs * Mrhs * Mtgt)%mpro).
+    intros Hmp.
+    apply (mpro_rewriting_domain_mono_set_quoted RW f _ _ Hmp fN).
+    cbn [MPRO_to_PRO].
+    do 2 change (PRO_denote f (?l * ?r)) with (PRO_denote f l * PRO_denote f r)%pro.
+
+    apply pro_rewriting_domain_stack; [apply pro_rewriting_domain_stack|].
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMlhs.
+      apply PRO_quote_correct_tensors in HQlhs.
+      eapply pro_rewriting_domain_mono_inclA, Hldom.
+      rewrite <- HQlhs.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMrhs.
+      apply PRO_quote_correct_tensors in HQrhs.
+      eapply pro_rewriting_domain_mono_inclA, Hrdom.
+      rewrite <- HQrhs.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+    - apply MPRO_PRO_quote_correct_tensors_lists in HMtgt.
+      apply PRO_quote_correct_tensors in HQtgt.
+      eapply pro_rewriting_domain_mono_inclA, Htgt.
+      rewrite <- HQtgt.
+      rewrite PRO_tensors_PRO_denote.
+      apply (list_fmap_inclA (RA:=prod_relation eq equiv) _).
+      rewrite PRO_tensors_MPRO_to_PRO_lists.
+      apply PermutationA_inclA.
+      done.
+  }
   destruct (sized_graph_to_term _ _ _) as [Mres|] eqn:HMres_eq; [|done].
   intros _ [= <-].
   intros Qres HMres res HQres Hres%bool_decide_spec.
@@ -1259,7 +2448,6 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -1272,7 +2460,6 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
@@ -1309,9 +2496,8 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
     MPRO_PRO_quote fN Mrhs Qrhs ->
     MPRO_PRO_quote fN Mtgt Qtgt ->
 
-  forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
-    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
+    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
   forall Qres, MPRO_PRO_denote fN Mres Qres ->
@@ -1335,9 +2521,9 @@ Proof.
     (exists dlhs, drhs; split_and!;
       [apply DiagramQuote_iff_DiagramDenote..|]; done).
   intros Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN bi bj bn bm Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt concr_asgn HfN Mres HMres_eq Qres HMres res HQres dres Hdres.
+    HMlhs HMrhs HMtgt (* concr_asgn HfN *) Mres HMres_eq Qres HMres res HQres dres Hdres.
   specialize (Hrw Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN _ _ _ _ Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt _ HfN Mres HMres_eq Qres HMres res HQres).
+    HMlhs HMrhs HMtgt (* _ HfN *) Mres HMres_eq Qres HMres res HQres).
   tspecialize Hrw. 1:{
     apply bool_decide_spec.
     destruct Hdres as [Hdres].
@@ -1368,7 +2554,6 @@ Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -1381,7 +2566,6 @@ Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
@@ -1450,7 +2634,6 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -1463,7 +2646,6 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
@@ -1500,9 +2682,8 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
     MPRO_PRO_quote fN Mrhs Qrhs ->
     MPRO_PRO_quote fN Mtgt Qtgt ->
 
-  forall concr_asgn, map_Forall (λ k v, fN k = v) concr_asgn ->
   forall Mres,
-    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context concr_asgn f
+    MPRO_gen_quote_rewrite RW sized_graph_to_term select_context f
       Mlhs Mrhs Mtgt match_number quotient_number = Some Mres ->
 
   forall Qres, MPRO_PRO_denote fN Mres Qres ->
@@ -1526,9 +2707,9 @@ Proof.
     (exists dlhs, drhs; split_and!;
       [apply DiagramQuote_iff_DiagramDenote..|]; done).
   intros Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN bi bj bn bm Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt concr_asgn HfN Mres HMres_eq Qres HMres res HQres dres Hdres.
+    HMlhs HMrhs HMtgt (* concr_asgn HfN *) Mres HMres_eq Qres HMres res HQres dres Hdres.
   specialize (Hrw Qlhs Qrhs Qtgt HQlhs HQrhs HQtgt fN _ _ _ _ Mlhs Mrhs Mtgt
-    HMlhs HMrhs HMtgt _ HfN Mres HMres_eq Qres HMres res HQres).
+    HMlhs HMrhs HMtgt (* _ HfN *) Mres HMres_eq Qres HMres res HQres).
   tspecialize Hrw. 1:{
     apply bool_decide_spec.
     destruct Hdres as [Hdres].
@@ -1559,7 +2740,6 @@ Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
   {SizedProD : SizedProLike (MStruct positive) Struct T D}
   (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
   (MStructI : InterpStruct (MStruct positive) Struct := SizedProD.(SPL_interp))
-  (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test))
   {MStructG : forall T, @SizedStructGraphable positive (MStruct positive) T}
   {FreeMStructG : FreeSizedStructGraphable (MStruct positive)}
   {MStructRes : ResizableStruct MStruct}
@@ -1572,7 +2752,6 @@ Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
     {LawGraphS : LawfulStructGraphable Struct T}
   {LawGraphM : LawfulSizedStructGraphable (MStruct positive) Struct T}
   {LawGraphM' : LawfulSizedStructGraphable (MStruct positive) Struct T'}
-  {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D}
   (RW : LawfulMPRORewritingRelation (MStruct positive) Struct T :=
     LawfulProLike_LawfulMPRORewritingRelation (MStruct positive) LawPro)
 
