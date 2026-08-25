@@ -6,140 +6,259 @@ From TensorRocq Require Import ProLike PropGraphTerm.
 
 From TensorRocqEx Require Import Rmodeq.
 
-(* First, we must define the data assocated to generators. In our case,
-  we use [option (bool * R + C)] with [None] being the hadamard box,
-  [Some (inl (false, α))] being a Z spider with phase [α],
-  [Some (inl (true, α))] being a X spider with phase [α], and
-  [Some (inr c)] being a constant gadget with value [c]. *)
-Definition ZXCVERT := option (bool * R + C).
 
-(* We must show the type of generators is nonempty *)
-#[export] Instance ZXCVERT_inhab : Inhabited ZXCVERT := populate None.
 
-(* We define the natural equivalence relation on [ZXCVERT], with phases
-  taken mod [2*PI], and show it is in fact an equivalence relation. *)
-#[export] Instance ZXCVERT_equiv : Equiv ZXCVERT :=
-  option_Forall2 (sum_relation (prod_relation eq (Rmodeq (2*PI))) eq).
 
-#[export] Instance ZXCVERT_equiv_equivalence : Equivalence (≡@{ZXCVERT}).
-Proof. apply _. Qed.
 
-(* We give an interpretation of our generators as dimensionless tensors (to [C]),
-  using the definitions in [ZXCore.v] *)
-Definition ZXCCALC_tensor (x : ZXCVERT) : DimensionlessTensor bool :=
-  match x with
-  | None => fun n m => (tensor_to_dimensionless (@h_stack n)) n m
-  | Some (inl (false, r))  => fun n m => @zsp n m r
-  | Some (inl (true, r)) => fun n m => @xsp n m r
-  | Some (inr c) => fun n m v w => c
+Module Canonize.
+
+Require Import StrictProp.
+
+Definition dec_unsquash `{Decision P} (p : Squash P) : P :=
+  match decide P with
+  | left HP => HP
+  | right HnP => sEmpty_rect _ (let '(squash HP) := p in match (HnP HP) with end)
   end.
 
-#[global] Arguments ZXCCALC_tensor !_ /.
-
-(* We show this tensor interpretation respects our equivalence relation;
-  this is basically just applying instances from [ZXCore.v]. *)
-#[export] Instance ZXCCALC_tensor_proper :
-  Proper ((≡) ==> (≡)) ZXCCALC_tensor.
+Lemma dec_unsquash_defn `{Decision P} (p : Squash P) :
+  dec_unsquash p =
+  match decide P with
+  | left HP => HP
+  | right HnP => sEmpty_rect _ (let '(squash HP) := p in match (HnP HP) with end)
+  end.
 Proof.
-  intros x x' Heq.
-  induction Heq as [x y Heq|]; [|done..].
-  induction Heq as [ [ [] x] [c y] [ [= <-] Heq]|? ? <-]; [..|done];
-  cbn;
-  intros n m;
-  now rewrite Heq.
+  done.
 Qed.
 
-(* Then, we give the [TensorLike] instance defining the tensor associated
-  to a [ZXCVERT]. *)
-#[export] Instance ZXCCALC : TensorLike C bool ZXCVERT := {
-  interpretTensor := ZXCCALC_tensor;
-}.
+Opaque dec_unsquash.
+
+Lemma dec_unsquash_squash `{Decision P} (p : P) :
+  dec_unsquash (squash p) =
+  match decide P with
+  | left HP => HP
+  | right HnP => False_rect _ (HnP p)
+  end.
+Proof.
+  rewrite dec_unsquash_defn.
+  case_decide; done.
+Qed.
+
+Definition canonize `{Decision P} (p : P) : P :=
+  dec_unsquash (squash p).
+
+Lemma canonize_canonical `{Decision P} (p q : P) : canonize p = canonize q.
+Proof.
+  done.
+Qed.
+
+End Canonize.
 
 
-(* We declare the equivalence relation assocaited to ZX-diagrams *)
-#[local] Instance ZX_equiv {n m} : Equiv (ZX n m) := proportional_by_1.
+(* FIXME: Move *)
+#[export] Instance sum_equivalence {A B} `{EqA : Equiv A,
+  EquivA : Equivalence A equiv,
+  EqB : Equiv B, EquivB : Equivalence B equiv} :
+  @Equivalence (A + B) equiv.
+Proof.
+  split.
+  - now intros []; constructor.
+  - now intros ? ? []; constructor.
+  - intros ? ? ? Hab Hbc.
+    induction Hab; inversion Hbc; subst; constructor;
+    etransitivity; eauto.
+Qed.
 
-#[program] Instance ZX_tensorlike : StrictTensorLike C bool ZX := {
-  strictInterpretTensor n m zx := ZX_tensor_semantics zx;
+(* FIXME: Move *)
+#[export] Instance withDiagrams_equivalence
+  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})} :
+  Equivalence (≡@{WithDiagrams T D}) := _.
+
+#[export, program] Instance bundledDiagram_tensorLike {R}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EQA : EqDecision A}
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensD : StrictTensorLike R A D} : TensorLike R A (BundledDiagram D) := {
+  interpretTensor d n m :=
+    from_option strictInterpretTensor (const_tensor rO) (unbundleDiagram n m d)
 }.
 Next Obligation.
-  intros n m zx zx' Hzx.
-  apply matrix_of_tensor_inj.
-  rewrite 2 ZX_tensor_semantics_correct.
-  now rewrite Hzx.
+  intros until D.
+  intros ? ? ?.
+  intros d d' Heq.
+  induction Heq.
+  cbn.
+  intros n m.
+  case_match; [|done].
+  case_match; [|done].
+  cbn.
+  subst.
+  case_match; [|done].
+  subst.
+  rewrite (proof_irrel _ eq_refl).
+  cbn.
+  now f_equiv.
+Qed.
+(* FIXME: Move *)
+#[export] Instance withDiagrams_tensorLike {R}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EQA : EqDecision A}
+  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (TensT : TensorLike R A T)
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensD : StrictTensorLike R A D} : TensorLike R A (WithDiagrams T D) := {
+  interpretTensor t :=
+    sum_rect (λ _, DimensionlessTensor A)
+      interpretTensor interpretTensor t;
+  interpretTensorProper := sum_rect_proper _ _
+}.
+(* FIXME: Move *)
+Lemma unbundleDiagram_Some {D : Mor nat} (n m : nat)
+  (bd : BundledDiagram D) d :
+  unbundleDiagram n m bd = Some d <-> bd = bundleDiagram d.
+Proof.
+  split.
+  - unfold unbundleDiagram.
+    induction bd as [[n' m'] d'].
+    case_match; [|now intros [=]].
+    intros [= <-].
+    injection e.
+    intros <- <-.
+    rewrite (proof_irrel _ eq_refl).
+    cbn.
+    done.
+  - intros ->.
+    cbn [unbundleDiagram bundleDiagram].
+    case_match; [|done].
+    rewrite (proof_irrel _ eq_refl).
+    done.
 Qed.
 
-Definition ZXCVERT_to_ZX
-  n m (c : ZXCVERT) : option (ZX n m) :=
-  match c with
-  | None => match decide (n = m) with
-    | left Heq => Some (cast _ _ Heq eq_refl (n_stack1 m Box))
-    | right _ => None
-    end
-  | Some (inl (true, r)) => Some (X n m r)
-  | Some (inl (false, r)) => Some (Z n m r)
-  | Some (inr c) => match n, m with
-    | 0, 0 => Some (zx_of_const c)
-    | _, _ => None
-    end
-  end.
-
-#[export] Instance ZX_tensorable : TensorableDiagram ZXCVERT ZX :=
-  ZXCVERT_to_ZX.
-
-#[export] Instance ZX_compositional : Compositional ZX := {
-  Did n := n_wire n;
-  Dcompose _ _ _ zx zx' := zx ⟷ zx';
-  Dstack _ _ _ _ zx zx' := zx ↕ zx';
-}.
-
-Definition Monoidal_to_ZX {n m} (p : Monoidal n m) : ZX n m :=
-  cast n m (Monoidal_eq p) eq_refl (n_wire _).
-
-Definition Symmetry_to_ZX {n m} (p : Symmetry n m) : ZX n m :=
-  match p with
-  | Swap n m => zx_comm n m
-  end.
+(* FIXME: Move *)
+Lemma unbundleDiagram_bundleDiagram {D : Mor nat} {n m : nat} (d : D n m) :
+  unbundleDiagram n m (bundleDiagram d) = Some d.
+Proof.
+  now apply unbundleDiagram_Some.
+Qed.
 
 
-Definition SymmetricG_to_ZX {n m} (p : SymmetricG n m) : ZX n m :=
-  match p with
-  | inl p => Monoidal_to_ZX p
-  | inr p => Symmetry_to_ZX p
-  end.
+(* FIXME: Move *)
+#[export] Instance morunion_leibniz {A} {Struct Struct' : Mor A}
+  `{EqStruct : forall n m, Equiv (Struct n m),
+    LeibStruct : forall n m, LeibnizEquiv (Struct n m)}
+  `{EqStruct' : forall n m, Equiv (Struct' n m),
+    LeibStruct' : forall n m, LeibnizEquiv (Struct' n m)} :
+    forall n m, LeibnizEquiv (MorUnion Struct Struct' n m).
+Proof.
+  intros n m p p' Hp.
+  induction Hp as [? ? Hp|? ? Hp]; apply leibniz_equiv in Hp; congruence.
+Qed.
 
-Definition Autonomy_to_ZX {n m} (p : Autonomy n m) : ZX n m :=
-  match p with
-  | Cap 0 => ⦰
-  | Cap 1 => ⊃
-  | Cap n => n_cup n
-  | Cup 0 => ⦰
-  | Cup 1 => ⊂
-  | Cup n => n_cap n
-  end.
+#[export] Instance Monoidal_leibniz n m : LeibnizEquiv (Monoidal n m).
+Proof.
+  easy.
+Qed.
 
-Definition Autonomous_to_ZX {n m} (p : Autonomous n m) : ZX n m :=
-  match p with
-  | inl p => SymmetricG_to_ZX p
-  | inr p => Autonomy_to_ZX p
-  end.
+#[export] Instance Symmetry_leibniz n m : LeibnizEquiv (Symmetry n m).
+Proof.
+  easy.
+Qed.
 
-#[export] Instance ZX_Monoidal_structable : StructableDiagram Monoidal ZX :=
-  fun _ _ => Monoidal_to_ZX.
+#[export] Instance Autonomy_leibniz n m : LeibnizEquiv (Autonomy n m).
+Proof.
+  easy.
+Qed.
 
-#[export] Instance ZX_Symmetry_structable : StructableDiagram Symmetry ZX :=
-  fun _ _ => Symmetry_to_ZX.
+#[export] Instance Frobenial_leibniz n m : LeibnizEquiv (Frobenial n m).
+Proof.
+  easy.
+Qed.
 
-#[export] Instance ZX_Autonomy_structable : StructableDiagram Autonomy ZX :=
-  fun _ _ => Autonomy_to_ZX.
 
-#[export] Instance ZX_SymmetricG_structable : StructableDiagram SymmetricG ZX :=
-  fun _ _ => SymmetricG_to_ZX.
 
-#[export] Instance ZX_Autonomous_structable : StructableDiagram Autonomous ZX :=
-  fun _ _ => Autonomous_to_ZX.
 
-Local Instance ZX_abstract_symmetricG : AbstractProLike SymmetricG ZX := {}.
+(* Print Instances LawfulStructGraphable. *)
+(* FIXME: Move *)
+#[export] Instance proper_from_symemtricg {n m} `{Reflexive T RT}
+  (f : SymmetricG n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+#[export] Instance proper_from_autonomous {n m} `{Reflexive T RT}
+  (f : Autonomous n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+#[export] Instance proper_from_frobenius {n m} `{Reflexive T RT}
+  (f : Frobenius n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Lemma n_wire_removal_l' {n n' n'' m} (zx : ZX n'' m) prfn' prfn'' :
+  cast n' n'' prfn' prfn'' (n_wire n) ⟷ zx ∝= cast _ _ (eq_trans_r prfn' prfn'') eq_refl zx.
+Proof.
+  subst.
+  rewrite 2 CastRules.cast_id.
+  now rewrite nwire_removal_l.
+Qed.
+
+Lemma n_wire_removal_r' {n m m' m''} (zx : ZX n m') prfm' prfm'' :
+  zx ⟷ cast m' m'' prfm' prfm'' (n_wire m) ∝= cast _ _ eq_refl (eq_trans_r prfm'' prfm') zx.
+Proof.
+  subst.
+  rewrite 2 CastRules.cast_id.
+  now rewrite nwire_removal_r.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma zx_of_const_mult' (c d : C) : zx_of_const (c * d) ∝=
+  zx_of_const c ⟷ zx_of_const d.
+Proof.
+  rewrite 3 zx_of_const_to_scaled_empty.
+  distribute_zxscale.
+  rewrite Cmult_comm, compose_empty_r.
+  done.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma empty_zxperm_empty {n m} (Hn : n = O) (Hm : m = O)
+  (zx : ZX n m) : ZXperm zx ->
+  zx ∝= cast n m Hn Hm ⦰.
+Proof.
+  intros Hzx.
+  apply prop_eq_of_perm_eq; [auto_zxperm..|].
+  subst.
+  easy.
+Qed.
+
 
 Fixpoint zx_mul_S_r n m : ZX (n * S m) (n + n * m) :=
   match n with
@@ -155,39 +274,6 @@ Fixpoint zx_mul_comm n m : ZX (n * m) (m * n) :=
     zx_mul_S_r n m ⟷
     (n_wire n ↕ zx_mul_comm n m)
   end.
-(*
-Lemma zx_mul_comm_S_l n m : zx_mul_comm (S n) m ∝= K.
-
-Lemma zx_mul_comm_transpose n m : ((zx_mul_comm n m) ⊤)%ZX ∝= zx_mul_comm m n.
-Proof. *)
-
-
-
-Lemma Monoidal_to_ZX_zxperm
-  {n m} (p : Monoidal n m) : ZXperm (Monoidal_to_ZX p).
-Proof.
-  unfold Monoidal_to_ZX.
-  auto_zxperm.
-Qed.
-
-Lemma Symmetry_to_ZX_zxperm
-  {n m} (p : Symmetry n m) : ZXperm (Symmetry_to_ZX p).
-Proof.
-  induction p; cbn;
-  auto_zxperm.
-Qed.
-
-#[export] Hint Resolve Monoidal_to_ZX_zxperm Symmetry_to_ZX_zxperm : zxperm_db.
-
-Lemma zx_symmetricG_SPRO_to_diagram_zxperm
-  {n m} (p : SPRO SymmetricG n m) : ZXperm (SPRO_to_diagram p).
-Proof.
-  induction p; cbn; [auto_zxperm..| |done].
-  induction s; cbn; auto_zxperm.
-Qed.
-
-#[export] Hint Resolve zx_symmetricG_SPRO_to_diagram_zxperm : zxperm_db.
-
 
 Lemma zx_mul_S_r_zxperm n m : ZXperm (zx_mul_S_r n m).
 Proof.
@@ -882,16 +968,6 @@ Proof.
   done.
 Qed.
 
-(* FIXME: Move *)
-Lemma empty_zxperm_empty {n m} (Hn : n = 0) (Hm : m = 0)
-  (zx : ZX n m) : ZXperm zx ->
-  zx ∝= cast n m Hn Hm ⦰.
-Proof.
-  intros Hzx.
-  apply prop_eq_of_perm_eq; [auto_zxperm..|].
-  subst.
-  easy.
-Qed.
 
 Lemma n_cup_alt_ZX_copy n :
   n_cup n ∝= cast (n + n) _ (Nat.double_twice n) eq_refl (ZX_copy n ⊃).
@@ -1002,6 +1078,431 @@ Proof.
   f_equiv; apply Forall_iff; now intros [].
 Qed.
 
+
+
+
+Lemma Z_Rmodeq_2PI {n m} α α' : α =[mod 2 * PI] α' ->
+  Z n m α ∝= Z n m α'.
+Proof.
+  intros Hα.
+  prep_matrix_equivalence.
+  apply tensor_of_matrix_inj'.
+  rewrite <- 2 ZX_tensor_semantics_correct.
+  rewrite 2 tensor_of_matrix_of_tensor.
+  cbn.
+  now f_equiv.
+Qed.
+
+Lemma X_Rmodeq_2PI {n m} α α' : α =[mod 2 * PI] α' ->
+  X n m α ∝= X n m α'.
+Proof.
+  intros Hα.
+  colorswap_of (@Z_Rmodeq_2PI n m α α' Hα).
+Qed.
+
+
+(* FIXME: Move!!! *)
+Lemma cast_n_wire_l {n m o}
+  (Hm : m = n) (Ho : o = n) :
+  cast _ _ Hm Ho (n_wire n) =
+  cast _ _ eq_refl (eq_trans Ho (eq_sym Hm)) (n_wire m).
+Proof.
+  subst; now rewrite 2 cast_id_eq.
+Qed.
+Lemma cast_n_wire_r {n m o}
+  (Hm : m = n) (Ho : o = n) :
+  cast _ _ Hm Ho (n_wire n) =
+  cast _ _ (eq_trans Hm (eq_sym Ho)) eq_refl (n_wire o).
+Proof.
+  subst; now rewrite 2 cast_id_eq.
+Qed.
+
+
+
+Lemma Z_push_out_phase_gadget n m α : Z n m α ∝= Z n (S m) 0 ⟷ (Z 1 0 α ↕ n_wire m).
+Proof.
+  rewrite (dominated_Z_spider_fusion_top_left 0 0 m n).
+  now rewrite Rplus_0_r.
+Qed.
+
+Lemma Z_push_out_phase_gadget' n m α β : Z n m (α + β) ∝=
+  Z n (S m) β ⟷ (Z 1 0 α ↕ n_wire m).
+Proof.
+  rewrite (dominated_Z_spider_fusion_top_left 0 0 m n).
+  done.
+Qed.
+
+Lemma PRO_to_ZX_cast `{ProLike Struct T ZX}
+  {n m n' m'} (Hn : n = n') (Hm : m = m') (p : PRO Struct T n m) :
+  PRO_to_diagram (cast_PRO Hn Hm p) =
+  cast _ _ (eq_sym Hn) (eq_sym Hm) <$> PRO_to_diagram p.
+Proof.
+  subst.
+  rewrite cast_PRO_id.
+  destruct (PRO_to_diagram _); [|done].
+  done.
+Qed.
+
+Lemma zx_mul_comm_n_1 n : zx_mul_comm n 1 ∝=
+  cast _ _ (Nat.mul_1_r n) (Nat.mul_1_l n) (n_wire n).
+Proof.
+  apply prop_eq_of_perm_eq; [auto_zxperm..|].
+  rewrite perm_of_zx_mul_comm.
+  rewrite perm_of_zx_cast, perm_of_n_wire.
+  rewrite kron_comm_perm_defn.
+  intros i Hi.
+  rewrite Nat.mod_small, Nat.div_small; lia.
+Qed.
+
+Lemma zx_mul_comm_1_n n : zx_mul_comm 1 n ∝=
+  cast _ _ (Nat.mul_1_l n) (Nat.mul_1_r n) (n_wire n).
+Proof.
+  apply prop_eq_of_perm_eq; [auto_zxperm..|].
+  rewrite perm_of_zx_mul_comm.
+  rewrite perm_of_zx_cast, perm_of_n_wire.
+  rewrite kron_comm_perm_defn.
+  intros i Hi.
+  rewrite Nat.mod_1_r, Nat.div_1_r.
+  lia.
+Qed.
+
+Lemma ZX_copy_1 {n m} (zx : ZX n m) :
+  ZX_copy 1 zx ∝= cast _ _ (Nat.mul_1_r n) (Nat.mul_1_r m) zx.
+Proof.
+  unfold ZX_copy.
+  rewrite zx_mul_comm_1_n, zx_mul_comm_n_1.
+  rewrite n_stack_1.
+  rewrite 2 cast_compose_eq_mid_join, nwire_removal_l, nwire_removal_r.
+  cast_irrelevance.
+Qed.
+
+
+Lemma zx_mul_comm_0_l n : zx_mul_comm 0 n ∝= cast _ _ eq_refl (Nat.mul_0_r _) ⦰.
+Proof.
+  apply empty_zxperm_empty.
+  auto_zxperm.
+Qed.
+
+Lemma zx_mul_comm_0_r n : zx_mul_comm n 0 ∝= cast _ _ (Nat.mul_0_r _) eq_refl ⦰.
+Proof.
+  apply empty_zxperm_empty.
+  auto_zxperm.
+Qed.
+Lemma zx_of_perm_kron_comm_perm n m :
+  zx_of_perm (n * m) (kron_comm_perm n m) ∝=
+  cast _ _ eq_refl (Nat.mul_comm _ _) (zx_mul_comm n m).
+Proof.
+  prop_perm_eq_nosimpl.
+  eq_by_WF_perm_eq (n * m).
+  rewrite perm_of_zx_of_perm_eq, perm_of_zx_cast by auto_perm.
+  rewrite perm_of_zx_mul_comm.
+  done.
+Qed.
+
+
+
+Lemma zx_mul_comm_transpose n m : (zx_mul_comm n m) ⊤ ∝= zx_mul_comm m n.
+Proof.
+  apply prop_eq_of_perm_eq; [auto_zxperm..|].
+  rewrite perm_of_zx_transpose by auto_zxperm.
+  rewrite 2 perm_of_zx_mul_comm.
+  rewrite kron_comm_perm_inv'.
+  done.
+Qed.
+
+Lemma zx_mul_comm_cancel n m : zx_mul_comm n m ⟷ zx_mul_comm m n ∝= n_wire _.
+Proof.
+  rewrite <- (zx_mul_comm_transpose n m).
+  apply zxperm_transpose_right_inverse; auto_zxperm.
+Qed.
+
+Lemma zx_mul_comm_S_r n m : zx_mul_comm n (S m) ∝=
+  zx_mul_S_r n m ⟷ (n_wire n ↕ zx_mul_comm n m).
+Proof.
+  done.
+Qed.
+
+Lemma zx_mul_comm_S_l n m : zx_mul_comm (S n) m ∝=
+  n_wire m ↕ zx_mul_comm n m ⟷ (zx_mul_S_r m n) ⊤.
+Proof.
+  apply transpose_diagrams_eq.
+  rewrite zx_mul_comm_transpose.
+  cbn.
+  rewrite transpose_involutive, n_wire_transpose, zx_mul_comm_transpose.
+  done.
+Qed.
+
+Lemma zx_mul_comm_le_1_l n m : n ≤ 1 -> zx_mul_comm n m ∝= cast _ _ eq_refl (Nat.mul_comm _ _) (n_wire _).
+Proof.
+  intros Hn.
+  assert (n = 0 \/ n = 1) as [-> | ->] by lia.
+  - cbn -[cast].
+    rewrite zx_mul_comm_0_l.
+    cast_irrelevance.
+  - rewrite zx_mul_comm_1_n.
+    auto_cast_eqn rewrite cast_backwards_eq, cast_contract_eq', cast_n_wire.
+    done.
+Qed.
+
+Lemma zx_mul_comm_le_1_r n m : m ≤ 1 -> zx_mul_comm n m ∝= cast _ _ (Nat.mul_comm _ _) eq_refl  (n_wire _).
+Proof.
+  intros Hm.
+  apply transpose_diagrams_eq.
+  rewrite zx_mul_comm_transpose, cast_transpose, n_wire_transpose.
+  rewrite zx_mul_comm_le_1_l by done.
+  done.
+Qed.
+
+Lemma ZX_copy_le_1 k {n m} (zx : ZX n m) : n <= 1 -> m <= 1 -> ZX_copy k zx ∝=
+  cast _ _ (Nat.mul_comm _ _) (Nat.mul_comm _ _) (k ⇑ zx).
+Proof.
+  unfold ZX_copy.
+  intros Hn Hm.
+  rewrite zx_mul_comm_le_1_l by done.
+  rewrite zx_mul_comm_le_1_r by done.
+  rewrite n_wire_removal_l'.
+  rewrite n_wire_removal_r', cast_contract_eq'.
+  cast_irrelevance.
+Qed.
+
+
+Lemma const_of_zx_colorswap zx : const_of_zx (color_swap zx) = const_of_zx zx.
+Proof.
+  rewrite colorswap_is_bihadamard.
+  cbn -[const_of_zx].
+  rewrite compose_empty_r, compose_empty_l.
+  done.
+Qed.
+
+Lemma stack_push_tl {n m o n' m'} (zx : ZX n m) (zx' : ZX m o) (zx'' : ZX n' m') :
+  (zx ⟷ zx') ↕ zx'' ∝= zx ↕ n_wire _ ⟷ (zx' ↕ zx'').
+Proof.
+  rewrite <- stack_compose_distr, nwire_removal_l.
+  done.
+Qed.
+
+Lemma stack_push_tr {n m o n' m'} (zx : ZX n m) (zx' : ZX m o) (zx'' : ZX n' m') :
+  (zx ⟷ zx') ↕ zx'' ∝= (zx ↕ zx'') ⟷ (zx' ↕ n_wire _).
+Proof.
+  rewrite <- stack_compose_distr, nwire_removal_r.
+  done.
+Qed.
+
+Lemma stack_push_bl {n m n' m' o'} (zx : ZX n m) (zx' : ZX n' m') (zx'' : ZX m' o') :
+  zx ↕ (zx' ⟷ zx'') ∝= n_wire _ ↕ zx' ⟷ (zx ↕ zx'').
+Proof.
+  rewrite <- stack_compose_distr, nwire_removal_l.
+  done.
+Qed.
+
+Lemma stack_push_br {n m n' m' o'} (zx : ZX n m) (zx' : ZX n' m') (zx'' : ZX m' o') :
+  zx ↕ (zx' ⟷ zx'') ∝= (zx ↕ zx') ⟷ (n_wire _ ↕ zx'').
+Proof.
+  rewrite <- stack_compose_distr, nwire_removal_r.
+  done.
+Qed.
+
+Lemma stack_mid_comm {n0 m0 n1 m1 n2 m2 n3 m3}
+  (zx0 : ZX n0 m0) (zx1 : ZX n1 m1) (zx2 : ZX n2 m2) (zx3 : ZX n3 m3) :
+  (zx0 ↕ zx1) ↕ (zx2 ↕ zx3) ∝= zx_mid_comm _ _ _ _
+    ⟷ ((zx0 ↕ zx2) ↕ (zx1 ↕ zx3)) ⟷ zx_mid_comm _ _ _ _.
+Proof.
+  rewrite ComposeRules.compose_assoc, zx_mid_comm_commutes_r.
+  rewrite <- ComposeRules.compose_assoc, <- zx_mid_comm_transpose, zxperm_transpose_left_inverse by auto_zxperm.
+  rewrite nwire_removal_l.
+  done.
+Qed.
+
+
+Lemma n_stack_gadget_to_scalar k (zx : ZX 0 0) :
+  k ⇑ zx ∝= const_of_zx zx ^ k .* n_wire _.
+Proof.
+  induction k; [cbn; rewrite zx_scale_1_l; done|].
+  cbn.
+  rewrite IHk, (gadget_is_scaled_empty zx) at 1.
+  distribute_zxscale.
+  apply zx_scale_simplify_eq.
+  - C_field.
+  - apply stack_empty_l.
+Qed.
+
+
+
+
+
+
+
+
+(* First, we must define the data assocated to generators. In our case,
+  we use [option (bool * R + C)] with [None] being the hadamard box,
+  [Some (inl (false, α))] being a Z spider with phase [α],
+  [Some (inl (true, α))] being a X spider with phase [α], and
+  [Some (inr c)] being a constant gadget with value [c]. *)
+Definition ZXCVERT := option (bool * R + C).
+
+(* We must show the type of generators is nonempty *)
+#[export] Instance ZXCVERT_inhab : Inhabited ZXCVERT := populate None.
+
+(* We define the natural equivalence relation on [ZXCVERT], with phases
+  taken mod [2*PI], and show it is in fact an equivalence relation. *)
+#[export] Instance ZXCVERT_equiv : Equiv ZXCVERT :=
+  option_Forall2 (sum_relation (prod_relation eq (Rmodeq (2*PI))) eq).
+
+#[export] Instance ZXCVERT_equiv_equivalence : Equivalence (≡@{ZXCVERT}).
+Proof. apply _. Qed.
+
+(* We give an interpretation of our generators as dimensionless tensors (to [C]),
+  using the definitions in [ZXCore.v] *)
+Definition ZXCCALC_tensor (x : ZXCVERT) : DimensionlessTensor bool :=
+  match x with
+  | None => fun n m => (tensor_to_dimensionless (@h_stack n)) n m
+  | Some (inl (false, r))  => fun n m => @zsp n m r
+  | Some (inl (true, r)) => fun n m => @xsp n m r
+  | Some (inr c) => fun n m v w => c
+  end.
+
+#[global] Arguments ZXCCALC_tensor !_ /.
+
+(* We show this tensor interpretation respects our equivalence relation;
+  this is basically just applying instances from [ZXCore.v]. *)
+#[export] Instance ZXCCALC_tensor_proper :
+  Proper ((≡) ==> (≡)) ZXCCALC_tensor.
+Proof.
+  intros x x' Heq.
+  induction Heq as [x y Heq|]; [|done..].
+  induction Heq as [ [ [] x] [c y] [ [= <-] Heq]|? ? <-]; [..|done];
+  cbn;
+  intros n m;
+  now rewrite Heq.
+Qed.
+
+(* Then, we give the [TensorLike] instance defining the tensor associated
+  to a [ZXCVERT]. *)
+#[export] Instance ZXCCALC : TensorLike C bool ZXCVERT := {
+  interpretTensor := ZXCCALC_tensor;
+}.
+
+
+(* We declare the equivalence relation assocaited to ZX-diagrams *)
+#[local] Instance ZX_equiv {n m} : Equiv (ZX n m) := proportional_by_1.
+
+#[program] Instance ZX_tensorlike : StrictTensorLike C bool ZX := {
+  strictInterpretTensor n m zx := ZX_tensor_semantics zx;
+}.
+Next Obligation.
+  intros n m zx zx' Hzx.
+  apply matrix_of_tensor_inj.
+  rewrite 2 ZX_tensor_semantics_correct.
+  now rewrite Hzx.
+Qed.
+
+Definition ZXCVERT_to_ZX
+  n m (c : ZXCVERT) : option (ZX n m) :=
+  match c with
+  | None => match decide (n = m) with
+    | left Heq => Some (cast _ _ Heq eq_refl (n_stack1 m Box))
+    | right _ => None
+    end
+  | Some (inl (true, r)) => Some (X n m r)
+  | Some (inl (false, r)) => Some (Z n m r)
+  | Some (inr c) => match n, m with
+    | 0, 0 => Some (zx_of_const c)
+    | _, _ => None
+    end
+  end.
+
+#[export] Instance ZX_tensorable : TensorableDiagram ZXCVERT ZX :=
+  ZXCVERT_to_ZX.
+
+#[export] Instance ZX_compositional : Compositional ZX := {
+  Did n := n_wire n;
+  Dcompose _ _ _ zx zx' := zx ⟷ zx';
+  Dstack _ _ _ _ zx zx' := zx ↕ zx';
+}.
+
+Definition Monoidal_to_ZX {n m} (p : Monoidal n m) : ZX n m :=
+  cast n m (Monoidal_eq p) eq_refl (n_wire _).
+
+Definition Symmetry_to_ZX {n m} (p : Symmetry n m) : ZX n m :=
+  match p with
+  | Swap n m => zx_comm n m
+  end.
+
+
+Definition SymmetricG_to_ZX {n m} (p : SymmetricG n m) : ZX n m :=
+  match p with
+  | inl p => Monoidal_to_ZX p
+  | inr p => Symmetry_to_ZX p
+  end.
+
+Definition Autonomy_to_ZX {n m} (p : Autonomy n m) : ZX n m :=
+  match p with
+  | Cap 0 => ⦰
+  | Cap 1 => ⊃
+  | Cap n => n_cup n
+  | Cup 0 => ⦰
+  | Cup 1 => ⊂
+  | Cup n => n_cap n
+  end.
+
+Definition Autonomous_to_ZX {n m} (p : Autonomous n m) : ZX n m :=
+  match p with
+  | inl p => SymmetricG_to_ZX p
+  | inr p => Autonomy_to_ZX p
+  end.
+
+#[export] Instance ZX_Monoidal_structable : StructableDiagram Monoidal ZX :=
+  fun _ _ => Monoidal_to_ZX.
+
+#[export] Instance ZX_Symmetry_structable : StructableDiagram Symmetry ZX :=
+  fun _ _ => Symmetry_to_ZX.
+
+#[export] Instance ZX_Autonomy_structable : StructableDiagram Autonomy ZX :=
+  fun _ _ => Autonomy_to_ZX.
+
+#[export] Instance ZX_SymmetricG_structable : StructableDiagram SymmetricG ZX :=
+  fun _ _ => SymmetricG_to_ZX.
+
+#[export] Instance ZX_Autonomous_structable : StructableDiagram Autonomous ZX :=
+  fun _ _ => Autonomous_to_ZX.
+
+Local Instance ZX_abstract_symmetricG : AbstractProLike SymmetricG ZX := {}.
+
+(*
+Lemma zx_mul_comm_S_l n m : zx_mul_comm (S n) m ∝= K.
+
+Lemma zx_mul_comm_transpose n m : ((zx_mul_comm n m) ⊤)%ZX ∝= zx_mul_comm m n.
+Proof. *)
+
+
+
+Lemma Monoidal_to_ZX_zxperm
+  {n m} (p : Monoidal n m) : ZXperm (Monoidal_to_ZX p).
+Proof.
+  unfold Monoidal_to_ZX.
+  auto_zxperm.
+Qed.
+
+Lemma Symmetry_to_ZX_zxperm
+  {n m} (p : Symmetry n m) : ZXperm (Symmetry_to_ZX p).
+Proof.
+  induction p; cbn;
+  auto_zxperm.
+Qed.
+
+#[export] Hint Resolve Monoidal_to_ZX_zxperm Symmetry_to_ZX_zxperm : zxperm_db.
+
+Lemma zx_symmetricG_SPRO_to_diagram_zxperm
+  {n m} (p : SPRO SymmetricG n m) : ZXperm (SPRO_to_diagram p).
+Proof.
+  induction p; cbn; [auto_zxperm..| |done].
+  induction s; cbn; auto_zxperm.
+Qed.
+
+#[export] Hint Resolve zx_symmetricG_SPRO_to_diagram_zxperm : zxperm_db.
+
+
+
 Definition Frobenial_to_ZX {n m} (p : Frobenial n m) : ZX n m :=
   match p with
   | Delta0 => Z 0 0 0
@@ -1022,64 +1523,6 @@ Definition Frobenius_to_ZX {n m} (p : Frobenius n m) : ZX n m :=
   fun _ _ => Frobenius_to_ZX.
 
 
-(* FIXME: Move *)
-#[export] Instance morunion_leibniz {A} {Struct Struct' : Mor A}
-  `{EqStruct : forall n m, Equiv (Struct n m),
-    LeibStruct : forall n m, LeibnizEquiv (Struct n m)}
-  `{EqStruct' : forall n m, Equiv (Struct' n m),
-    LeibStruct' : forall n m, LeibnizEquiv (Struct' n m)} :
-    forall n m, LeibnizEquiv (MorUnion Struct Struct' n m).
-Proof.
-  intros n m p p' Hp.
-  induction Hp as [? ? Hp|? ? Hp]; apply leibniz_equiv in Hp; congruence.
-Qed.
-
-#[export] Instance Monoidal_leibniz n m : LeibnizEquiv (Monoidal n m).
-Proof.
-  easy.
-Qed.
-
-#[export] Instance Symmetry_leibniz n m : LeibnizEquiv (Symmetry n m).
-Proof.
-  easy.
-Qed.
-
-#[export] Instance Autonomy_leibniz n m : LeibnizEquiv (Autonomy n m).
-Proof.
-  easy.
-Qed.
-
-#[export] Instance Frobenial_leibniz n m : LeibnizEquiv (Frobenial n m).
-Proof.
-  easy.
-Qed.
-
-
-
-
-(* Print Instances LawfulStructGraphable. *)
-(* FIXME: Move *)
-#[export] Instance proper_from_symemtricg {n m} `{Reflexive T RT}
-  (f : SymmetricG n m -> T) :
-  Proper (equiv ==> RT) f.
-Proof.
-  intros s s' <-%leibniz_equiv.
-  done.
-Qed.
-#[export] Instance proper_from_autonomous {n m} `{Reflexive T RT}
-  (f : Autonomous n m -> T) :
-  Proper (equiv ==> RT) f.
-Proof.
-  intros s s' <-%leibniz_equiv.
-  done.
-Qed.
-#[export] Instance proper_from_frobenius {n m} `{Reflexive T RT}
-  (f : Frobenius n m -> T) :
-  Proper (equiv ==> RT) f.
-Proof.
-  intros s s' <-%leibniz_equiv.
-  done.
-Qed.
 
 #[export, program] Instance ZX_Monoidal_lawstructable :
   LawfulStructableDiagram C bool Monoidal ZX.
@@ -1176,113 +1619,10 @@ Next Obligation.
   destruct ss as [ss|ss]; apply (ofStruct_correct _ _ ss).
 Qed.
 
-Lemma Z_Rmodeq_2PI {n m} α α' : α =[mod 2 * PI] α' ->
-  Z n m α ∝= Z n m α'.
-Proof.
-  intros Hα.
-  prep_matrix_equivalence.
-  apply tensor_of_matrix_inj'.
-  rewrite <- 2 ZX_tensor_semantics_correct.
-  rewrite 2 tensor_of_matrix_of_tensor.
-  cbn.
-  now f_equiv.
-Qed.
-
-Lemma X_Rmodeq_2PI {n m} α α' : α =[mod 2 * PI] α' ->
-  X n m α ∝= X n m α'.
-Proof.
-  intros Hα.
-  colorswap_of (@Z_Rmodeq_2PI n m α α' Hα).
-Qed.
 
 
-(* FIXME: Move *)
-#[export] Instance sum_equivalence {A B} `{EqA : Equiv A,
-  EquivA : Equivalence A equiv,
-  EqB : Equiv B, EquivB : Equivalence B equiv} :
-  @Equivalence (A + B) equiv.
-Proof.
-  split.
-  - now intros []; constructor.
-  - now intros ? ? []; constructor.
-  - intros ? ? ? Hab Hbc.
-    induction Hab; inversion Hbc; subst; constructor;
-    etransitivity; eauto.
-Qed.
-
-(* FIXME: Move *)
-#[export] Instance withDiagrams_equivalence
-  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (D : Mor nat)
-  {EqD : forall n m, Equiv (D n m)}
-  {EquivD : forall n m, Equivalence (≡@{D n m})} :
-  Equivalence (≡@{WithDiagrams T D}) := _.
 
 
-#[export, program] Instance bundledDiagram_tensorLike {R}
-  `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EQA : EqDecision A}
-  (D : Mor nat)
-  {EqD : forall n m, Equiv (D n m)}
-  {EquivD : forall n m, Equivalence (≡@{D n m})}
-  {TensD : StrictTensorLike R A D} : TensorLike R A (BundledDiagram D) := {
-  interpretTensor d n m :=
-    from_option strictInterpretTensor (const_tensor rO) (unbundleDiagram n m d)
-}.
-Next Obligation.
-  intros until D.
-  intros ? ? ?.
-  intros d d' Heq.
-  induction Heq.
-  cbn.
-  intros n m.
-  case_match; [|done].
-  case_match; [|done].
-  cbn.
-  subst.
-  case_match; [|done].
-  subst.
-  rewrite (proof_irrel _ eq_refl).
-  cbn.
-  now f_equiv.
-Qed.
-
-(* FIXME: Move *)
-#[export] Instance withDiagrams_tensorLike {R}
-  `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EQA : EqDecision A}
-  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (TensT : TensorLike R A T)
-  (D : Mor nat)
-  {EqD : forall n m, Equiv (D n m)}
-  {EquivD : forall n m, Equivalence (≡@{D n m})}
-  {TensD : StrictTensorLike R A D} : TensorLike R A (WithDiagrams T D) := {
-  interpretTensor t :=
-    sum_rect (λ _, DimensionlessTensor A)
-      interpretTensor interpretTensor t;
-  interpretTensorProper := sum_rect_proper _ _
-}.
-(* FIXME: Move *)
-Lemma unbundleDiagram_Some {D : Mor nat} (n m : nat)
-  (bd : BundledDiagram D) d :
-  unbundleDiagram n m bd = Some d <-> bd = bundleDiagram d.
-Proof.
-  split.
-  - unfold unbundleDiagram.
-    induction bd as [[n' m'] d'].
-    case_match; [|now intros [=]].
-    intros [= <-].
-    injection e.
-    intros <- <-.
-    rewrite (proof_irrel _ eq_refl).
-    cbn.
-    done.
-  - intros ->.
-    cbn [unbundleDiagram bundleDiagram].
-    case_match; [|done].
-    rewrite (proof_irrel _ eq_refl).
-    done.
-Qed.
 
 Notation ZXDVERT := (WithDiagrams ZXCVERT ZX).
 
@@ -1424,16 +1764,60 @@ Notation "'[' zx ']'" := ((inr (bundleDiagram zx%ZX) :> ZXDVERT)) (only printing
 
 End GeneratorNotations.
 
-(* FIXME: Move *)
-Lemma zx_of_const_mult' (c d : C) : zx_of_const (c * d) ∝=
-  zx_of_const c ⟷ zx_of_const d.
-Proof.
-  rewrite 3 zx_of_const_to_scaled_empty.
-  distribute_zxscale.
-  rewrite Cmult_comm, compose_empty_r.
-  done.
-Qed.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* FIXME: Move *)
+Module BWQuote.
+
+Import Ltac2.
+Export BWQuote.
+
+(* FIXME: Move *)
+Ltac2 timeout_or (i : int) (f : unit -> 'a) (d : unit -> 'a) :=
+  orelse (fun () => Control.timeout i f) (fun _ => d ()).
+
+Ltac2 quote_constr_eq_timeout (i : int) c d :=
+  timeout_or i (fun _ => quote_constr_eq c d) (fun _ => false).
+
+End BWQuote.
+
+
+
+
+(* Reset this to enable/disable visualization. By default, it is disabled in 
+  this file and enabled elsewhere. *)
+Ltac visualize_flag :=
+  idtac.
+
+Ltac visualize_flag ::=
+  fail.
 
 
 
@@ -1526,12 +1910,88 @@ Proof.
   done.
 Qed.
 
-#[export] Instance zx_quote_symm_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
+Lemma zx_quote_symm_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
   zx ap : Quote zx ap ->
   Quote (cast _ _ Hn Hm zx) (cast_PRO (eq_sym Hn) (eq_sym Hm) ap).
 Proof.
   subst.
   now rewrite cast_PRO_id, cast_id_eq.
+Qed.
+
+
+Lemma zx_quote_symm_cast_lr {n m n' m'} (Hn : n = n') (Hm : m = m')
+  (zx : ZX n' m') (ap : PROP ZXDVERT n' m')
+  (apl : PROP ZXDVERT n n') (apr : PROP ZXDVERT m' m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  DiagramQuote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  DiagramQuote (cast _ _ Hn Hm zx) (apl ;; ap ;; apr).
+Proof.
+  intros [Hap] [Hapl] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r', n_wire_removal_l'.
+  rewrite cast_contract_eq'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_symm_cast_l {n m n'} (Hn : n = n') (Hm : m = m)
+  (zx : ZX n' m) (ap : PROP ZXDVERT n' m)
+  (apl : PROP ZXDVERT n n') :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  DiagramQuote (cast _ _ Hn Hm zx) (apl ;; ap).
+Proof.
+  intros [Hap] [Hapl].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_l'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_symm_cast_r {n m m'} (Hn : n = n) (Hm : m = m')
+  (zx : ZX n m') (ap : PROP ZXDVERT n m')
+  (apr : PROP ZXDVERT m' m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  DiagramQuote (cast _ _ Hn Hm zx) (ap ;; apr).
+Proof.
+  intros [Hap] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_symm_cast_id {n m} (Hn : n = n) (Hm : m = m)
+  (zx : ZX n m) (ap : PROP ZXDVERT n m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn Hm zx) (ap).
+Proof.
+  rewrite CastRules.cast_id_eq.
+  done.
+Qed.
+
+Lemma zx_quote_symm_cast_n_wire {n m k} (Hn : n = k) (Hm : m = k) :
+  DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (cast n m Hn Hm (n_wire k))
+    (Pgen _ _ (inr (bundleDiagram (cast n m
+      (Canonize.canonize (eq_trans_r Hn Hm)) eq_refl (n_wire m))))).
+Proof.
+  constructor.
+  cbn - [unbundleDiagram].
+  rewrite unbundleDiagram_bundleDiagram.
+  f_equiv.
+  rewrite (@cast_n_wire_l m), (@cast_n_wire_l k).
+  cast_irrelevance.
 Qed.
 
 #[export] Instance zx_quote_symm_Z n m α : Quote (Z n m α) (Pgen n m (inl (Some (inl (false, α))))) | 1.
@@ -1599,10 +2059,10 @@ End ZXquote_symm.
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
 
-#[export] Hint Extern 0 (DiagramQuote ⊂ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) ⊂ _) =>
   exact (zx_quote_symm_cup) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote ⊃ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) ⊃ _) =>
   exact (zx_quote_symm_cap) : typeclass_instances.
 
 (*
@@ -1612,21 +2072,67 @@ End ZXquote_symm.
 #[export] Hint Extern 0 (DiagramQuote (n_cap ?n) _) =>
   exact (zx_quote_symm_cup n) : typeclass_instances. *)
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (?zx ↕ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) (?zx ↕ ?zx') _) =>
   notypeclasses refine (zx_quote_symm_stack zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (?zx ⟷ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) (?zx ⟷ ?zx') _) =>
   notypeclasses refine (zx_quote_symm_compose zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (@zx_scale ?n ?m ?c ?val) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) (@zx_scale ?n ?m ?c ?val) _) =>
   notypeclasses refine (@zx_quote_symm_scale c n m val _ _): typeclass_instances.
 
-#[export] Hint Extern 10 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (?val) _) =>
+#[export] Hint Extern 10 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) (?val) _) =>
   progress first [unfold val|simpl] : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike) (zx_comm ?n ?m) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=SymmetricG) (D:=ZX) (zx_comm ?n ?m) _) =>
   exact (zx_quote_symm_zx_comm n m) : typeclass_instances.
 
+Module QuoteCast.
+
+Import Ltac2 ConstrExtra BWQuote.
+
+(* In the non-parametric case, this will _always_ serve to simply eliminate
+  casts (which must be definitional equalities). However, writing it this
+  way allows for proper handling of parametric sizes via monoidal paths *)
+Ltac2 solve_zx_symm_quote_cast_nonmonoidal () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) ?ap] =>
+    let n_id := quote_constr_eq_timeout 1 n n' in
+    let m_id := quote_constr_eq_timeout 1 m m' in
+    match n_id, m_id with
+    | true, true => 
+      let prf := '(@zx_quote_symm_cast_id $n' $m' $hn $hm $zx $ap) in 
+      apply $prf
+    | true, false =>
+      let prf := '(@zx_quote_symm_cast_l $n $m $n' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf 
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, true =>
+      let prf := '(@zx_quote_symm_cast_r $n $m $m' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, false =>
+      let prf := '(@zx_quote_symm_cast_lr $n $m $n' $m' $hn $hm $zx _ _ _  (* _ _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()|solve_zx_symm_quote_cast_n_wire()] *)
+    end
+  end.
+
+End QuoteCast.
+
+#[export] Hint Extern 5 (DiagramQuote (Struct:=SymmetricG) (D:=ZX)
+  (cast ?n ?m ?hn ?hm ?zx) _) =>
+  lazymatch zx with
+  | n_wire ?k => tryif (timeout 1 (unify n m; unify k m)) then
+      apply (zx_quote_symm_cast_id hn hm)
+      else fail
+  | _ =>
+    ltac2:(QuoteCast.solve_zx_symm_quote_cast_nonmonoidal())
+  end : typeclass_instances.
+
+#[export] Hint Extern 20 (DiagramQuote (Struct:=SymmetricG) (D:=ZX)
+  (cast ?n ?m ?hn ?hm (n_wire _)) _) =>
+  refine (zx_quote_symm_cast_n_wire hn hm) : typeclass_instances.
 
 
 
@@ -1857,13 +2363,19 @@ Ltac setup_zxsrw_lhs lem match_number :=
 
 
 Ltac zxsviz :=
-  SizedProQuote.prop_visualize_goal ZX_SymmetricG_ProLike.
+  tryif visualize_flag then 
+  SizedProQuote.prop_visualize_goal ZX_SymmetricG_ProLike
+  else idtac.
 
 Ltac zxsviz_lhs :=
-  SizedProQuote.prop_visualize_lhs ZX_SymmetricG_ProLike.
+  tryif visualize_flag then 
+  SizedProQuote.prop_visualize_lhs ZX_SymmetricG_ProLike
+  else idtac.
 
 Ltac zxsviz_rhs :=
-  SizedProQuote.prop_visualize_rhs ZX_SymmetricG_ProLike.
+  tryif visualize_flag then 
+  SizedProQuote.prop_visualize_rhs ZX_SymmetricG_ProLike
+  else idtac.
 
 
 
@@ -1895,7 +2407,7 @@ Ltac zxsrw_lhs lem match_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (zxsrw_lhs_lemma 
+        specialize (zxsrw_lhs_lemma
           (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt match_number lem) as Hrw
         (* specialize (LawfulProLike_PRO_monog_quote_rewrite_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
@@ -2298,12 +2810,87 @@ Proof.
   done.
 Qed.
 
-#[export] Instance zx_quote_auto_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
+Lemma zx_quote_auto_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
   zx ap : Quote zx ap ->
   Quote (cast _ _ Hn Hm zx) (cast_PRO (eq_sym Hn) (eq_sym Hm) ap).
 Proof.
   subst.
   now rewrite cast_PRO_id, cast_id_eq.
+Qed.
+
+Lemma zx_quote_auto_cast_lr {n m n' m'} (Hn : n = n') (Hm : m = m')
+  (zx : ZX n' m') (ap : APROP ZXDVERT n' m')
+  (apl : APROP ZXDVERT n n') (apr : APROP ZXDVERT m' m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  DiagramQuote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  DiagramQuote (cast _ _ Hn Hm zx) (apl ;; ap ;; apr).
+Proof.
+  intros [Hap] [Hapl] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r', n_wire_removal_l'.
+  rewrite cast_contract_eq'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_auto_cast_l {n m n'} (Hn : n = n') (Hm : m = m)
+  (zx : ZX n' m) (ap : APROP ZXDVERT n' m)
+  (apl : APROP ZXDVERT n n') :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  DiagramQuote (cast _ _ Hn Hm zx) (apl ;; ap).
+Proof.
+  intros [Hap] [Hapl].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_l'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_auto_cast_r {n m m'} (Hn : n = n) (Hm : m = m')
+  (zx : ZX n m') (ap : APROP ZXDVERT n m')
+  (apr : APROP ZXDVERT m' m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  DiagramQuote (cast _ _ Hn Hm zx) (ap ;; apr).
+Proof.
+  intros [Hap] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_auto_cast_id {n m} (Hn : n = n) (Hm : m = m)
+  (zx : ZX n m) (ap : APROP ZXDVERT n m) :
+  DiagramQuote zx ap ->
+  DiagramQuote (cast _ _ Hn Hm zx) (ap).
+Proof.
+  rewrite CastRules.cast_id_eq.
+  done.
+Qed.
+
+Lemma zx_quote_auto_cast_n_wire {n m k} (Hn : n = k) (Hm : m = k) :
+  DiagramQuote (ProD:=ZX_Autonomous_ProLike) (cast n m Hn Hm (n_wire k))
+    (Pgen _ _ (inr (bundleDiagram (cast n m
+      (Canonize.canonize (eq_trans_r Hn Hm)) eq_refl (n_wire m))))).
+Proof.
+  constructor.
+  cbn - [unbundleDiagram].
+  rewrite unbundleDiagram_bundleDiagram.
+  f_equiv.
+  rewrite (@cast_n_wire_l m), (@cast_n_wire_l k).
+  cast_irrelevance.
 Qed.
 
 #[export] Instance zx_quote_auto_Z n m α :
@@ -2414,34 +3001,80 @@ End ZXquote_auto.
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) ⊂ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) ⊂ _) =>
   exact (zx_quote_auto_cup) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) ⊃ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) ⊃ _) =>
   exact (zx_quote_auto_cap) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (n_cup ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (n_cup ?n) _) =>
   exact (zx_quote_auto_n_cap n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (n_cap ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (n_cap ?n) _) =>
   exact (zx_quote_auto_n_cup n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (?zx ↕ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (?zx ↕ ?zx') _) =>
   notypeclasses refine (zx_quote_auto_stack zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (?zx ⟷ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (?zx ⟷ ?zx') _) =>
   notypeclasses refine (zx_quote_auto_compose zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (@zx_scale ?n ?m ?c ?val) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (@zx_scale ?n ?m ?c ?val) _) =>
   notypeclasses refine (@zx_quote_auto_scale c n m val _ _): typeclass_instances.
 
-#[export] Hint Extern 10 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (?val) _) =>
+#[export] Hint Extern 10 (DiagramQuote (Struct:=Autonomous) (D:=ZX) (?val) _) =>
   progress first [unfold val|simpl] : typeclass_instances.
 
 #[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike) (zx_comm ?n ?m) _) =>
   exact (zx_quote_auto_zx_comm n m) : typeclass_instances.
 
 
+Module QuoteCast.
+
+Import Ltac2 ConstrExtra BWQuote.
+
+(* In the non-parametric case, this will _always_ serve to simply eliminate
+  casts (which must be definitional equalities). However, writing it this
+  way allows for proper handling of parametric sizes via monoidal paths *)
+Ltac2 solve_zx_auto_quote_cast_nonmonoidal () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) ?ap] =>
+    let n_id := quote_constr_eq_timeout 1 n n' in
+    let m_id := quote_constr_eq_timeout 1 m m' in
+    match n_id, m_id with
+    | true, true => 
+      let prf := '(@zx_quote_auto_cast_id $n' $m' $hn $hm $zx $ap) in 
+      apply $prf
+    | true, false =>
+      let prf := '(@zx_quote_auto_cast_l $n $m $n' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf 
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, true =>
+      let prf := '(@zx_quote_auto_cast_r $n $m $m' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, false =>
+      let prf := '(@zx_quote_auto_cast_lr $n $m $n' $m' $hn $hm $zx _ _ _  (* _ _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()|solve_zx_symm_quote_cast_n_wire()] *)
+    end
+  end.
+
+End QuoteCast.
+
+#[export] Hint Extern 5 (DiagramQuote (Struct:=Autonomous) (D:=ZX)
+  (cast ?n ?m ?hn ?hm ?zx) _) =>
+  lazymatch zx with
+  | n_wire ?k => tryif (timeout 1 (unify n m; unify k m)) then
+      apply (zx_quote_auto_cast_id hn hm)
+      else fail
+  | _ =>
+    ltac2:(QuoteCast.solve_zx_auto_quote_cast_nonmonoidal())
+  end : typeclass_instances.
+
+#[export] Hint Extern 20 (DiagramQuote (Struct:=Autonomous) (D:=ZX)
+  (cast ?n ?m ?hn ?hm (n_wire _)) _) =>
+  refine (zx_quote_auto_cast_n_wire hn hm) : typeclass_instances.
 
 
 
@@ -2646,13 +3279,19 @@ End ZXdenote_auto.
 
 
 Ltac zxaviz :=
-  SizedProQuote.aprop_visualize_goal ZX_Autonomous_ProLike.
+  tryif visualize_flag then
+  SizedProQuote.aprop_visualize_goal ZX_Autonomous_ProLike
+  else idtac.
 
 Ltac zxaviz_lhs :=
-  SizedProQuote.aprop_visualize_lhs ZX_Autonomous_ProLike.
+  tryif visualize_flag then
+  SizedProQuote.aprop_visualize_lhs ZX_Autonomous_ProLike
+  else idtac.
 
 Ltac zxaviz_rhs :=
-  SizedProQuote.aprop_visualize_rhs ZX_Autonomous_ProLike.
+  tryif visualize_flag then
+  SizedProQuote.aprop_visualize_rhs ZX_Autonomous_ProLike
+  else idtac.
 
 
 Definition zxacat_lemma := LawfulProLike_PRO_quote_test_correct
@@ -2680,7 +3319,7 @@ Ltac setup_zxarw_lhs lem match_number quotient_number :=
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
         specialize (zxarw_lhs_lemma
-          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt 
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt
           match_number quotient_number lem) as Hrw
         (* specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
@@ -2705,7 +3344,7 @@ Ltac zxarw_lhs lem match_number quotient_number :=
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
         specialize (zxarw_lhs_lemma
-          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt 
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt
           match_number quotient_number lem) as Hrw
         (* specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
@@ -3138,7 +3777,7 @@ Proof.
   done.
 Qed.
 
-#[export] Instance zx_quote_frob_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
+Lemma zx_quote_frob_cast {n m n' m'} (Hn : n = n') (Hm : m = m')
   zx ap : Quote zx ap ->
   Quote (cast _ _ Hn Hm zx) (cast_PRO (eq_sym Hn) (eq_sym Hm) ap).
 Proof.
@@ -3148,64 +3787,78 @@ Qed.
 
 
 
-
-
-
-
-Lemma Z_push_out_phase_gadget n m α : Z n m α ∝= Z n (S m) 0 ⟷ (Z 1 0 α ↕ n_wire m).
+Lemma zx_quote_frob_cast_lr {n m n' m'} (Hn : n = n') (Hm : m = m')
+  (zx : ZX n' m') (ap : FPROP ZXDVERT n' m')
+  (apl : FPROP ZXDVERT n n') (apr : FPROP ZXDVERT m' m) :
+  Quote zx ap ->
+  Quote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  Quote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  Quote (cast _ _ Hn Hm zx) (apl ;; ap ;; apr).
 Proof.
-  rewrite (dominated_Z_spider_fusion_top_left 0 0 m n).
-  now rewrite Rplus_0_r.
+  intros [Hap] [Hapl] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r', n_wire_removal_l'.
+  rewrite cast_contract_eq'.
+  cast_irrelevance.
 Qed.
 
-Lemma Z_push_out_phase_gadget' n m α β : Z n m (α + β) ∝=
-  Z n (S m) β ⟷ (Z 1 0 α ↕ n_wire m).
+Lemma zx_quote_frob_cast_l {n m n'} (Hn : n = n') (Hm : m = m)
+  (zx : ZX n' m) (ap : FPROP ZXDVERT n' m)
+  (apl : FPROP ZXDVERT n n') :
+  Quote zx ap ->
+  Quote (cast _ _ Hn eq_refl (n_wire _)) apl ->
+  Quote (cast _ _ Hn Hm zx) (apl ;; ap).
 Proof.
-  rewrite (dominated_Z_spider_fusion_top_left 0 0 m n).
+  intros [Hap] [Hapl].
+  constructor.
+  cbn.
+  rewrite Hap, Hapl.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_l'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_frob_cast_r {n m m'} (Hn : n = n) (Hm : m = m')
+  (zx : ZX n m') (ap : FPROP ZXDVERT n m')
+  (apr : FPROP ZXDVERT m' m) :
+  Quote zx ap ->
+  Quote (cast _ _ eq_refl Hm (n_wire _)) apr ->
+  Quote (cast _ _ Hn Hm zx) (ap ;; apr).
+Proof.
+  intros [Hap] [Hapr].
+  constructor.
+  cbn.
+  rewrite Hap, Hapr.
+  cbn -[cast].
+  f_equiv.
+  rewrite n_wire_removal_r'.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_frob_cast_id {n m} (Hn : n = n) (Hm : m = m)
+  (zx : ZX n m) (ap : FPROP ZXDVERT n m) :
+  Quote zx ap ->
+  Quote (cast _ _ Hn Hm zx) (ap).
+Proof.
+  rewrite CastRules.cast_id_eq.
   done.
 Qed.
 
-Lemma PRO_to_ZX_cast `{ProLike Struct T ZX}
-  {n m n' m'} (Hn : n = n') (Hm : m = m') (p : PRO Struct T n m) :
-  PRO_to_diagram (cast_PRO Hn Hm p) =
-  cast _ _ (eq_sym Hn) (eq_sym Hm) <$> PRO_to_diagram p.
+Lemma zx_quote_frob_cast_n_wire {n m k} (Hn : n = k) (Hm : m = k) :
+  Quote (cast n m Hn Hm (n_wire k))
+    (Pgen _ _ (inr (bundleDiagram (cast n m
+      (Canonize.canonize (eq_trans_r Hn Hm)) eq_refl (n_wire m))))).
 Proof.
-  subst.
-  rewrite cast_PRO_id.
-  destruct (PRO_to_diagram _); [|done].
-  done.
-Qed.
-
-Lemma zx_mul_comm_n_1 n : zx_mul_comm n 1 ∝=
-  cast _ _ (Nat.mul_1_r n) (Nat.mul_1_l n) (n_wire n).
-Proof.
-  apply prop_eq_of_perm_eq; [auto_zxperm..|].
-  rewrite perm_of_zx_mul_comm.
-  rewrite perm_of_zx_cast, perm_of_n_wire.
-  rewrite kron_comm_perm_defn.
-  intros i Hi.
-  rewrite Nat.mod_small, Nat.div_small; lia.
-Qed.
-
-Lemma zx_mul_comm_1_n n : zx_mul_comm 1 n ∝=
-  cast _ _ (Nat.mul_1_l n) (Nat.mul_1_r n) (n_wire n).
-Proof.
-  apply prop_eq_of_perm_eq; [auto_zxperm..|].
-  rewrite perm_of_zx_mul_comm.
-  rewrite perm_of_zx_cast, perm_of_n_wire.
-  rewrite kron_comm_perm_defn.
-  intros i Hi.
-  rewrite Nat.mod_1_r, Nat.div_1_r.
-  lia.
-Qed.
-
-Lemma ZX_copy_1 {n m} (zx : ZX n m) :
-  ZX_copy 1 zx ∝= cast _ _ (Nat.mul_1_r n) (Nat.mul_1_r m) zx.
-Proof.
-  unfold ZX_copy.
-  rewrite zx_mul_comm_1_n, zx_mul_comm_n_1.
-  rewrite n_stack_1.
-  rewrite 2 cast_compose_eq_mid_join, nwire_removal_l, nwire_removal_r.
+  constructor.
+  cbn - [unbundleDiagram].
+  rewrite unbundleDiagram_bundleDiagram.
+  f_equiv.
+  rewrite (@cast_n_wire_l m), (@cast_n_wire_l k).
   cast_irrelevance.
 Qed.
 
@@ -3415,48 +4068,94 @@ Ltac zx_quote_frob_Z_tac := zx_quote_frob_Z_tac_step; repeat zx_quote_frob_Z_tac
   solve [zx_quote_frob_Z_tac|let _ := match goal with
     |- ?G => idtac "FAIL ON" G end in idtac] : typeclass_instances. *)
 
-#[export] Hint Extern 0 (DiagramQuote (Z ?n ?m 0) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (Z ?n ?m 0) _) =>
   exact (zx_quote_frob_Z_0 n m) : typeclass_instances.
 
 
-#[export] Hint Extern 1 (DiagramQuote (Z ?n ?m ?alpha) _) =>
+#[export] Hint Extern 1 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (Z ?n ?m ?alpha) _) =>
   exact (zx_quote_frob_Z_gen n m alpha) : typeclass_instances.
 
-#[export] Hint Extern 3 (DiagramQuote (X ?n ?m ?α) _) =>
+#[export] Hint Extern 3 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (X ?n ?m ?α) _) =>
   notypeclasses refine (zx_quote_frob_X n m α _ _);
   cbn : typeclass_instances.
 
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) ⊂ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) ⊂ _) =>
   exact (zx_quote_frob_cup) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) ⊃ _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) ⊃ _) =>
   exact (zx_quote_frob_cap) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (n_cup ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (n_cup ?n) _) =>
   exact (zx_quote_frob_n_cap n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (n_cap ?n) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (n_cap ?n) _) =>
   exact (zx_quote_frob_n_cup n) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (?zx ↕ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (?zx ↕ ?zx') _) =>
   notypeclasses refine (zx_quote_frob_stack zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (?zx ⟷ ?zx') _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (?zx ⟷ ?zx') _) =>
   notypeclasses refine (zx_quote_frob_compose zx zx' _ _ _ _) : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (@zx_scale ?n ?m ?c ?val) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (@zx_scale ?n ?m ?c ?val) _) =>
   notypeclasses refine (@zx_quote_frob_scale c n m val _ _): typeclass_instances.
 
-#[export] Hint Extern 10 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (?val) _) =>
+#[export] Hint Extern 10 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (?val) _) =>
   progress first [unfold val|simpl] : typeclass_instances.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Frobenius_ProLike) (zx_comm ?n ?m) _) =>
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (zx_comm ?n ?m) _) =>
   exact (zx_quote_frob_zx_comm n m) : typeclass_instances.
 
 
+Module QuoteCast.
+
+Import Ltac2 ConstrExtra BWQuote.
+
+(* In the non-parametric case, this will _always_ serve to simply eliminate
+  casts (which must be definitional equalities). However, writing it this
+  way allows for proper handling of parametric sizes via monoidal paths *)
+Ltac2 solve_zx_frob_quote_cast_nonmonoidal () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) ?ap] =>
+    let n_id := quote_constr_eq_timeout 1 n n' in
+    let m_id := quote_constr_eq_timeout 1 m m' in
+    match n_id, m_id with
+    | true, true => 
+      let prf := '(@zx_quote_frob_cast_id $n' $m' $hn $hm $zx $ap) in 
+      apply $prf
+    | true, false =>
+      let prf := '(@zx_quote_frob_cast_l $n $m $n' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf 
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, true =>
+      let prf := '(@zx_quote_frob_cast_r $n $m $m' $hn $hm $zx _ _ (* _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()] *)
+    | false, false =>
+      let prf := '(@zx_quote_frob_cast_lr $n $m $n' $m' $hn $hm $zx _ _ _  (* _ _ _ *)) in
+      apply $prf
+      (* > [|solve_zx_symm_quote_cast_n_wire()|solve_zx_symm_quote_cast_n_wire()] *)
+    end
+  end.
+
+End QuoteCast.
+
+#[export] Hint Extern 5 (DiagramQuote (Struct:=Frobenius) (D:=ZX)
+  (cast ?n ?m ?hn ?hm ?zx) _) =>
+  lazymatch zx with
+  | n_wire ?k => tryif (timeout 1 (unify n m; unify k m)) then
+      apply (zx_quote_frob_cast_id hn hm)
+      else fail
+  | _ =>
+    ltac2:(QuoteCast.solve_zx_frob_quote_cast_nonmonoidal())
+  end : typeclass_instances.
+
+#[export] Hint Extern 20 (DiagramQuote (Struct:=Frobenius) (D:=ZX)
+  (cast ?n ?m ?hn ?hm (n_wire _)) _) =>
+  refine (zx_quote_frob_cast_n_wire hn hm) : typeclass_instances.
 
 
 
@@ -3698,7 +4397,7 @@ End ZXdenote_frob.
 #[export] Hint Extern 0 (DiagramDenote (ProD:=ZX_Frobenius_ProLike) _ ([str inr (Delta1 ?n ?m)])) =>
   exact (zx_denote_frob_Pdelta1 n m) : typeclass_instances.
 
-  
+
 
 Definition zxfcat_lemma := LawfulProLike_PRO_quote_test_correct
   (T':=positive) _ _ _ _ _  (ZX_Frobenius_lawpro).
@@ -4153,7 +4852,7 @@ End ZXfrob.
 From TensorRocq Require Import BW BWSized SizedProps PropsGraphs SizedPropsGraphs SizedProLike SizedRewriting SizedProQuote.
 
 Open Scope nat_scope.
-(* 
+(*
 Definition ZX_tensor_is_Some (asgn : Pmap nat) (n m : btree positive) (t : ZXCVERT) : bool :=
   match t with
   | None => (* H-box stack *) bool_decide (n =@{list positive} m) (* Conservative, but sufficient *)
@@ -4229,6 +4928,16 @@ Notation SizedProLike' MS S T D :=
 #[export] Instance ZX_Frobenius_SizedProLike : SizedProLike' MFrobenius Frobenius ZXDVERT ZX := {}.
 
 
+(* FIXME: Move *)
+Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
+  btree_size f a = btree_size f b.
+Proof.
+  rewrite <- 2 sum_list_with_btree_elems.
+  f_equal.
+  now apply btree_elems_bpath in p.
+Qed.
+
+
 
 
 Module ZXmsymm.
@@ -4239,29 +4948,6 @@ Local Set Typeclasses Unique Instances.
 
 Local Notation Quote := (DiagramQuote (ProD:=ZX_SymmetricG_ProLike)).
 
-Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
-  btree_size f a = btree_size f b.
-Proof.
-  rewrite <- 2 sum_list_with_btree_elems.
-  f_equal.
-  now apply btree_elems_bpath in p.
-Qed.
-
-(* FIXME: Move!!! *)
-Lemma cast_n_wire_l {n m o}
-  (Hm : m = n) (Ho : o = n) :
-  cast _ _ Hm Ho (n_wire n) =
-  cast _ _ eq_refl (eq_trans Ho (eq_sym Hm)) (n_wire m).
-Proof.
-  subst; now rewrite 2 cast_id_eq.
-Qed.
-Lemma cast_n_wire_r {n m o}
-  (Hm : m = n) (Ho : o = n) :
-  cast _ _ Hm Ho (n_wire n) =
-  cast _ _ (eq_trans Hm (eq_sym Ho)) eq_refl (n_wire o).
-Proof.
-  subst; now rewrite 2 cast_id_eq.
-Qed.
 
 Lemma zx_quote_symm_cast_nwire_bpath_aux (f : positive -> nat)
   (a b : btree positive)
@@ -4339,7 +5025,7 @@ Module QuoteCast.
 Import Ltac2.
 Import ConstrExtra.
 
-Ltac2 solve_zx_symm_quote_cast () : unit :=
+(* Ltac2 solve_zx_symm_quote_cast () : unit :=
   lazy_match! goal with
   | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) _] =>
     let (cs, bn) := parse_nat_btree_to_pos [] n in
@@ -4354,13 +5040,33 @@ Ltac2 solve_zx_symm_quote_cast () : unit :=
     let prf := '(zx_quote_symm_cast_bpath (interp_discrete_hg_inhab $ccs)
       $cbn $cbm $cbn' $cbm' eq_refl eq_refl $zx _ $hn $hm) in
     refine '(id $prf _)
+  end. *)
+
+Ltac2 solve_zx_symm_quote_cast_n_wire_monoidal () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m _ _ ?hn ?hm (n_wire ?k)) _] =>
+    if Bool.and (CC.is_nat_const n) (CC.is_nat_const m) then
+      apply (ZXsymm.zx_quote_symm_cast_id $hn $hm)
+    else
+    let (cs, bn) := parse_nat_btree_to_pos [] n in
+    let (cs, bm) := parse_nat_btree_to_pos cs m in
+    if btree_eq Int.equal bn bm then
+      let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
+      let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
+      let ccs := CC.mk_list_typed 'nat cs in
+      refine '(zx_quote_symm_cast_nwire_bpath (interp_discrete_hg_inhab $ccs)
+        $cbn $cbm eq_refl $hn $hm)
+    else
+      refine '(@ZXsymm.zx_quote_symm_cast_n_wire $n $m $k $hn $hm)
   end.
 
 End QuoteCast.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_SymmetricG_ProLike)
-  (cast _ _ _ _ _) _) =>
-  ltac2:(QuoteCast.solve_zx_symm_quote_cast()) : typeclass_instances.
+
+#[export] Hint Extern 4 (DiagramQuote (Struct:=SymmetricG) (D:=ZX)
+  (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
+    ltac2:(QuoteCast.solve_zx_symm_quote_cast_n_wire_monoidal())
+    : typeclass_instances.
 
 (* TODO: Add instance for when it's a definitional equality *)
 #[export] Instance zx_denote_symm_monoidal {n m} (s : Monoidal n m) :
@@ -4640,29 +5346,6 @@ Local Set Typeclasses Unique Instances.
 
 Local Notation Quote := (DiagramQuote (ProD:=ZX_Autonomous_ProLike)).
 
-Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
-  btree_size f a = btree_size f b.
-Proof.
-  rewrite <- 2 sum_list_with_btree_elems.
-  f_equal.
-  now apply btree_elems_bpath in p.
-Qed.
-
-(* FIXME: Move!!! *)
-Lemma cast_n_wire_l {n m o}
-  (Hm : m = n) (Ho : o = n) :
-  cast _ _ Hm Ho (n_wire n) =
-  cast _ _ eq_refl (eq_trans Ho (eq_sym Hm)) (n_wire m).
-Proof.
-  subst; now rewrite 2 cast_id_eq.
-Qed.
-Lemma cast_n_wire_r {n m o}
-  (Hm : m = n) (Ho : o = n) :
-  cast _ _ Hm Ho (n_wire n) =
-  cast _ _ (eq_trans Hm (eq_sym Ho)) eq_refl (n_wire o).
-Proof.
-  subst; now rewrite 2 cast_id_eq.
-Qed.
 
 Lemma zx_quote_auto_cast_nwire_bpath_aux (f : positive -> nat)
   (a b : btree positive)
@@ -4740,7 +5423,7 @@ Module QuoteCast.
 Import Ltac2.
 Import ConstrExtra.
 
-Ltac2 solve_zx_auto_quote_cast () : unit :=
+(* Ltac2 solve_zx_auto_quote_cast () : unit :=
   lazy_match! goal with
   | [|- DiagramQuote (@cast ?n ?m ?n' ?m' ?hn ?hm ?zx) _] =>
     let (cs, bn) := parse_nat_btree_to_pos [] n in
@@ -4755,13 +5438,34 @@ Ltac2 solve_zx_auto_quote_cast () : unit :=
     let prf := '(zx_quote_auto_cast_bpath (interp_discrete_hg_inhab $ccs)
       $cbn $cbm $cbn' $cbm' eq_refl eq_refl $zx _ $hn $hm) in
     refine '(id $prf _)
+  end. *)
+
+Ltac2 solve_zx_auto_quote_cast_n_wire_monoidal () : unit :=
+  lazy_match! goal with
+  | [|- DiagramQuote (@cast ?n ?m _ _ ?hn ?hm (n_wire ?k)) _] =>
+    if Bool.and (CC.is_nat_const n) (CC.is_nat_const m) then
+      apply (ZXauto.zx_quote_auto_cast_id $hn $hm)
+    else
+    let (cs, bn) := parse_nat_btree_to_pos [] n in
+    let (cs, bm) := parse_nat_btree_to_pos cs m in
+    if btree_eq Int.equal bn bm then
+      let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
+      let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
+      let ccs := CC.mk_list_typed 'nat cs in
+      refine '(zx_quote_auto_cast_nwire_bpath (interp_discrete_hg_inhab $ccs)
+        $cbn $cbm eq_refl $hn $hm)
+    else
+      refine '(@ZXauto.zx_quote_auto_cast_n_wire $n $m $k $hn $hm)
   end.
 
 End QuoteCast.
 
-#[export] Hint Extern 0 (DiagramQuote (ProD:=ZX_Autonomous_ProLike)
-  (cast _ _ _ _ _) _) =>
-  ltac2:(QuoteCast.solve_zx_auto_quote_cast()) : typeclass_instances.
+
+#[export] Hint Extern 4 (DiagramQuote (Struct:=Autonomous) (D:=ZX)
+  (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
+    ltac2:(QuoteCast.solve_zx_auto_quote_cast_n_wire_monoidal())
+    : typeclass_instances.
+
 
 (* TODO: Add instance for when it's a definitional equality *)
 #[export] Instance zx_denote_auto_monoidal {n m} (s : Monoidal n m) :
@@ -5032,5 +5736,5 @@ End Examples.
 End ZXmauto.
 
 
-
-
+Ltac visualize_flag ::=
+  idtac.
