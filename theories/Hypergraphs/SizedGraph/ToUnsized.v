@@ -1245,32 +1245,6 @@ Proof.
     now rewrite lookup_vec_to_list_fin.
 Qed.
 
-Lemma fin_elements_eq_fun_to_vec n :
-  fin_elements n = fun_to_vec id.
-Proof.
-  induction n; [done|].
-  cbn.
-  rewrite IHn.
-  rewrite <- vec_to_list_map, vmap_fun_to_vec.
-  done.
-Qed.
-
-Lemma vec_to_list_fun_to_vec_gen
-  {A n} (f : fin n -> A) :
-  vec_to_list (fun_to_vec f) = f <$> fin_elements _.
-Proof.
-  rewrite fin_elements_eq_fun_to_vec.
-  rewrite <- vec_to_list_map, vmap_fun_to_vec.
-  done.
-Qed.
-
-
-Lemma NoDup_fun_to_vec {A n} (f : fin n -> A) (Hf : Inj eq eq f) :
-  NoDup (fun_to_vec f).
-Proof.
-  rewrite vec_to_list_fun_to_vec_gen.
-  apply (NoDup_fmap _), fin_elements_NoDup.
-Qed.
 
 Lemma subst_by_vec_id' {n} (v : vec positive n) p :
   subst_by_vec (vzip v v) p = p.

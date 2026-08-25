@@ -1865,6 +1865,18 @@ Ltac zxsviz_lhs :=
 Ltac zxsviz_rhs :=
   SizedProQuote.prop_visualize_rhs ZX_SymmetricG_ProLike.
 
+
+
+
+Definition zxscat_lemma := LawfulProLike_PRO_quote_test_correct
+  (T':=positive) _ _ _ _ _  (ZX_SymmetricG_lawpro).
+
+Definition zxsrw_lhs_lemma := LawfulProLike_PRO_monog_quote_rewrite_correct
+  (T':=positive) _ _ _ _ _  (ZX_SymmetricG_lawpro).
+
+Definition zxsclean_lhs_lemma := LawfulProLike_PRO_monog_quote_clean_correct
+  (T':=positive) _ _ _ _ _  (ZX_SymmetricG_lawpro).
+
 (* Redefine this to enable/disable printing after rewriting *)
 Ltac zxsrw_visualize_after :=
   zxsviz.
@@ -1883,9 +1895,11 @@ Ltac zxsrw_lhs lem match_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (LawfulProLike_PRO_monog_quote_rewrite_correct
+        specialize (zxsrw_lhs_lemma 
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt match_number lem) as Hrw
+        (* specialize (LawfulProLike_PRO_monog_quote_rewrite_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
-          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number lem) as Hrw
+          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number lem) as Hrw *)
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
@@ -1973,9 +1987,11 @@ Ltac zxsclean_lhs_aux :=
     let lv := eval unfold l in l in
     lazymatch goal with
     | |- ?R ?tgt _ =>
-      specialize (LawfulProLike_PRO_monog_quote_clean_correct
+      specialize (zxsclean_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ tgt) as Hrw
+      (* specialize (LawfulProLike_PRO_monog_quote_clean_correct
           _ _ _ _ _  (ZX_SymmetricG_lawpro)
-          (interp_discrete_hg_inhab lv) tgt) as Hrw
+          (interp_discrete_hg_inhab lv) tgt) as Hrw *)
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
     (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
@@ -2022,9 +2038,7 @@ Ltac zxscat :=
   let lv := eval unfold l in l in
   lazymatch goal with
   | |- ?R ?lhs ?rhs =>
-    specialize (LawfulProLike_PRO_quote_test_correct
-        _ _ _ _ _  (ZX_SymmetricG_lawpro)
-        (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
+    specialize (zxscat_lemma (interp_discrete_hg_inhab lv) _ _ lhs rhs) as Hrw
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
   (tryif timeout 3 (specialize (Hrw _ _ _ _)) then idtac else
@@ -2640,6 +2654,16 @@ Ltac zxaviz_lhs :=
 Ltac zxaviz_rhs :=
   SizedProQuote.aprop_visualize_rhs ZX_Autonomous_ProLike.
 
+
+Definition zxacat_lemma := LawfulProLike_PRO_quote_test_correct
+  (T':=positive) _ _ _ _ _  (ZX_Autonomous_lawpro).
+
+Definition zxarw_lhs_lemma := LawfulProLike_PRO_bimonog_quote_rewrite_correct
+  (T':=positive) _ _ _ _ _  (ZX_Autonomous_lawpro).
+
+Definition zxaclean_lhs_lemma := LawfulProLike_PRO_bimonog_quote_clean_correct
+  (T':=positive) _ _ _ _ _  (ZX_Autonomous_lawpro).
+
 Ltac zxarw_visualize_after :=
   zxaviz.
 
@@ -2655,9 +2679,12 @@ Ltac setup_zxarw_lhs lem match_number quotient_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
+        specialize (zxarw_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt 
+          match_number quotient_number lem) as Hrw
+        (* specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
+          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw *)
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
@@ -2677,9 +2704,12 @@ Ltac zxarw_lhs lem match_number quotient_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
+        specialize (zxarw_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt 
+          match_number quotient_number lem) as Hrw
+        (* specialize (LawfulProLike_PRO_bimonog_quote_rewrite_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
+          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw *)
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
@@ -2788,9 +2818,11 @@ Ltac zxaclean_lhs_aux :=
     let lv := eval unfold l in l in
     lazymatch goal with
     | |- ?R ?tgt _ =>
-      specialize (LawfulProLike_PRO_bimonog_quote_clean_correct
+      specialize (zxaclean_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ tgt) as Hrw
+      (* specialize (LawfulProLike_PRO_bimonog_quote_clean_correct
           _ _ _ _ _  (ZX_Autonomous_lawpro)
-          (interp_discrete_hg_inhab lv) tgt) as Hrw
+          (interp_discrete_hg_inhab lv) tgt) as Hrw *)
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
     (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
@@ -2838,9 +2870,11 @@ Ltac zxacat :=
   let lv := eval unfold l in l in
   lazymatch goal with
   | |- ?R ?lhs ?rhs =>
-    specialize (LawfulProLike_PRO_quote_test_correct
+    specialize (zxacat_lemma
+        (interp_discrete_hg_inhab lv) _ _ lhs rhs) as Hrw
+    (* specialize (LawfulProLike_PRO_quote_test_correct
         _ _ _ _ _  (ZX_Autonomous_lawpro)
-        (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
+        (interp_discrete_hg_inhab lv) lhs rhs) as Hrw *)
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
   (tryif timeout 3 (specialize (Hrw _ _ _ _)) then idtac else
@@ -3664,6 +3698,16 @@ End ZXdenote_frob.
 #[export] Hint Extern 0 (DiagramDenote (ProD:=ZX_Frobenius_ProLike) _ ([str inr (Delta1 ?n ?m)])) =>
   exact (zx_denote_frob_Pdelta1 n m) : typeclass_instances.
 
+  
+
+Definition zxfcat_lemma := LawfulProLike_PRO_quote_test_correct
+  (T':=positive) _ _ _ _ _  (ZX_Frobenius_lawpro).
+
+Definition zxfrw_lhs_lemma := LawfulProLike_PRO_frobenius_quote_rewrite_correct
+  (T':=positive) _ _ _ _ _  (ZX_Frobenius_lawpro).
+
+Definition zxfclean_lhs_lemma := LawfulProLike_PRO_frobenius_quote_clean_correct
+  (T':=positive) _ _ _ _ _  (ZX_Frobenius_lawpro).
 
 Ltac setup_zxfrw_lhs lem match_number quotient_number :=
   etransitivity; [
@@ -3677,9 +3721,11 @@ Ltac setup_zxfrw_lhs lem match_number quotient_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
+        specialize (zxfrw_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt match_number quotient_number lem) as Hrw
+        (* specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
+          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw *)
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
@@ -3699,9 +3745,11 @@ Ltac zxfrw_lhs lem match_number quotient_number :=
     | |- ?R ?tgt _ =>
       lazymatch type of lem with
       | ?R ?lhs ?rhs =>
-        specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
+        specialize (zxfrw_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ lhs rhs _ _ tgt match_number quotient_number lem) as Hrw
+        (* specialize (LawfulProLike_PRO_frobenius_quote_rewrite_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw
+          (interp_discrete_hg_inhab lv) lhs rhs tgt match_number quotient_number lem) as Hrw *)
       | ?lemT => fail "cannot recognize lemma (type) as the application of a relation: " lemT
       end
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
@@ -3867,9 +3915,11 @@ Ltac zxfclean_lhs :=
     let lv := eval unfold l in l in
     lazymatch goal with
     | |- ?R ?tgt _ =>
-      specialize (LawfulProLike_PRO_frobenius_quote_clean_correct
+      specialize (zxfclean_lhs_lemma
+          (interp_discrete_hg_inhab lv) _ _ tgt) as Hrw
+      (* specialize (LawfulProLike_PRO_frobenius_quote_clean_correct
           _ _ _ _ _  (ZX_Frobenius_lawpro)
-          (interp_discrete_hg_inhab lv) tgt) as Hrw
+          (interp_discrete_hg_inhab lv) tgt) as Hrw *)
     | |- ?G => fail "cannot recognize goal as the application of a relation: " G
     end;
     (tryif timeout 3 (specialize (Hrw _ _)) then idtac else
@@ -3907,9 +3957,11 @@ Ltac zxfcat :=
   let lv := eval unfold l in l in
   lazymatch goal with
   | |- ?R ?lhs ?rhs =>
-    specialize (LawfulProLike_PRO_quote_test_correct
+    specialize (zxfcat_lemma
+        (interp_discrete_hg_inhab lv) _ _ lhs rhs) as Hrw
+    (* specialize (LawfulProLike_PRO_quote_test_correct
         _ _ _ _ _  (ZX_Frobenius_lawpro)
-        (interp_discrete_hg_inhab lv) lhs rhs) as Hrw
+        (interp_discrete_hg_inhab lv) lhs rhs) as Hrw *)
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
   end;
   (tryif timeout 3 (specialize (Hrw _ _ _ _)) then idtac else
@@ -4097,14 +4149,11 @@ End ZXfrob.
 
 
 
-(*
-
-
 
 From TensorRocq Require Import BW BWSized SizedProps PropsGraphs SizedPropsGraphs SizedProLike SizedRewriting SizedProQuote.
 
 Open Scope nat_scope.
-
+(* 
 Definition ZX_tensor_is_Some (asgn : Pmap nat) (n m : btree positive) (t : ZXCVERT) : bool :=
   match t with
   | None => (* H-box stack *) bool_decide (n =@{list positive} m) (* Conservative, but sufficient *)
@@ -4167,17 +4216,17 @@ Next Obligation.
     rewrite (btree_size_ext Hsome).
     cbn.
     case_decide; done.
-Qed.
+Qed. *)
 
 Notation SizedProLike' MS S T D :=
     (SizedProLike (N:=positive) MS S T D).
 
 
-#[export] Instance ZX_SymmetricG_SizedProLike : SizedProLike' MSymmetric SymmetricG ZXCVERT ZX := {}.
+#[export] Instance ZX_SymmetricG_SizedProLike : SizedProLike' MSymmetric SymmetricG ZXDVERT ZX := {}.
 
-#[export] Instance ZX_Autonomous_SizedProLike : SizedProLike' MAutonomous Autonomous ZXCVERT ZX := {}.
+#[export] Instance ZX_Autonomous_SizedProLike : SizedProLike' MAutonomous Autonomous ZXDVERT ZX := {}.
 
-#[export] Instance ZX_Frobenius_SizedProLike : SizedProLike' MFrobenius Frobenius ZXCVERT ZX := {}.
+#[export] Instance ZX_Frobenius_SizedProLike : SizedProLike' MFrobenius Frobenius ZXDVERT ZX := {}.
 
 
 
@@ -4337,7 +4386,7 @@ Ltac zxpscat :=
   let Hrw := fresh "Hrw" in
   time? "zxpscat setup tactic" specialize (zxpscat_lemma) as Hrw;
 
-  let le := fresh "le" in evar (le : list ZXCVERT);
+  let le := fresh "le" in evar (le : list ZXDVERT);
   let lev := eval unfold le in le in
   specialize (Hrw (interp_discrete_hg_inhab lev));
   lazymatch goal with
@@ -4379,7 +4428,7 @@ Ltac zxpsrw_lhs lem match_number :=
   let Hrw := fresh "Hrw" in
   time? "zxpsrw_lhs setup tactic" specialize (zxpsrw_lhs_lemma) as Hrw;
 
-  let le := fresh "le" in evar (le : list ZXCVERT);
+  let le := fresh "le" in evar (le : list ZXDVERT);
   let lev := eval unfold le in le in
   specialize (Hrw (interp_discrete_hg_inhab lev));
 
@@ -4421,10 +4470,10 @@ Ltac zxpsrw_lhs lem match_number :=
   do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
     else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.");
 
-  specialize_with_concr_asgn_list Hrw lnv;
+  (* specialize_with_concr_asgn_list Hrw lnv;
   time? "zxpsrw_lhs prove correctness of concrete assignment" (
     tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac
-    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error");
+    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error"); *)
 
   epose proof (Hrw _) as Hrw;
   time? "zxpsrw_lhs compute rewrite" (tspecialize Hrw; [vm_compute;
@@ -4738,7 +4787,7 @@ Ltac zxpacat :=
   let Hrw := fresh "Hrw" in
   time? "zxpacat setup tactic" specialize (zxpacat_lemma) as Hrw;
 
-  let le := fresh "le" in evar (le : list ZXCVERT);
+  let le := fresh "le" in evar (le : list ZXDVERT);
   let lev := eval unfold le in le in
   specialize (Hrw (interp_discrete_hg_inhab lev));
   lazymatch goal with
@@ -4780,7 +4829,7 @@ Ltac zxparw_lhs lem match_number :=
   let Hrw := fresh "Hrw" in
   time? "zxparw_lhs setup tactic" specialize (zxparw_lhs_lemma) as Hrw;
 
-  let le := fresh "le" in evar (le : list ZXCVERT);
+  let le := fresh "le" in evar (le : list ZXDVERT);
   let lev := eval unfold le in le in
   specialize (Hrw (interp_discrete_hg_inhab lev));
 
@@ -4822,10 +4871,10 @@ Ltac zxparw_lhs lem match_number :=
   do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
     else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.");
 
-  specialize_with_concr_asgn_list Hrw lnv;
+  (* specialize_with_concr_asgn_list Hrw lnv;
   time? "zxparw_lhs prove correctness of concrete assignment" (
     tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac
-    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error");
+    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error"); *)
 
   epose proof (Hrw _) as Hrw;
   time? "zxparw_lhs compute rewrite" (tspecialize Hrw; [vm_compute;
@@ -4980,7 +5029,7 @@ Abort.
 
 End Examples.
 
-End ZXmauto. *)
+End ZXmauto.
 
 
 
