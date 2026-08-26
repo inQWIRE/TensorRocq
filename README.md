@@ -42,7 +42,9 @@ After either command, TensorRocq can be imported and used for abstract reasoning
 
 ### Building Examples
 
-Once TensorRocq is installed as above, follow the steps below to build the examples.
+<!-- NB: installation is no longer needed -->
+<!-- Once TensorRocq is installed as above, follow the steps below to build the examples. -->
+Building the examples does not require installing TensorRocq as a library, though the examples do have several dependencies.
 
 First, install [QuantumLib](https://github.com/inQWIRE/QuantumLib) through opam.
 
@@ -60,7 +62,7 @@ opam pin -y coq-voqc https://github.com/inQWIRE/SQIR.git
 opam pin -y coq-vyzx https://github.com/inQWIRE/VyZX.git
 ```
 
-Finally, run `make examples`.
+Finally, run `make` to build TensorRocq and `make examples` to build the examples.
 
 
 
