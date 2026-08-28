@@ -1361,18 +1361,6 @@ Let Equiv_positive : Equiv positive := eq.
 Local Existing Instance Equiv_positive.
 
 
-
-Ltac ereplace oc :=
-  let x := fresh "x" in
-  let ec := fresh "ec" in
-  set (x := oc);
-  let T := type of x in
-  evar (ec : T);
-  replace x with ec; [subst ec|symmetry; subst x].
-
-Tactic Notation "ereplace" uconstr(c) :=
-  ereplace c.
-
 Lemma tree_test_unoptimized_case_2 :
   tree_correct' ([gen 3%positive 0 0] *
    ((([gen 1%positive 0 1] * Pid 1;; [gen 2%positive 2 1]);;

@@ -97,3 +97,113 @@ Tactic Notation "vm_eval" uconstr(pat) "in"
   remember pat as x eqn:Hx in H;
   vm_compute in Hx;
   subst x.
+
+Tactic Notation "vm_eval" uconstr(pat) "in" "*" :=
+  let x := fresh "x" in
+  (* let Hx := fresh "Hx" in *)
+  set (x := pat) in *;
+  vm_compute in x;
+  subst x.
+
+Tactic Notation "cbn_eval" uconstr(pat) "in" "*" :=
+  let x := fresh "x" in
+  (* let Hx := fresh "Hx" in *)
+  set (x := pat) in *;
+  cbn in x;
+  subst x.
+
+Tactic Notation "cbn_eval" uconstr(pat) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in *;
+  cbn in Hx;
+  subst x.
+
+Tactic Notation "cbn_eval" uconstr(pat) "in" 
+  ne_hyp_list_sep(H, ",") :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  remember pat as x eqn:Hx in H;
+  cbn in Hx;
+  subst x.
+
+(* FIXME: Move *)
+
+Ltac ereplace oc :=
+  let x := fresh "x" in
+  let ec := fresh "ec" in
+  set (x := oc);
+  let T := type of x in
+  evar (ec : T);
+  replace x with ec; [subst ec|symmetry; subst x].
+
+
+Tactic Notation "ereplace" uconstr(c) :=
+  ereplace c.
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in" "*" :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in *;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in" ne_hyp_list_sep(H, ",") :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in H;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in"
+  ne_hyp_list_sep(H, ",") "|-" "*" :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in H |- *;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x].
+
+
+Tactic Notation "ereplace" uconstr(c) "by" tactic3(tac) :=
+  let x := fresh "x" in
+  let ec := fresh "ec" in
+  set (x := c);
+  let T := type of x in
+  evar (ec : T);
+  replace x with ec; [subst ec|symmetry; subst x ec; tac].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "by" tactic3(tac) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx;
+  eassert (Hxe : x = e); [subst x|clear Hx; subst x; tac].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in" "*" "by" tactic3(tac) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in *;
+  eassert (Hxe : x = e); [subst x|clear Hx; subst x; tac].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in" ne_hyp_list_sep(H, ",") "by" tactic3(tac) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in H;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x; tac].
+
+Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in"
+  ne_hyp_list_sep(H, ",") "|-" "*" "by" tactic3(tac) :=
+  let x := fresh "x" in
+  let Hx := fresh "Hx" in
+  let Hxe := fresh "Hxe" in
+  remember c as x eqn:Hx in H |- *;
+  assert (Hxe : x = e); [subst x|clear Hx; subst x; tac].
