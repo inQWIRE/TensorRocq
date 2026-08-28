@@ -333,3 +333,152 @@ Fixpoint plist_to_unique_counts_aux (fuel : nat) (l : list positive) :
 
 Definition plist_to_unique_counts l :=
   plist_to_unique_counts_aux (S (length l)) l.
+
+
+
+
+
+(* FIXME: Move *)
+Unset Elimination Schemes.
+Inductive ntree {A B} :=
+  | nleaf (b : B) : ntree
+  | nnode (a : A) (l : list ntree) : ntree.
+
+#[global] Arguments ntree _ _ : clear implicits.
+Set Elimination Schemes.
+
+Declare Scope ntree_scope.
+Delimit Scope ntree_scope with ntree.
+Bind Scope ntree_scope with ntree.
+
+Notation "! b" := (nleaf b) (at level 15) : ntree_scope.
+
+Fixpoint ntree_fold {A B C}
+  (fl : B -> C)
+  (fn : A -> list C -> C)
+  (n : ntree A B) : C :=
+  match n with
+  | nleaf b => fl b
+  | nnode a ns =>
+    fn a (ntree_fold fl fn <$> ns)
+  end.
+
+Notation sum_list_with' f :=
+  (foldl (λ a b, Nat.add a (f b)) O).
+
+
+
+Notation IOH_tree T := (ntree (IdxOrHyperEdge T) (IdxOrHyperEdge T)).
+
+Definition IOH_tree_insize {T} (t : IOH_tree T) : nat :=
+  match t with
+  | nleaf ioh | nnode ioh _ => IOH_insize ioh
+  end.
+
+Fixpoint IOH_tree_outsize {T} (t : IOH_tree T) : nat :=
+  match t with
+  | nleaf ioh => IOH_outsize ioh
+  | nnode _ ts =>
+    sum_list_with' IOH_tree_outsize ts
+  end.
+
+Definition IOH_tree_ins {T} (t : IOH_tree T) : list positive :=
+  match t with
+  | nleaf ioh | nnode ioh _ => IOH_ins ioh
+  end.
+
+Fixpoint IOH_tree_outs {T} (t : IOH_tree T) : list positive :=
+  match t with
+  | nleaf ioh => IOH_outs ioh
+  | nnode _ ts =>
+    ts ≫= IOH_tree_outs
+  end.
+
+Definition optimize_tree_edges {T} (inputs : list positive)
+  (es : list (IOH_tree T)) : list (IOH_tree T) :=
+  let idxmap : Pmap positive :=
+    list_to_map (imap (λ i p, (p, Pos.of_succ_nat i)) inputs) in
+  let es' := (λ e : IOH_tree T,
+    (omap (idxmap !!.) $ IOH_tree_ins e, e)) <$> es in
+  (merge_sort (fun e e' =>
+    Is_true ((fun e e' => match N.compare (inversionsP_between e e')
+    (inversionsP_between e' e) with
+    | Lt => true
+    | Gt => false
+    | Eq => Nat.leb (length e) (length e')
+    end) e.1 e'.1)) es').*2.
+
+Fixpoint extend_extracted_ioh_with_composable_aux (fuel : nat)
+  {T} (hg : Pmap (HyperEdge T))
+  (ioh : IdxOrHyperEdge T) : IOH_tree T * Pmap (HyperEdge T) :=
+  match fuel with
+  | 0 => (nleaf ioh, hg)
+  | S fuel =>
+  match ioh with
+  | inl p => (nleaf ioh, hg)
+  | inr tio =>
+    let ins := tio.1.2 in
+    let inset : Pset := list_to_set tio.2 in
+    let '(extr, hg') := get_extractable_edges inset hg in
+    if (match extr with | PEmpty => true | _ => false end) then
+      (* No more edges can be extracted *)
+      (nleaf ioh, hg)
+    else
+      let es := (map_to_list extr).*2 in
+      let (extr_es, hg') := foldr
+        (λ tio '(ts, hg),
+          let (t, hg') :=
+            extend_extracted_ioh_with_composable_aux fuel hg (inr tio) in
+          (t :: ts, hg')) ([], hg') es in
+      let unused_inputs := inset ∖ list_to_set (es ≫= snd ∘ fst) in
+      let ts : list (IOH_tree T) :=
+        extr_es ++ (nleaf ∘ inl <$> elements unused_inputs) in
+      let ordered_ts := optimize_tree_edges tio.2 ts in
+      (nnode (inr tio) ordered_ts, hg')
+  end
+  end.
+
+(* Definition extend_extracted_ioh_with_composable {T} (hg : Pmap (HyperEdge T))
+  (ioh : IdxOrHyperEdge T) : IOH_tree T * Pmap (HyperEdge T) :=
+  extend_extracted_ioh_with_composable_aux (S (size hg)) hg ioh. *)
+
+Definition extend_extracted_iohs_with_composable {T} (hg : Pmap (HyperEdge T))
+  (iohs : list (IdxOrHyperEdge T)) : list (IOH_tree T) * Pmap (HyperEdge T) :=
+  let fuel := S (size hg) in
+  foldr
+    (λ ioh '(ts, hg),
+      let (t, hg') := extend_extracted_ioh_with_composable_aux fuel hg ioh in
+      (t :: ts, hg'))
+    ([], hg) iohs.
+
+
+Definition IOH_aprop_insize ins {T} (t : IdxOrHyperEdge T) : nat :=
+  length (IOH_aprop_ins ins t).
+
+Definition IOH_aprop_outsize ins {T} (t : IdxOrHyperEdge T) : nat :=
+  length (IOH_aprop_outs ins t).
+
+Definition IOH_tree_aprop_insize ins {T} (t : IOH_tree T) : nat :=
+  match t with
+  | nleaf ioh | nnode ioh _ => IOH_aprop_insize ins ioh
+  end.
+
+Fixpoint IOH_tree_aprop_outsize ins {T} (t : IOH_tree T) : nat :=
+  match t with
+  | nleaf ioh => IOH_aprop_outsize ins ioh
+  | nnode ioh ts =>
+    sum_list_with' (IOH_tree_aprop_outsize (IOH_aprop_outs ins ioh)) ts
+  end.
+
+Definition IOH_tree_aprop_ins ins {T} (t : IOH_tree T) : list positive :=
+  match t with
+  | nleaf ioh | nnode ioh _ => IOH_aprop_ins ins ioh
+  end.
+
+Fixpoint IOH_tree_aprop_outs ins {T} (t : IOH_tree T) : list positive :=
+  match t with
+  | nleaf ioh => IOH_aprop_outs ins ioh
+  | nnode ioh ts =>
+    ts ≫= IOH_tree_aprop_outs (IOH_aprop_outs ins ioh)
+  end.
+
