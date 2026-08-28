@@ -37,76 +37,7 @@ Proof.
   done.
 Qed.
 
-
 Local Existing Instance Countable_Equiv.
-
-
-Record LawfulMPRORewritingRelation {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-   := mk_LawfulMPRORewritingRelation {
-  LPRR :>
-    LawfulPRORewritingRelation Struct T;
-  pro_rewriting_domain_mono_strong {n m} (p : PRO Struct T n m)
-    {n' m'} (p' : PRO Struct T n' m') :
-    (forall nmt, nmt ∈ PRO_tensors p -> InA (prod_relation eq equiv) nmt (PRO_tensors p')) ->
-    LPRR.(pro_rewriting_domain) p' -> LPRR.(pro_rewriting_domain) p;
-  mpro_rewriting_relation_graph_syntax_l {n m} (mp mp' mq : MPRO MStruct T n m)  :
-    MPRO_graph_semantics mp ≡ₛ MPRO_graph_semantics mp' ->
-    forall fN,
-    LPRR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
-    LPRR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq) ->
-    LPRR _ _ (MPRO_to_PRO fN mp') (MPRO_to_PRO fN mq);
-  }.
-
-Global Arguments LawfulMPRORewritingRelation (_ _ _) {_ _ _ _ _ _ _} : assert.
-
-
-Lemma pro_rewriting_domain_mono {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RW : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (p : PRO Struct T n m)
-    {n' m'} (p' : PRO Struct T n' m') :
-    PRO_tensors p ⊆ PRO_tensors p' ->
-    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
-Proof.
-  intros Htens.
-  apply pro_rewriting_domain_mono_strong.
-  intros nmt Hnmt%Htens%elem_of_list_In.
-  apply (In_InA _).
-  done.
-Qed.
-
-Lemma pro_rewriting_domain_mono_inclA {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RW : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (p : PRO Struct T n m)
-    {n' m'} (p' : PRO Struct T n' m') :
-    inclA (prod_relation eq equiv) (PRO_tensors p) (PRO_tensors p') ->
-    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
-Proof.
-  intros Hpp'.
-  apply pro_rewriting_domain_mono_strong.
-  intros nmt Hnmt.
-  apply Hpp'.
-  apply (In_InA _), elem_of_list_In.
-  done.
-Qed.
-
 
 
 (* FIXME: Move *)
@@ -171,48 +102,6 @@ Proof.
   now rewrite 2 sum_list_with_btree_elems.
 Qed.
 
-Lemma mpro_rewriting_domain_mono {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp : MPRO MStruct T n m)
-    {n' m'} (mp' : MPRO MStruct T n' m') :
-    MPRO_tensors mp ⊆ MPRO_tensors mp' ->
-  forall fN,
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
-Proof.
-  intros Hmp fN.
-  apply pro_rewriting_domain_mono.
-  rewrite 2 PRO_tensors_MPRO_to_PRO.
-  now apply list_fmap_subseteq.
-Qed.
-
-Lemma mpro_rewriting_domain_mono_lists {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp : MPRO MStruct T n m)
-    {n' m'} (mp' : MPRO MStruct T n' m') :
-    MPRO_tensors_lists mp ⊆ MPRO_tensors_lists mp' ->
-  forall fN,
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
-Proof.
-  intros Hmp fN.
-  apply pro_rewriting_domain_mono.
-  rewrite 2 PRO_tensors_MPRO_to_PRO_lists.
-  now apply list_fmap_subseteq.
-Qed.
-
 (* FIXME: Move *)
 Lemma list_fmap_subseteq_inv {A B} (f : A -> B) {Hf : Inj eq eq f}
   (l l' : list A) :
@@ -235,52 +124,6 @@ Proof.
   rewrite 2 Forall_forall in Hl.
   hnf.
   naive_solver.
-Qed.
-
-
-
-Lemma mpro_rewriting_domain_mono_encoded {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{Countable T}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp : MPRO MStruct T n m)
-    {n' m'} (mp' : MPRO MStruct T n' m') :
-    MPRO_tensors_encoded mp ⊆ MPRO_tensors_encoded mp' ->
-  forall fN,
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
-Proof.
-  intros Hmp.
-  apply mpro_rewriting_domain_mono_lists.
-  apply (list_fmap_subseteq_inv encode).
-  unfold MPRO_tensors_lists.
-  rewrite <- 2 list_fmap_compose.
-  exact Hmp.
-Qed.
-
-Lemma mpro_rewriting_domain_mono_set {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{Countable T}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp : MPRO MStruct T n m)
-    {n' m'} (mp' : MPRO MStruct T n' m') :
-    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
-  forall fN,
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
-Proof.
-  intros Hmp.
-  apply mpro_rewriting_domain_mono_encoded.
-  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
-  now apply list_to_set_subseteq in Hmp.
 Qed.
 
 (* FIXME: Move *)
@@ -312,152 +155,6 @@ Lemma MPRO_tensors_lists_denote_MPRO {A MStruct T T'} (f : T -> T')
 Proof.
   induction mp; cbn; rewrite ? fmap_app; f_equal; auto.
 Qed.
-
-Lemma mpro_rewriting_domain_mono_set_quoted {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{Equiv T, Equivalence T equiv}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  `{Countable T'} (f : T' -> T)
-  {n m} (mp : MPRO MStruct T' n m)
-    {n' m'} (mp' : MPRO MStruct T' n' m') :
-    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
-  forall fN,
-    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp')) ->
-    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp)).
-Proof.
-  intros Hmp fN.
-  rewrite <- 2 MPRO_to_PRO_denote_MPRO.
-  apply mpro_rewriting_domain_mono_lists.
-  rewrite 2 MPRO_tensors_lists_denote_MPRO.
-  apply list_fmap_subseteq.
-  apply (list_fmap_subseteq_inv encode).
-  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
-  unfold MPRO_tensors_lists.
-  rewrite <- 2 list_fmap_compose.
-  now apply list_to_set_subseteq in Hmp.
-Qed.
-
-Lemma mpro_rewriting_relation_graph_syntax_r {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp mq mq' : MPRO MStruct T n m)  :
-    MPRO_graph_semantics mq ≡ₛ MPRO_graph_semantics mq' ->
-    forall fN,
-    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mq') ->
-    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq) ->
-    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq').
-Proof.
-  intros Hqq' fN Hq' Hqp%symmetry.
-  apply (mpro_rewriting_relation_graph_syntax_l RR mq mq' mp Hqq') in Hqp; [|by auto..].
-  now symmetry.
-Qed.
-
-Lemma mpro_rewriting_relation_graph_syntax  {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T)
-  {n m} (mp mq : MPRO MStruct T n m)  :
-    MPRO_graph_semantics mp ≡ₛ MPRO_graph_semantics mq ->
-    forall fN,
-    pro_rewriting_domain RR (MPRO_to_PRO fN mp) ->
-    pro_rewriting_domain RR (MPRO_to_PRO fN mq) ->
-    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq).
-Proof.
-  intros Hpq fN Hp Hq.
-  apply (mpro_rewriting_relation_graph_syntax_l RR mq mp mq); [done..|].
-  now apply pro_rewriting_relation_refl.
-Qed.
-
-(* Definition LMPRR_rel {MStruct Struct T}
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {MStructI : InterpStruct MStruct Struct}
-  {StructG : StructGraphable Struct T}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  {concrete_assignments : Pmap nat}
-  (RR : LawfulMPRORewritingRelation MStruct Struct T concrete_assignments) *)
-
-
-
-Program Definition LawfulProLike_LawfulMPRORewritingRelation
-  (MStruct : Mor (btree positive))
-  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
-  {Struct : Mor nat} {T : Type} {D : Mor nat}
-  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
-  {EquivMStruct : forall n m, @Equivalence (MStruct n m) equiv}
-  {SizedProD : SizedProLike MStruct Struct T D}
-  (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
-  (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
-  (* (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test)) *)
-  {MStructG : @SizedStructGraphable positive MStruct T}
-  {StructG : StructGraphable Struct T}
-  {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
-  {TensD : StrictTensorLike R A D}
-  (LawPro : LawfulProLike R A Struct T D)
-    {LawGraphS : LawfulStructGraphable Struct T}
-  {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
-  {LawTensD : LawfulTensorableDiagram R A T D }
-  (* {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D} *)
-  : LawfulMPRORewritingRelation MStruct Struct T := {|
-  LPRR := LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro;
-  (* pro_rewriting_relation n m :=
-    λ p q, exists d1 d2, DiagramDenote d1 p /\ DiagramDenote d2 q /\ d1 ≡ d2;
-  pro_rewriting_domain n m p := is_Some (PRO_to_diagram p); *)
-|}.
-Next Obligation.
-  intros until p'.
-  intros Hp.
-  cbn.
-  rewrite 2 PRO_to_diagram_is_Some.
-  rewrite 2 Forall_forall.
-  intros Hp'.
-  intros ((i, o), t) Htio%Hp%InA_alt.
-  destruct Htio as ([[i' o'] t'] & [[= <- <-] Hts] & Ht').
-  simpl in Hts.
-  erewrite (f_equiv is_Some).
-  2:{
-    apply (LawTensD.(ofTensor_proper R A)), Hts.
-  }
-  now apply (Hp' (i, o, t')).
-Qed.
-Next Obligation.
-  intros until mp.
-  intros mp' mq Hpp' fN Hmp' Hpq.
-  eapply pro_rewriting_relation_graph_syntax_l, Hpq; [done|].
-  rewrite <- 2 (MPRO_graph_semantics_correct).
-  now apply bw_sized_graph_to_graph_scohg_syntactic_eq.
-Qed.
-
-
-
-
-
-
-Import SizedPropGraphTerm.
-
-Import ToUnsized.
-
-
-
 
 (* FIXME: Move to SizedPropGraphs or something *)
 Class FreeSizedStructGraphable {N} (MStruct : Mor (btree N))
@@ -498,160 +195,6 @@ Qed.
 Proof.
   intros T n m []; done.
 Qed.
-
-
-
-
-
-
-
-
-(* FIXME: Move *)
-
-
-
-Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
-  (MStruct : Mor (btree positive))
-  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
-  {Struct : Mor nat} {T : Type} {D : Mor nat}
-  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
-  {EqMStruct : forall n m, Equiv (MStruct n m)}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
-  {EquivMStruct : forall n m, @Equivalence (MStruct n m) equiv}
-  {SizedProD : SizedProLike MStruct Struct T D}
-  (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
-  (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
-  {MStructG : forall T, @SizedStructGraphable positive MStruct T}
-  {FreeMStructG : FreeSizedStructGraphable MStruct}
-  {StructG : forall T, StructGraphable Struct T}
-  {FreeStructG : FreeStructGraphable Struct}
-  {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
-  {TensD : StrictTensorLike R A D}
-  (LawPro : LawfulProLike R A Struct T D)
-    {LawGraphS : LawfulStructGraphable Struct T}
-  {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
-  {LawGraphM' : LawfulSizedStructGraphable MStruct Struct T'}
-  (RW : LawfulMPRORewritingRelation MStruct Struct T :=
-    LawfulProLike_LawfulMPRORewritingRelation MStruct LawPro)
-  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
-    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
-
-
-  (f : T' -> T)
-  {n m} (dlhs drhs : D n m) :
-  forall lhs rhs,
-  DiagramQuote dlhs lhs ->
-  DiagramQuote drhs rhs ->
-  forall Qlhs Qrhs,
-  PRO_quote f Qlhs lhs ->
-  PRO_quote f Qrhs rhs ->
-  forall (fN : positive -> nat) a b (Mlhs Mrhs : MPRO MStruct T' a b),
-  MPRO_PRO_quote (MStruct:=MStruct) fN Mlhs Qlhs ->
-  MPRO_PRO_quote (MStruct:=MStruct) fN Mrhs Qrhs ->
-  default_countable_sized_graph_iso_test (MPRO_graph_semantics Mlhs)
-    (MPRO_graph_semantics Mrhs) = true ->
-  dlhs ≡ drhs.
-Proof.
-  assert (Hf : Proper (equiv ==> equiv) f) by now intros ? ? [= <-].
-  intros lhs rhs Hlhs Hrhs Qlhs Qrhs HQlhs HQrhs fN a b Mlhs Mrhs HMlhs HMrhs.
-  intros HMlr%default_countable_sized_graph_iso_test_correct.
-
-
-  apply (PRO_quote_correct_graph_semantics _) in HQlhs as HQlhs'.
-  apply (PRO_quote_correct_graph_semantics _) in HQrhs as HQrhs'.
-  assert (Hlr : (PRO_graph_semantics Qlhs ≡ₛ PRO_graph_semantics Qrhs)%cohg). 1:{
-    eapply MPRO_PRO_quote_correct_graph_semantics_mor, HMlr; eauto.
-  }
-  eapply (DiagramQuote_correct R A); [eauto..|].
-  rewrite <- 2 PRO_graph_semantics_correct.
-  apply graph_semantics_syntactic_eq.
-  rewrite HQlhs', HQrhs'.
-  f_equiv.
-  apply Hlr.
-Qed.
-
-(*
-
-Lemma LawfulProLike_RW_dom_of_Quote
-  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
-  (Struct : Mor nat) (T : Type) (D : Mor nat)
-  {ProD : ProLike Struct T D}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
-  {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
-  {TensD : StrictTensorLike R A D}
-  (LawPro : LawfulProLike R A Struct T D)
-  `{FreeGraphS : FreeSizedStructGraphable Struct,
-    LawGraphS : !LawfulSizedStructGraphable Struct T}
-  (RW : LawfulPRORewritingRelation Struct T :=
-    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
-  {n m} (d : D n m) p :
-  DiagramQuote d p ->
-  RW.(pro_rewriting_domain) p.
-Proof.
-  intros [Hdp%(f_equiv is_Some)].
-  now apply Hdp.
-Qed.
-
-Lemma LawfulProLike_RW_dom_of_Denote
-  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
-  (Struct : Mor nat) (T : Type) (D : Mor nat)
-  {ProD : ProLike Struct T D}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
-  {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
-  {TensD : StrictTensorLike R A D}
-  (LawPro : LawfulProLike R A Struct T D)
-  `{FreeGraphS : FreeSizedStructGraphable Struct,
-    LawGraphS : !LawfulSizedStructGraphable Struct T}
-  (RW : LawfulPRORewritingRelation Struct T :=
-    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
-  {n m} (d : D n m) p :
-  DiagramDenote d p ->
-  RW.(pro_rewriting_domain) p.
-Proof.
-  intros [Hdp%(f_equiv is_Some)].
-  now apply Hdp.
-Qed.
-
-
-
-Lemma LawfulProLike_equiv_of_RW_Quote
-  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
-  {Struct : Mor nat} {T : Type} {D : Mor nat}
-  {ProD : ProLike Struct T D}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
-  {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
-  {TensD : StrictTensorLike R A D}
-  (LawPro : LawfulProLike R A Struct T D)
-  `{FreeGraphS : FreeSizedStructGraphable Struct,
-    LawGraphS : !LawfulSizedStructGraphable Struct T}
-  (RW : LawfulPRORewritingRelation Struct T :=
-    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
-  {n m} (d d' : D n m) p p' :
-  DiagramQuote d p ->
-  DiagramQuote d' p' ->
-  RW n m p p' -> d ≡ d'.
-Proof.
-  intros [Hdp] [Hdp'] (d1 & d1' & [Hd1] & [Hd1'] & Heq).
-  rewrite Hd1 in Hdp.
-  rewrite Hd1' in Hdp'.
-  apply (inj Some) in Hdp, Hdp'.
-  rewrite <- Hdp, <- Hdp'; done.
-Qed. *)
 
 
 
@@ -838,6 +381,9 @@ Proof.
   apply Hscohg.2.2.2.2.
   now apply elem_of_union_l.
 Qed.
+
+Import ToUnsized.
+
 
 Lemma sized_graph_tensors_sized_add_top_loop {N T n m}
   (scohg : SizedCospanHyperGraph N T (S n) (S m)) :
@@ -1534,9 +1080,537 @@ Qed.
 
 
 
+Record LawfulMPRORewritingRelation {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+   := mk_LawfulMPRORewritingRelation {
+  LPRR :>
+    LawfulPRORewritingRelation Struct T;
+  pro_rewriting_domain_mono_strong {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    (forall nmt, nmt ∈ PRO_tensors p -> InA (prod_relation eq equiv) nmt (PRO_tensors p')) ->
+    LPRR.(pro_rewriting_domain) p' -> LPRR.(pro_rewriting_domain) p;
+  mpro_rewriting_relation_graph_syntax_l {n m} (mp mp' mq : MPRO MStruct T n m)  :
+    MPRO_graph_semantics mp ≡ₛ MPRO_graph_semantics mp' ->
+    forall fN,
+    LPRR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    LPRR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq) ->
+    LPRR _ _ (MPRO_to_PRO fN mp') (MPRO_to_PRO fN mq);
+  }.
+
+Global Arguments LawfulMPRORewritingRelation (_ _ _) {_ _ _ _ _ _ _} : assert.
+
+
+Lemma pro_rewriting_domain_mono {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    PRO_tensors p ⊆ PRO_tensors p' ->
+    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
+Proof.
+  intros Htens.
+  apply pro_rewriting_domain_mono_strong.
+  intros nmt Hnmt%Htens%elem_of_list_In.
+  apply (In_InA _).
+  done.
+Qed.
+
+Lemma pro_rewriting_domain_mono_inclA {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (p : PRO Struct T n m)
+    {n' m'} (p' : PRO Struct T n' m') :
+    inclA (prod_relation eq equiv) (PRO_tensors p) (PRO_tensors p') ->
+    RW.(pro_rewriting_domain) p' -> RW.(pro_rewriting_domain) p.
+Proof.
+  intros Hpp'.
+  apply pro_rewriting_domain_mono_strong.
+  intros nmt Hnmt.
+  apply Hpp'.
+  apply (In_InA _), elem_of_list_In.
+  done.
+Qed.
 
 
 
+
+Lemma mpro_rewriting_domain_mono {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors mp ⊆ MPRO_tensors mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp fN.
+  apply pro_rewriting_domain_mono.
+  rewrite 2 PRO_tensors_MPRO_to_PRO.
+  now apply list_fmap_subseteq.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_lists {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_lists mp ⊆ MPRO_tensors_lists mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp fN.
+  apply pro_rewriting_domain_mono.
+  rewrite 2 PRO_tensors_MPRO_to_PRO_lists.
+  now apply list_fmap_subseteq.
+Qed.
+
+
+
+Lemma mpro_rewriting_domain_mono_encoded {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Countable T}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_encoded mp ⊆ MPRO_tensors_encoded mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp.
+  apply mpro_rewriting_domain_mono_lists.
+  apply (list_fmap_subseteq_inv encode).
+  unfold MPRO_tensors_lists.
+  rewrite <- 2 list_fmap_compose.
+  exact Hmp.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_set {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Countable T}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp : MPRO MStruct T n m)
+    {n' m'} (mp' : MPRO MStruct T n' m') :
+    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp') ->
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mp).
+Proof.
+  intros Hmp.
+  apply mpro_rewriting_domain_mono_encoded.
+  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
+  now apply list_to_set_subseteq in Hmp.
+Qed.
+
+Lemma mpro_rewriting_domain_mono_set_quoted {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{Equiv T, Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  `{Countable T'} (f : T' -> T)
+  {n m} (mp : MPRO MStruct T' n m)
+    {n' m'} (mp' : MPRO MStruct T' n' m') :
+    MPRO_tensors_set mp ⊆ MPRO_tensors_set mp' ->
+  forall fN,
+    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp')) ->
+    RR.(pro_rewriting_domain) (PRO_denote f (MPRO_to_PRO fN mp)).
+Proof.
+  intros Hmp fN.
+  rewrite <- 2 MPRO_to_PRO_denote_MPRO.
+  apply mpro_rewriting_domain_mono_lists.
+  rewrite 2 MPRO_tensors_lists_denote_MPRO.
+  apply list_fmap_subseteq.
+  apply (list_fmap_subseteq_inv encode).
+  rewrite <- 2 list_to_set_MPRO_tensors_encoded in Hmp.
+  unfold MPRO_tensors_lists.
+  rewrite <- 2 list_fmap_compose.
+  now apply list_to_set_subseteq in Hmp.
+Qed.
+
+Lemma mpro_rewriting_relation_graph_syntax_r {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp mq mq' : MPRO MStruct T n m)  :
+    MPRO_graph_semantics mq ≡ₛ MPRO_graph_semantics mq' ->
+    forall fN,
+    RR.(pro_rewriting_domain) (MPRO_to_PRO fN mq') ->
+    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq) ->
+    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq').
+Proof.
+  intros Hqq' fN Hq' Hqp%symmetry.
+  apply (mpro_rewriting_relation_graph_syntax_l RR mq mq' mp Hqq') in Hqp; [|by auto..].
+  now symmetry.
+Qed.
+
+Lemma mpro_rewriting_relation_graph_syntax  {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T)
+  {n m} (mp mq : MPRO MStruct T n m)  :
+    MPRO_graph_semantics mp ≡ₛ MPRO_graph_semantics mq ->
+    forall fN,
+    pro_rewriting_domain RR (MPRO_to_PRO fN mp) ->
+    pro_rewriting_domain RR (MPRO_to_PRO fN mq) ->
+    RR _ _ (MPRO_to_PRO fN mp) (MPRO_to_PRO fN mq).
+Proof.
+  intros Hpq fN Hp Hq.
+  apply (mpro_rewriting_relation_graph_syntax_l RR mq mp mq); [done..|].
+  now apply pro_rewriting_relation_refl.
+Qed.
+
+(* Definition LMPRR_rel {MStruct Struct T}
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {MStructI : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {concrete_assignments : Pmap nat}
+  (RR : LawfulMPRORewritingRelation MStruct Struct T concrete_assignments) *)
+
+
+
+Program Definition LawfulProLike_LawfulMPRORewritingRelation
+  (MStruct : Mor (btree positive))
+  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  {Struct : Mor nat} {T : Type} {D : Mor nat}
+  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {EquivMStruct : forall n m, @Equivalence (MStruct n m) equiv}
+  {SizedProD : SizedProLike MStruct Struct T D}
+  (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
+  (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
+  (* (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test)) *)
+  {MStructG : @SizedStructGraphable positive MStruct T}
+  {StructG : StructGraphable Struct T}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+    {LawGraphS : LawfulStructGraphable Struct T}
+  {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
+  {LawTensD : LawfulTensorableDiagram R A T D }
+  (* {LawSomeTTest : LawfulSizedOfTensorSomeTestable T D} *)
+  : LawfulMPRORewritingRelation MStruct Struct T := {|
+  LPRR := LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro;
+  (* pro_rewriting_relation n m :=
+    λ p q, exists d1 d2, DiagramDenote d1 p /\ DiagramDenote d2 q /\ d1 ≡ d2;
+  pro_rewriting_domain n m p := is_Some (PRO_to_diagram p); *)
+|}.
+Next Obligation.
+  intros until p'.
+  intros Hp.
+  cbn.
+  rewrite 2 PRO_to_diagram_is_Some.
+  rewrite 2 Forall_forall.
+  intros Hp'.
+  intros ((i, o), t) Htio%Hp%InA_alt.
+  destruct Htio as ([[i' o'] t'] & [[= <- <-] Hts] & Ht').
+  simpl in Hts.
+  erewrite (f_equiv is_Some).
+  2:{
+    apply (LawTensD.(ofTensor_proper R A)), Hts.
+  }
+  now apply (Hp' (i, o, t')).
+Qed.
+Next Obligation.
+  intros until mp.
+  intros mp' mq Hpp' fN Hmp' Hpq.
+  eapply pro_rewriting_relation_graph_syntax_l, Hpq; [done|].
+  rewrite <- 2 (MPRO_graph_semantics_correct).
+  now apply bw_sized_graph_to_graph_scohg_syntactic_eq.
+Qed.
+
+
+
+
+
+
+Import SizedPropGraphTerm.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* FIXME: Move *)
+
+
+
+Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
+  (MStruct : Mor (btree positive))
+  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  {Struct : Mor nat} {T : Type} {D : Mor nat}
+  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {EquivMStruct : forall n m, @Equivalence (MStruct n m) equiv}
+  {SizedProD : SizedProLike MStruct Struct T D}
+  (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
+  (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
+  {MStructG : forall T, @SizedStructGraphable positive MStruct T}
+  {FreeMStructG : FreeSizedStructGraphable MStruct}
+  {StructG : forall T, StructGraphable Struct T}
+  {FreeStructG : FreeStructGraphable Struct}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+    {LawGraphS : LawfulStructGraphable Struct T}
+  {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
+  {LawGraphM' : LawfulSizedStructGraphable MStruct Struct T'}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T :=
+    LawfulProLike_LawfulMPRORewritingRelation MStruct LawPro)
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+
+
+  (f : T' -> T)
+  {n m} (dlhs drhs : D n m) :
+  forall lhs rhs,
+  DiagramQuote dlhs lhs ->
+  DiagramQuote drhs rhs ->
+  forall Qlhs Qrhs,
+  PRO_quote f Qlhs lhs ->
+  PRO_quote f Qrhs rhs ->
+  forall (fN : positive -> nat) a b (Mlhs Mrhs : MPRO MStruct T' a b),
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mlhs Qlhs ->
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mrhs Qrhs ->
+  default_countable_sized_graph_iso_test (MPRO_graph_semantics Mlhs)
+    (MPRO_graph_semantics Mrhs) = true ->
+  dlhs ≡ drhs.
+Proof.
+  assert (Hf : Proper (equiv ==> equiv) f) by now intros ? ? [= <-].
+  intros lhs rhs Hlhs Hrhs Qlhs Qrhs HQlhs HQrhs fN a b Mlhs Mrhs HMlhs HMrhs.
+  intros HMlr%default_countable_sized_graph_iso_test_correct.
+
+
+  apply (PRO_quote_correct_graph_semantics _) in HQlhs as HQlhs'.
+  apply (PRO_quote_correct_graph_semantics _) in HQrhs as HQrhs'.
+  assert (Hlr : (PRO_graph_semantics Qlhs ≡ₛ PRO_graph_semantics Qrhs)%cohg). 1:{
+    eapply MPRO_PRO_quote_correct_graph_semantics_mor, HMlr; eauto.
+  }
+  eapply (DiagramQuote_correct R A); [eauto..|].
+  rewrite <- 2 PRO_graph_semantics_correct.
+  apply graph_semantics_syntactic_eq.
+  rewrite HQlhs', HQrhs'.
+  f_equiv.
+  apply Hlr.
+Qed.
+
+
+Lemma LawfulMProLike_MPRO_quote_test_correct_casted `{Countable T'}
+  (MStruct : Mor (btree positive))
+  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  {Struct : Mor nat} {T : Type} {D : Mor nat}
+  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {EquivMStruct : forall n m, @Equivalence (MStruct n m) equiv}
+  {SizedProD : SizedProLike MStruct Struct T D}
+  (ProD : ProLike Struct T D := SizedProD.(SPL_PL))
+  (MStructI : InterpStruct MStruct Struct := SizedProD.(SPL_interp))
+  {MStructG : forall T, @SizedStructGraphable positive MStruct T}
+  {FreeMStructG : FreeSizedStructGraphable MStruct}
+  {StructG : forall T, StructGraphable Struct T}
+  {FreeStructG : FreeStructGraphable Struct}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+    {LawGraphS : LawfulStructGraphable Struct T}
+  {LawGraphM : LawfulSizedStructGraphable MStruct Struct T}
+  {LawGraphM' : LawfulSizedStructGraphable MStruct Struct T'}
+  (RW : LawfulMPRORewritingRelation MStruct Struct T :=
+    LawfulProLike_LawfulMPRORewritingRelation MStruct LawPro)
+  {StructGProp : forall T (EqT : Equiv T) (EquivT : Equivalence (≡@{T})) n m,
+    Proper ((≡@{Struct n m}) ==> cohg_syntactic_eq) (graph_of_struct (T:=T))}
+
+
+  (f : T' -> T)
+  {n m} (dlhs drhs : D n m) :
+  forall lhs rhs,
+  DiagramQuote dlhs lhs ->
+  DiagramQuote drhs rhs ->
+  forall Qlhs Qrhs,
+  PRO_quote f Qlhs lhs ->
+  PRO_quote f Qrhs rhs ->
+  forall (fN : positive -> nat) 
+    a b a' b' (Mlhs : MPRO MStruct T' a b) (Mrhs : MPRO MStruct T' a' b'),
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mlhs Qlhs ->
+  MPRO_PRO_quote (MStruct:=MStruct) fN Mrhs Qrhs ->
+  forall (Ha : a' =@{list _} a) (Hb : b' =@{list _} b),
+  default_countable_sized_graph_iso_test (MPRO_graph_semantics Mlhs)
+    (cast_sized_graph (bsize_eq_elems Ha) (bsize_eq_elems Hb) 
+      (MPRO_graph_semantics Mrhs)) = true ->
+  dlhs ≡ drhs.
+Proof.
+  assert (Hf : Proper (equiv ==> equiv) f) by now intros ? ? [= <-].
+  intros lhs rhs Hlhs Hrhs Qlhs Qrhs HQlhs HQrhs fN a b a' b' Mlhs Mrhs HMlhs HMrhs Ha Hb.
+  intros HMlr%default_countable_sized_graph_iso_test_correct.
+
+
+  apply (PRO_quote_correct_graph_semantics _) in HQlhs as HQlhs'.
+  apply (PRO_quote_correct_graph_semantics _) in HQrhs as HQrhs'.
+  assert (Hlr : (PRO_graph_semantics Qlhs ≡ₛ PRO_graph_semantics Qrhs)%cohg). 1:{
+    eapply MPRO_PRO_quote_correct_graph_semantics_mor_casted, HMlr; eauto.
+  }
+  eapply (DiagramQuote_correct R A); [eauto..|].
+  rewrite <- 2 PRO_graph_semantics_correct.
+  apply graph_semantics_syntactic_eq.
+  rewrite HQlhs', HQrhs'.
+  f_equiv.
+  apply Hlr.
+Qed.
+
+(*
+
+Lemma LawfulProLike_RW_dom_of_Quote
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeSizedStructGraphable Struct,
+    LawGraphS : !LawfulSizedStructGraphable Struct T}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d : D n m) p :
+  DiagramQuote d p ->
+  RW.(pro_rewriting_domain) p.
+Proof.
+  intros [Hdp%(f_equiv is_Some)].
+  now apply Hdp.
+Qed.
+
+Lemma LawfulProLike_RW_dom_of_Denote
+  (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  (Struct : Mor nat) (T : Type) (D : Mor nat)
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeSizedStructGraphable Struct,
+    LawGraphS : !LawfulSizedStructGraphable Struct T}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d : D n m) p :
+  DiagramDenote d p ->
+  RW.(pro_rewriting_domain) p.
+Proof.
+  intros [Hdp%(f_equiv is_Some)].
+  now apply Hdp.
+Qed.
+
+
+
+Lemma LawfulProLike_equiv_of_RW_Quote
+  {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
+  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  {Struct : Mor nat} {T : Type} {D : Mor nat}
+  {ProD : ProLike Struct T D}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{EqStruct : forall n m, Equiv (Struct n m)}
+  `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStruct : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T}
+  {TensD : StrictTensorLike R A D}
+  (LawPro : LawfulProLike R A Struct T D)
+  `{FreeGraphS : FreeSizedStructGraphable Struct,
+    LawGraphS : !LawfulSizedStructGraphable Struct T}
+  (RW : LawfulPRORewritingRelation Struct T :=
+    LawfulProLike_LawfulPRORewritingRelation R A Struct T D LawPro)
+  {n m} (d d' : D n m) p p' :
+  DiagramQuote d p ->
+  DiagramQuote d' p' ->
+  RW n m p p' -> d ≡ d'.
+Proof.
+  intros [Hdp] [Hdp'] (d1 & d1' & [Hd1] & [Hd1'] & Heq).
+  rewrite Hd1 in Hdp.
+  rewrite Hd1' in Hdp'.
+  apply (inj Some) in Hdp, Hdp'.
+  rewrite <- Hdp, <- Hdp'; done.
+Qed. *)
 
 
 

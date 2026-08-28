@@ -1069,12 +1069,12 @@ Lemma vmap_vzip_with {A B C D} (f : C -> D) (g : A -> B -> C) {n}
 Proof.
   induction n; inv_all_vec_fin; cbn in *; congruence.
 Qed.
-Lemma fst_vzip {A} {n} (v w : vec A n) :
+Lemma fst_vzip {A B} {n} (v : vec A n) (w : vec B n):
   vmap fst (vzip_with pair v w) = v.
 Proof.
   induction n; inv_all_vec_fin; cbn in *; congruence.
 Qed.
-Lemma snd_vzip {A} {n} (v w : vec A n) :
+Lemma snd_vzip {A B} {n} (v : vec A n) (w : vec B n):
   vmap snd (vzip_with pair v w) = w.
 Proof.
   induction n; inv_all_vec_fin; cbn in *; congruence.

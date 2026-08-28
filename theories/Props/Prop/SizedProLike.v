@@ -212,6 +212,45 @@ Proof.
   now rewrite 2 (MPRO_graph_semantics_correct _ _) in Heq.
 Qed.
 
+
+Lemma MPRO_PRO_quote_correct_graph_semantics_mor_casted {N}
+  {MStruct : Mor (btree N)} {Struct : Mor nat} {T}
+  {EqMStruct : forall n m, Equiv (MStruct n m)}
+  {EqStruct : forall n m, Equiv (Struct n m)}
+  {EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {EqT : Equiv T} {EquivT : @Equivalence T equiv}
+  {InterpS : InterpStruct MStruct Struct}
+  {StructG : StructGraphable Struct T}
+  {MStructG : SizedStructGraphable MStruct T}
+  {LawStruct : LawfulSizedStructGraphable MStruct Struct T}
+  (fN : N -> nat)
+
+  {a b a' b' : btree N} (mp : MPRO MStruct T a b) (mq : MPRO MStruct T a' b') 
+  (Ha : a' =@{list _} a) (Hb : b' =@{list _} b)
+  {n m : nat} (p q : PRO Struct T n m) :
+  MPRO_PRO_quote fN mp p ->
+  MPRO_PRO_quote fN mq q ->
+  MPRO_graph_semantics mp ≡ₛ cast_bw_sized_graph Ha Hb (MPRO_graph_semantics mq) ->
+  (PRO_graph_semantics p ≡ₛ PRO_graph_semantics q)%cohg.
+Proof.
+  intros Hp.
+  apply MPRO_PRO_quote_size in Hp as Hnm.
+  destruct Hnm as [-> ->].
+  rewrite MPRO_PRO_quote_refl in *.
+  intros Hq.
+  rewrite Hp.
+  intros Heq%(bw_sized_graph_to_graph_scohg_syntactic_eq fN).
+  apply MPRO_PRO_quote_correct_graph_semantics in Hq.
+  apply sigT2_relation_alt in Hq as [Hab Hq].
+  cbn in Hq.
+  rewrite Hq.
+  rewrite eq_rect_r_to_cast_graph.
+  rewrite MPRO_graph_semantics_correct in Heq.
+  rewrite Heq.
+  rewrite bw_sized_graph_to_graph_cast.
+  f_equiv; apply proof_irrel.
+Qed.
+
 Lemma MPRO_PRO_quote_compose {N} {MStruct : Mor (btree N)} {Struct : Mor nat} {T}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
