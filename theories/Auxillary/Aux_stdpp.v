@@ -1293,3 +1293,16 @@ Proof.
   apply decide_ext'; [done|now intros; f_equal; auto|..].
   intros; done.
 Qed.
+
+
+#[export] Instance fin_add_comm_involutive {n m} : Cancel eq (fin_add_comm) (@fin_add_comm n m).
+Proof.
+  intros i.
+  now induction i using fin_add_inv;
+  rewrite ?fin_add_comm_L, ?fin_add_comm_R, ?fin_add_comm_L.
+Qed.
+
+#[export] Instance fin_add_comm_inj {n m} : Inj eq eq (@fin_add_comm n m).
+Proof.
+  apply cancel_inj.
+Qed.

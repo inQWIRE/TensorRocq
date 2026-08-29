@@ -2827,3 +2827,227 @@ Proof.
   rewrite <- (norm_verts_vert_eq x), Heq.
   apply (subrel (norm_verts_vert_eq y)).
 Qed.
+
+
+Definition transpose_graph {T n m} (cohg : CospanHyperGraph T n m) : CospanHyperGraph T m n :=
+  mk_cohg (transpose_hg cohg) cohg.(outputs) cohg.(inputs).
+
+#[global] Arguments transpose_graph {_ _ _} !_ /.
+
+
+Lemma transpose_relabel_graph {T n m} f (cohg : CospanHyperGraph T n m) :
+  transpose_graph (relabel_graph f cohg) = relabel_graph f (transpose_graph cohg).
+Proof.
+  apply cohg_ext; [apply transpose_relabel_hg|done..].
+Qed.
+
+Lemma transpose_reindex_graph {T n m} f (cohg : CospanHyperGraph T n m) :
+  transpose_graph (reindex_graph f cohg) = reindex_graph f (transpose_graph cohg).
+Proof.
+  apply cohg_ext; [apply transpose_reindex_hg|done..].
+Qed.
+
+Lemma vertices_transpose_graph {T n m} (cohg : CospanHyperGraph T n m) :
+  vertices (transpose_graph cohg) = vertices cohg.
+Proof.
+  rewrite 2 vertices_vertices_hg_decomp.
+  f_equal.
+  - simpl.
+    now rewrite vertices_hg_transpose.
+  - simpl.
+    apply list_to_set_perm_L; solve_Permutation.
+Qed.
+
+Lemma referenced_vertices_transpose_graph {T n m} (cohg : CospanHyperGraph T n m) :
+  referenced_vertices (transpose_graph cohg) = referenced_vertices cohg.
+Proof.
+  rewrite 2 referenced_vertices_decomp.
+  f_equal.
+  - simpl.
+    apply list_to_set_perm_L; solve_Permutation.
+  - simpl.
+    now rewrite referenced_vertices_hg_transpose.
+Qed.
+
+Lemma transpose_set_verts {T n m} (cohg : CospanHyperGraph T n m) v :
+  transpose_graph (set_verts cohg v) = set_verts (transpose_graph cohg) v.
+Proof.
+  done.
+Qed.
+
+Lemma norm_verts_transpose_graph {T n m} (cohg : CospanHyperGraph T n m) :
+  norm_verts (transpose_graph cohg) = transpose_graph (norm_verts cohg).
+Proof.
+  unfold norm_verts.
+  rewrite transpose_set_verts, vertices_transpose_graph.
+  done.
+Qed.
+
+#[export] Instance transpose_graph_cohg_vert_eq {T n m} :
+  Proper (cohg_vert_eq ==> cohg_vert_eq) (@transpose_graph T n m).
+Proof.
+  unfold cohg_vert_eq.
+  intros cohg cohg' Hveq.
+  rewrite 2 norm_verts_transpose_graph.
+  now f_equal.
+Qed.
+
+#[export] Instance transpose_graph_cohg_eq `{Equiv T} {n m} :
+  Proper (cohg_eq ==> cohg_eq) (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Heq.
+  split_and!; [apply Heq..|].
+  simpl.
+  f_equiv; apply Heq.
+Qed.
+
+#[export] Instance transpose_graph_cohg_equiv `{Equiv T} {n m} :
+  Proper (equiv ==> equiv) (@transpose_graph T n m).
+Proof.
+  apply rtc_proper, rel_union_proper; apply _.
+Qed.
+
+#[export] Instance transpose_graph_isomorphic {T} {n m} :
+  Proper (isomorphic ==> isomorphic) (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Hcohg.
+  induction Hcohg.
+  rewrite transpose_relabel_graph, transpose_reindex_graph.
+  now constructor.
+Qed.
+
+#[export] Instance transpose_graph_struct_isomorphic {T} {n m} :
+  Proper (struct_isomorphic ==> struct_isomorphic) (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Hcohg.
+  unfold struct_isomorphic in *.
+  rewrite 2 norm_verts_transpose_graph.
+  now f_equiv.
+Qed.
+
+#[export] Instance transpose_graph_cohg_syntactic_eq `{Equiv T} {n m} :
+  Proper (cohg_syntactic_eq ==> cohg_syntactic_eq) (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Hcohg.
+  induction Hcohg.
+  rewrite transpose_relabel_graph, transpose_reindex_graph.
+  constructor; [done..|].
+  rewrite 2 norm_verts_transpose_graph.
+  now f_equiv.
+Qed.
+
+#[export] Instance transpose_graph_involutive {T n m} : Cancel eq transpose_graph (@transpose_graph T n m).
+Proof.
+  intros cohg.
+  apply cohg_ext; [|done..].
+  apply transpose_hg_involutive.
+Qed.
+
+#[export] Instance transpose_graph_inj {T n m} : Inj eq eq (@transpose_graph T n m).
+Proof.
+  apply cancel_inj.
+Qed.
+
+#[export] Instance transpose_graph_inj_cohg_vert_eq {T n m} :
+  Inj cohg_vert_eq cohg_vert_eq (@transpose_graph T n m).
+Proof.
+  eapply @cancel_inj.
+  - intros cohg.
+    apply eq_reflexivity, transpose_graph_involutive.
+  - apply _.
+  - apply _.
+Qed.
+
+#[export] Instance transpose_graph_inj_isomorphic {T n m} :
+  Inj isomorphic isomorphic (@transpose_graph T n m).
+Proof.
+  eapply @cancel_inj.
+  - intros cohg.
+    apply eq_reflexivity, transpose_graph_involutive.
+  - apply _.
+  - apply _.
+Qed.
+
+#[export] Instance transpose_graph_inj_struct_isomorphic {T n m} :
+  Inj struct_isomorphic struct_isomorphic (@transpose_graph T n m).
+Proof.
+  eapply @cancel_inj.
+  - intros cohg.
+    apply eq_reflexivity, transpose_graph_involutive.
+  - apply _.
+  - apply _.
+Qed.
+
+#[export] Instance transpose_graph_inj_cohg_eq `{Equiv T} {n m} :
+  Inj cohg_eq cohg_eq (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Heq%(f_equiv transpose_graph).
+  now rewrite 2 transpose_graph_involutive in Heq.
+Qed.
+
+#[export] Instance transpose_graph_inj_equiv `{Equiv T} {n m} :
+  Inj equiv equiv (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Heq%(f_equiv transpose_graph).
+  now rewrite 2 transpose_graph_involutive in Heq.
+Qed.
+
+#[export] Instance transpose_graph_inj_cohg_syntactic_eq `{Equiv T} {n m} :
+  Inj cohg_syntactic_eq cohg_syntactic_eq (@transpose_graph T n m).
+Proof.
+  intros cohg cohg' Heq%(f_equiv transpose_graph).
+  now rewrite 2 transpose_graph_involutive in Heq.
+Qed.
+
+
+
+
+
+Lemma transpose_add_top_loop_eq {T n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  transpose_graph (add_top_loop cohg) =
+  relabel_graph (Pmap_map {[vhd cohg.(inputs) := vhd cohg.(outputs);
+    vhd cohg.(outputs) := vhd cohg.(inputs)]})
+    (add_top_loop (transpose_graph cohg)).
+Proof.
+  unfold add_top_loop.
+  rewrite transpose_relabel_graph.
+  rewrite relabel_graph_compose.
+  cbn.
+  rewrite transpose_hg_add_vertices.
+  unfold transpose_graph; cbn.
+  apply cohg_ext.
+  - cbn.
+    rewrite 2 relabel_hg_add_vertices.
+    f_equal.
+    + apply relabel_hg_ext.
+      intros i.
+      cbn.
+      now rewrite Pmap_map_swap_fn_lookup.
+    + rewrite 2 set_map_singleton_L.
+      cbn.
+      f_equal.
+      rewrite Pmap_map_swap_fn_lookup.
+      rewrite fn_lookup_singleton, fn_lookup_singleton_r.
+      done.
+  - cbn.
+    apply Vector.map_ext.
+    intros i; cbn.
+    rewrite Pmap_map_swap_fn_lookup.
+    done.
+  - cbn.
+    apply Vector.map_ext.
+    intros i; cbn.
+    rewrite Pmap_map_swap_fn_lookup.
+    done.
+Qed.
+
+Lemma transpose_add_top_loop {T n m} (cohg : CospanHyperGraph T (S n) (S m)) :
+  isomorphic (transpose_graph (add_top_loop cohg))
+  (add_top_loop (transpose_graph cohg)).
+Proof.
+  symmetry.
+  apply isomorphic_exists.
+  eexists _, id.
+  rewrite reindex_graph_id, transpose_add_top_loop_eq.
+  split_and!; [..|done]; apply _.
+Qed.

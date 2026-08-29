@@ -2203,3 +2203,194 @@ Proof.
   rewrite 2 compose_graphs_to_compose_graphs_aux.
   now apply compose_graphs_aux_cohg_eq; do 2 f_equiv.
 Qed.
+
+
+
+
+
+(* FIXME: Move, to StackComposeRules? *)
+#[export] Instance add_top_loop_isomorphic {T n m} :
+  Proper (isomorphic ==> isomorphic) (@add_top_loop T n m).
+Proof.
+  intros cohg cohg' Hcohg.
+  induction Hcohg.
+  rewrite add_top_loop_relabel_graph, add_top_loop_reindex_graph by done.
+  now constructor.
+Qed.
+
+#[export] Instance add_top_loops_isomorphic {T k n m} :
+  Proper (isomorphic ==> isomorphic) (@add_top_loops T k n m).
+Proof.
+  intros cohg cohg' Hcohg.
+  induction k; [done|].
+  cbn.
+  apply IHk.
+  now f_equiv.
+Qed.
+
+Lemma transpose_add_top_loops {T k n m} (cohg : CospanHyperGraph T (k + n) (k + m)) :
+  isomorphic (transpose_graph (add_top_loops cohg))
+  (add_top_loops (transpose_graph cohg)).
+Proof.
+  induction k; [done|].
+  cbn.
+  rewrite IHk, transpose_add_top_loop.
+  done.
+Qed.
+
+Lemma transpose_stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') :
+  transpose_graph (stack_graphs_aux cohg cohg') =
+  stack_graphs_aux (transpose_graph cohg) (transpose_graph cohg').
+Proof.
+  apply cohg_ext; [|done..].
+  cbn.
+  rewrite transpose_hg_union.
+  done.
+Qed.
+
+Lemma transpose_stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') :
+  transpose_graph (stack_graphs cohg cohg') =
+  stack_graphs (transpose_graph cohg) (transpose_graph cohg').
+Proof.
+  unfold stack_graphs.
+  rewrite transpose_stack_graphs_aux, 2 transpose_relabel_graph, 2 transpose_reindex_graph.
+  done.
+Qed.
+
+Lemma transpose_swapped_stack_graphs_aux {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') :
+  cohg.(hyperedges) ##ₘ cohg'.(hyperedges) ->
+  transpose_graph (swapped_stack_graphs_aux cohg cohg') =
+    (swapped_stack_graphs_aux (transpose_graph cohg') (transpose_graph cohg)).
+Proof.
+  intros Hdisj.
+  apply cohg_ext; [|done..].
+  cbn.
+  rewrite transpose_hg_union.
+  apply hg_ext; [|cbn; apply union_comm_L].
+  apply map_union_comm.
+  now apply map_disjoint_fmap.
+Qed.
+
+Lemma transpose_swapped_stack_graphs_eq {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') :
+  transpose_graph (swapped_stack_graphs cohg cohg') =
+  relabel_graph (pos_elim xI xO)
+    (reindex_graph (pos_elim xI xO)
+    (swapped_stack_graphs (transpose_graph cohg') (transpose_graph cohg))).
+Proof.
+  unfold swapped_stack_graphs.
+  rewrite transpose_swapped_stack_graphs_aux by
+    (now apply map_disjoint_fmap, (kmap_inj2_disjoint _ _)).
+  rewrite 2 transpose_relabel_graph, 2 transpose_reindex_graph.
+  rewrite reindex_swapped_stack_graphs_aux by apply _.
+  rewrite relabel_swapped_stack_graphs_aux.
+  rewrite 2 reindex_relabel_graph.
+  rewrite 2 relabel_graph_compose, 2 reindex_graph_compose by apply _.
+  done.
+Qed.
+
+
+Lemma transpose_swapped_stack_graphs {T n m n' m'} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T n' m') :
+  isomorphic (transpose_graph (swapped_stack_graphs cohg cohg'))
+  ((swapped_stack_graphs (transpose_graph cohg') (transpose_graph cohg))).
+Proof.
+  symmetry.
+  rewrite transpose_swapped_stack_graphs_eq.
+  constructor; apply _.
+Qed.
+
+Lemma transpose_compose_graphs {T n m o} (cohg : CospanHyperGraph T n m)
+  (cohg' : CospanHyperGraph T m o) :
+  transpose_graph (compose_graphs cohg cohg') ≡ᵢ
+  compose_graphs (transpose_graph cohg') (transpose_graph cohg).
+Proof.
+  rewrite <- 2 compose_graphs_alt_correct.
+  rewrite transpose_add_top_loops.
+  rewrite transpose_swapped_stack_graphs.
+  done.
+Qed.
+
+Lemma transpose_id_graph {T} n : transpose_graph (@id_graph T n) =
+  id_graph n.
+Proof.
+  done.
+Qed.
+
+Lemma transpose_cup_graph {T} n : transpose_graph (@cup_graph T n) =
+  cap_graph n.
+Proof.
+  done.
+Qed.
+
+Lemma transpose_cap_graph {T} n : transpose_graph (@cap_graph T n) =
+  cup_graph n.
+Proof.
+  done.
+Qed.
+
+Lemma transpose_swap_graph_eq {T} n m : transpose_graph (@swap_graph T n m) =
+  relabel_graph (nat_map_to_pos_map (fin_inj_to_nat_inj (@fin_add_comm m n))) (swap_graph m n).
+Proof.
+  apply cohg_ext; [done|cbn; apply vec_eq; intros i; rewrite ?vlookup_map;
+  unfold nat_map_to_pos_map; rewrite pos_to_nat_pred_of_nat..];
+  (induction i as [i|i] using fin_add_inv;
+    [rewrite 2 lookup_vapp_L|rewrite 2 lookup_vapp_R]); rewrite 2 vlookup_seq;
+    cbn;
+    rewrite <- fin_to_nat_R;
+    [rewrite <- (@fin_to_nat_L m n)|rewrite <- (@fin_to_nat_L n m)..|
+    rewrite <- (@fin_to_nat_L m n)];
+    rewrite fin_inj_to_nat_inj_fin, 1?fin_add_comm_L, 1?fin_add_comm_R;
+    done.
+Qed.
+
+Lemma transpose_swap_graph {T} n m :
+  isomorphic (transpose_graph (@swap_graph T n m)) (swap_graph m n).
+Proof.
+  symmetry.
+  apply isomorphic_exists.
+  eexists _, id.
+  rewrite reindex_graph_id.
+  rewrite transpose_swap_graph_eq.
+  split_and!; [..|done]; apply _.
+Qed.
+
+Lemma transpose_graph_of_tensor_eq {T} (t : T) n m :
+  transpose_graph (graph_of_tensor t n m) =
+  relabel_graph (pos_elim xI xO) (graph_of_tensor t m n).
+Proof.
+  apply cohg_ext; [|cbn; rewrite Vector.map_map; done..].
+  cbn.
+  apply hg_ext; [|done].
+  cbn -[fmap insert].
+  rewrite 2 hyperedges_singleton.
+  rewrite 2 map_fmap_singleton.
+  f_equal.
+  cbn.
+  rewrite <- 2 list_fmap_compose.
+  done.
+Qed.
+
+Lemma transpose_graph_of_tensor {T} (t : T) n m :
+  isomorphic (transpose_graph (graph_of_tensor t n m))
+  (graph_of_tensor t m n).
+Proof.
+  symmetry.
+  apply isomorphic_exists.
+  eexists _, id.
+  rewrite reindex_graph_id.
+  rewrite transpose_graph_of_tensor_eq.
+  split_and!; [..|done]; apply _.
+Qed.
+
+Lemma compose_graphs_id_graph_r {T n m} (cohg : CospanHyperGraph T n m) : 
+  compose_graphs cohg (id_graph m) ≡ᵢ cohg.
+Proof.
+  apply (inj transpose_graph).
+  rewrite transpose_compose_graphs, transpose_id_graph.
+  now rewrite compose_graphs_id_graph_l.
+Qed.
+

@@ -2572,3 +2572,50 @@ Proof.
   unfold nat_map_to_pos_map, compose.
   now rewrite pos_to_nat_pred_of_nat.
 Qed.
+
+
+
+Lemma Pmap_map_double_lookup a b k :
+  Pmap_map {[a := b; b := a]} k =
+  if decide (a = k) then b else if decide (b = k) then a else k.
+Proof.
+  unfold Pmap_map.
+  rewrite lookup_insert_case.
+  case_decide; [done|].
+  cbn.
+  case_decide; [subst; now rewrite lookup_singleton|now rewrite lookup_singleton_ne].
+Qed.
+
+Lemma Pmap_map_swap_fn_lookup a b k :
+  Pmap_map {[a := b; b := a]} ({[a := b]} k) = {[b := a]} k.
+Proof.
+  rewrite 2 fn_lookup_singleton_case.
+  do 2 case_decide;
+  subst;
+  rewrite Pmap_map_double_lookup;
+  repeat case_decide; congruence.
+Qed.
+
+Lemma Pmap_map_swap_fn_lookup' a b k :
+  Pmap_map {[a := b; b := a]} ({[b := a]} k) = {[a := b]} k.
+Proof.
+  rewrite 2 fn_lookup_singleton_case.
+  do 2 case_decide;
+  subst;
+  rewrite Pmap_map_double_lookup;
+  repeat case_decide; congruence.
+Qed.
+
+#[export] Instance Pmap_map_swap_inj a b :
+  Inj eq eq (Pmap_map {[a := b; b := a]}).
+Proof.
+  intros i j.
+  rewrite 2 Pmap_map_double_lookup.
+  repeat case_decide; congruence.
+Qed.
+
+#[export] Instance pos_elim_xI_xO_inj :
+  Inj eq eq (pos_elim xI xO).
+Proof.
+  intros [] []; cbn; congruence.
+Qed.

@@ -453,3 +453,95 @@ Qed.
 
 End HyperGraphFacts.
 
+
+Definition transpose_hg {T} (hg : HyperGraph T) : HyperGraph T :=
+  mk_hg ((λ '(t, i, o), (t, o, i)) <$> hg.(hyperedges)) (hg.(hypervertices)).
+
+#[export] Instance transpose_hg_proper `{Equiv T} :
+  Proper (equiv ==> equiv) (@transpose_hg T).
+Proof.
+  intros hg hg' [Hhg Heq].
+  split; [|apply Heq].
+  cbn.
+  apply map_fmap_proper, Hhg.
+  intros [[t i] o] [[t' i'] o'].
+  intros Htio; split; [split|]; apply Htio.
+Qed.
+
+
+Lemma transpose_relabel_hg {T} f (hg : HyperGraph T) :
+  transpose_hg (relabel_hg f hg) = relabel_hg f (transpose_hg hg).
+Proof.
+  apply hg_ext; [|done].
+  cbn.
+  rewrite <- 2 map_fmap_compose.
+  apply map_fmap_ext.
+  intros _ [[t i] o] _.
+  done.
+Qed.
+
+Lemma transpose_reindex_hg {T} f (hg : HyperGraph T) :
+  transpose_hg (reindex_hg f hg) = reindex_hg f (transpose_hg hg).
+Proof.
+  apply hg_ext; [|done].
+  cbn.
+  rewrite kmap_fmap'.
+  done.
+Qed.
+
+Lemma transpose_hg_union {T} (hg hg' : HyperGraph T) :
+  transpose_hg (hg ∪ hg') = transpose_hg hg ∪ transpose_hg hg'.
+Proof.
+  apply hg_ext; [|done].
+  cbn.
+  apply map_fmap_union.
+Qed.
+
+Lemma transpose_hg_disj_union {T} (hg hg' : HyperGraph T) :
+  transpose_hg (hg ⊎ hg') = transpose_hg hg ⊎ transpose_hg hg'.
+Proof.
+  unfold disj_union, hypergraph_disjunion.
+  rewrite transpose_hg_union, 2 transpose_reindex_hg, 2 transpose_relabel_hg.
+  done.
+Qed.
+
+Lemma transpose_hg_add_vertices {T} (hg : HyperGraph T) v :
+  transpose_hg (hg_add_vertices hg v) = hg_add_vertices (transpose_hg hg) v.
+Proof.
+  done.
+Qed.
+
+Lemma referenced_vertices_hg_transpose {T} (hg : HyperGraph T) :
+  referenced_vertices_hg (transpose_hg hg) = referenced_vertices_hg hg.
+Proof.
+  unfold referenced_vertices_hg.
+  rewrite 2 list_to_set_bind_L.
+  f_equiv.
+  cbn.
+  rewrite map_to_list_fmap.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [k [[t i] o]] _.
+  cbn.
+  apply list_to_set_perm_L.
+  solve_Permutation.
+Qed.
+
+Lemma vertices_hg_transpose {T} (hg : HyperGraph T) :
+  vertices_hg (transpose_hg hg) = vertices_hg hg.
+Proof.
+  rewrite 2 vertices_hg_decomp.
+  f_equal.
+  now rewrite referenced_vertices_hg_transpose.
+Qed.
+
+#[export] Instance transpose_hg_involutive {T} : Involutive eq (@transpose_hg T).
+Proof.
+  intros hg.
+  apply hg_ext; [|done].
+  cbn.
+  rewrite <- map_fmap_compose.
+  rewrite <- (map_fmap_id hg.(hyperedges)) at 2.
+  apply map_fmap_ext.
+  intros _ [[t i] o] _; done.
+Qed.
