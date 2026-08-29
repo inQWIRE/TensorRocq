@@ -776,7 +776,8 @@ Ltac2 mk_MPRO_PRO_chain_prf_Monoidal (m : (int btree, int btree Monoidal, constr
 
 Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
   lazy_match! goal with
-  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) 
+    (a:=?ca) (b:=?cb) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_Monoidal_gen id) id cp) in
     let ts := CC.of_evar_ended_list id cts in
     let map_btree := parse_nat_btree_to_pos in
@@ -785,7 +786,13 @@ Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
     apply MPRO_PRO_quote_of_chain;
     let prf := mk_MPRO_PRO_chain_prf_Monoidal mp in 
-    exact $prf
+    if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
+      exact $prf
+    else
+      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      refine '($prf' $ca $cb _ _);
+      refine '(BW.bpath_of_eq' _);
+      reflexivity
   end.
 
 
@@ -839,7 +846,8 @@ Ltac2 mk_MPRO_PRO_chain_prf_SymmetricG (m : (int btree, int btree SymmetricG, co
 
 Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
   lazy_match! goal with
-  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) 
+    (a:=?ca) (b:=?cb) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_SymmetricG_gen id) id cp) in
     let ts := CC.of_evar_ended_list id cts in
     let map_btree := parse_nat_btree_to_pos in
@@ -848,7 +856,13 @@ Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
     apply MPRO_PRO_quote_of_chain;
     let prf := mk_MPRO_PRO_chain_prf_SymmetricG mp in 
-    exact $prf
+    if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
+      exact $prf
+    else
+      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      refine '($prf' $ca $cb _ _);
+      refine '(BW.bpath_of_eq' _);
+      reflexivity
   end.
 
 Ltac2 mk_MPRO_PRO_denote_SymmetricG () :=
@@ -901,7 +915,8 @@ Ltac2 mk_MPRO_PRO_chain_prf_Autonomous (m : (int btree, int btree Autonomous, co
 
 Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
   lazy_match! goal with
-  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) _ ?cp] =>
+  | [|- MPRO_PRO_quote (Struct:=_) (T:=?_cT) (interp_discrete_hg_inhab ?cts) 
+    (a:=?ca) (b:=?cb) _ ?cp] =>
     let p := once (CC.of_PRO id (CC.of_Autonomous_gen id) id cp) in
     let ts := CC.of_evar_ended_list id cts in
     let map_btree := parse_nat_btree_to_pos in
@@ -910,7 +925,13 @@ Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
     apply MPRO_PRO_quote_of_chain;
     let prf := mk_MPRO_PRO_chain_prf_Autonomous mp in 
-    exact $prf
+    if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
+      exact $prf
+    else
+      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      refine '($prf' $ca $cb _ _);
+      refine '(BW.bpath_of_eq' _);
+      reflexivity
   end.
 
 Ltac2 mk_MPRO_PRO_denote_Autonomous () :=
@@ -947,6 +968,14 @@ Definition monoidal_test_diags : list {nm & PRO Monoidal positive nm.1 nm.2} :=
     !(Passoc 1 2 1 ;; Passoc (2 + 0) 1 1)
   ].
 
+Definition monoidal_test_diag_pairs : 
+  list ({nm & PRO Monoidal positive nm.1 nm.2} * {nm & PRO Monoidal positive nm.1 nm.2}) :=
+  Eval cbn [monoidal_test_diags app] in
+  [
+    (!(Passoc 1 1 1 ;; Passoc 1 1 1), !(Pinvassoc 1 1 1 ;; Passoc 1 1 1));
+    (!(Pid 1), !(Pid 0 * Pid 1))
+  ].
+
 Definition symmetricg_test_diags : list {nm & PRO SymmetricG positive nm.1 nm.2} :=
   Eval cbn [symmetricg_test_diags app] in
   ProQuote.testing.symmetricg_test_diags ++
@@ -955,6 +984,14 @@ Definition symmetricg_test_diags : list {nm & PRO SymmetricG positive nm.1 nm.2}
     !(Passoc 1 2 1 ;; Passoc (2 + 0) 1 1);
     !(Passoc 1 1 1 ;; Passoc 1 1 1 ;; Pswap 1 1 * Pid 1);
     !(Passoc 2 1 1 ;; Passoc 2 1 1 ;; Pswap 2 2 * Pid 0)
+  ].
+
+Definition symmetricg_test_diag_pairs : 
+  list ({nm & PRO SymmetricG positive nm.1 nm.2} * {nm & PRO SymmetricG positive nm.1 nm.2}) :=
+  Eval cbn [monoidal_test_diags app] in
+  [
+    (!(Passoc 1 1 1 ;; Passoc 1 1 1), !(Pinvassoc 1 1 1 ;; Passoc 1 1 1));
+    (!(Pid 1), !(Pid 0 * Pid 1))
   ].
 
 Definition autonomous_test_diags : list {nm & PRO Autonomous positive nm.1 nm.2} :=
@@ -967,6 +1004,14 @@ Definition autonomous_test_diags : list {nm & PRO Autonomous positive nm.1 nm.2}
     !(Passoc 2 1 1 ;; Passoc 2 1 1 ;; Pswap 2 2 * Pid 0);
     !(Passoc 2 1 1 ;; Passoc 2 1 1 ;; Pswap 2 2 * Pid 0 ;; Pcap 2);
     !(Pcup 2 ;; Passoc 2 1 1 ;; Passoc 2 1 1 ;; Pswap 2 2 * Pid 0 ;; Pcap 2)
+  ].
+
+Definition autonomous_test_diag_pairs : 
+  list ({nm & PRO Autonomous positive nm.1 nm.2} * {nm & PRO Autonomous positive nm.1 nm.2}) :=
+  Eval cbn [monoidal_test_diags app] in
+  [
+    (!(Passoc 1 1 1 ;; Passoc 1 1 1), !(Pinvassoc 1 1 1 ;; Passoc 1 1 1));
+    (!(Pid 1), !(Pid 0 * Pid 1))
   ].
 
 Ltac2 monoidal_roundtrip_test l (cm : constr) :=
@@ -985,6 +1030,24 @@ Ltac2 monoidal_roundtrip_test l (cm : constr) :=
 
   ) (Ltac1.of_ident l) (Ltac1.of_constr cm).
 
+Ltac2 monoidal_roundtrip_test_pairs l (cm : constr) (cm' : constr) :=
+  ltac1:(l cm cm' |-
+
+  let lv := eval unfold l in l in
+  let a := mk_evar (BW.btree positive) in
+  let b := mk_evar (BW.btree positive) in
+  eassert (Hq : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm :> PRO Monoidal positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_Monoidal());
+  eassert (Hq' : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm' :> PRO Monoidal positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_Monoidal());
+  clear Hq Hq'
+
+  ) (Ltac1.of_ident l) (Ltac1.of_constr cm) (Ltac1.of_constr cm').
+
 Ltac2 symmetricg_roundtrip_test l (cm : constr) :=
   ltac1:(l cm |-
 
@@ -999,6 +1062,24 @@ Ltac2 symmetricg_roundtrip_test l (cm : constr) :=
   end
 
   ) (Ltac1.of_ident l) (Ltac1.of_constr cm).
+
+Ltac2 symmetricg_roundtrip_test_pairs l (cm : constr) (cm' : constr) :=
+  ltac1:(l cm cm' |-
+
+  let lv := eval unfold l in l in
+  let a := mk_evar (BW.btree positive) in
+  let b := mk_evar (BW.btree positive) in
+  eassert (Hq : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm :> PRO SymmetricG positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_SymmetricG());
+  eassert (Hq' : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm' :> PRO SymmetricG positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_SymmetricG());
+  clear Hq Hq'
+
+  ) (Ltac1.of_ident l) (Ltac1.of_constr cm) (Ltac1.of_constr cm').
 
 Ltac2 autonomous_roundtrip_test l (cm : constr) :=
   ltac1:(l cm |-
@@ -1015,6 +1096,24 @@ Ltac2 autonomous_roundtrip_test l (cm : constr) :=
 
   ) (Ltac1.of_ident l) (Ltac1.of_constr cm).
 
+Ltac2 autonomous_roundtrip_test_pairs l (cm : constr) (cm' : constr) :=
+  ltac1:(l cm cm' |-
+
+  let lv := eval unfold l in l in
+  let a := mk_evar (BW.btree positive) in
+  let b := mk_evar (BW.btree positive) in
+  eassert (Hq : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm :> PRO Autonomous positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_Autonomous());
+  eassert (Hq' : MPRO_PRO_quote (interp_discrete_hg_inhab lv) 
+    (a:=a) (b:=b) _
+    (cm' :> PRO Autonomous positive _ _))
+      by ltac2:(mk_MPRO_PRO_quote_Autonomous());
+  clear Hq Hq'
+
+  ) (Ltac1.of_ident l) (Ltac1.of_constr cm) (Ltac1.of_constr cm').
+
 Goal forall (n m o p : nat), True.
 intros n m o p.
 Proof Mode "Classic".
@@ -1030,8 +1129,18 @@ let cmon := CC.of_list (of_bundled id) 'monoidal_test_diags in
 List.iter (monoidal_roundtrip_test @l) cmon).
 
 ltac2:(
+let cmon := CC.of_list (CC.of_pair (of_bundled id) (of_bundled id)) 
+  'monoidal_test_diag_pairs in
+List.iter (fun (cm, cm') => monoidal_roundtrip_test_pairs @l cm cm') cmon).
+
+ltac2:(
 let cmon := CC.of_list (of_bundled id) 'symmetricg_test_diags in
 List.iter (symmetricg_roundtrip_test @l) cmon).
+
+ltac2:(
+let cmon := CC.of_list (CC.of_pair (of_bundled id) (of_bundled id)) 
+  'symmetricg_test_diag_pairs in
+List.iter (fun (cm, cm') => symmetricg_roundtrip_test_pairs @l cm cm') cmon).
 
 ltac2:(monoidal_roundtrip_test @l constr:((Passoc 1 1 n ;; Passoc 1 1 n :> PRO Monoidal positive _ _))).
 
@@ -1040,6 +1149,11 @@ ltac2:(monoidal_roundtrip_test @l constr:((Passoc 1 1 n ;; Passoc 1 1 n :> PRO M
 ltac2:(
 let cmon := CC.of_list (of_bundled id) 'autonomous_test_diags in
 List.iter ((autonomous_roundtrip_test @l)) cmon).
+
+ltac2:(
+let cmon := CC.of_list (CC.of_pair (of_bundled id) (of_bundled id)) 
+  'autonomous_test_diag_pairs in
+List.iter (fun (cm, cm') => autonomous_roundtrip_test_pairs @l cm cm') cmon).
 
 
 
