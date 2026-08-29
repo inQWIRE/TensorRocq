@@ -422,7 +422,7 @@ Ltac2 is_nat_const (c : constr) :=
     | _ =>
       let c' := Std.eval_hnf c in
       if Constr.equal c c' then false
-      else go c
+      else go c'
     end in
   go c.
 
