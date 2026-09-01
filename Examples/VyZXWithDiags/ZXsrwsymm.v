@@ -17,6 +17,7 @@ From TensorRocq Require SizedProQuote. (* For visualization *)
 
 
 
+From TensorRocqEx Require Export NonZXAux.
 
 From TensorRocqEx Require Export ZXrwsymm.
 
@@ -145,7 +146,7 @@ Lemma zx_quote_symm_cast_nwire_bpath_infix_prf {f : positive -> nat}
   {l r mid mid' : btree positive}
   (Ha : btree_elems a = (l + mid + r)%btree)
   (Hb : btree_elems b = (l + mid' + r)%btree)
-  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
   btree_size f mid = btree_size f mid'.
 Proof.
   apply (f_equal (sum_list_with f)) in Ha, Hb.
@@ -160,14 +161,14 @@ Lemma zx_quote_symm_cast_nwire_bpath_infix (f : positive -> nat)
   (Ha : btree_elems a = (l + mid + r)%btree)
   (Hb : btree_elems b = (l + mid' + r)%btree)
   {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
-  Quote (cast _ _ Han Hbn (n_wire n)) 
-  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+  Quote (cast _ _ Han Hbn (n_wire n))
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha))
     :> PRO _ _ (btree_size f a) (btree_size f l + btree_size f mid + btree_size f r)) ;;
-   Pid (btree_size f l) * 
-   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
-    (cast _ _ (Canonize.canonize 
-      (zx_quote_symm_cast_nwire_bpath_infix_prf Ha Hb Han Hbn)) 
-      eq_refl (n_wire _)))) * Pid (btree_size f r) ;; 
+   Pid (btree_size f l) *
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram
+    (cast _ _ (Canonize.canonize
+      (zx_quote_symm_cast_nwire_bpath_infix_prf Ha Hb Han Hbn))
+      eq_refl (n_wire _)))) * Pid (btree_size f r) ;;
    MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
 Proof.
   eapply DiagramQuote_proper_equiv; [|done|]. 2:{
@@ -192,7 +193,7 @@ Lemma zx_quote_symm_cast_nwire_bpath_prefix_prf {f : positive -> nat}
   {l mid mid' : btree positive}
   (Ha : btree_elems a = (l + mid)%btree)
   (Hb : btree_elems b = (l + mid')%btree)
-  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
   btree_size f mid = btree_size f mid'.
 Proof.
   apply (f_equal (sum_list_with f)) in Ha, Hb.
@@ -207,14 +208,14 @@ Lemma zx_quote_symm_cast_nwire_bpath_prefix (f : positive -> nat)
   (Ha : btree_elems a = (l + mid)%btree)
   (Hb : btree_elems b = (l + mid')%btree)
   {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
-  Quote (cast _ _ Han Hbn (n_wire n)) 
-  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+  Quote (cast _ _ Han Hbn (n_wire n))
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha))
     :> PRO _ _ (btree_size f a) (btree_size f l + btree_size f mid)) ;;
-   Pid (btree_size f l) * 
-   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
-    (cast _ _ (Canonize.canonize 
-      (zx_quote_symm_cast_nwire_bpath_prefix_prf Ha Hb Han Hbn)) 
-      eq_refl (n_wire _)))) ;; 
+   Pid (btree_size f l) *
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram
+    (cast _ _ (Canonize.canonize
+      (zx_quote_symm_cast_nwire_bpath_prefix_prf Ha Hb Han Hbn))
+      eq_refl (n_wire _)))) ;;
    MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
 Proof.
   eapply DiagramQuote_proper_equiv; [|done|]. 2:{
@@ -239,7 +240,7 @@ Lemma zx_quote_symm_cast_nwire_bpath_suffix_prf {f : positive -> nat}
   {r mid mid' : btree positive}
   (Ha : btree_elems a = (mid + r)%btree)
   (Hb : btree_elems b = (mid' + r)%btree)
-  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
   btree_size f mid = btree_size f mid'.
 Proof.
   apply (f_equal (sum_list_with f)) in Ha, Hb.
@@ -254,13 +255,13 @@ Lemma zx_quote_symm_cast_nwire_bpath_suffix (f : positive -> nat)
   (Ha : btree_elems a = (mid + r)%btree)
   (Hb : btree_elems b = (mid' + r)%btree)
   {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
-  Quote (cast _ _ Han Hbn (n_wire n)) 
-  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+  Quote (cast _ _ Han Hbn (n_wire n))
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha))
     :> PRO _ _ (btree_size f a) (btree_size f mid + btree_size f r)) ;;
-   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
-    (cast _ _ (Canonize.canonize 
-      (zx_quote_symm_cast_nwire_bpath_suffix_prf Ha Hb Han Hbn)) 
-      eq_refl (n_wire _)))) * Pid (btree_size f r) ;; 
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram
+    (cast _ _ (Canonize.canonize
+      (zx_quote_symm_cast_nwire_bpath_suffix_prf Ha Hb Han Hbn))
+      eq_refl (n_wire _)))) * Pid (btree_size f r) ;;
    MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
 Proof.
   eapply DiagramQuote_proper_equiv; [|done|]. 2:{
@@ -279,7 +280,7 @@ Proof.
   cast_irrelevance.
 Qed.
 
-Lemma zx_quote_symm_cast_n_wire_id {n k} (Hn Hm : n = k) : 
+Lemma zx_quote_symm_cast_n_wire_id {n k} (Hn Hm : n = k) :
   Quote (cast _ _ Hn Hm (n_wire k)) (Pid n).
 Proof.
   rewrite cast_n_wire.
@@ -318,9 +319,9 @@ Ltac2 greatest_prefix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) : 'a 
     | [], [] => ([], [], [])
     | _ :: _, [] => ([], l, [])
     | [], _ :: _ => ([], [], r)
-    | a :: l', b :: r' => 
-      if eqa a b then 
-        let (pref, l'', r'') := go l' r' in 
+    | a :: l', b :: r' =>
+      if eqa a b then
+        let (pref, l'', r'') := go l' r' in
         (a :: pref, l'', r'')
       else
         ([], l, r)
@@ -328,21 +329,21 @@ Ltac2 greatest_prefix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) : 'a 
   in go l r.
 
 Ltac2 greatest_suffix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) :=
-  let (revpref, revl, revr) := greatest_prefix eqa (List.rev l) (List.rev r) in 
+  let (revpref, revl, revr) := greatest_prefix eqa (List.rev l) (List.rev r) in
   (List.rev revpref, List.rev revl, List.rev revr).
 
-Ltac2 greatest_common_prefix_suffix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) : 
+Ltac2 greatest_common_prefix_suffix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) :
   'a list * 'a list * 'a list * 'a list :=
-  let (pref, l', r') := greatest_prefix eqa l r in 
-  let (suff, l'', r'') := greatest_suffix eqa l' r' in 
+  let (pref, l', r') := greatest_prefix eqa l r in
+  let (suff, l'', r'') := greatest_suffix eqa l' r' in
   (pref, suff, l'', r'').
 
 Ltac2 btree_of_list' (l : 'a list) : 'a btree :=
   let rec go acc l :=
-    match l with 
+    match l with
     | [] => acc
     | a :: l => go (Bnode acc (Bleaf a)) l
-    end in 
+    end in
   match l with
   | [] => Bempty
   | a :: l => go (Bleaf a) l
@@ -359,19 +360,19 @@ Ltac2 solve_zx_symm_quote_cast_n_wire_monoidal () : unit :=
     let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
     let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
     let ccs := CC.mk_list_typed 'nat cs in
-    let bn_elems := btree_elems bn in 
-    let bm_elems := btree_elems bm in 
+    let bn_elems := btree_elems bn in
+    let bm_elems := btree_elems bm in
     if List.equal Int.equal bn_elems bm_elems then
       refine constr:(zx_quote_symm_cast_nwire_bpath (interp_discrete_hg_inhab $ccs)
         $cbn $cbm eq_refl $hn $hm)
     else
-      let (pref, suff, mid, mid') := 
-        greatest_common_prefix_suffix Int.equal bn_elems bm_elems in 
-      let cbpref := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' pref) in 
-      let cbsuff := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' suff) in 
-      let cbmid := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid) in 
-      let cbmid' := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid') in 
-      match pref, suff with 
+      let (pref, suff, mid, mid') :=
+        greatest_common_prefix_suffix Int.equal bn_elems bm_elems in
+      let cbpref := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' pref) in
+      let cbsuff := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' suff) in
+      let cbmid := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid) in
+      let cbmid' := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid') in
+      match pref, suff with
       | _::_, _::_ =>
         refine constr:(zx_quote_symm_cast_nwire_bpath_infix (interp_discrete_hg_inhab $ccs)
           $cbn $cbm $cbpref $cbsuff $cbmid $cbmid' eq_refl eq_refl
@@ -398,29 +399,13 @@ Ltac2 solve_zx_symm_quote_cast_n_wire_monoidal () : unit :=
         | (?m + ?n, ?o + ?n) =>
           apply (@zx_quote_symm_cast_n_wire_add_r $n $m $o);
           go constr:(pair $m $o)
-        | _ => 
+        | _ =>
           apply ZXsymm.zx_quote_symm_cast_n_wire
-        end in 
+        end in
       go constr:(pair $n $m) *)
   end.
 
 End QuoteCast.
-
-(* FIXME: Move, and ideally improve to take reductions? *)
-Tactic Notation "cbn_eval" uconstr(pat) :=
-  let x := fresh "x" in
-  let Hx := fresh "Hx" in
-  remember pat as x eqn:Hx in *;
-  cbn in Hx;
-  subst x.
-
-Tactic Notation "cbn_eval" uconstr(pat) "in" 
-  ne_hyp_list_sep(H, ",") :=
-  let x := fresh "x" in
-  let Hx := fresh "Hx" in
-  remember pat as x eqn:Hx in H;
-  cbn in Hx;
-  subst x.
 
 Ltac do_cast_MPRO_simpl_flag := fail.
 
@@ -430,7 +415,7 @@ Ltac zx_symm_quote_n_wire_cast_tac_monoidal :=
       (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
     tryif timeout 1 (unify n m) then
       exact (zx_quote_symm_cast_n_wire_id hn hm)
-    else 
+    else
       let Hprf := fresh "Hprf" in
       let quote := match goal with |- ?R _ _ => R end in
       eassert (Hprf : quote (cast n m hn hm (n_wire k)) _) by ltac2:(QuoteCast.solve_zx_symm_quote_cast_n_wire_monoidal());
@@ -441,7 +426,7 @@ Ltac zx_symm_quote_n_wire_cast_tac_monoidal :=
           cbn_eval (MPRO_to_PRO _ _) in Hprf
         end
         else idtac;
-      lazy [btree_size interp_discrete_hg_inhab list_pth list_drop_pos head tail] in Hprf;
+      lazy [btree_size interp_discrete_hg_inhab list_pth list_drop_pos head tail btree_elems btree_of_list_rassoc] in Hprf;
       exact Hprf
   end.
 
@@ -466,7 +451,7 @@ Proof.
   (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
     tryif timeout 1 (unify n m) then
       exact (zx_quote_symm_cast_n_wire_id hn hm)
-    else 
+    else
       let Hprf := fresh "Hprf" in
       let quote := match goal with |- ?R _ _ => R end in
       eassert (Hprf : quote (cast n m hn hm (n_wire k)) _) by ltac2:(QuoteCast.solve_zx_symm_quote_cast_n_wire_monoidal());
@@ -494,9 +479,9 @@ Proof.
   apply _.
   Import Ltac2.
   lazy [btree_size interp_discrete_hg_inhab list_pth list_drop_pos head tail] in Hprf |- *.
-  ltac2:(let hprf := Fresh.fresh (Fresh.Free.of_goal()) @hprf in 
-  let goal := Control.goal() in 
-  Std.assert (Std.AssertType 
+  ltac2:(let hprf := Fresh.fresh (Fresh.Free.of_goal()) @hprf in
+  let goal := Control.goal() in
+  Std.assert (Std.AssertType
     (Some (Std.IntroNaming (Std.IntroIdentifier hprf))) goal None)).
   assert (hprf : $goal)). assert (Hprf : )
 
@@ -535,9 +520,9 @@ Proof.
         | (?m + ?n, ?o + ?n) =>
           apply (@zx_quote_symm_cast_n_wire_add_r $n $m $o);
           go constr:(pair $m $o)
-        | _ => 
+        | _ =>
           apply ZXsymm.zx_quote_symm_cast_n_wire
-        end in 
+        end in
       go constr:(pair $n $m)
   end.
   Set Typeclasses Debug.
@@ -606,33 +591,46 @@ Ltac zxpscat_old :=
   | |- _ => fail "(zxspcat) Unexpected goal when trying to compute isomorphism test! Please report this unexpected error."
   end|fail "(zxspcat) Unexpected additional goal! Please report this unexpected error."..].
 
-Ltac zxpscat :=
-
-  let Hrw := fresh "Hrw" in
+Ltac zxpscat_setup Hrw le :=
   time? "zxpscat setup tactic" specialize (zxpscat_casted_lemma) as Hrw;
-
-  let le := fresh "le" in evar (le : list ZXDVERT);
   let lev := eval unfold le in le in
-  specialize (Hrw (interp_discrete_hg_inhab lev));
+  specialize (Hrw (interp_discrete_hg_inhab lev)).
+
+Ltac zxpscat_parse Hrw :=
   lazymatch goal with
   | |- ?R ?dlhs ?drhs =>
     specialize (Hrw _ _ dlhs drhs)
   | |- ?G => fail "cannot recognize goal as the application of a relation: " G
-  end;
-  time? "zxpscat quote to PRO" (epose proof (Hrw _ _) as Hrw;
-  do 2 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Timed out trying to quote goal! Have you declared all necessary instances?"));
-  time? "zxpscat quote to positive PRO" (epose proof (Hrw _ _) as Hrw;
-  do 2 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error.")); (* TODO: maybe replace with just tactic? *)
-  let ln := fresh "ln" in evar (ln : list nat);
-  let lnv := eval unfold ln in ln in
-  specialize (Hrw (interp_discrete_hg_inhab lnv));
-  time? "zxpscat quote to MPRO" (epose proof (Hrw _ _ _ _ _ _) as Hrw;
-  (do 2 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error."));
-  do 2 (specialize (Hrw eq_refl)));
+  end.
 
+Ltac zxpscat_quote_tac :=
+  zx_symm_simplify_quote_tac; typeclasses eauto.
+
+Ltac zxpscat_quote Hrw :=
+  time? "zxpscat quote to PRO" (epose proof (Hrw _ _) as Hrw;
+  do 2 (tryif timeout 3 (tspecialize Hrw by zxpscat_quote_tac) then idtac
+    else fail "Timed out trying to quote goal! Have you declared all necessary instances?")).
+
+Ltac zxpscat_to_pos_tac :=
+  typeclasses eauto.
+
+Ltac zxpscat_to_pos Hrw :=
+  time? "zxpscat quote to positive PRO" (epose proof (Hrw _ _) as Hrw;
+  do 2 (tryif timeout 3 (tspecialize Hrw by zxpscat_to_pos_tac) then idtac
+    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error.")).
+
+Ltac zxpscat_to_sized_tac :=
+  typeclasses eauto.
+
+Ltac zxpscat_to_sized Hrw ln :=
+  let lnv := eval unfold ln in ln in
+  specialize (Hrw (@interp_discrete_hg_inhab _ Nat.inhabited lnv));
+  time? "zxpscat quote to MPRO" (epose proof (Hrw _ _ _ _ _ _) as Hrw;
+  (do 2 (tryif timeout 3 (tspecialize Hrw by zxpscat_to_sized_tac) then idtac
+    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error."));
+  do 2 (specialize (Hrw eq_refl))).
+
+Ltac zxpscat_final Hrw ln le :=
   close_evar_ended_list ln; close_evar_ended_list le;
   time? "zxpscat refine (quick)" notypeclasses refine (Hrw _);
   [
@@ -649,17 +647,28 @@ Ltac zxpscat :=
   | |- _ => fail "(zxspcat) Unexpected goal when trying to compute isomorphism test! Please report this unexpected error."
   end|fail "(zxspcat) Unexpected additional goal! Please report this unexpected error."..].
 
-
-
-Ltac zxpsrw_lhs lem match_number :=
+Ltac zxpscat :=
 
   let Hrw := fresh "Hrw" in
-  time? "zxpsrw_lhs setup tactic" specialize (zxpsrw_lhs_lemma) as Hrw;
-
   let le := fresh "le" in evar (le : list ZXDVERT);
-  let lev := eval unfold le in le in
-  specialize (Hrw (interp_discrete_hg_inhab lev));
+  zxpscat_setup Hrw le;
+  zxpscat_parse Hrw;
+  zxpscat_quote Hrw;
+  zxpscat_to_pos Hrw;
 
+  let ln := fresh "ln" in evar (ln : list nat);
+  zxpscat_to_sized Hrw ln;
+
+  zxpscat_final Hrw ln le.
+
+
+Ltac zxpsrw_lhs_setup Hrw le :=
+  time? "zxpsrw_lhs setup tactic" specialize (zxpsrw_lhs_lemma) as Hrw;
+  let lev := eval unfold le in le in
+  specialize (Hrw (interp_discrete_hg_inhab lev)).
+
+Ltac zxpsrw_lhs_parse Hrw lem match_number :=
+  time? "zxpsrw_lhs_parse" (
   let lemT := type of lem in
   lazymatch lemT with
   | ?R ?dlhs ?drhs =>
@@ -676,55 +685,105 @@ Ltac zxpsrw_lhs lem match_number :=
   end;
 
   specialize (Hrw match_number);
-  specialize (Hrw lem);
+  specialize (Hrw lem)).
 
-  epose proof (Hrw _ _ _) as Hrw;
+Ltac zxpsrw_lhs_quote_tac :=
+  zx_symm_simplify_quote_tac; typeclasses eauto.
+
+Ltac zxpsrw_lhs_quotes Hrw :=
+
+  time? "zxpsrw_lhs setup quote lem/goal" (
+    epose proof (Hrw _ _ _) as Hrw);
 
   time? "zxpsrw_lhs quote lem to PRO" (
-  do 2 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
+  do 2 (tryif timeout 2 (tspecialize Hrw by zxpsrw_lhs_quote_tac) then idtac
     else fail "Timed out trying to quote lemma! Have you declared all necessary instances?"));
   time? "zxpsrw_lhs quote goal to PRO" (
-  do 1 (tryif timeout 2 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Timed out trying to quote goal! Have you declared all necessary instances?"));
+  do 1 (tryif timeout 2 (tspecialize Hrw by zxpsrw_lhs_quote_tac) then idtac
+    else fail "Timed out trying to quote goal! Have you declared all necessary instances?")).
+
+Ltac zxpsrw_lhs_to_pos_tac :=
+  typeclasses eauto.
+
+Ltac zxpsrw_lhs_to_pos Hrw :=
 
   time? "zxpsrw_lhs quote to positive PRO" (epose proof (Hrw _ _ _) as Hrw;
-  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error.")); (* TODO: maybe replace with just tactic? *)
+  do 3 (tryif timeout 3 (tspecialize Hrw by zxpsrw_lhs_to_pos_tac) then idtac
+    else fail "Failed to perform PRO quotation (to convert to computational domain)! Please report this unexpected error."); (* TODO: maybe replace with just tactic? *)
 
-  let ln := fresh "ln" in evar (ln : list nat);
+  lazy [btree_size list_pth list_drop_pos head tail btree_elems btree_of_list_rassoc] in Hrw).
+
+
+Ltac zxpsrw_lhs_to_sized_tac :=
+  typeclasses eauto.
+
+Ltac zxpsrw_lhs_to_sized Hrw ln :=
   let lnv := eval unfold ln in ln in
-  specialize (Hrw (interp_discrete_hg_inhab lnv));
+  specialize (Hrw (@interp_discrete_hg_inhab _ Nat.inhabited lnv));
+  time? "zxpsrw_lhs quote PRO to MPRO" (
   epose proof (Hrw _ _ _ _   _ _ _) as Hrw;
-  do 3 (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.");
+  do 3 (tryif timeout 3 (tspecialize Hrw by zxpsrw_lhs_to_sized_tac) then idtac
+    else fail "Failed interpreting PRO as a sized MPRO! Please report this unexpected error.")).
 
-  (* specialize_with_concr_asgn_list Hrw lnv;
-  time? "zxpsrw_lhs prove correctness of concrete assignment" (
-    tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac
-    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error"); *)
 
+Ltac zxpsrw_lhs_compute Hrw :=
   epose proof (Hrw _) as Hrw;
   time? "zxpsrw_lhs compute rewrite" (tspecialize Hrw; [vm_compute;
     lazymatch goal with
     | |- ?R (Some _) (Some _) => reflexivity
     | |- ?R None _ => fail "could not find the specified rewrite!"
     end
-    | ]);
+    | ]).
 
+Ltac zxpsrw_lhs_from_sized_tac :=
+  typeclasses eauto.
+
+Ltac zxpsrw_lhs_from_sized Hrw :=
   time? "zxpsrw_lhs MPRO to PRO" (epose proof (Hrw _) as Hrw;
-  (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac
-    else fail "Failed interpreting resulting sized MPRO as a PRO! Please report this unexpected error."));
+  (tryif timeout 3 (tspecialize Hrw by zxpsrw_lhs_from_sized_tac) then idtac
+    else fail "Failed interpreting resulting sized MPRO as a PRO! Please report this unexpected error.")).
 
+Ltac zxpsrw_lhs_from_pos_tac :=
+  typeclasses eauto.
+
+Ltac zxpsrw_lhs_from_pos Hrw :=
   time? "zxpsrw_lhs denote from positive PRO" (epose proof (Hrw _) as Hrw;
-  (tryif timeout 3 (tspecialize Hrw by typeclasses eauto) then idtac else
-    fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this."));
+  (tryif timeout 3 (tspecialize Hrw by zxpsrw_lhs_from_pos_tac) then idtac else
+    fail "Failed to perform PRO unquotation (to convert from computational domain)! Please report this.")).
 
+Ltac zxpsrw_lhs_denote_tac :=
+  zx_symm_simplify_denote_tac; typeclasses eauto.
+
+Ltac zxpsrw_lhs_denote Hrw :=
   time? "zxpsrw_lhs denote PRO to goal" (epose proof (Hrw _) as Hrw;
   (tryif timeout 10 (tspecialize Hrw by typeclasses eauto) then idtac else
-    fail "Timed out trying to denote result! Have you declared all necessary instances?"));
+    fail "Timed out trying to denote result! Have you declared all necessary instances?")).
+
+Ltac zxpsrw_lhs_final Hrw le ln :=
+  time? "zxpsrw_lhs cleanup and apply" (
   close_evar_ended_list le; close_evar_ended_list ln;
   subst le ln;
-  etransitivity; [apply Hrw|clear Hrw].
+  etransitivity; [apply Hrw|clear Hrw]).
+
+Ltac zxpsrw_lhs lem match_number :=
+
+  let Hrw := fresh "Hrw" in
+  let le := fresh "le" in evar (le : list ZXDVERT);
+  zxpsrw_lhs_setup Hrw le;
+  zxpsrw_lhs_parse Hrw lem match_number;
+  zxpsrw_lhs_quotes Hrw;
+  zxpsrw_lhs_to_pos Hrw;
+  let ln := fresh "ln" in evar (ln : list nat);
+  zxpsrw_lhs_to_sized Hrw ln;
+  (* specialize_with_concr_asgn_list Hrw lnv;
+  time? "zxpsrw_lhs prove correctness of concrete assignment" (
+    tryif (timeout 1 (tspecialize Hrw by compute_done)) then idtac
+    else fail "Failed to prove concrete assignment map correct! Please report this unexpected error"); *)
+  zxpsrw_lhs_compute Hrw;
+  zxpsrw_lhs_from_sized Hrw;
+  zxpsrw_lhs_from_pos Hrw;
+  zxpsrw_lhs_denote Hrw;
+  zxpsrw_lhs_final Hrw le ln.
 
 
 Ltac zxpsrw_rhs lem match_number :=
@@ -792,10 +851,7 @@ Lemma parametric_stack_associativity_example {n m o p} {α β γ} :
   Z n m α ⟷ X m (o + (n + m)) β ⟷ (Z o p γ ↕ (Z n p γ ↕ Z m p γ)) ⟷
     X _ n α.
 Proof.
-  (* Ltac enable_timing ::= idtac. *)
-  (* idtac "--------------------------------------". *)
-
-  Time zxpscat.
+  zxpscat.
 Qed.
 
 Lemma Z_absolute_fusion' {n m o} (α β : R) : m <> O ->
@@ -817,7 +873,6 @@ Proof.
   - apply Z_spider_1_1_fusion.
   - rewrite grow_Z_top_right, grow_Z_top_left.
     zxpsrw (Z_1_2_1_fusion 0 0).
-    rewrite Rplus_0_l.
     zxpsrw IHm.
     zxpscat.
 Qed.
@@ -830,6 +885,7 @@ Lemma parametric_rewriting_example {n m o p : nat} {α β γ : R} : m <> 0 -> n 
   Z (p + (n + m)) p 0 ∝= Z _ _ 0.
 Proof.
   intros Hm Hn.
+  zxpsrw_lhs (@Z_absolute_fusion' m n m α α Hn).
 
 
   (* TODO: Investigate parameter matching like this:
@@ -850,7 +906,6 @@ Proof.
 
 
   (* TODO: etc... let lem := lem *)
-  zxpsrw_lhs (@Z_absolute_fusion' m n m α α Hn).
 Abort.
 
 

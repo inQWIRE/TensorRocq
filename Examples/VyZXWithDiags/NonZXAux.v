@@ -1,29 +1,10 @@
 From VyZX Require Export ZXRules ZXpermFacts CoreRules DiagramRules GateRules.
 
-From TensorRocqEx Require Export VyZXTensor.
-From TensorRocq Require Import ProLike PropGraphTerm.
+From TensorRocq Require Import BW.
 
-
-From TensorRocqEx Require Import Rmodeq.
-
-From TensorRocqEx Require Import VyZXExample_withdiags.
-
-
-Import ZXsymm ZXauto ZXfrob.
-
-
-Import ZXmsymm.
-  Import SizedProQuote.
-  Import SizedRewriting SizedProLike.
-  Import SizedPropsGraphs PropsGraphs.
-
-Import BW.
-
-Import ComposeRules.
+From stdpp Require Import tactics.
 
 Open Scope nat_scope.
-
-Ltac visualize_flag ::= fail.
 
 
 Module GeneratorNotations.
@@ -41,16 +22,13 @@ Notation "'H'" := ((inl None :> ZXDVERT)) (only printing, at level 1).
 Notation "'[' zx ']'" := ((inr (existT _ zx%ZX) :> ZXDVERT)) (only printing, at level 0).
 Notation "'[' zx ']'" := ((inr (bundleDiagram zx%ZX) :> ZXDVERT)) (only printing, at level 0). *)
 
-Export GeneratorNotations.
+(* Export GeneratorNotations. *)
 
 Notation "n ≃ m" := (cast n%nat m%nat _ _ (n_wire _)) (only printing, at level 70).
 
 End GeneratorNotations.
 
 Import GeneratorNotations.
-
-(* FIXME: Move *)
-Hint Opaque zx_mid_comm zx_mul_S_r zx_mul_comm : typeclass_instances.
 
 
 
@@ -165,6 +143,16 @@ Qed.
 
 
 
+From TensorRocq Require Import BW BWSized.
+
+(* FIXME: Move *)
+Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
+  btree_size f a = btree_size f b.
+Proof.
+  rewrite <- 2 sum_list_with_btree_elems.
+  f_equal.
+  now apply btree_elems_bpath in p.
+Qed.
 
 Lemma btree_size_const_1 {A} {n : btree A} :
   btree_size (λ _, 1) n = bsize n.

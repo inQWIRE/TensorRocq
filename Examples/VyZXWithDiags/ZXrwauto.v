@@ -208,16 +208,26 @@ Proof.
   cast_irrelevance.
 Qed.
 
-#[export] Instance zx_quote_auto_Z n m α :
-  Quote (Z n m α) (Pgen n m (inl (Some (inl (false, α))))) | 1.
+#[export] Instance zx_quote_auto_Z n m α α' : Rsimpl_modeq_2PI α α' ->
+  Quote (Z n m α) (Pgen n m (inl (Some (inl (false, α'))))) | 1.
 Proof.
-  constructor; done.
+  intros Hα.
+  constructor.
+  cbn.
+  f_equiv.
+  apply Z_Rmodeq_2PI.
+  symmetry; apply Hα.
 Qed.
 
-#[export] Instance zx_quote_auto_X n m α :
-  Quote (X n m α) (Pgen n m (inl (Some (inl (true, α))))) | 1.
+#[export] Instance zx_quote_auto_X n m α α' : Rsimpl_modeq_2PI α α' ->
+  Quote (X n m α) (Pgen n m (inl (Some (inl (true, α'))))) | 1.
 Proof.
-  constructor; done.
+  intros Hα.
+  constructor.
+  cbn.
+  f_equiv.
+  apply X_Rmodeq_2PI.
+  symmetry; apply Hα.
 Qed.
 
 
@@ -872,7 +882,6 @@ Theorem hopf_rule_Z_X :
 Proof.
   apply prop_by_iff_zx_scale.
   split; [|intros ?%(f_equal fst); cbn in *; lra].
-  zxaviz.
   rewrite <- (@nwire_removal_r 2).
   cbv delta [n_wire]; simpl.
   rewrite stack_empty_r_fwd.
@@ -882,9 +891,9 @@ Proof.
   rewrite cup_X.
   replace (0%R) with (0 + 0)%R by lra.
   zxarw_lhs (symmetry (@Z_spider_1_1_fusion 0 2 0 0)).
+  replace (0%R) with (0 + 0)%R by lra.
 
   rewrite <- X_spider_1_1_fusion.
-  replace (0 + 0)%R with 0%R by lra.
 
   zxarw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)).
 
@@ -902,9 +911,7 @@ Proof.
 
   rewrite <- Z_0_is_wire at 1.
   zxarw (symmetry (@Z_add_l 0 1 0 0 0 0)) at 0 quotient 0.
-  rewrite 2 Rplus_0_r.
   zxarw (@Z_spider_1_1_fusion 0 2 0 0).
-  rewrite Rplus_0_r.
   zxarw (cup_pullthrough_top (X 1 0 0) —).
   rewrite 2 zx_of_const_to_scaled_empty.
   distribute_zxscale.
@@ -938,16 +945,14 @@ Proof.
   assert (Hrw1 : X 1 2 0 ∝= — ↕ ⊂ ⟷ (— ↕ X 1 2 0 ↕ —) ⟷ (⊃ ↕ n_wire 2)). 1:{
     rewrite cup_X, cap_X.
     zxarw_rhs (dominated_X_spider_fusion_top_left 2 0 1 0 0 0).
-    rewrite Rplus_0_l.
     zxarw (X_spider_fusion_bot_left_top_right 1 0 2 0 0 0 0 eq_refl eq_refl) at 0.
-    now rewrite Rplus_0_l.
+    done.
   }
   (* rewrite <- cap_Z, <- cup_Z. *)
   assert (Hrw2 : Z 2 1 0 ∝= (n_wire 2 ↕ ⊂) ⟷ (— ↕ Z 2 1 0 ↕ —) ⟷ (⊃ ↕ —)). 1:{
     zxarw_rhs (Z_spider_fusion_bot_left_top_right 1 0 1 0 1 0 0 eq_refl eq_refl).
-    rewrite Rplus_0_l.
     zxarw_rhs (Z_spider_fusion_bot_left_top_right 1 0 1 1 0 0 0 eq_refl eq_refl).
-    now rewrite Rplus_0_l.
+    done.
   }
   rewrite Hrw1 at 2.
   rewrite Hrw2 at 2.
@@ -982,9 +987,7 @@ Proof.
   zxarw (to_gadget bi_algebra_rule_X_over_Z).
 
   zxarw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
-  rewrite Rplus_0_l.
   zxarw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).
-  rewrite Rplus_0_l.
   zxarw (to_gadget hopf_rule_Z_X_vert 1 1 1 1 0 0 eq_refl).
   zxarw (symmetry (zx_of_const_mult (/ C2) (/ √ 2))).
   rewrite Cinv_mult_distr.

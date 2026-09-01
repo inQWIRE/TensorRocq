@@ -209,11 +209,10 @@ Proof.
 Qed.
 
 
-Lemma PRO_to_diagram_Pdelta_1 n m : n + m <> O ->
+Lemma PRO_to_diagram_Pdelta_1 n m :
   PRO_to_diagram (Pdelta 1 n m) ≡ Some (Z _ _ 0).
 Proof.
   cbn.
-  intros Hnm.
   f_equiv.
   rewrite ZX_copy_1.
   rewrite cast_Z.
@@ -281,13 +280,14 @@ Proof.
   apply _.
 Qed.
 
-Lemma zx_quote_frob_X n m α d :
-  Quote (n_stack1 n Box ⟷ (Z n m α ⟷ n_stack1 m Box))
-    d -> Quote (X n m α) d.
+Lemma zx_quote_frob_X n m α α' : Rsimpl_modeq_2PI α α' ->
+  Quote (X n m α) (Pgen _ _ (inl (Some (inl (true, α'))))).
 Proof.
-  apply DiagramQuote_proper_equiv, reflexivity.
-  rewrite <- colorswap_is_bihadamard.
-  done.
+  intros Hα.
+  constructor.
+  cbn.
+  f_equiv.
+  now apply X_Rmodeq_2PI; symmetry.
 Qed.
 
 
@@ -383,6 +383,36 @@ Proof.
   done.
 Qed.
 
+Lemma zx_quote_frob_Z_simplify_phase n m α α' d : Rsimpl_modeq_2PI α α' ->
+  Quote (Z n m α') d -> Quote (Z n m α) d.
+Proof.
+  intros Hα [Hd].
+  constructor.
+  rewrite Hd.
+  f_equiv.
+  now apply Z_Rmodeq_2PI, symmetry.
+Qed.
+
+Lemma zx_quote_frob_Z_gen_simplify_phase n m α α' : Rsimpl_modeq_2PI α α' ->
+  Quote (Z n m α) (Pdelta1 n (S m) ;; Pgen 1 0 (inl (Some (inl (false, α')))) * Pid m).
+Proof.
+  constructor.
+  cbn.
+  f_equiv.
+  rewrite <- Z_push_out_phase_gadget.
+  now apply Z_Rmodeq_2PI, symmetry.
+Qed.
+
+Lemma zx_quote_frob_Z_gen_simplify_phase_0 n m α : Rsimpl_modeq_2PI α 0 ->
+  Quote (Z n m α) (Pdelta1 n m).
+Proof.
+  intros Hα.
+  constructor.
+  cbn.
+  f_equiv.
+  now apply Z_Rmodeq_2PI, symmetry.
+Qed.
+
 #[export] Instance zx_quote_frob_abs {n m} (zx : ZX n m) :
   Quote zx (Pgen n m (inr (bundleDiagram zx))) | 50.
 Proof.
@@ -419,11 +449,17 @@ Ltac zx_quote_frob_Z_tac := zx_quote_frob_Z_tac_step; repeat zx_quote_frob_Z_tac
 
 
 #[export] Hint Extern 1 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (Z ?n ?m ?alpha) _) =>
-  exact (zx_quote_frob_Z_gen n m alpha) : typeclass_instances.
+  let Halpha := fresh "Halpha" in 
+  eassert (Halpha : Rsimpl_modeq_2PI alpha _) by once typeclasses eauto;
+  lazymatch type of Halpha with
+  | Rsimpl_modeq_2PI _ 0 => 
+    exact (zx_quote_frob_Z_gen_simplify_phase_0 n m alpha Halpha)
+  | _ => 
+    exact (zx_quote_frob_Z_gen_simplify_phase n m alpha _ Halpha)
+  end : typeclass_instances.
 
 #[export] Hint Extern 3 (DiagramQuote (Struct:=Frobenius) (D:=ZX) (X ?n ?m ?α) _) =>
-  notypeclasses refine (zx_quote_frob_X n m α _ _);
-  cbn : typeclass_instances.
+  eapply (zx_quote_frob_X n m α _) : typeclass_instances.
 
 (* A few of these instances don't resolve nicely when sizes simplify,
   so we help typeclass resolution apply them with these hints. *)
@@ -639,12 +675,12 @@ Proof.
 Qed.
 
 
-Lemma zx_denote_frob_Pdelta_1 n m : n + m <> O ->
+Lemma zx_denote_frob_Pdelta_1 n m :
   Denote (Z (n * 1) (m * 1) 0)
   (Pstruct _ _ (inr (Delta 1 n m))).
 Proof.
   constructor.
-  rewrite PRO_to_diagram_Pdelta_1 by done.
+  rewrite PRO_to_diagram_Pdelta_1.
   done.
 Qed.
 
@@ -733,10 +769,7 @@ End ZXdenote_frob.
   exact (zx_denote_frob_zx_comm n m) : typeclass_instances.
 
 #[export] Hint Extern 1 (DiagramDenote (ProD:=ZX_Frobenius_ProLike) _ ([str inr (Delta 1 ?n ?m)])) =>
-  let H := fresh in
-  tryif assert (H : n + m <> O) by lia then
-    exact (zx_denote_frob_Pdelta_1 n m H)
-  else fail : typeclass_instances.
+  exact (zx_denote_frob_Pdelta_1 n m) : typeclass_instances.
 
 
 #[export] Hint Extern 0 (DiagramDenote (ProD:=ZX_Frobenius_ProLike) _ ([str inr (Delta 1 0 0)])) =>
@@ -1100,16 +1133,16 @@ Proof.
   rewrite cap_Z.
   rewrite cup_X.
   rewrite <- (Rplus_0_l 0).
-  zxsclean_lhs.
+  (* zxsclean_lhs. *)
   rewrite <- X_spider_1_1_fusion, <- Z_spider_1_1_fusion.
-  rewrite Rplus_0_l.
   zxfrw_lhs (to_gadget (proportional_by_sym bi_algebra_rule_Z_X)) at 0.
-  zxfrw_lhs (X_wrap_under_bot_right 1 1 0 eq_refl eq_refl) at 1.
+  zxfrw_lhs (X_wrap_under_bot_right 1 1 0 eq_refl eq_refl) at 0.
   zxfrw_lhs (to_gadget Z_state_0_copy 2 eq_refl eq_refl).
   cbn.
   rewrite <- zx_of_const_mult'.
   replace (_ * / √ 2)%C with (/ C2)%C by (autorewrite with RtoC_db; C_field).
-  rewrite box_to_transpose.
+  zxfrw (cup_pullthrough_top (X 1 0 0) —).
+  cbn.
   zxfcat.
 Qed.
 
@@ -1147,6 +1180,7 @@ Qed.
 
 Lemma cnot_is_swapp_notc : _CNOT_ ∝= ⨉ ⟷ _NOTC_ ⟷ ⨉.
 Proof.
+  rewrite X_to_Z.
   zxfcat.
 Qed.
 
@@ -1174,11 +1208,10 @@ Proof.
   zxfrw (@dominated_Z_spider_fusion_top_left 2 0 1 1 0 0).
   (* rewrite Rplus_0_l. *)
   zxfrw (@dominated_X_spider_fusion_bot_right 2 0 1 1 0 0).
-  rewrite Rplus_0_l.
   zxfrw (to_gadget hopf_rule_Z_X_vert 1 1 1 1 0 0 eq_refl).
   zxfrw (symmetry (zx_of_const_mult (/ C2) (/ √ 2))).
   rewrite Cinv_mult_distr.
-  zxfrw box_compose.
+  rewrite X_0_is_wire.
   zxfcat.
 Qed.
 

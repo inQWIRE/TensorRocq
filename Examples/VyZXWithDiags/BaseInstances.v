@@ -304,6 +304,10 @@ Qed.
 
 Notation ZXDVERT := (WithDiagrams ZXCVERT ZX).
 
+
+#[export] Instance ZXDVERT_equiv : Equiv ZXDVERT := _.
+#[export] Instance ZXDVERT_equivalence : @Equivalence ZXDVERT equiv := _.
+
 #[export] Instance ZXDCALC : TensorLike C bool ZXDVERT :=
   withDiagrams_tensorLike ZXCVERT ZXCCALC ZX.
 
@@ -446,3 +450,10 @@ From TensorRocq Require SizedProQuote.
         Control.zero Init.No_value
     end
   ) : typeclass_instances.
+
+
+From TensorRocqEx Require Export Rsimpl.
+
+
+(* FIXME: Move *)
+Hint Opaque zx_mid_comm zx_mul_S_r zx_mul_comm : typeclass_instances.

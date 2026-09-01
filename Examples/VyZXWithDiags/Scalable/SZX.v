@@ -116,6 +116,7 @@ Proof.
     distribute_zxscale.
     rewrite zx_scale_stack_distr_r, zx_scale_compose_distr_r, zx_scale_compose_distr_l.
     apply zx_scale_simplify_eq; [done|].
+    rewrite !X_to_Z.
     zxfrw box_compose.
     rewrite box_compose.
     done.
@@ -123,12 +124,12 @@ Proof.
     distribute_zxscale.
     rewrite zx_scale_stack_distr_l, zx_scale_compose_distr_r, zx_scale_compose_distr_l.
     apply zx_scale_simplify_eq; [done|].
+    rewrite !X_to_Z.
     zxfrw box_compose.
     rewrite box_compose.
     done.
   - zxsrw <- (@X_add_l 0 0 1 0 0 0).
     rewrite (gadget_is_scaled_empty zx_invsqrt2), const_of_zx_invsqrt2.
-    rewrite 2 Rplus_0_r.
     zxfcat.
 Qed.
 
@@ -303,9 +304,26 @@ Proof.
         rewrite 2 Nat.add_0_r, Cpow_add_r.
         C_field.
       }
+      (* Ltac enable_timing ::= idtac. *)
+      (* Set Typeclasses Debug.
+      let lem := constr:(dominated_X_spider_fusion_bot_right (S n * 1) 0 1 1 0 0) in 
+      let match_number := constr:(O) in 
+      let Hrw := fresh "Hrw" in
+      let le := fresh "le" in evar (le : list ZXDVERT);
+      zxpsrw_lhs_setup Hrw le;
+      zxpsrw_lhs_parse Hrw lem match_number;
+      zxpsrw_lhs_quotes Hrw.
+      zxpsrw_lhs_to_pos Hrw.
+      let ln := fresh "ln" in evar (ln : list nat);
+      zxpsrw_lhs_to_sized Hrw ln.
+      zxpsrw_lhs_compute Hrw.
+      zxpsrw_lhs_from_sized Hrw.
+      zxpsrw_lhs_from_pos Hrw.
+      zxpsrw_lhs_denote Hrw.
+      zxpsrw_lhs_final Hrw le ln. *)
       zxpsrw (dominated_X_spider_fusion_bot_right (S n * 1) 0 1 1 0 0).
-      rewrite Rplus_0_r.
       zxpscat.
+      (* zxpscat. *)
   - cbn [zx_binmat_aux_l].
     induction A as [v A] using vec_S_inv.
     cbn [vhd vtl Vector.caseS].
@@ -333,7 +351,7 @@ Proof.
     rewrite <- !compose_assoc.
     rewrite cast_compose_eq_mid_join.
     rewrite <- ZX_copy_compose.
-    rewrite <- Z_add_r, 2 Rplus_0_r.
+    rewrite <- Z_add_r.
     apply compose_simplify_casted_abs; [lia|intros ?..].
     2:{
       rewrite cast_stack_r_fwd, cast_contract_eq'.
@@ -356,6 +374,7 @@ Proof.
     rewrite zx_mul_comm_1_l.
     rewrite n_wire_removal_l'.
     rewrite cast_compose_distribute, cast_contract_eq', compose_assoc.
+    rewrite 2 Rplus_0_l.
     f_equiv; [cast_irrelevance|].
     rewrite <- stack_compose_distr.
     rewrite n_wire_removal_l', cast_contract_eq', cast_n_wire.

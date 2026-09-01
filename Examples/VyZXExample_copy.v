@@ -6,6 +6,10 @@ From TensorRocq Require Import ProLike PropGraphTerm.
 
 From TensorRocqEx Require Import Rmodeq.
 
+
+Goal True.
+fail.
+
 (* First, we must define the data assocated to generators. In our case,
   we use [option (bool * R + C)] with [None] being the hadamard box,
   [Some (inl (false, α))] being a Z spider with phase [α],

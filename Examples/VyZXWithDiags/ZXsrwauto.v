@@ -17,6 +17,7 @@ From TensorRocq Require SizedProQuote. (* For visualization *)
 
 
 
+From TensorRocqEx Require Export NonZXAux.
 
 From TensorRocqEx Require Export ZXrwauto.
 
@@ -103,6 +104,160 @@ Proof.
 Qed.
 
 
+Lemma zx_quote_auto_cast_n_wire_setup {n m k} (Hn : n = k) (Hm : m = k) p :
+  Quote (cast _ _ (eq_trans_r Hn Hm) eq_refl (n_wire _)) p ->
+  Quote (cast _ _ Hn Hm (n_wire k)) p.
+Proof.
+  subst.
+  rewrite 2 cast_id_eq.
+  done.
+Qed.
+
+Lemma zx_quote_auto_cast_nwire_bpath_infix_prf {f : positive -> nat}
+  {a b : btree positive}
+  {l r mid mid' : btree positive}
+  (Ha : btree_elems a = (l + mid + r)%btree)
+  (Hb : btree_elems b = (l + mid' + r)%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  btree_size f mid = btree_size f mid'.
+Proof.
+  apply (f_equal (sum_list_with f)) in Ha, Hb.
+  rewrite 2 sum_list_with_btree_elems in Ha, Hb.
+  cbn in Ha, Hb.
+  lia.
+Qed.
+
+Lemma zx_quote_auto_cast_nwire_bpath_infix (f : positive -> nat)
+  (a b : btree positive)
+  (l r mid mid' : btree positive)
+  (Ha : btree_elems a = (l + mid + r)%btree)
+  (Hb : btree_elems b = (l + mid' + r)%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
+  Quote (cast _ _ Han Hbn (n_wire n)) 
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+    :> PRO _ _ (btree_size f a) (btree_size f l + btree_size f mid + btree_size f r)) ;;
+   Pid (btree_size f l) * 
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
+    (cast _ _ (Canonize.canonize 
+      (zx_quote_auto_cast_nwire_bpath_infix_prf Ha Hb Han Hbn)) 
+      eq_refl (n_wire _)))) * Pid (btree_size f r) ;; 
+   MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
+Proof.
+  eapply DiagramQuote_proper_equiv; [|done|]. 2:{
+    Import ZXauto.
+    apply zx_quote_auto_compose, zx_quote_auto_compose.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f a (l + mid + r)).
+    - apply DiagramQuote_iff_DiagramDenote.
+      cbn.
+      apply zx_denote_auto_stack, _.
+      apply zx_denote_auto_stack; [apply _|].
+      apply _.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f (l + mid' + r) b).
+  }
+  rewrite cast_stack_r_fwd, cast_stack_l_fwd, 2 n_wire_stack.
+  rewrite 2 n_wire_removal_l', 2 cast_contract_eq'.
+  rewrite cast_n_wire_r.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_auto_cast_nwire_bpath_prefix_prf {f : positive -> nat}
+  {a b : btree positive}
+  {l mid mid' : btree positive}
+  (Ha : btree_elems a = (l + mid)%btree)
+  (Hb : btree_elems b = (l + mid')%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  btree_size f mid = btree_size f mid'.
+Proof.
+  apply (f_equal (sum_list_with f)) in Ha, Hb.
+  rewrite 2 sum_list_with_btree_elems in Ha, Hb.
+  cbn in Ha, Hb.
+  lia.
+Qed.
+
+Lemma zx_quote_auto_cast_nwire_bpath_prefix (f : positive -> nat)
+  (a b : btree positive)
+  (l mid mid' : btree positive)
+  (Ha : btree_elems a = (l + mid)%btree)
+  (Hb : btree_elems b = (l + mid')%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
+  Quote (cast _ _ Han Hbn (n_wire n)) 
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+    :> PRO _ _ (btree_size f a) (btree_size f l + btree_size f mid)) ;;
+   Pid (btree_size f l) * 
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
+    (cast _ _ (Canonize.canonize 
+      (zx_quote_auto_cast_nwire_bpath_prefix_prf Ha Hb Han Hbn)) 
+      eq_refl (n_wire _)))) ;; 
+   MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
+Proof.
+  eapply DiagramQuote_proper_equiv; [|done|]. 2:{
+    Import ZXauto.
+    apply zx_quote_auto_compose, zx_quote_auto_compose.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f a (l + mid)).
+    - apply DiagramQuote_iff_DiagramDenote.
+      cbn.
+      apply zx_denote_auto_stack, _.
+      apply _.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f (l + mid') b).
+  }
+  rewrite cast_stack_r_fwd, n_wire_stack.
+  rewrite 2 n_wire_removal_l', 2 cast_contract_eq'.
+  rewrite cast_n_wire_r.
+  cast_irrelevance.
+Qed.
+
+
+Lemma zx_quote_auto_cast_nwire_bpath_suffix_prf {f : positive -> nat}
+  {a b : btree positive}
+  {r mid mid' : btree positive}
+  (Ha : btree_elems a = (mid + r)%btree)
+  (Hb : btree_elems b = (mid' + r)%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) : 
+  btree_size f mid = btree_size f mid'.
+Proof.
+  apply (f_equal (sum_list_with f)) in Ha, Hb.
+  rewrite 2 sum_list_with_btree_elems in Ha, Hb.
+  cbn in Ha, Hb.
+  lia.
+Qed.
+
+Lemma zx_quote_auto_cast_nwire_bpath_suffix (f : positive -> nat)
+  (a b : btree positive)
+  (r mid mid' : btree positive)
+  (Ha : btree_elems a = (mid + r)%btree)
+  (Hb : btree_elems b = (mid' + r)%btree)
+  {n} (Han : btree_size f a = n) (Hbn : btree_size f b = n) :
+  Quote (cast _ _ Han Hbn (n_wire n)) 
+  ((MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' Ha)) 
+    :> PRO _ _ (btree_size f a) (btree_size f mid + btree_size f r)) ;;
+   Pgen (btree_size f mid) (btree_size f mid') (inr (bundleDiagram 
+    (cast _ _ (Canonize.canonize 
+      (zx_quote_auto_cast_nwire_bpath_suffix_prf Ha Hb Han Hbn)) 
+      eq_refl (n_wire _)))) * Pid (btree_size f r) ;; 
+   MPRO_to_PRO f (gbpath_to_MPRO (bpath_of_eq' (eq_sym Hb)))).
+Proof.
+  eapply DiagramQuote_proper_equiv; [|done|]. 2:{
+    Import ZXauto.
+    apply zx_quote_auto_compose, zx_quote_auto_compose.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f a (mid + r)).
+    - apply DiagramQuote_iff_DiagramDenote.
+      cbn.
+      apply zx_denote_auto_stack, _.
+      apply _.
+    - apply (zx_quote_auto_cast_nwire_bpath_aux f (mid' + r) b).
+  }
+  rewrite cast_stack_l_fwd, n_wire_stack.
+  rewrite 2 n_wire_removal_l', 2 cast_contract_eq'.
+  rewrite cast_n_wire_r.
+  cast_irrelevance.
+Qed.
+
+Lemma zx_quote_auto_cast_n_wire_id {n k} (Hn Hm : n = k) : 
+  Quote (cast _ _ Hn Hm (n_wire k)) (Pid n).
+Proof.
+  rewrite cast_n_wire.
+  apply _.
+Qed.
 
 
 End ZXquote_auto.
@@ -129,30 +284,128 @@ Import ConstrExtra.
     refine '(id $prf _)
   end. *)
 
+(* FIXME: Move *)
+Ltac2 greatest_prefix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) : 'a list * 'a list * 'a list :=
+  let rec go l r :=
+    match l, r with
+    | [], [] => ([], [], [])
+    | _ :: _, [] => ([], l, [])
+    | [], _ :: _ => ([], [], r)
+    | a :: l', b :: r' => 
+      if eqa a b then 
+        let (pref, l'', r'') := go l' r' in 
+        (a :: pref, l'', r'')
+      else
+        ([], l, r)
+    end
+  in go l r.
+
+Ltac2 greatest_suffix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) :=
+  let (revpref, revl, revr) := greatest_prefix eqa (List.rev l) (List.rev r) in 
+  (List.rev revpref, List.rev revl, List.rev revr).
+
+Ltac2 greatest_common_prefix_suffix (eqa : 'a -> 'a -> bool) (l : 'a list) (r : 'a list) : 
+  'a list * 'a list * 'a list * 'a list :=
+  let (pref, l', r') := greatest_prefix eqa l r in 
+  let (suff, l'', r'') := greatest_suffix eqa l' r' in 
+  (pref, suff, l'', r'').
+
+Ltac2 btree_of_list' (l : 'a list) : 'a btree :=
+  let rec go acc l :=
+    match l with 
+    | [] => acc
+    | a :: l => go (Bnode acc (Bleaf a)) l
+    end in 
+  match l with
+  | [] => Bempty
+  | a :: l => go (Bleaf a) l
+  end.
+
 Ltac2 solve_zx_auto_quote_cast_n_wire_monoidal () : unit :=
   lazy_match! goal with
-  | [|- DiagramQuote (@cast ?n ?m _ _ ?hn ?hm (n_wire ?k)) _] =>
+  | [|- DiagramQuote (@cast ?n ?m _ _ ?hn ?hm (n_wire ?_k)) _] =>
     if Bool.and (CC.is_nat_const n) (CC.is_nat_const m) then
       apply (ZXauto.zx_quote_auto_cast_id $hn $hm)
     else
     let (cs, bn) := parse_nat_btree_to_pos [] n in
     let (cs, bm) := parse_nat_btree_to_pos cs m in
-    if btree_eq Int.equal bn bm then
-      let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
-      let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
-      let ccs := CC.mk_list_typed 'nat cs in
-      refine '(zx_quote_auto_cast_nwire_bpath (interp_discrete_hg_inhab $ccs)
+    let cbn := CC.to_btree_typed 'positive CC.to_pos bn in
+    let cbm := CC.to_btree_typed 'positive CC.to_pos bm in
+    let ccs := CC.mk_list_typed 'nat cs in
+    let bn_elems := btree_elems bn in 
+    let bm_elems := btree_elems bm in 
+    if List.equal Int.equal bn_elems bm_elems then
+      refine constr:(zx_quote_auto_cast_nwire_bpath (interp_discrete_hg_inhab $ccs)
         $cbn $cbm eq_refl $hn $hm)
     else
-      refine '(@ZXauto.zx_quote_auto_cast_n_wire $n $m $k $hn $hm)
+      let (pref, suff, mid, mid') := 
+        greatest_common_prefix_suffix Int.equal bn_elems bm_elems in 
+      let cbpref := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' pref) in 
+      let cbsuff := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' suff) in 
+      let cbmid := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid) in 
+      let cbmid' := CC.to_btree_typed constr:(positive) CC.to_pos (btree_of_list' mid') in 
+      match pref, suff with 
+      | _::_, _::_ =>
+        refine constr:(zx_quote_auto_cast_nwire_bpath_infix (interp_discrete_hg_inhab $ccs)
+          $cbn $cbm $cbpref $cbsuff $cbmid $cbmid' eq_refl eq_refl
+          $hn $hm)
+      | _::_, [] =>
+        refine constr:(zx_quote_auto_cast_nwire_bpath_prefix (interp_discrete_hg_inhab $ccs)
+          $cbn $cbm $cbpref $cbmid $cbmid' eq_refl eq_refl $hn $hm)
+      | [], _::_ =>
+        refine constr:(zx_quote_auto_cast_nwire_bpath_suffix (interp_discrete_hg_inhab $ccs)
+          $cbn $cbm $cbsuff $cbmid $cbmid' eq_refl eq_refl
+          $hn $hm)
+      | [], [] =>
+        refine constr:(ZXauto.zx_quote_auto_cast_n_wire $hn $hm)
+      end
+      (* apply (zx_quote_auto_cast_n_wire_setup $hn $hm);
+      let rec go nm :=
+        lazy_match! nm with
+        | (?n + ?m, ?n + ?o) =>
+          apply (@zx_quote_auto_cast_n_wire_add_l $n $m $o);
+          go constr:(pair $m $o)
+        | (S ?n, S ?m) =>
+          apply (@zx_quote_auto_cast_n_wire_add_l 1 $n $m);
+          go constr:(pair $n $m)
+        | (?m + ?n, ?o + ?n) =>
+          apply (@zx_quote_auto_cast_n_wire_add_r $n $m $o);
+          go constr:(pair $m $o)
+        | _ => 
+          apply ZXauto.zx_quote_auto_cast_n_wire
+        end in 
+      go constr:(pair $n $m) *)
   end.
 
 End QuoteCast.
 
+Ltac do_cast_MPRO_simpl_flag := fail.
 
-#[export] Hint Extern 4 (DiagramQuote (Struct:=Autonomous) (D:=ZX)
+Ltac zx_auto_quote_n_wire_cast_tac_monoidal :=
+  lazymatch goal with
+  |- (DiagramQuote (Struct:=Autonomous) (D:=ZX)
+      (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
+    tryif timeout 1 (unify n m) then
+      exact (zx_quote_auto_cast_n_wire_id hn hm)
+    else 
+      let Hprf := fresh "Hprf" in
+      let quote := match goal with |- ?R _ _ => R end in
+      eassert (Hprf : quote (cast n m hn hm (n_wire k)) _) by ltac2:(QuoteCast.solve_zx_auto_quote_cast_n_wire_monoidal());
+      tryif do_cast_MPRO_simpl_flag then
+        do 2 try lazymatch type of Hprf with
+        | context [MPRO_to_PRO _ _] =>
+          (* vm_eval (bpath_of_eq' _) in Hprf; *)
+          cbn_eval (MPRO_to_PRO _ _) in Hprf
+        end
+        else idtac;
+      lazy [btree_size interp_discrete_hg_inhab list_pth list_drop_pos head tail] in Hprf;
+      exact Hprf
+  end.
+
+
+#[export] Hint Extern 0 (DiagramQuote (Struct:=Autonomous) (D:=ZX)
   (cast ?n ?m ?hn ?hm (n_wire ?k)) _) =>
-    ltac2:(QuoteCast.solve_zx_auto_quote_cast_n_wire_monoidal())
+    zx_auto_quote_n_wire_cast_tac_monoidal
     : typeclass_instances.
 
 
@@ -429,7 +682,6 @@ Proof.
   - apply Z_spider_1_1_fusion.
   - rewrite grow_Z_top_right, grow_Z_top_left.
     zxparw (Z_1_2_1_fusion 0 0).
-    rewrite Rplus_0_l.
     zxparw IHm.
     zxpacat.
 Qed.

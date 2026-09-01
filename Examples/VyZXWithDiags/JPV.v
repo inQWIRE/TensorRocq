@@ -53,7 +53,6 @@ Proof.
     rewrite Cexp_0, zx_of_const_to_scaled_empty, zx_scale_1_l.
     zxsrw left_triangle_state_1.
     zxsrw (@Z_spider_1_1_fusion 0 0 0 0).
-    rewrite Rplus_0_r.
     rewrite (gadget_is_scaled_empty (Z 0 0 0)).
     rewrite const_of_zx_Z_gen.
     rewrite Cexp_0.
@@ -61,7 +60,6 @@ Proof.
     zxsrw (@X_1_n_state_1 2 PI).
     zxsrw (gadget_is_scaled_empty (X 0 1 0 ⟷ Z 1 0 0)).
     rewrite const_of_zx_X_0_1_0_Z_1_0_0.
-    rewrite X_eq_2_PI by lra.
     rewrite <- ! zx_of_const_mult'.
     rewrite zx_of_const_1'; [zxacat|].
     cbn.
@@ -79,26 +77,19 @@ Proof.
     zxsrw left_triangle_state_1.
     rewrite state_1_defn.
     zxsrw (X_spider_fusion_top_left_bot_right 0 0 1 0 1 PI 0 eq_refl eq_refl).
-    pose proof (Z_state_copy 0 1 PI eq_refl eq_refl) as Hrw.
-    rewrite Rmult_0_l in Hrw.
-    rewrite Rplus_0_r.
-    unfold n_stack in Hrw.
-    zxsrw (to_gadget Hrw).
-    clear Hrw.
+    zxsrw (to_gadget (Z_state_copy' false 1 PI eq_refl eq_refl)).
     rewrite <- !zx_of_const_mult'.
     f_equiv.
     f_equiv.
-    rewrite Cexp_0, Cexp_PI.
+    rewrite Cexp_0.
     cbn.
-    autorewrite with RtoC_db.
-    C_field; lca.
+    C_field.
   - zxsrw (Z_1_2_state_0 0).
     zxsrw left_triangle_state_0.
     zxsrw left_triangle_state_0.
     rewrite state_0_defn.
     (* zxsrw (X_zxperm_absorbtion_left 2 2 1 0 ⨉ ltac:(auto_zxperm)). *)
     zxsrw <- (@X_add_l 0 0 1 0 0 0).
-    rewrite 2 Rplus_0_r.
     zxscat.
 Qed.
 
@@ -142,7 +133,6 @@ Proof.
     zxsrw (@X_1_n_state_0 0 PI).
     zxsrw (@X_1_n_state_1 1 PI).
     zxsrw (@X_spider_1_1_fusion 0 0 (PI + PI) PI).
-    rewrite (X_Rmodeq_2PI _ PI) by (exists (1 : BinInt.Z); lra).
     rewrite X_0_0_PI_zero.
     rewrite ?zx_scale_0_l.
     rewrite ?compose_0_l, ?stack_0_l.
@@ -162,13 +152,9 @@ Proof.
     zxsrw <- Hrw.
     rewrite state_1_defn.
     zxsrw (@X_spider_1_1_fusion 0 1 PI PI).
-
-    rewrite (X_eq_2_PI 0 1 (PI + PI)) by lra.
     zxsrw (@X_spider_1_1_fusion 0 0 0 0).
-    rewrite Rplus_0_r.
     zxsrw (to_gadget (X_state_pi_copy 0 eq_refl eq_refl)).
     zxsrw (@X_spider_1_1_fusion 0 0 0 0).
-    rewrite Rplus_0_r.
     rewrite (gadget_is_scaled_empty (X 0 0 0)).
     rewrite const_of_zx_X_gen.
     rewrite Cexp_0.
@@ -195,7 +181,6 @@ Proof.
     rewrite state_0_defn.
     zxsrw (@X_spider_1_1_fusion 0 0 0 PI).
     zxsrw (@X_spider_1_1_fusion 0 0 0 PI).
-    rewrite Rplus_0_l.
     now rewrite X_0_0_PI_zero, ?compose_0_l, ?stack_0_l.
   - cbn.
     rewrite <- !compose_assoc.
@@ -210,19 +195,13 @@ Proof.
     cbn.
     rewrite state_0_defn at 1 2.
     zxsrw (X_spider_fusion_top_left_bot_right 0 0 1 0 0 0 PI eq_refl eq_refl).
-    pose proof (Z_state_copy 0 0 PI eq_refl eq_refl) as Hrw.
-    rewrite Rplus_0_l.
-    rewrite Rmult_0_l in Hrw.
-    zxsrw (to_gadget Hrw).
+    zxsrw (to_gadget (Z_state_copy' false 0 PI eq_refl eq_refl)).
     zxsrw (Z_1_n_state0 0 0).
     rewrite <- ! zx_of_const_mult'.
     f_equiv.
     f_equiv.
-    rewrite Cexp_PI, Cexp_0.
     cbn.
-    autorewrite with RtoC_db.
     C_field.
-    lca.
 Qed.
 
 Lemma JPV_2_4_a : (Z 0 3 0 ⟷ X 3 0 0) ↕ (Z 0 1 0 ⟷ X 1 0 0) ∝= ⦰.
@@ -269,7 +248,7 @@ Proof.
   lca.
 Qed.
 
-#[export] Instance ZXDVERT_inhab : Inhabited ZXDVERT := _.
+(* #[export] Instance ZXDVERT_inhab : Inhabited ZXDVERT := _. *)
 
 Lemma JPV_2_6 : Z 1 1 PI ⟷ X 1 2 0 ∝= X 1 2 0 ⟷ (Z 1 1 PI ↕ Z 1 1 PI).
 Proof.
@@ -384,7 +363,6 @@ Proof.
     zxsrw triangle_state_1.
     zxscat.
   - zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
-    rewrite Rplus_0_r.
     rewrite <- cap_Z.
     zxarw_rhs (cup_pullthrough_top (zx_triangle_left ⟷ Z 1 0 0) —).
     zxsrw_rhs <- (eq_reflexivity (RA:=proportional_by_1)  _ _ zx_triangle_defn).
@@ -555,7 +533,6 @@ Proof.
   zxsrw (triangle_state_b b).
   destruct b.
   - zxsrw (@X_1_n_state_1 2 PI).
-    rewrite X_eq_2_PI by lra.
     rewrite <- cap_X.
     zxsrw <- (Z_wrap_over_top_right 1 1 0).
     zxsrw (Z_1_2_state_1 0).
@@ -563,14 +540,11 @@ Proof.
     rewrite Cexp_0.
     rewrite zx_of_const_1' by C_field.
     zxscat.
-  - pose proof (Z_state_copy 0 2 PI eq_refl eq_refl) as Hrw.
-    rewrite Rmult_0_l, Cexp_0, Cexp_PI in Hrw.
-    zxsrw (to_gadget Hrw).
+  - zxsrw (to_gadget (Z_state_copy' false 2 PI eq_refl eq_refl)).
     rewrite <- zx_of_const_mult'.
     rewrite zx_of_const_1'; [zxfcat|].
     cbn.
-    autorewrite with RtoC_db.
-    C_field; lca.
+    C_field.
 Qed.
 
 Lemma JPV_2_18_b : (Z 0 1 0 ⟷ X 1 0 0) ↕
@@ -593,14 +567,11 @@ Proof.
   zxsrw (left_triangle_state_b b).
   zxsrw (left_triangle_state_b b).
   destruct b.
-  - pose proof (Z_state_copy 0 2 0 eq_refl eq_refl) as Hrw.
-    rewrite Rmult_0_l, Cexp_0 in Hrw.
-    zxsrw (to_gadget Hrw).
+  - zxsrw (to_gadget (Z_state_copy' false 2 0 eq_refl eq_refl)).
     rewrite <- zx_of_const_mult'.
     rewrite zx_of_const_1'; [zxfcat|].
     cbn.
-    autorewrite with RtoC_db.
-    C_field; lca.
+    C_field.
   - zxsrw (@X_1_n_state_0 2 0).
     rewrite <- cap_X.
     zxsrw <- (Z_wrap_over_top_right 1 1 0).
@@ -678,68 +649,25 @@ Proof.
   reflexivity.
 Qed.
 
+
+Import ZXmsymm.
+  Import SizedProQuote.
+  Import SizedRewriting SizedProLike.
+  Import SizedPropsGraphs PropsGraphs.
+Import ZXmauto.
+
 Lemma wrap_otl_otr {n m o} (zx : ZX n (m + o)) :
   wrap_otl (wrap_otr zx) ∝= zx.
 Proof.
   unfold wrap_otl, wrap_otr.
-  rewrite stack_nwire_distribute_l.
-  rewrite cast_stack_r_fwd, stack_assoc_back_fwd, cast_contract_eq', n_wire_stack.
-
-  unshelve erewrite (cast_compose_mid_distribute (m + m + (m + o))); [lia|].
-  rewrite <- compose_assoc.
-  rewrite cast_contract_eq'.
-  rewrite cast_id.
-  rewrite <- stack_compose_distr.
-  rewrite nwire_removal_l, nwire_removal_r.
-  rewrite push_out_top.
-  rewrite <- (nwire_removal_r zx) at 2.
-  rewrite compose_assoc.
-  Morphisms.f_equiv.
-  rewrite <- n_wire_stack.
-  rewrite stack_assoc_back_fwd.
-  rewrite (stack_assoc_back_fwd (n_wire m) (n_cup m) (n_wire o)).
-  rewrite cast_contract_eq'.
-  rewrite cast_compose_l, cast_contract_eq'.
-  rewrite <- cast_stack_l, <- stack_nwire_distribute_r.
-  rewrite <- cast_stack_l.
-  Morphisms.f_equiv.
-  rewrite cast_id.
-  apply big_yank_l.
-  Unshelve.
-  all: lia.
+  zxpacat.
 Qed.
 
 Lemma wrap_otr_otl {n m o} (zx : ZX (n + m) o) :
   wrap_otr (wrap_otl zx) ∝= zx.
 Proof.
   unfold wrap_otl, wrap_otr.
-  rewrite stack_nwire_distribute_l.
-  rewrite cast_stack_r_fwd, stack_assoc_back_fwd, cast_contract_eq', n_wire_stack.
-  unshelve erewrite (cast_compose_mid_distribute (n + n + (n + m))); [lia|].
-  rewrite compose_assoc.
-  rewrite cast_contract_eq'.
-  rewrite cast_id.
-  rewrite <- stack_compose_distr.
-  rewrite nwire_removal_l, nwire_removal_r.
-  rewrite pull_out_top.
-  rewrite <- (nwire_removal_l zx) at 2.
-  rewrite <- compose_assoc.
-  Morphisms.f_equiv.
-  rewrite <- n_wire_stack.
-  rewrite stack_assoc_back_fwd.
-  rewrite (stack_assoc_back_fwd (n_wire n) (n_cap n) (n_wire m)).
-  rewrite cast_contract_eq'.
-  rewrite cast_compose_l, cast_contract_eq'.
-  cbn [Nat.add].
-  rewrite <- cast_stack_l, <- stack_nwire_distribute_r.
-  rewrite <- cast_stack_l.
-  Morphisms.f_equiv.
-
-  rewrite big_yank_r.
-  rewrite cast_contract_eq', cast_id.
-  reflexivity.
-  Unshelve.
-  all: lia.
+  zxpacat.
 Qed.
 
 
@@ -748,29 +676,7 @@ Lemma wrap_ubl_ubr {n m o} (zx : ZX n (m + o)) :
   wrap_ubl (wrap_ubr zx) ∝= zx.
 Proof.
   unfold wrap_ubl, wrap_ubr.
-  rewrite stack_nwire_distribute_r.
-  rewrite cast_stack_l_fwd, stack_assoc_fwd, n_wire_stack.
-  rewrite <- compose_assoc.
-  rewrite cast_compose_eq_mid_join.
-  rewrite <- stack_compose_distr, nwire_removal_l, nwire_removal_r.
-  unshelve erewrite push_out_bot, (cast_compose_mid_distribute (m + o)); [lia..|].
-  rewrite cast_contract_eq', cast_id.
-  rewrite compose_assoc.
-  rewrite <- (nwire_removal_r zx) at 2.
-  Morphisms.f_equiv.
-
-  rewrite <- n_wire_stack.
-  rewrite 2 stack_assoc_fwd.
-  rewrite 2 cast_contract_eq'.
-  rewrite cast_compose_l, cast_contract_eq'.
-  rewrite <- cast_stack_r, <- stack_nwire_distribute_l.
-  rewrite <- cast_stack_r.
-  Morphisms.f_equiv.
-  rewrite big_yank_r.
-  rewrite cast_contract_eq', cast_id.
-  reflexivity.
-  Unshelve.
-  all: lia.
+  zxpacat.
 Qed.
 
 
@@ -778,30 +684,7 @@ Lemma wrap_ubr_ubl {n m o} (zx : ZX (n + m) o) :
   wrap_ubr (wrap_ubl zx) ∝= zx.
 Proof.
   unfold wrap_ubl, wrap_ubr.
-  rewrite stack_nwire_distribute_r.
-  rewrite cast_stack_l_fwd, (stack_assoc_fwd zx), n_wire_stack.
-
-  rewrite compose_assoc.
-  rewrite cast_compose_eq_mid_join.
-  rewrite <- stack_compose_distr, nwire_removal_l, nwire_removal_r.
-  unshelve erewrite pull_out_bot, (cast_compose_mid_distribute (n + m)); [lia..|].
-  rewrite cast_contract_eq', cast_id.
-  rewrite <- compose_assoc.
-  rewrite <- (nwire_removal_l zx) at 2.
-  Morphisms.f_equiv.
-
-  rewrite <- n_wire_stack.
-  rewrite 2 stack_assoc_fwd.
-  rewrite 2 cast_contract_eq'.
-  rewrite cast_compose_l, cast_contract_eq'.
-  rewrite <- cast_stack_r, <- stack_nwire_distribute_l.
-  rewrite <- cast_stack_r.
-  Morphisms.f_equiv.
-  rewrite big_yank_l.
-  rewrite cast_id.
-  reflexivity.
-  Unshelve.
-  all: lia.
+  zxpacat.
 Qed.
 
 
@@ -880,11 +763,7 @@ Lemma wrap_otl_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
   cast o _ eq_refl (Nat.add_assoc _ _ _) (proc_to_state zx0 ↕ zx1).
 Proof.
   unfold wrap_otl, proc_to_state.
-  rewrite stack_assoc_back_fwd, cast_contract_eq'.
-  rewrite cast_compose_r_eq_mid.
-  rewrite <- stack_compose_distr.
-  cast_irrelevance.
-  now rewrite nwire_removal_l.
+  zxpacat.
 Qed.
 
 Lemma wrap_otr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
@@ -892,11 +771,7 @@ Lemma wrap_otr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
   cast _ _ (Nat.add_assoc _ _ _) eq_refl ((n_wire m ↕ zx0 ⟷ n_cup m) ↕ zx1).
 Proof.
   unfold wrap_otr.
-  rewrite stack_assoc_back_fwd, cast_contract_eq'.
-  rewrite cast_compose_l_eq_mid.
-  rewrite <- stack_compose_distr.
-  cast_irrelevance.
-  now rewrite nwire_removal_r.
+  zxpacat.
 Qed.
 
 
@@ -906,10 +781,7 @@ Lemma wrap_ubl_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
     (zx0 ↕ (n_cap o ⟷ (zx1 ↕ n_wire o))).
 Proof.
   unfold wrap_ubl.
-  rewrite stack_assoc_fwd.
-  rewrite cast_compose_eq_mid_join.
-  cast_irrelevance.
-  now rewrite <- stack_compose_distr, nwire_removal_l.
+  zxpacat.
 Qed.
 
 Lemma wrap_ubr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
@@ -918,10 +790,7 @@ Lemma wrap_ubr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
     (zx0 ↕ (zx1 ↕ n_wire p ⟷ n_cup p)).
 Proof.
   unfold wrap_ubr.
-  rewrite stack_assoc_fwd, cast_compose_eq_mid_join.
-  cast_irrelevance.
-  rewrite <- stack_compose_distr, nwire_removal_r.
-  reflexivity.
+  zxpacat.
 Qed.
 
 
@@ -930,10 +799,8 @@ Lemma wrap_otl_transpose {n m o} zx :
 	(@wrap_otl n m o zx) ⊤ ∝= wrap_otr (zx ⊤).
 Proof.
 	unfold wrap_otl, wrap_otr.
-	cbn [transpose].
-	rewrite n_cap_transpose, cast_transpose.
-	cbn [transpose].
-	now rewrite !n_wire_transpose.
+  rewrite 2 transpose_to_big_yank_l.
+  zxpacat.
 Qed.
 
 Lemma wrap_otr_transpose {n m o} zx :
@@ -948,11 +815,8 @@ Lemma wrap_ubl_transpose {n m o} zx :
 	(@wrap_ubl n m o zx) ⊤ ∝= wrap_ubr (zx ⊤).
 Proof.
 	unfold wrap_ubl, wrap_ubr.
-	cbn [transpose].
-	rewrite cast_transpose.
-	cbn [transpose].
-	rewrite n_cap_transpose.
-	now rewrite !n_wire_transpose.
+  rewrite 2 transpose_to_big_yank_l.
+  zxpacat.
 Qed.
 
 Lemma wrap_ubr_transpose {n m o} zx :
@@ -1138,7 +1002,6 @@ Proof.
   zxsrw (left_triangle_state_b b).
   rewrite state_b_defn'.
   zxsrw (dominated_X_spider_fusion_top_right 0 0 1 1 (if b then PI else 0) 0).
-  rewrite Rplus_0_r.
   rewrite zx_invsqrt2_to_const, <- zx_of_const_mult'.
   rewrite zx_of_const_1' by C_field.
   destruct b.
@@ -1204,7 +1067,6 @@ Proof.
   destruct b.
   - zxsrw (@Z_spider_1_1_fusion 0 1 0 PI).
     zxsrw (@Z_spider_1_1_fusion 0 1 0 PI).
-    rewrite Rplus_0_l.
     rewrite fold_state_minus.
     zxsrw left_triangle_state_minus.
     zxsrw (Z_1_n_state1 1 PI).
@@ -1239,7 +1101,6 @@ Proof.
   zxsrw Hrw.
   clear Hrw.
   zxsrw (@Z_spider_1_1_fusion 0 2 0 PI).
-  rewrite Rplus_0_l.
   pose proof (f_equiv transpose JPV_2_7) as Hrw.
   cbn in Hrw.
   rewrite triangle_transpose in Hrw.
@@ -1247,7 +1108,6 @@ Proof.
   clear Hrw.
   zxsrw (dominated_X_spider_fusion_top_left 0 0 1 1 0 β).
   zxsrw (dominated_Z_spider_fusion_top_left 0 0 1 0 0 PI).
-  rewrite 2 Rplus_0_l.
   zxsrw (gadget_is_scaled_empty (X 0 1 0 ⟷ Z 1 0 0)).
   rewrite const_of_zx_X_0_1_0_Z_1_0_0.
   rewrite <- zx_of_const_mult'.
@@ -1273,15 +1133,12 @@ Proof.
     rewrite zx_of_const_1' by (cbn; C_field; lca).
     zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
     zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
-    rewrite Rplus_0_r.
     zxaclean_lhs.
     zxsrw <- (X_wrap_under_bot_left  1 1 PI eq_refl eq_refl).
     zxarw_rhs <- (X_wrap_under_bot_left  1 1 PI eq_refl eq_refl).
     zxsrw (@X_1_n_state_1 1 β).
     zxsrw (@X_spider_1_1_fusion 0 2 (PI + β) PI).
-    rewrite (X_Rmodeq_2PI _ β) by (exists (1 : BinInt.Z); lra).
     zxsrw (@X_1_n_state_1 2 PI).
-    rewrite (X_eq_2_PI _ _ (_ + _)) by lra.
     f_equiv.
     rewrite <- (X_proc_to_state 1 1 β).
     unfold proc_to_state.
@@ -1294,9 +1151,7 @@ Proof.
     rewrite <- zx_of_const_mult'.
     rewrite (f_equal zx_of_const (y:=/ C2)) by (cbn; C_field).
     zxsrw (dominated_Z_spider_fusion_top_right 0 0 1 0 0 0).
-    rewrite Rplus_0_r.
     zxsrw (dominated_Z_spider_fusion_top_left 0 0 1 1 0 0).
-    rewrite Rplus_0_r.
     zxsrw (Z_1_2_state_0 0).
     zxarw_rhs <- (X_wrap_under_bot_left 1 1 PI eq_refl eq_refl).
     zxsrw (to_gadget (Z_state_copy' false 2 PI eq_refl eq_refl)).
@@ -1304,7 +1159,6 @@ Proof.
     rewrite (f_equal zx_of_const (y:=/√2)) by
       (cbn; C_field; lca).
     zxsrw (dominated_Z_spider_fusion_top_right 0 0 1 0 0 0).
-    rewrite Rplus_0_r.
     zxsrw (Z_1_n_state0 0 0).
     zxsrw (@X_1_n_state_0 1 β).
     rewrite <- zx_of_const_mult'.
@@ -1355,10 +1209,9 @@ Proof.
     rewrite <- zx_of_const_mult'.
     rewrite zx_of_const_1' by (C_field; lca).
     zxsrw (dominated_Z_spider_fusion_bot_right 0 0 1 2 0 PI).
-    rewrite Rplus_0_l.
     zxsrw (dominated_X_spider_fusion_bot_right 0 0 1 1 0 0).
-    rewrite Rplus_0_r.
     rewrite X_0_is_wire.
+    rewrite !X_to_Z.
     zxfcat.
   }
   transitivity (Z 1 2 PI ⟷ (— ↕ (zx_triangle ⟷ Z 1 2 PI)) ⟷
@@ -1372,9 +1225,7 @@ Proof.
     rewrite <- zx_of_const_mult'.
     rewrite Cexp_PI'.
     zxsrw (dominated_Z_spider_fusion_bot_right 0 0 1 2 0 PI).
-    rewrite Rplus_0_l.
     zxsrw (dominated_X_spider_fusion_bot_right 0 0 1 1 PI 0).
-    rewrite Rplus_0_r.
     rewrite <- zx_of_const_mult'.
     rewrite zx_of_const_1' by (C_field; lca).
     zxscat.
@@ -1384,14 +1235,12 @@ Proof.
     symmetry.
     rewrite <- (Rplus_0_r PI).
     rewrite <- (@dominated_Z_spider_fusion_top_left 1 0 1 1).
-    rewrite Rplus_0_r.
     cbn.
     rewrite (X_wrap_over_top_left 1 1 0) at 1.
     zxsrw JPV_2_6.
 
     zxsrw (dominated_Z_spider_fusion_top_right 1 0 1 0 PI 0).
     zxsrw (dominated_Z_spider_fusion_bot_right 1 0 1 0 PI (PI + 0)).
-    rewrite (Z_eq_2_PI 2 0 (PI + _)) by lra.
     zxsrw <- (X_wrap_over_top_left 1 1 0).
     zxscat.
   }

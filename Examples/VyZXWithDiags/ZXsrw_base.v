@@ -18,7 +18,7 @@ From TensorRocq Require SizedProQuote. (* For visualization *)
 
 
 
-From TensorRocqEx Require Export ZXrwsymm ZXrwauto ZXrwfrob.
+From TensorRocqEx Require Export ZXrwsymm.
 
 
 
@@ -101,12 +101,3 @@ Notation SizedProLike' MS S T D :=
 
 #[export] Instance ZX_Frobenius_SizedProLike : SizedProLike' MFrobenius Frobenius ZXDVERT ZX := {}.
 
-
-(* FIXME: Move *)
-Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
-  btree_size f a = btree_size f b.
-Proof.
-  rewrite <- 2 sum_list_with_btree_elems.
-  f_equal.
-  now apply btree_elems_bpath in p.
-Qed.

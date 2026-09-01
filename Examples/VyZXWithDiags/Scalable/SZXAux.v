@@ -1404,8 +1404,7 @@ Proof.
     rewrite <- compose_assoc.
     rewrite cast_compose_eq_mid_join.
     rewrite 2 zx_mul_comm_S_l.
-    Ltac enable_timing ::= idtac.
-    Time zxpsrw (zxperm_transpose_left_inverse (zx_mul_S_r n n0 ↕ zx_mul_S_r n' n0) 
+    zxpsrw (zxperm_transpose_left_inverse (zx_mul_S_r n n0 ↕ zx_mul_S_r n' n0) 
       ltac:(auto_zxperm)).
     zxpsrw (zxperm_transpose_left_inverse (zx_mul_S_r m n0 ↕ zx_mul_S_r m' n0) 
       ltac:(auto_zxperm)).
