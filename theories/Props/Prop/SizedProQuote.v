@@ -784,12 +784,12 @@ Ltac2 mk_MPRO_PRO_quote_Monoidal () :=
     let (ts', mp) := map_PRO_with map_btree
         (map_Monoidal_with map_btree) pair ts p in
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
-    apply MPRO_PRO_quote_of_chain;
+    apply MPRO_PRO_quote_of_chain_Monoidal;
     let prf := mk_MPRO_PRO_chain_prf_Monoidal mp in 
     if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
       exact $prf
     else
-      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      let prf' := constr:(MPC_cast (EqDecision0:=Pos.eq_dec) _ _ _ _ _ $prf) in
       refine '($prf' $ca $cb _ _);
       refine '(BW.bpath_of_eq' _);
       reflexivity
@@ -811,7 +811,7 @@ Ltac2 mk_MPRO_PRO_denote_Monoidal () :=
     Std.unify cn ecn;
     Std.unify cm ecm;
     Std.unify ecp cp;
-    apply (MPRO_PRO_denote_of_refl _ $ca $cb $cmp $cn $cm $cp);
+    apply (MPRO_PRO_denote_of_refl_Monoidal _ $ca $cb $cmp $cn $cm $cp);
     reflexivity
   end.
 
@@ -854,12 +854,12 @@ Ltac2 mk_MPRO_PRO_quote_SymmetricG () :=
     let (ts', mp) := map_PRO_with map_btree
         (map_SymmetricG_with map_btree) pair ts p in
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
-    apply MPRO_PRO_quote_of_chain;
+    apply MPRO_PRO_quote_of_chain_SymmetricG;
     let prf := mk_MPRO_PRO_chain_prf_SymmetricG mp in 
     if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
       exact $prf
     else
-      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      let prf' := constr:(MPC_cast (EqDecision0:=Pos.eq_dec) _ _ _ _ _ $prf) in
       refine '($prf' $ca $cb _ _);
       refine '(BW.bpath_of_eq' _);
       reflexivity
@@ -880,7 +880,7 @@ Ltac2 mk_MPRO_PRO_denote_SymmetricG () :=
     Std.unify cn ecn;
     Std.unify cm ecm;
     Std.unify ecp cp;
-    apply (MPRO_PRO_denote_of_refl _ $ca $cb $cmp $cn $cm $cp);
+    apply (MPRO_PRO_denote_of_refl_SymmetricG _ $ca $cb $cmp $cn $cm $cp);
     reflexivity
   end.
 
@@ -923,12 +923,12 @@ Ltac2 mk_MPRO_PRO_quote_Autonomous () :=
     let (ts', mp) := map_PRO_with map_btree
         (map_Autonomous_with map_btree) pair ts p in
     let _cts := once (CC.extend_evar_ended_list ts' cts) in
-    apply MPRO_PRO_quote_of_chain;
+    apply MPRO_PRO_quote_of_chain_Autonomous;
     let prf := mk_MPRO_PRO_chain_prf_Autonomous mp in 
     if Bool.and (Constr.is_evar ca) (Constr.is_evar cb) then
       exact $prf
     else
-      let prf' := constr:(MPC_cast _ _ _ _ _ $prf) in
+      let prf' := constr:(MPC_cast (EqDecision0:=Pos.eq_dec) _ _ _ _ _ $prf) in
       refine '($prf' $ca $cb _ _);
       refine '(BW.bpath_of_eq' _);
       reflexivity
@@ -949,7 +949,7 @@ Ltac2 mk_MPRO_PRO_denote_Autonomous () :=
     Std.unify cn ecn;
     Std.unify cm ecm;
     Std.unify ecp cp;
-    apply (MPRO_PRO_denote_of_refl _ $ca $cb $cmp $cn $cm $cp);
+    apply (MPRO_PRO_denote_of_refl_Autonomous _ $ca $cb $cmp $cn $cm $cp);
     reflexivity
   end.
 

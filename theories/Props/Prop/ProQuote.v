@@ -5,7 +5,7 @@ Definition PRO_denote {Struct T T'} (f : T -> T') {n m}
   map_PRO (λ n m s, s) f p.
 
 Class PRO_quote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
-  `{Equiv T'} (f : T -> T') {n m}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
   (p : PRO Struct T n m) (p' : PRO Struct T' n m) :=
   quote_pro : PRO_denote f p ≡ p'.
 
@@ -15,6 +15,79 @@ Lemma mk_PRO_quote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
   PRO_denote f p ≡ p' -> PRO_quote f p p'.
 Proof.
   done.
+Qed.
+
+Lemma mk_PRO_quote_Monoidal {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Monoidal T n m) (p' : PRO Monoidal T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_quote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_quote_SymmetricG {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO SymmetricG T n m) (p' : PRO SymmetricG T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_quote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_quote_Autonomous {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Autonomous T n m) (p' : PRO Autonomous T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_quote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_quote_Frobenius {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Frobenius T n m) (p' : PRO Frobenius T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_quote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_quote' {Struct T} `{EqStruct : forall n m, Equiv (Struct n m),
+  EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Struct T n m) (p' : PRO Struct T' n m) : 
+  PRO_denote f p = p' -> PRO_quote f p p'.
+Proof.
+  intros <-; apply mk_PRO_quote; reflexivity.
+Qed.
+
+Lemma mk_PRO_quote'_Monoidal {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Monoidal T n m) (p' : PRO Monoidal T' n m) : 
+  PRO_denote f p = p' -> PRO_quote f p p'.
+Proof.
+  apply mk_PRO_quote'.
+Qed.
+
+Lemma mk_PRO_quote'_SymmetricG {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO SymmetricG T n m) (p' : PRO SymmetricG T' n m) : 
+  PRO_denote f p = p' -> PRO_quote f p p'.
+Proof.
+  apply mk_PRO_quote'.
+Qed.
+
+Lemma mk_PRO_quote'_Autonomous {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Autonomous T n m) (p' : PRO Autonomous T' n m) : 
+  PRO_denote f p = p' -> PRO_quote f p p'.
+Proof.
+  apply mk_PRO_quote'.
+Qed.
+
+Lemma mk_PRO_quote'_Frobenius {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Frobenius T n m) (p' : PRO Frobenius T' n m) : 
+  PRO_denote f p = p' -> PRO_quote f p p'.
+Proof.
+  apply mk_PRO_quote'.
 Qed.
 
 Class PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
@@ -28,6 +101,81 @@ Lemma mk_PRO_unquote {Struct T} `{EqStruct : forall n m, Equiv (Struct n m)}
   PRO_denote f p ≡ p' -> PRO_unquote f p p'.
 Proof.
   done.
+Qed.
+
+
+Lemma mk_PRO_unquote_Monoidal {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Monoidal T n m) (p' : PRO Monoidal T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_unquote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_unquote_SymmetricG {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO SymmetricG T n m) (p' : PRO SymmetricG T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_unquote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_unquote_Autonomous {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Autonomous T n m) (p' : PRO Autonomous T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_unquote f p p'.
+Proof.
+  done.
+Qed.
+
+Lemma mk_PRO_unquote_Frobenius {T}
+  `{EqT' : Equiv T'} (f : T -> T') {n m}
+  (p : PRO Frobenius T n m) (p' : PRO Frobenius T' n m) : 
+  PRO_denote f p ≡ p' -> PRO_unquote f p p'.
+Proof.
+  done.
+Qed.
+
+
+Lemma mk_PRO_unquote' {Struct T} `{EqStruct : forall n m, Equiv (Struct n m),
+  EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Struct T n m) (p' : PRO Struct T' n m) : 
+  PRO_denote f p = p' -> PRO_unquote f p p'.
+Proof.
+  intros <-; apply mk_PRO_unquote; reflexivity.
+Qed.
+
+Lemma mk_PRO_unquote'_Monoidal {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Monoidal T n m) (p' : PRO Monoidal T' n m) : 
+  PRO_denote f p = p' -> PRO_unquote f p p'.
+Proof.
+  apply mk_PRO_unquote'.
+Qed.
+
+Lemma mk_PRO_unquote'_SymmetricG {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO SymmetricG T n m) (p' : PRO SymmetricG T' n m) : 
+  PRO_denote f p = p' -> PRO_unquote f p p'.
+Proof.
+  apply mk_PRO_unquote'.
+Qed.
+
+Lemma mk_PRO_unquote'_Autonomous {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Autonomous T n m) (p' : PRO Autonomous T' n m) : 
+  PRO_denote f p = p' -> PRO_unquote f p p'.
+Proof.
+  apply mk_PRO_unquote'.
+Qed.
+
+Lemma mk_PRO_unquote'_Frobenius {T}
+  `{EqT' : Equiv T', EquivT' : Equivalence T' equiv} (f : T -> T') {n m}
+  (p : PRO Frobenius T n m) (p' : PRO Frobenius T' n m) : 
+  PRO_denote f p = p' -> PRO_unquote f p p'.
+Proof.
+  apply mk_PRO_unquote'.
 Qed.
 
 From Ltac2 Require Import Ltac2.
@@ -1681,7 +1829,7 @@ Ltac2 intify_PRO (ns : constr list) (p : ('n, 's, constr) PRO) : constr list * (
 Ltac2 deintify_PRO (ns : constr list) (p : ('n, 's, int) PRO) : ('n, 's, constr) PRO :=
   map_PRO id id (fun i => Ltac2.List.nth ns i) p.
 
-Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
+Ltac2 mk_PRO_quote_interp_discrete_hg_inhab_old () :=
   match! goal with
   | [|- PRO_quote (Struct:=?struct_T) (interp_discrete_hg_inhab (T:=?t_T) ?cts) 
     (n:=?_cn) (m:=?_cm) ?cqp ?cp] =>
@@ -1697,8 +1845,55 @@ Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
     reflexivity
   end.
 
+Ltac2 mk_PRO_quote_apply struct eqT' equivT' f p p' := 
+  let prf := lazy_match! struct with
+    | Monoidal => constr:(mk_PRO_quote'_Monoidal (EqT':=$eqT') (EquivT':=$equivT') $f $p $p')
+    | SymmetricG => constr:(mk_PRO_quote'_SymmetricG (EqT':=$eqT') (EquivT':=$equivT') $f $p $p')
+    | Autonomous => constr:(mk_PRO_quote'_Autonomous (EqT':=$eqT') (EquivT':=$equivT') $f $p $p')
+    | Frobenius => constr:(mk_PRO_quote'_Frobenius (EqT':=$eqT') (EquivT':=$equivT') $f $p $p')
+    | _ => constr:(mk_PRO_quote' (Struct:=$struct) (EqT':=$eqT') (EquivT':=$equivT') $f $p $p')
+    end in
+  refine '($prf _);
+  reflexivity.
+
+Ltac2 mk_PRO_quote_interp_discrete_hg_inhab () :=
+  lazy_match! goal with
+  | [|- PRO_quote (Struct:=?struct_T) (T':=?t_T) (EqT':=?eqT)
+    ?f
+    (n:=?_cn) (m:=?_cm) ?cqp ?cp] =>
+    let cts := lazy_match! f with
+      | interp_discrete_hg_inhab ?cts => cts
+      end in
+    let p := CC.of_PRO id id id cp in 
+    let ts := CC.of_evar_ended_list id cts in 
+    let (ts', pi) := (intify_PRO ts p) in 
+    let pi := map_PRO id id (fun x => CC.to_pos (Int.add x 1)) pi in 
+    let (_, _, cpi) := CC.to_PRO_safe struct_T '(positive) id id id pi in
+    let _cts := CC.extend_evar_ended_list ts' cts in 
+    Std.unify cqp cpi;
+    let equivT := '(_ : @Equivalence $t_T (@equiv _ $eqT)) in
+    mk_PRO_quote_apply struct_T eqT equivT f cpi cp
+  end.
+
+Ltac2 mk_PRO_unquote_tac () :=
+  let struct := lazy_match! goal with
+    | [|- PRO_unquote (Struct:=?struct) _ _ _] => struct 
+    end in 
+  ltac1:(struct |-
+  tryif unify struct Monoidal then
+    refine (mk_PRO_unquote'_Monoidal _ _ _ _)
+  else tryif unify struct SymmetricG then
+    refine (mk_PRO_unquote'_SymmetricG _ _ _ _)
+  else tryif unify struct Autonomous then
+    refine (mk_PRO_unquote'_Autonomous _ _ _ _)
+  else tryif unify struct Frobenius then
+    refine (mk_PRO_unquote'_Frobenius _ _ _ _)
+  else 
+    refine (mk_PRO_unquote' _ _ _ _)) (Ltac1.of_constr struct).
+
+
 Ltac2 mk_PRO_unquote_interp_discrete_hg_inhab () :=
-  refine '(mk_PRO_unquote _ _ _ _);
+  mk_PRO_unquote_tac ();
   ltac1:(lazy [PRO_denote map_PRO id interp_discrete_hg_inhab 
     list_pth head list_drop_pos tail]);
   reflexivity.

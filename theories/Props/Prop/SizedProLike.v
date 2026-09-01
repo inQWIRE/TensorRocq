@@ -578,6 +578,78 @@ Proof.
   constructor.
 Qed.
 
+Lemma MPRO_PRO_quote_of_chain_Monoidal
+  (fN : positive -> nat) {a b} (mp : MPRO MMonoidal positive a b)
+    {n m} (p : PRO Monoidal positive n m) : 
+    MPRO_PRO_chain fN mp p -> MPRO_PRO_quote fN mp p.
+Proof.
+  apply MPRO_PRO_quote_of_chain.
+Qed.
+
+Lemma MPRO_PRO_quote_of_chain_SymmetricG
+  (fN : positive -> nat) {a b} (mp : MPRO MSymmetric positive a b)
+    {n m} (p : PRO SymmetricG positive n m) : 
+    MPRO_PRO_chain fN mp p -> MPRO_PRO_quote fN mp p.
+Proof.
+  apply MPRO_PRO_quote_of_chain.
+Qed.
+
+Lemma MPRO_PRO_quote_of_chain_Autonomous
+  (fN : positive -> nat) {a b} (mp : MPRO MAutonomous positive a b)
+    {n m} (p : PRO Autonomous positive n m) : 
+    MPRO_PRO_chain fN mp p -> MPRO_PRO_quote fN mp p.
+Proof.
+  apply MPRO_PRO_quote_of_chain.
+Qed.
+
+Lemma MPRO_PRO_quote_of_chain_Frobenius
+  (fN : positive -> nat) {a b} (mp : MPRO MFrobenius positive a b)
+    {n m} (p : PRO Frobenius positive n m) : 
+    MPRO_PRO_chain fN mp p -> MPRO_PRO_quote fN mp p.
+Proof.
+  apply MPRO_PRO_quote_of_chain.
+Qed.
+
+Lemma MPRO_PRO_denote_of_refl_Monoidal
+  (fN : positive -> nat)
+  a b (mp : MPRO MMonoidal positive a b) n m (p : PRO Monoidal positive n m)
+    (Hmp : existT (P:=λ nm, PRO Monoidal positive nm.1 nm.2) (btree_size fN a, btree_size fN b) (MPRO_to_PRO fN mp) =
+      existT (P:=λ nm, PRO Monoidal positive nm.1 nm.2) (n, m) p) :
+    MPRO_PRO_denote fN mp p.
+Proof.
+  now apply MPRO_PRO_denote_of_refl.
+Qed.
+
+Lemma MPRO_PRO_denote_of_refl_SymmetricG
+  (fN : positive -> nat)
+  a b (mp : MPRO MSymmetric positive a b) n m (p : PRO SymmetricG positive n m)
+    (Hmp : existT (P:=λ nm, PRO SymmetricG positive nm.1 nm.2) (btree_size fN a, btree_size fN b) (MPRO_to_PRO fN mp) =
+      existT (P:=λ nm, PRO SymmetricG positive nm.1 nm.2) (n, m) p) :
+    MPRO_PRO_denote fN mp p.
+Proof.
+  now apply MPRO_PRO_denote_of_refl.
+Qed.
+
+Lemma MPRO_PRO_denote_of_refl_Autonomous
+  (fN : positive -> nat)
+  a b (mp : MPRO MAutonomous positive a b) n m (p : PRO Autonomous positive n m)
+    (Hmp : existT (P:=λ nm, PRO Autonomous positive nm.1 nm.2) (btree_size fN a, btree_size fN b) (MPRO_to_PRO fN mp) =
+      existT (P:=λ nm, PRO Autonomous positive nm.1 nm.2) (n, m) p) :
+    MPRO_PRO_denote fN mp p.
+Proof.
+  now apply MPRO_PRO_denote_of_refl.
+Qed.
+
+Lemma MPRO_PRO_denote_of_refl_Frobenius
+  (fN : positive -> nat)
+  a b (mp : MPRO MFrobenius positive a b) n m (p : PRO Frobenius positive n m)
+    (Hmp : existT (P:=λ nm, PRO Frobenius positive nm.1 nm.2) (btree_size fN a, btree_size fN b) (MPRO_to_PRO fN mp) =
+      existT (P:=λ nm, PRO Frobenius positive nm.1 nm.2) (n, m) p) :
+    MPRO_PRO_denote fN mp p.
+Proof.
+  now apply MPRO_PRO_denote_of_refl.
+Qed.
+
 (*
 Lemma MPRO_PRO_quote_exists' {N} {MStruct : Mor (btree N)} {Struct : Mor nat} {T}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
