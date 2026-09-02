@@ -622,7 +622,7 @@ Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
 Lemma graph_apply_hom_correct (f : T -> T') `{Hf : !Proper (equiv ==> equiv) f}
-  `{Hfhom : !TensorLikeHom R A f}
+  `{Hfhom : !TensorLikeHom id A f}
   {n m} (cohg : CospanHyperGraph T n m) :
   graph_semantics (SR:=SR) (graph_apply_hom f cohg) ≡ graph_semantics cohg.
 Proof.
@@ -646,7 +646,10 @@ Proof.
     destruct ((hedges cohg).(hyperedges) !! t) as [dt|]; [|done].
     cbn.
     constructor.
-    refine (interpretTensor_hom dt.1.1).
+    simpl.
+    intros n' m'.
+    erewrite <- (interpretTensor_hom dt.1.1).
+    now rewrite tensor_apply_hom_id.
   - eapply map_Forall_impl; [apply Hmr.2|].
     cbn.
     intros ? ?; apply SummedElement_iff.

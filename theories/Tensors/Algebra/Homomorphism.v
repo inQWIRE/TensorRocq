@@ -1,10 +1,5 @@
 Require Import Aux_stdpp Basics Setoid Morphisms Algebra.Definitions Summable.Definitions.
 
-(* FIXME: Move *)
-#[export] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); lia.
-Qed.
 
 
 Fixpoint nat2SR `{SR : SemiRing R rO rI radd rmul req} (n : nat) : R :=

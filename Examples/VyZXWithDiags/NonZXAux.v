@@ -33,49 +33,6 @@ Import GeneratorNotations.
 
 
 
-Module prf_notations.
-
-(* FIXME: Move *)
-Notation mul_1_r := (Nat.mul_1_r _).
-Notation mul_1_r' := (eq_sym (Nat.mul_1_r _)).
-Notation mul_1_l := (Nat.mul_1_l _).
-Notation mul_1_l' := (eq_sym (Nat.mul_1_l _)).
-
-(* FIXME: Move  *)
-Notation mul_add_distr_l := (Nat.mul_add_distr_l _ _ _).
-Notation mul_add_distr_l' := (eq_sym (Nat.mul_add_distr_l _ _ _)).
-Notation mul_add_distr_r := (Nat.mul_add_distr_r _ _ _).
-Notation mul_add_distr_r' := (eq_sym (Nat.mul_add_distr_r _ _ _)).
-
-(* FIXME: Move *)
-Notation mul_0_r := (Nat.mul_0_r _).
-Notation mul_0_r' := (eq_sym (Nat.mul_0_r _)).
-Notation mul_0_l := (Nat.mul_0_l _).
-Notation mul_0_l' := (eq_sym (Nat.mul_0_l _)).
-Notation add_0_r := (Nat.add_0_r _).
-Notation add_0_r' := (eq_sym (Nat.add_0_r _)).
-Notation add_0_l := (Nat.add_0_l _).
-Notation add_0_l' := (eq_sym (Nat.add_0_l _)).
-
-Notation add_assoc := (Nat.add_assoc _ _ _).
-Notation add_assoc' := (eq_sym (Nat.add_assoc _ _ _)).
-Notation mul_assoc := (Nat.mul_assoc _ _ _).
-Notation mul_assoc' := (eq_sym (Nat.mul_assoc _ _ _)).
-
-Notation add_comm := (Nat.add_comm _ _).
-Notation add_comm' := (eq_sym (Nat.add_comm _ _)).
-
-Notation mul_comm := (Nat.mul_comm _ _).
-Notation mul_comm' := (eq_sym (Nat.mul_comm _ _)).
-
-Notation twice_double := (eq_sym (Nat.double_twice _) : 2 * _ = _ + _).
-Notation twice_double_r := (eq_sym (Nat.double_twice _) : _ * 2 = _ + _).
-
-Notation double_twice := ((Nat.double_twice _) : _ + _ = 2 * _).
-Notation double_twice_r := ((Nat.double_twice _) : _ + _ = _ * 2).
-
-
-End prf_notations.
 
 Import prf_notations.
 
@@ -144,25 +101,3 @@ Qed.
 
 
 From TensorRocq Require Import BW BWSized.
-
-(* FIXME: Move *)
-Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
-  btree_size f a = btree_size f b.
-Proof.
-  rewrite <- 2 sum_list_with_btree_elems.
-  f_equal.
-  now apply btree_elems_bpath in p.
-Qed.
-
-Lemma btree_size_const_1 {A} {n : btree A} :
-  btree_size (λ _, 1) n = bsize n.
-Proof.
-  induction n; cbn; lia.
-Qed.
-
-Lemma bsize_eq_path {A n n'} (p : @bpath A n n') : bsize n = bsize n'.
-Proof.
-  rewrite <- 2 btree_size_const_1.
-  apply btree_size_eq_path.
-  done.
-Qed.

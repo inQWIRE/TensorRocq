@@ -521,9 +521,9 @@ Qed.
   Some_proper.
 
 #[export] Instance Some_TensorLikeHom `{TensorLike R rO rI radd rmul req A T} :
-  TensorLikeHom R A (@Some T).
+  TensorLikeHom (@id R) A (@Some T).
 Proof.
-  split.
+  split; [apply _..|].
   reflexivity.
 Qed.
 
@@ -559,9 +559,9 @@ Qed. *)
 
 Local Existing Instance positive_equiv.
 
-(* 
+(*
 Lemma graph_equiv_of_positive `{Equiv T, Equivalence T equiv}
-  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) 
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m)
   val val' oval oval' :
   CospanHyperGraphDenote (λ _, Some) tt val oval ->
   CospanHyperGraphDenote (λ _, Some) tt val' oval' ->
@@ -595,7 +595,7 @@ Qed.
 
 
 Lemma graph_syntactic_equiv_of_positive_inhab `{Equiv T, Equivalence T equiv, Inhabited T}
-  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m) 
+  (ctx : list T) {n m} (expr expr' : CospanHyperGraph positive n m)
   val val' :
   CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr val ->
   CospanHyperGraphQuote interp_discrete_hg_inhab ctx expr' val' ->

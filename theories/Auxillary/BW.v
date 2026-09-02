@@ -1773,3 +1773,62 @@ Fixpoint nat_to_btree_rassoc (n : nat) : btree () :=
 Time Compute
   let n := 200%nat in
   from_option (λ _, ()) () (may_bpath (nat_to_btree_lassoc n) (nat_to_btree_rassoc n)). *)
+
+
+Lemma btree_to_vec_to_list {A} (b : btree A) :
+  btree_to_vec b =@{list A} b.
+Proof.
+  induction b; [|done..].
+  cbn.
+  now rewrite vec_to_list_app; f_equal.
+Qed.
+Lemma sum_list_with_btree_elems {A} (f : A -> nat) (b : btree A) :
+  sum_list_with f b = btree_size f b.
+Proof.
+  induction b; [|done..].
+  cbn; now rewrite sum_list_with_app; f_equal.
+Qed.
+
+(* FIXME: Move *)
+Lemma btree_elems_fmap {A B} (f : A -> B) (b : btree A) :
+  btree_elems (f <$> b) =@{list _} f <$> (b :> list _).
+Proof.
+  induction b; [|done..].
+  cbn.
+  now rewrite fmap_app; congruence.
+Qed.
+
+Lemma bsize_fmap {A B} (f : A -> B) (b : btree A) :
+  bsize (f <$> b) = bsize b.
+Proof.
+  induction b; cbn; congruence.
+Qed.
+
+(* FIXME: Move *)
+Lemma bsize_eq_elems {N} {n m : btree N} : n =@{list N} m -> bsize n = bsize m.
+Proof.
+  rewrite <- 2 length_btree_elems.
+  now intros <-.
+Qed.
+
+
+Lemma btree_size_eq_path {N} {f : N -> nat} {a b : btree N} (p : bpath a b) :
+  btree_size f a = btree_size f b.
+Proof.
+  rewrite <- 2 sum_list_with_btree_elems.
+  f_equal.
+  now apply btree_elems_bpath in p.
+Qed.
+
+Lemma btree_size_const_1 {A} {n : btree A} :
+  btree_size (λ _, 1) n = bsize n.
+Proof.
+  induction n; cbn; lia.
+Qed.
+
+Lemma bsize_eq_path {A n n'} (p : @bpath A n n') : bsize n = bsize n'.
+Proof.
+  rewrite <- 2 btree_size_const_1.
+  apply btree_size_eq_path.
+  done.
+Qed.

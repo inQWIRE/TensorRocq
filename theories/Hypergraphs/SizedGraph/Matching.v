@@ -535,16 +535,10 @@ Definition exploded_interfaced_bw_sized_context {N} `{EqDecision N} {T}
   let '(f_g_equiv_classes, ctx) := exploded_interfaced_sized_context subcohg cohg me mv true_bnd in
   (f_g_equiv_classes,.) <$> bw_sized_graph_of_sized_graph (m:=(i + j) + m) ctx.
 
-Definition bw_sized_graph_runit_r {N T} {n m} (scohg : BWSizedCospanHyperGraph N T n (0 + m)) :
-  BWSizedCospanHyperGraph N T n m := {|
-    bw_scohg := scohg :> SizedCospanHyperGraph N T (bsize n) (bsize m);
-    bw_inputs := scohg.(bw_inputs);
-    bw_outputs := scohg.(bw_outputs);
-  |}.
 
 Definition make_bw_sized_pushout {N T} {i j} (subcohg : BWSizedCospanHyperGraph N T i j)
   {n m} (context : BWSizedCospanHyperGraph N T n ((i + j) + m)) : BWSizedCospanHyperGraph N T n m :=
-  bw_sized_graph_runit_r (compose_bw_sized_graphs context (stack_bw_sized_graphs
+  bw_sized_graph_lunit_r (compose_bw_sized_graphs context (stack_bw_sized_graphs
     (* (wrapunder_l subcohg) *)
     (compose_bw_sized_graphs (stack_bw_sized_graphs subcohg (id_bw_sized_graph j)) (cap_bw_sized_graph j))
     (id_bw_sized_graph m))).

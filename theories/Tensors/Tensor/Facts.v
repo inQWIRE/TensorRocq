@@ -5,7 +5,7 @@ From stdpp Require vector.
 Import vector.
 
 From TensorRocq Require Import Aux Aux_stdpp Tensor.Definitions.
-From TensorRocq Require Export Summable.
+From TensorRocq Require Export Summable Homomorphism.
 
 (* NB : We require a semiring (even though we use only equality)
   so typeclass inference is better-behaved *)
@@ -13,12 +13,59 @@ From TensorRocq Require Export Summable.
 
 (* A typeclass recording that a functions preserves the interpretation of
   tensors between two [TensorLike] types [T] and [T']. *)
-Class TensorLikeHom (R : Type) `{SR : SemiRing R rO rI radd rmul req}
+(* Class TensorLikeHom (R : Type) `{SR : SemiRing R rO rI radd rmul req}
   (A : Type) `{SA : Summable A, EQA : EqDecision A} `{Equiv T, Equiv T'}
   `{Equivalence T equiv, Equivalence T' equiv}
   `{!TensorLike R A T, !TensorLike R A T'}
   (f : T -> T') `{!Proper (equiv ==> equiv) f} := {
   interpretTensor_hom t : interpretTensor (f t) ≡ interpretTensor t
+}. *)
+
+
+Class TensorLikeHom
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+  (f : R -> R') (A : Type)
+  `{SA : Summable A, EQA : EqDecision A}
+  {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
+  `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
+  (fT : T -> T')
+  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'} := {
+  TLH_SRH :: SemiRingHomomorphism f;
+  TLH_proper : Proper (equiv ==> equiv) fT;
+  interpretTensor_hom t n m :
+    tensor_apply_hom f (interpretTensor t n m) ≡
+    interpretTensor (fT t) n m
+}.
+
+
+(* Class FreeStrictTensorLike
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
+    EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  {STL : forall `{SR : SemiRing R rO rI radd rmul req},
+    StrictTensorLike R A T} := {
+  strictInterpretTensor_free
+    `{SR : SemiRing R rO rI radd rmul req}
+    `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+    {n m} (t : T n m) :
+    tensor_apply_hom f (strictInterpretTensor t) ≡
+    strictInterpretTensor t
+}. *)
+
+Class StrictTensorLikeHom
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
+    EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  {STL : StrictTensorLike R A T}
+  {STL' : StrictTensorLike R' A T} := {
+  strictInterpretTensor_hom {n m} (t : T n m) :
+    tensor_apply_hom f (strictInterpretTensor t) ≡
+    strictInterpretTensor t
 }.
 
 
@@ -56,6 +103,40 @@ Proof.
   now eapply tensoreq_trans; [apply Ht|apply Ht'].
 Qed.
 
+
+Lemma tensor_equiv_alt
+  {n m} (t t' : @Tensor R n m A) :
+  t ≡ t' <-> Forall (λ v, Forall (λ w, req (t v w) (t' v w)) sum_elements) sum_elements.
+Proof.
+  rewrite Forall_forall.
+  setoid_rewrite Forall_forall.
+  unfold equiv, Tensor_equiv, tensoreq.
+  setoid_rewrite SummedElement_iff.
+  firstorder.
+Qed.
+
+#[export] Instance tensor_equiv_dec (HRdec : RelDecision req)
+  {n m} : RelDecision (≡@{@Tensor R n m A}).
+refine (fun t t' => cast_if (decide (Forall (λ v, Forall (λ w, req (t v w) (t' v w)) sum_elements) sum_elements)));
+abstract (now rewrite tensor_equiv_alt).
+Defined.
+
+Lemma tensor_equiv_to_bool
+  (reqb : R -> R -> bool) (Hreqb : forall r s, reqb r s = true <-> req r s)
+  {n m} (t t' : @Tensor R n m A) :
+  t ≡ t' <-> forallb (λ v, forallb (λ w, reqb (t v w) (t' v w)) sum_elements) sum_elements = true.
+Proof.
+  rewrite <- Is_true_true.
+  rewrite forallb_True.
+  rewrite tensor_equiv_alt.
+  f_equiv.
+  intros v.
+  rewrite forallb_True.
+  f_equiv.
+  intros w.
+  now rewrite Is_true_true, Hreqb.
+Qed.
+
 End tensoreq.
 
 Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
@@ -71,6 +152,7 @@ Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
   symmetry proved by dimensionlesstensoreq_symm
   transitivity proved by dimensionlesstensoreq_trans
   as dimensionlesstensoreq_setoid.
+
 
 
 
@@ -839,3 +921,212 @@ Section TensorOpsFacts.
 
 
 End TensorOpsFacts.
+
+
+Section TensorHom.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+
+Context `{SR' : SemiRing R' rO' rI' radd' rmul' req'}.
+
+Notation "0'" := rO'.
+Notation "1'" := rI'.
+Notation "x '=='' y" := (req' x y) (at level 70).
+Infix "+'" := radd' (at level 50, left associativity).
+Infix "*'" := rmul' (at level 40, left associativity).
+
+Add Ring R' : SR'.(RSRth)
+  (setoid SR'.(Req_equiv) SR'.(Req_ext)).
+
+Let Req_equivalence' : Equivalence req' := Req_equiv.
+Local Existing Instance Req_equivalence'.
+
+Let Radd_proper' := Req_ext.(SRadd_ext) : Proper (req' ==> req' ==> req') radd'.
+Local Existing Instance Radd_proper'.
+
+Let Rmul_proper' := Req_ext.(SRmul_ext) : Proper (req' ==> req' ==> req') rmul'.
+Local Existing Instance Rmul_proper'.
+
+
+
+#[export] Instance tensor_apply_hom_mor (f : R -> R')
+  {Hf : SemiRingHomomorphism f} {n m} `{SA : Summable A} :
+  Proper (equiv ==> equiv) (tensor_apply_hom f (n:=n) (m:=m) (A:=A)).
+Proof.
+  intros t t' Ht v w Hv Hw.
+  cbn.
+  apply Hf.
+  now apply Ht.
+Qed.
+
+Lemma tensor_apply_hom_delta (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {n} :
+  tensor_apply_hom f (delta_tensor (n:=n)) ≡ delta_tensor (A:=A) (n:=n).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_swap (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {n m} :
+  tensor_apply_hom f (swap_tensor (n:=n) (m:=m)) ≡ swap_tensor (A:=A).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_cup (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {n} :
+  tensor_apply_hom f (cup_tensor (n:=n)) ≡ cup_tensor (A:=A) (n:=n).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_cap (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {n} :
+  tensor_apply_hom f (cap_tensor (n:=n)) ≡ cap_tensor (A:=A) (n:=n).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_delta_spider (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {n m} :
+  tensor_apply_hom f (delta_spider_tensor (n:=n) (m:=m))
+    ≡ delta_spider_tensor (A:=A).
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  rewrite (sum_of_SRH f).
+  apply sum_of_ext.
+  intros a.
+  case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_delta_spider_bundled (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+  {k n m} :
+  tensor_apply_hom f (delta_spider_tensor_bundled k (n:=n) (m:=m))
+    ≡ delta_spider_tensor_bundled (A:=A) k.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  rewrite (SRH_Rlist_prod _).
+  apply Rlist_prod_ext.
+  rewrite Forall2_fmap_l.
+  rewrite Forall2_vlookup.
+  intros i.
+  cbn.
+  rewrite 2 vlookup_zip_with.
+  apply tensor_apply_hom_delta_spider; apply _.
+Qed.
+
+Lemma tensor_apply_hom_stack_tensor (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+  {n m o p} (t : Tensor n m A) (t' : Tensor o p A) :
+  tensor_apply_hom f (stack_tensor t t') ≡
+  stack_tensor (tensor_apply_hom f t) (tensor_apply_hom f t').
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_compose_tensor (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+  {n m o} (t : Tensor n m A) (t' : Tensor m o A) :
+  tensor_apply_hom f (compose_tensor t t') ≡
+  compose_tensor (tensor_apply_hom f t) (tensor_apply_hom f t').
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  rewrite (sum_of_SRH _).
+  apply sum_of_ext.
+  intros a.
+  apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_perm_tensor (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EQA : EqDecision A} 
+  {n m} (fi : fin n -> fin m) :
+  tensor_apply_hom f (perm_tensor fi) ≡
+  perm_tensor fi.
+Proof.
+  intros v w _ _; cbn; case_decide; apply Hf.
+Qed.
+
+Lemma tensor_apply_hom_tensor_to_dimensionless (f : R -> R')
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+  {n m} (t : @Tensor R n m A) n' m' : 
+  tensor_apply_hom f (tensor_to_dimensionless t n' m') ≡
+  tensor_to_dimensionless (tensor_apply_hom f t) n' m'.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  do 2 (destruct (vec_cast_opt _ _); cbn); 
+  [done|apply Hf..].
+Qed.
+
+
+Lemma tensor_apply_hom_id `{SA : Summable A} 
+  {n m} (t : @Tensor R n m A) :
+  tensor_apply_hom id t ≡ t.
+Proof.
+  done.
+Qed.
+
+Lemma tensor_apply_hom_ext_strong 
+  (f g : R -> R')
+  `{SA : Summable A} 
+  {n m} (t : @Tensor R n m A) 
+  (Hfg : forall v w, SummedElement v -> SummedElement w -> f (t v w) ==' g (t v w)):
+  tensor_apply_hom f t ≡ tensor_apply_hom g t.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  auto.
+Qed.
+
+Lemma tensor_apply_hom_ext
+  (f g : R -> R')
+  (Hfg : forall r, f r ==' g r) 
+  `{SA : Summable A} 
+  {n m} (t : @Tensor R n m A) :
+  tensor_apply_hom f t ≡ tensor_apply_hom g t.
+Proof.
+  intros v w Hv Hw.
+  cbn.
+  auto.
+Qed.
+
+End TensorHom.
+

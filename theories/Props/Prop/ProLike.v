@@ -714,6 +714,145 @@ Definition WithDiagrams T (D : Mor nat) : Type := T + BundledDiagram D.
 
 
 
+(* FIXME: Move *)
+#[export] Instance withDiagrams_equivalence
+  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})} :
+  Equivalence (≡@{WithDiagrams T D}) := _.
+
+#[export, program] Instance bundledDiagram_tensorLike {R}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EQA : EqDecision A}
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensD : StrictTensorLike R A D} : TensorLike R A (BundledDiagram D) := {
+  interpretTensor d n m :=
+    from_option strictInterpretTensor (const_tensor rO) (unbundleDiagram n m d)
+}.
+Next Obligation.
+  intros until D.
+  intros ? ? ?.
+  intros d d' Heq.
+  induction Heq.
+  cbn.
+  intros n m.
+  case_match; [|done].
+  case_match; [|done].
+  cbn.
+  subst.
+  case_match; [|done].
+  subst.
+  rewrite (proof_irrel _ eq_refl).
+  cbn.
+  now f_equiv.
+Qed.
+(* FIXME: Move *)
+#[export] Instance withDiagrams_tensorLike {R}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A, EQA : EqDecision A}
+  T `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  (TensT : TensorLike R A T)
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensD : StrictTensorLike R A D} : TensorLike R A (WithDiagrams T D) := {
+  interpretTensor t :=
+    sum_rect (λ _, DimensionlessTensor A)
+      interpretTensor interpretTensor t;
+  interpretTensorProper := sum_rect_proper _ _
+}.
+(* FIXME: Move *)
+Lemma unbundleDiagram_Some {D : Mor nat} (n m : nat)
+  (bd : BundledDiagram D) d :
+  unbundleDiagram n m bd = Some d <-> bd = bundleDiagram d.
+Proof.
+  split.
+  - unfold unbundleDiagram.
+    induction bd as [[n' m'] d'].
+    case_match; [|now intros [=]].
+    intros [= <-].
+    injection e.
+    intros <- <-.
+    rewrite (proof_irrel _ eq_refl).
+    cbn.
+    done.
+  - intros ->.
+    cbn [unbundleDiagram bundleDiagram].
+    case_match; [|done].
+    rewrite (proof_irrel _ eq_refl).
+    done.
+Qed.
+
+(* FIXME: Move *)
+Lemma unbundleDiagram_bundleDiagram {D : Mor nat} {n m : nat} (d : D n m) :
+  unbundleDiagram n m (bundleDiagram d) = Some d.
+Proof.
+  now apply unbundleDiagram_Some.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance morunion_leibniz {A} {Struct Struct' : Mor A}
+  `{EqStruct : forall n m, Equiv (Struct n m),
+    LeibStruct : forall n m, LeibnizEquiv (Struct n m)}
+  `{EqStruct' : forall n m, Equiv (Struct' n m),
+    LeibStruct' : forall n m, LeibnizEquiv (Struct' n m)} :
+    forall n m, LeibnizEquiv (MorUnion Struct Struct' n m).
+Proof.
+  intros n m p p' Hp.
+  induction Hp as [? ? Hp|? ? Hp]; apply leibniz_equiv in Hp; congruence.
+Qed.
+
+#[export] Instance Monoidal_leibniz n m : LeibnizEquiv (Monoidal n m).
+Proof.
+  easy.
+Qed.
+
+#[export] Instance Symmetry_leibniz n m : LeibnizEquiv (Symmetry n m).
+Proof.
+  easy.
+Qed.
+
+#[export] Instance Autonomy_leibniz n m : LeibnizEquiv (Autonomy n m).
+Proof.
+  easy.
+Qed.
+
+#[export] Instance Frobenial_leibniz n m : LeibnizEquiv (Frobenial n m).
+Proof.
+  easy.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance proper_from_symmetricg {n m} `{Reflexive T RT}
+  (f : SymmetricG n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+#[export] Instance proper_from_autonomous {n m} `{Reflexive T RT}
+  (f : Autonomous n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+#[export] Instance proper_from_frobenius {n m} `{Reflexive T RT}
+  (f : Frobenius n m -> T) :
+  Proper (equiv ==> RT) f.
+Proof.
+  intros s s' <-%leibniz_equiv.
+  done.
+Qed.
+
+
+
+
 (* The construction of rewriting using bundled diagrams, requiring only
   quoting structure *)
 

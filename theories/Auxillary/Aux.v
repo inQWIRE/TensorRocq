@@ -2,6 +2,7 @@
   really live somewhere else. *)
 
 Require Import Setoid.
+Require PArith.
 
 Lemma eq_reflexivity {A : Type} {RA : relation A} `{Reflexive A RA} x y : 
   x = y -> RA x y.
@@ -207,3 +208,67 @@ Tactic Notation "ereplace" uconstr(c) "with" uconstr(e) "in"
   let Hxe := fresh "Hxe" in
   remember c as x eqn:Hx in H |- *;
   assert (Hxe : x = e); [subst x|clear Hx; subst x; tac].
+
+
+
+
+Module prf_notations.
+Import PeanoNat.
+
+(* FIXME: Move *)
+Notation mul_1_r := (Nat.mul_1_r _).
+Notation mul_1_r' := (eq_sym (Nat.mul_1_r _)).
+Notation mul_1_l := (Nat.mul_1_l _).
+Notation mul_1_l' := (eq_sym (Nat.mul_1_l _)).
+
+(* FIXME: Move  *)
+Notation mul_add_distr_l := (Nat.mul_add_distr_l _ _ _).
+Notation mul_add_distr_l' := (eq_sym (Nat.mul_add_distr_l _ _ _)).
+Notation mul_add_distr_r := (Nat.mul_add_distr_r _ _ _).
+Notation mul_add_distr_r' := (eq_sym (Nat.mul_add_distr_r _ _ _)).
+
+(* FIXME: Move *)
+Notation mul_0_r := (Nat.mul_0_r _).
+Notation mul_0_r' := (eq_sym (Nat.mul_0_r _)).
+Notation mul_0_l := (Nat.mul_0_l _).
+Notation mul_0_l' := (eq_sym (Nat.mul_0_l _)).
+Notation add_0_r := (Nat.add_0_r _).
+Notation add_0_r' := (eq_sym (Nat.add_0_r _)).
+Notation add_0_l := (Nat.add_0_l _).
+Notation add_0_l' := (eq_sym (Nat.add_0_l _)).
+
+Notation add_assoc := (Nat.add_assoc _ _ _).
+Notation add_assoc' := (eq_sym (Nat.add_assoc _ _ _)).
+Notation mul_assoc := (Nat.mul_assoc _ _ _).
+Notation mul_assoc' := (eq_sym (Nat.mul_assoc _ _ _)).
+
+Notation add_comm := (Nat.add_comm _ _).
+Notation add_comm' := (eq_sym (Nat.add_comm _ _)).
+
+Notation mul_comm := (Nat.mul_comm _ _).
+Notation mul_comm' := (eq_sym (Nat.mul_comm _ _)).
+
+Notation twice_double := (eq_sym (Nat.double_twice _) : 2 * _ = _ + _).
+Notation twice_double_r := (eq_sym (Nat.double_twice _) : _ * 2 = _ + _).
+
+Notation double_twice := ((Nat.double_twice _) : _ + _ = 2 * _).
+Notation double_twice_r := ((Nat.double_twice _) : _ + _ = _ * 2).
+
+
+End prf_notations.
+
+(* FIXME: Move, to Aux? *)
+Ltac enable_timing :=
+  fail.
+
+Tactic Notation "time?" string(s) tactic3(tac) :=
+  tryif enable_timing then
+    idtac "Running" s"...";
+    time "time?_internal" tac
+  else tac.
+
+Tactic Notation "time?" tactic3(tac) :=
+  tryif enable_timing then
+    time "time?_internal" tac
+  else tac.
+

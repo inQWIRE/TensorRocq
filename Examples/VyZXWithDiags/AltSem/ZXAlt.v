@@ -182,13 +182,6 @@ Definition Qh_stack {n : nat} : @Tensor QC n n bool :=
 
 #[global] Arguments Qh_stack {_} _ _ / : assert.
 
-(* FIXME: Move *)
-Lemma xorb_if {A} (a a' : A) (b b' : bool) :
-  (if xorb b b' then a else a') =
-  if b then if b' then a' else a else if b' then a else a'.
-Proof.
-  destruct b, b'; done.
-Qed.
 
 Lemma QCinvsqrt2_pow_S n :
   QCinvsqrt2_pow (S n) == QCinvsqrt2_pow 1 * QCinvsqrt2_pow n.
@@ -312,7 +305,7 @@ Proof.
     inv_all_vec_fin.
     now rewrite decide_True by done.
   - rewrite Qh_stack_S.
-    rewrite (tensor_apply_hom_stack _ (n:=1) (m:=1)).
+    rewrite (tensor_apply_hom_stack_tensor _ (n:=1) (m:=1)).
     erewrite stack_tensor_mor; [|apply Qh_correct|apply IHn].
     intros v w _ _.
     inv_all_vec_fin; cbn.
@@ -405,15 +398,6 @@ Definition QZXC2ZXC : QZXCVERT -> ZXCVERT :=
   fmap (M:=option) (sum_map (prod_map Datatypes.id (λ z, IZR z * PI / 4)%R) QC2C).
 
 (* FIXME: Move *)
-#[export] Instance sum_map_proper `{RA : relation A, RA' : relation A',
-  RB : relation B, RB' : relation B'} (f : A -> B) (f' : A' -> B')
-  {Hf : Proper (RA ==> RB) f} {Hf' : Proper (RA' ==> RB') f'} :
-  Proper (sum_relation RA RA' ==> sum_relation RB RB') (sum_map f f').
-Proof.
-  intros a b Hab.
-  induction Hab; cbn; constructor; now f_equiv.
-Qed.
-
 Section Zfact.
 
 Local Open Scope Z_scope.
@@ -703,11 +687,11 @@ Ltac simplify_PRO_quote_tac :=
   let rec go :=
     let rhs := lazymatch goal with |- PRO_quote _ _ ?rhs => constr:(rhs) end in
     lazymatch rhs with
-    | Pcompose _ _ =>
-      apply (PRO_quote_compose f);
+    | Pcompose ?pl ?pr =>
+      eapply (PRO_quote_compose f _ pl _ pr);
       go
-    | Pstack _ _ =>
-      apply (PRO_quote_stack f);
+    | Pstack ?pl ?pr =>
+      eapply (PRO_quote_stack f _ pl _ pr);
       go
     | Pid _ =>
       apply (PRO_quote_id f)
@@ -905,10 +889,893 @@ Proof.
   done.
 Qed.
 
+#[export] Instance quote_zx_mat_zero n m :
+  GeneratorQuote zx_of_QC_tensor
+    (fun v w => 0%QC) (@zx_zero n m).
+Proof.
+  apply mk_quote_zx_mat.
+  rewrite zx_zero_semantics.
+  intros v w _ _.
+  cbn -[QC2C].
+  rewrite QC2C_Z.
+  done.
+Qed.
+
+#[export] Instance quote_zx_mat_invsqrt2 :
+  GeneratorQuote zx_of_QC_tensor
+    (fun v w => mkQC 0 1 0 0) (zx_invsqrt2).
+Proof.
+  apply mk_quote_zx_mat.
+  rewrite zx_invsqrt2_semantics.
+  intros v w _ _.
+  inv_all_vec_fin.
+  rewrite <- RtoC_inv.
+  lca.
+Qed.
+
+#[export] Instance quote_zx_mat_two :
+  GeneratorQuote zx_of_QC_tensor
+    (fun v w => mkQC 2 0 0 0) (zx_two).
+Proof.
+  apply mk_quote_zx_mat.
+  rewrite zx_two_defn.
+  intros v w _ _.
+  inv_all_vec_fin.
+  cbn.
+  rewrite Cexp_0.
+  lca.
+Qed.
+
+#[export] Instance quote_zx_mat_sqrt2 :
+  GeneratorQuote zx_of_QC_tensor
+    (fun v w => mkQC 0 2 0 0) (zx_sqrt2).
+Proof.
+  apply mk_quote_zx_mat.
+  rewrite zx_sqrt2_semantics.
+  intros v w _ _.
+  inv_all_vec_fin.
+  unfold tensor_of_matrix, scale.
+  cbn.
+  rewrite 2 Q2R_Z.
+  rewrite Rdiv_0_l, 2 Rplus_0_l.
+  change (?x, _) with (RtoC x).
+  rewrite RtoC_div.
+  C_field.
+Qed.
+
+
+
+From TensorRocqEx Require Import ZXrwsymm.
+
+Import ZXsymm.
+
+#[export] Instance QCeq_dec : RelDecision QCeq.
+refine (fun r s => cast_if (bool_dec (QCeqb r s) true));
+abstract(now rewrite <- QCeqb_iff; congruence).
+Defined.
+
+#[export] Instance QCtensor_dec n m : RelDecision (≡@{@Tensor QC n m bool}) :=
+  tensor_equiv_dec QCeq_dec.
+
+#[export] Instance QZXD2ZXD_TLH : TensorLikeHom' QC2C bool QZXD2ZXD.
+Proof.
+  split.
+  - apply _.
+  - apply _.
+  - intros t n m.
+    destruct t as [v|bd].
+    + destruct v as [[([], z) | qc]|]; cbn.
+      * now rewrite Qxsp_correct.
+      * now rewrite Qzsp_correct.
+      * done.
+      * rewrite (tensor_apply_hom_tensor_to_dimensionless _).
+        apply tensor_to_dimensionless_mor.
+        now rewrite Qh_stack_correct.
+    + induction bd as [(n', m') t].
+      cbn -[unbundleDiagram].
+      unfold unbundleDiagram.
+      destruct (nat_pair_eq_dec_eval _ _) as [e|e];
+        [|intros v w _ _; cbn -[QC2C]; solve_C_eq].
+      cbn.
+      injection e.
+      intros <- <-.
+      rewrite (proof_irrel e eq_refl).
+      cbn [eq_rect_r eq_rect eq_sym].
+      apply matrix_of_tensor_inj.
+      rewrite ZX_tensor_semantics_correct.
+      unfold zx_of_QC_tensor.
+      rewrite zx_of_matrix_semantics by auto_wf.
+      done.
+Qed.
+
+
+Ltac zxsolve_mid :=
+  eapply (PRO_semantics_eq_by_quote QC2C bool _ QZXD2ZXD (TLH:=QZXD2ZXD_TLH)).
+
+Ltac zxsolve :=
+  zxsbypro;
+  zxsolve_mid;
+  [apply _..|];
+  compute_done.
 
 
 
 
+Module JPV.
+
+(* Import ZXsymm ZXauto ZXfrob. *)
+
+Local Open Scope C_scope.
+
+Lemma zx_triangle_left_defn : zx_triangle_left = zx_triangle ⊤.
+Proof. reflexivity. Qed.
+
+Lemma zx_triangle_defn : zx_triangle = X 1 1 (PI / 2) ⟷ Z 1 1 (PI / 4) ⟷ (Z 0 1 (PI / 4) ↕ — ⟷ X 2 1 0)
+⟷ (Z 1 2 0 ⟷ (— ↕ (X 1 2 0 ⟷ (Z 1 0 (- PI / 4) ↕ Z 1 0 (- PI / 4))))).
+Proof. reflexivity. Qed.
+
+
+Lemma cup_is_controlized :
+  is_controlized ⊂
+  cupcap_controlizer.
+Proof.
+  unfold is_controlized, is_controlled_state.
+  split; zxsolve.
+Qed.
+
+Lemma box_is_controlized :
+  is_controlized □
+  box_controlizer.
+Proof.
+  unfold is_controlized, is_controlled_state.
+  split; zxsolve.
+Qed.
+
+Lemma X_1_2_is_controlized :
+  is_controlized (X 1 2 0)
+  X_1_2_controlizer.
+Proof.
+  unfold is_controlized, is_controlled_state.
+  split; zxsolve.
+Qed.
+
+Lemma JPV'_27 : Z 1 2 0 ⟷ (◁ ↕ —) ⟷ X 2 1 0 ∝= / √2 .* ◁.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma X_0_0_PI_zero : X 0 0 PI ∝= zx_zero.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_17 : (— ↕ X 0 2 PI) ⟷ ((Z 2 1 0 ⟷ ▷) ↕ ◁) ⟷ (Z 2 1 0) ∝=
+  /√ 2 .* (X 1 0 0 ⟷ Z 0 1 0).
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_4_a : (Z 0 3 0 ⟷ X 3 0 0) ↕ (Z 0 1 0 ⟷ X 1 0 0) ∝= ⦰.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_4_b : (Z 0 3 0 ⟷ X 3 0 0) ↕ (Z 0 3 0 ⟷ X 3 0 0) ↕ Z 0 0 0 ∝= ⦰.
+Proof.
+  zxsolve.
+Qed.
+
+
+(* Lemma JPV_2_5 α β : (Z 0 1 PI ⟷ X 1 0 α) ↕ (Z 0 1 PI ⟷ X 1 0 β) ∝=
+  (Z 0 1 PI ⟷ X 1 0 (α + β)) ↕ (Z 0 1 0 ⟷ X 1 0 0).
+Proof.
+  apply transpose_diagrams_eq.
+  cbn.
+  apply const_of_zx_inj.
+  rewrite 2 const_of_zx_stack.
+  rewrite const_of_zx_X_0_1_0_Z_1_0_0.
+  rewrite 3 const_of_zx_X_0_1_Z_1_0_gen.
+  rewrite 5 (Cexp_add).
+  rewrite Cexp_PI.
+  C_field.
+  lca.
+Qed. *)
+
+Lemma JPV_2_6 : Z 1 1 PI ⟷ X 1 2 0 ∝= X 1 2 0 ⟷ (Z 1 1 PI ↕ Z 1 1 PI).
+Proof.
+  zxsolve.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma fold_state_0 : X 0 1 0 ∝= √2 .* state_0.
+Proof.
+  zxsolve.
+Qed.
+Lemma fold_state_1 : X 0 1 PI ∝= √2 .* state_1.
+Proof.
+  zxsolve.
+Qed.
+
+
+Lemma JPV_2_7 : X 0 1 0 ⟷ zx_triangle ∝= Z 0 1 0 ↕ (Z 0 1 0 ⟷ X 1 0 0).
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_8 : X 0 1 0 ⟷ zx_triangle_left ∝= X 0 1 0.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_9 : X 0 1 PI ⟷ zx_triangle ∝= X 0 1 PI.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_10 : X 0 1 PI ⟷ zx_triangle_left ∝= Z 0 1 0 ↕ (Z 0 1 0 ⟷ X 1 0 0).
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_11 : X 1 1 PI ⟷ zx_triangle_left ∝= zx_triangle ⟷ X 1 1 PI.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_12 : Z 1 2 0 ⟷ (zx_triangle_left ↕ X 1 2 0) ⟷ (Z 2 1 0 ↕ —) ∝=
+  Z 1 2 0 ⟷ (X 1 2 0 ↕ zx_triangle_left) ⟷ (— ↕ Z 2 1 0).
+Proof.
+  zxsolve.
+Qed.
+
+
+
+Lemma JPV_2_13 : Z 1 2 0 ⟷ ((zx_triangle_left ⟷ Z 1 0 0) ↕ (zx_triangle ⟷ zx_triangle)) ∝=
+  zx_triangle ⟷ Z 1 2 0 ⟷ ((zx_triangle_left ⟷ Z 1 0 0) ↕ —).
+Proof.
+  zxsolve.
+Qed.
+
+(* FIXME: Move *)
+Lemma triangle_left_transpose : zx_triangle_left ⊤ = zx_triangle.
+Proof.
+  rewrite zx_triangle_left_defn.
+  apply transpose_involutive_eq.
+Qed.
+Lemma zx_invsqrt2_defn' : zx_invsqrt2 ∝= Z 0 3 0 ⟷ X 3 0 0.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_14 : (Z 0 1 0 ⟷ zx_triangle) ↕
+  (Z 0 1 0 ⟷ zx_triangle_left) ⟷ Z 2 1 0 ∝= Z 0 0 0 ↕ Z 0 1 0.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_15 : Z 1 2 0 ⟷ (□ ↕ zx_triangle_left) ⟷ Z 2 1 0 ∝=
+  (Z 0 3 0 ⟷ X 3 0 0) ↕
+  zx_triangle_left ⟷ Z 1 1 PI.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_16 : Z 1 2 0 ⟷ (zx_triangle ↕ zx_triangle_left) ⟷ Z 2 1 0 ∝= —.
+Proof.
+  zxsolve.
+Qed.
+
+Local Open Scope C_scope.
+Import Complex.
+
+(* FIXME: Move *)
+Lemma const_of_zx_zero : const_of_zx zx_zero = 0.
+Proof.
+  unfold const_of_zx.
+  rewrite zx_zero_semantics.
+  done.
+Qed.
+Lemma zx_of_const_0 : zx_of_const 0 ∝= zx_zero.
+Proof.
+  zxsolve.
+Qed.
+Lemma Z_2_1_0_states_b b c :
+  state_b b ↕ state_b c ⟷ Z 2 1 0 ∝=
+  (if eqb b c then state_b b else zx_zero).
+Proof.
+  destruct b, c; zxsolve.
+Qed.
+
+
+Lemma JPV_2_17' : Z 1 2 0 ⟷ (zx_triangle ↕ (X 1 1 PI ⟷ zx_triangle_left)) ⟷ Z 2 1 0 ∝=
+  (X 0 3 0 ⟷ Z 3 0 0) ↕ (X 1 0 0 ⟷ Z 0 1 0).
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_18_a : (Z 0 1 0 ⟷ X 1 0 0) ↕
+  ((— ↕ Z 1 2 0) ⟷ ((X 2 1 PI ⟷ zx_triangle_left) ↕
+  zx_triangle_left) ⟷ Z 2 1 0) ∝=
+  zx_triangle_left ↕ zx_triangle_left ⟷ Z 2 1 0.
+Proof.
+  zxsbypro.
+  zxsolve_mid; [apply _..|].
+  apply tensor_equiv_alt.
+  Import Aux.
+  vm_eval (sum_elements).
+  constructor; [|admit].
+  constructor; [|admit].
+  vm_eval (PRO_semantics _ _ _).
+  zxsolve.
+Qed.
+
+Lemma JPV_2_18_b : (Z 0 1 0 ⟷ X 1 0 0) ↕
+  ((— ↕ Z 1 2 0) ⟷ ((X 2 1 0 ⟷ zx_triangle) ↕
+  zx_triangle) ⟷ Z 2 1 0) ∝=
+  zx_triangle ↕ zx_triangle ⟷ Z 2 1 0.
+Proof.
+  zxsolve.
+Qed.
+
+(* FIXME: Remove when in VyZX: *)
+
+
+Definition wrap_otl {n m o} (zx : ZX (n + m) o) : ZX m (n + o) :=
+  n_cap n ↕ n_wire m ⟷
+    cast _ _ (eq_sym (Nat.add_assoc _ _ _)) eq_refl (n_wire n ↕ zx).
+
+Definition wrap_otr {n m o} (zx : ZX n (m + o)) : ZX (m + n) o :=
+  cast _ _ eq_refl (eq_sym (Nat.add_assoc _ _ _)) (n_wire m ↕ zx)
+  ⟷ (n_cup m ↕ n_wire o).
+
+Definition wrap_ubl {n m o} (zx : ZX (n + m) o) : ZX n (o + m) :=
+  cast _ _ (eq_sym (Nat.add_0_r _))
+    (eq_sym (Nat.add_assoc _ _ _)) (n_wire n ↕ n_cap m) ⟷
+    (zx ↕ n_wire m).
+
+Definition wrap_ubr {n m o} (zx : ZX n (m + o)) : ZX (n + o) m :=
+  (zx ↕ n_wire o) ⟷
+    cast _ _ (eq_sym (Nat.add_assoc _ _ _))
+      (eq_sym (Nat.add_0_r _)) (n_wire m ↕ n_cup o).
+Import Setoid.
+
+Add Parametric Morphism {n m o} : (@wrap_otl n m o) with signature
+  proportional_by_1 ==> proportional_by_1 as wrap_otl_mor.
+Proof.
+  unfold wrap_otl.
+  now intros ? ? ->.
+Qed.
+
+Add Parametric Morphism {n m o} : (@wrap_otr n m o) with signature
+  proportional_by_1 ==> proportional_by_1 as wrap_otr_mor.
+Proof.
+  unfold wrap_otr.
+  now intros ? ? ->.
+Qed.
+
+Add Parametric Morphism {n m o} : (@wrap_ubl n m o) with signature
+  proportional_by_1 ==> proportional_by_1 as wrap_ubl_mor.
+Proof.
+  unfold wrap_ubl.
+  now intros ? ? ->.
+Qed.
+
+Add Parametric Morphism {n m o} : (@wrap_ubr n m o) with signature
+  proportional_by_1 ==> proportional_by_1 as wrap_ubr_mor.
+Proof.
+  unfold wrap_ubr.
+  now intros ? ? ->.
+Qed.
+
+
+Global Arguments wrap_otl : simpl never.
+Global Arguments wrap_otr : simpl never.
+Global Arguments wrap_ubl : simpl never.
+Global Arguments wrap_ubr : simpl never.
+
+Import CastRules.
+
+Lemma cast_compose_mid_distribute {n n' m o o' : nat}
+  (m' : nat) (prfm : m' = m) (zx0 : ZX n m) (zx1 : ZX m o)
+  prfn prfo :
+  cast n' o' prfn prfo (zx0 ⟷ zx1) =
+  cast n' m' prfn prfm zx0 ⟷ cast m' o' prfm prfo zx1.
+Proof.
+  subst.
+  reflexivity.
+Qed.
+
+
+From TensorRocqEx Require Import ZXsrwsymm ZXsrwauto.
+Import ZXmsymm.
+  Import SizedProQuote.
+  Import SizedRewriting SizedProLike.
+  Import SizedPropsGraphs PropsGraphs.
+Import ZXauto ZXmauto.
+
+Import BWQuote.
+
+Typeclasses Opaque n_cap n_cup.
+
+Lemma wrap_otl_otr {n m o} (zx : ZX n (m + o)) :
+  wrap_otl (wrap_otr zx) ∝= zx.
+Proof.
+  unfold wrap_otl, wrap_otr.
+  zxpacat.
+Qed.
+
+Lemma wrap_otr_otl {n m o} (zx : ZX (n + m) o) :
+  wrap_otr (wrap_otl zx) ∝= zx.
+Proof.
+  unfold wrap_otl, wrap_otr.
+  zxpacat.
+Qed.
+
+
+
+Lemma wrap_ubl_ubr {n m o} (zx : ZX n (m + o)) :
+  wrap_ubl (wrap_ubr zx) ∝= zx.
+Proof.
+  unfold wrap_ubl, wrap_ubr.
+  zxpacat.
+Qed.
+
+
+Lemma wrap_ubr_ubl {n m o} (zx : ZX (n + m) o) :
+  wrap_ubr (wrap_ubl zx) ∝= zx.
+Proof.
+  unfold wrap_ubl, wrap_ubr.
+  zxpacat.
+Qed.
+
+
+Lemma wrap_over_top_left {n m o} (zx zx' : ZX (n + m) o) :
+  wrap_otl zx ∝= wrap_otl zx' ->
+	zx ∝= zx'.
+Proof.
+  intros Hzx%wrap_otr_mor.
+  now rewrite 2 wrap_otr_otl in Hzx.
+Qed.
+
+Lemma wrap_over_top_right {n m o} zx zx' :
+  wrap_otr zx ∝= @wrap_otr n m o zx' ->
+	zx ∝= zx'.
+Proof.
+  intros Hzx%wrap_otl_mor.
+  now rewrite 2 wrap_otl_otr in Hzx.
+Qed.
+
+Lemma wrap_under_bottom_left {n m o} (zx zx' : ZX (n + m) o) :
+  wrap_ubl zx ∝= wrap_ubl zx' ->
+	zx ∝= zx'.
+Proof.
+  intros Hzx%wrap_ubr_mor.
+  now rewrite 2 wrap_ubr_ubl in Hzx.
+Qed.
+
+Lemma wrap_under_bottom_right {n m o} zx zx' :
+  wrap_ubr zx ∝= @wrap_ubr n m o zx' ->
+	zx ∝= zx'.
+Proof.
+  intros Hzx%wrap_ubl_mor.
+  now rewrite 2 wrap_ubl_ubr in Hzx.
+Qed.
+
+
+Lemma wrap_otl_compose {n m o p} (zx0 : ZX (n + m) o) (zx1 : ZX o p) :
+  wrap_otl (zx0 ⟷ zx1) ∝= wrap_otl zx0 ⟷ (n_wire n ↕ zx1).
+Proof.
+  unfold wrap_otl.
+  rewrite stack_nwire_distribute_l, <- cast_compose_l_eq_mid.
+  rewrite compose_assoc.
+  reflexivity.
+Qed.
+
+Lemma wrap_otr_compose {n m o p} (zx0 : ZX n m) (zx1 : ZX m (o + p)) :
+  wrap_otr (zx0 ⟷ zx1) ∝= (n_wire o ↕ zx0) ⟷ wrap_otr zx1.
+Proof.
+  unfold wrap_otr.
+  rewrite stack_nwire_distribute_l, <- cast_compose_r_eq_mid.
+  rewrite compose_assoc.
+  reflexivity.
+Qed.
+
+
+Lemma wrap_ubl_compose {n m o p} (zx0 : ZX (n + m) o) (zx1 : ZX o p) :
+  wrap_ubl (zx0 ⟷ zx1) ∝= wrap_ubl zx0 ⟷ (zx1 ↕ n_wire m).
+Proof.
+  unfold wrap_ubl.
+  rewrite stack_nwire_distribute_r.
+  rewrite compose_assoc.
+  reflexivity.
+Qed.
+
+Lemma wrap_ubr_compose {n m o p} (zx0 : ZX n m) (zx1 : ZX m (o + p)) :
+  wrap_ubr (zx0 ⟷ zx1) ∝= (zx0 ↕ n_wire p) ⟷ wrap_ubr zx1.
+Proof.
+  unfold wrap_ubr.
+  rewrite stack_nwire_distribute_r.
+  rewrite compose_assoc.
+  reflexivity.
+Qed.
+
+Lemma wrap_otl_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
+  wrap_otl (zx0 ↕ zx1) ∝=
+  cast o _ eq_refl (Nat.add_assoc _ _ _) (proc_to_state zx0 ↕ zx1).
+Proof.
+  unfold wrap_otl, proc_to_state.
+  zxpacat.
+Qed.
+
+Lemma wrap_otr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
+  wrap_otr (zx0 ↕ zx1) ∝=
+  cast _ _ (Nat.add_assoc _ _ _) eq_refl ((n_wire m ↕ zx0 ⟷ n_cup m) ↕ zx1).
+Proof.
+  unfold wrap_otr.
+  zxpacat.
+Qed.
+
+
+Lemma wrap_ubl_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
+  wrap_ubl (zx0 ↕ zx1) ∝=
+  cast _ _ (eq_sym (Nat.add_0_r _)) (eq_sym (Nat.add_assoc _ _ _))
+    (zx0 ↕ (n_cap o ⟷ (zx1 ↕ n_wire o))).
+Proof.
+  unfold wrap_ubl.
+  zxpacat.
+Qed.
+
+Lemma wrap_ubr_stack {n m o p} (zx0 : ZX n m) (zx1 : ZX o p) :
+  wrap_ubr (zx0 ↕ zx1) ∝=
+  cast _ _ (eq_sym (Nat.add_assoc _ _ _)) (eq_sym (Nat.add_0_r _))
+    (zx0 ↕ (zx1 ↕ n_wire p ⟷ n_cup p)).
+Proof.
+  unfold wrap_ubr.
+  zxpacat.
+Qed.
+
+
+
+Lemma wrap_otl_transpose {n m o} zx :
+	(@wrap_otl n m o zx) ⊤ ∝= wrap_otr (zx ⊤).
+Proof.
+	unfold wrap_otl, wrap_otr.
+  rewrite 2 transpose_to_big_yank_l.
+  zxpacat.
+Qed.
+
+Lemma wrap_otr_transpose {n m o} zx :
+	(@wrap_otr n m o zx) ⊤ ∝= wrap_otl (zx ⊤).
+Proof.
+	apply transpose_diagrams_eq.
+	rewrite wrap_otl_transpose.
+	now rewrite 2!transpose_involutive.
+Qed.
+
+Lemma wrap_ubl_transpose {n m o} zx :
+	(@wrap_ubl n m o zx) ⊤ ∝= wrap_ubr (zx ⊤).
+Proof.
+	unfold wrap_ubl, wrap_ubr.
+  rewrite 2 transpose_to_big_yank_l.
+  zxpacat.
+Qed.
+
+Lemma wrap_ubr_transpose {n m o} zx :
+	(@wrap_ubr n m o zx) ⊤ ∝= wrap_ubl (zx ⊤).
+Proof.
+	apply transpose_diagrams_eq.
+	rewrite wrap_ubl_transpose.
+	now rewrite 2!transpose_involutive.
+Qed.
+
+#[export] Hint Rewrite
+  @wrap_otl_transpose @wrap_otr_transpose
+  @wrap_otl_transpose @wrap_otr_transpose : transpose_db.
+
+
+Lemma wrap_otl_colorswap {n m o} zx :
+	⊙ (@wrap_otl n m o zx) ∝= wrap_otl (⊙ zx).
+Proof.
+	unfold wrap_otl.
+	cbn [color_swap].
+	rewrite n_cap_colorswap, cast_colorswap.
+	cbn [color_swap].
+	now rewrite !n_wire_colorswap.
+Qed.
+
+Lemma wrap_otr_colorswap {n m o} zx :
+	⊙ (@wrap_otr n m o zx) ∝= wrap_otr (⊙ zx).
+Proof.
+	unfold wrap_otr.
+	cbn [color_swap].
+	rewrite n_cup_colorswap, cast_colorswap.
+	cbn [color_swap].
+	now rewrite !n_wire_colorswap.
+Qed.
+
+Lemma wrap_ubl_colorswap {n m o} zx :
+	⊙ (@wrap_ubl n m o zx) ∝= wrap_ubl (⊙ zx).
+Proof.
+	unfold wrap_ubl.
+	cbn [color_swap].
+	rewrite cast_colorswap.
+	cbn [color_swap].
+	rewrite n_cap_colorswap.
+	now rewrite !n_wire_colorswap.
+Qed.
+
+Lemma wrap_ubr_colorswap {n m o} zx :
+	⊙ (@wrap_ubr n m o zx) ∝= wrap_ubr (⊙ zx).
+Proof.
+	unfold wrap_ubr.
+	cbn [color_swap].
+	rewrite cast_colorswap.
+	cbn [color_swap].
+	rewrite n_cup_colorswap.
+	now rewrite !n_wire_colorswap.
+Qed.
+
+#[export] Hint Rewrite
+  @wrap_otl_colorswap @wrap_otr_colorswap
+  @wrap_otl_colorswap @wrap_otr_colorswap : colorswap_db.
+
+
+(* FIXME: Move *)
+Lemma zx_of_const_transpose c : (zx_of_const c) ⊤ ∝= zx_of_const c.
+Proof.
+  prep_matrix_equivalence; rewrite semantics_transpose_comm; now by_cell.
+Qed.
+Lemma fold_state_plus : Z 0 1 0 ∝= √ 2 .* state_plus.
+Proof.
+  zxsolve.
+Qed.
+Lemma fold_state_minus : Z 0 1 PI ∝= √ 2 .* state_minus.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_19 : (— ↕ (Z 1 2 0 ⟷ (zx_triangle ↕ zx_triangle_left))) ⟷
+  (X 2 1 PI ↕ —) ⟷ Z 2 1 0 ∝=
+  ((Z 1 2 0 ⟷ (zx_triangle_left ↕ zx_triangle)) ↕ —) ⟷
+  (— ↕ X 2 1 PI) ⟷ Z 2 1 0.
+Proof.
+  zxsolve.
+Qed.
+
+(* FIXME: Move *)
+Lemma zx_invsqrt2_to_const :
+  zx_invsqrt2 ∝= zx_of_const (/ √ 2).
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_20 : (Z 0 1 0 ⟷ X 1 0 0) ↕ (Z 1 2 0 ⟷ (— ↕ zx_triangle_left) ⟷ X 2 1 0) ∝=
+  zx_triangle_left.
+Proof.
+  zxsolve.
+Qed.
+
+(* FIXME: Move *)
+Lemma triangle_state_plus : state_plus ⟷ zx_triangle ∝= state_plus .+ / √ 2 .* state_1.
+Proof.
+  prep_matrix_equivalence.
+  rewrite zx_compose_spec.
+  rewrite zx_triangle_semantics.
+  rewrite zx_plus_semantics, zx_scale_semantics.
+  rewrite state_plus_semantics, state_1_semantics.
+  by_cell; lca.
+Qed.
+
+Lemma triangle_state_minus : state_minus ⟷ zx_triangle ∝= / √ 2 .* state_0.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma left_triangle_state_plus : state_plus ⟷ zx_triangle_left ∝= state_plus .+ / √ 2 .* state_0.
+Proof.
+  prep_matrix_equivalence.
+  rewrite zx_compose_spec.
+  rewrite zx_triangle_left_semantics.
+  rewrite zx_plus_semantics, zx_scale_semantics.
+  rewrite state_plus_semantics, state_0_semantics.
+  by_cell; lca.
+Qed.
+
+Lemma left_triangle_state_minus : state_minus ⟷ zx_triangle_left ∝= - / √ 2 .* state_1.
+Proof.
+  zxsolve.
+Qed.
+
+Lemma JPV_2_21 : zx_triangle_left ⟷ Z 1 1 PI ⟷ zx_triangle_left ⟷ Z 1 1 PI
+  ∝= Z 1 1 PI ⟷ zx_triangle_left ⟷ Z 1 1 PI ⟷ zx_triangle_left.
+Proof.
+  zxsolve.
+Qed.
+
+(* FIXME: Unstateable! Lemma JPV_2_22 : ... *)
+
+Lemma JPV_2_23 β : X 0 1 PI ⟷ zx_triangle_left ⟷ Z 1 2 PI ⟷
+  (zx_triangle_left ↕ X 1 2 β) ⟷ ((Z 2 1 PI ⟷ X 1 0 0) ↕ —) ∝=
+  (Z 0 1 0 ⟷ X 1 0 0) ↕ (Z 0 1 PI ⟷ X 1 1 β).
+Proof.
+  zxsrw JPV_2_10.
+  zxsrw (gadget_is_scaled_empty (Z 0 1 0 ⟷ X 1 0 0)).
+  zxsrw (gadget_is_scaled_empty (Z 0 1 0 ⟷ X 1 0 0)).
+  f_equiv.
+  pose proof (f_equiv transpose (to_gadget (X_state_copy 0 2 PI eq_refl eq_refl))) as Hrw.
+  rewrite Rmult_0_l, Cexp_0, Cexp_PI in Hrw.
+  cbn in Hrw.
+  rewrite zx_of_const_transpose in Hrw.
+  zxsrw Hrw.
+  clear Hrw.
+  zxsrw (@Z_spider_1_1_fusion 0 2 0 PI).
+  pose proof (f_equiv transpose JPV_2_7) as Hrw.
+  cbn in Hrw.
+  rewrite triangle_transpose in Hrw.
+  zxsrw Hrw.
+  clear Hrw.
+  zxsrw (dominated_X_spider_fusion_top_left 0 0 1 1 0 β).
+  zxsrw (dominated_Z_spider_fusion_top_left 0 0 1 0 0 PI).
+  zxsrw (gadget_is_scaled_empty (X 0 1 0 ⟷ Z 1 0 0)).
+  rewrite const_of_zx_X_0_1_0_Z_1_0_0.
+  rewrite <- zx_of_const_mult'.
+  replace (Cmult _ _) with C1 by (autorewrite with RtoC_db; C_field; lca).
+  rewrite <- zx_scale_defn, zx_scale_1_l.
+  zxscat.
+Qed.
+
+
+
+Lemma JPV_2_24 β : Z 1 2 0 ⟷ ((zx_triangle ⟷ X 1 1 β) ↕ (zx_triangle_left ⟷ X 1 1 β))
+  ⟷ (— ↕ Z 1 2 0) ⟷ (X 2 1 PI ↕ —) ∝=
+  Z 1 2 0 ⟷ (zx_triangle ↕ zx_triangle_left)
+  ⟷ (— ↕ Z 1 2 0) ⟷ (X 2 1 PI ↕ X 1 1 β).
+Proof.
+  apply prop_eq_by_eq_on_state_b_1_n.
+  intros b.
+  do 2 zxsrw (Z_1_2_state_b 0 b).
+  do 2 zxsrw (triangle_state_b b).
+  do 2 zxsrw (left_triangle_state_b b).
+  f_equiv.
+  destruct b.
+  - zxsrw (to_gadget (Z_state_copy' false 1 β eq_refl eq_refl)).
+    rewrite zx_of_const_1' by (cbn; C_field; lca).
+    zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
+    zxsrw (@Z_spider_1_1_fusion 0 2 0 0).
+    zxaclean_lhs.
+    zxsrw <- (X_wrap_under_bot_left  1 1 PI eq_refl eq_refl).
+    zxarw_rhs <- (X_wrap_under_bot_left  1 1 PI eq_refl eq_refl).
+    zxsrw (@X_1_n_state_1 1 β).
+    zxsrw (@X_spider_1_1_fusion 0 2 (PI + β) PI).
+    zxsrw (@X_1_n_state_1 2 PI).
+    f_equiv.
+    rewrite <- (X_proc_to_state 1 1 β).
+    unfold proc_to_state.
+    zxacat.
+  - zxsrw (to_gadget (Z_state_copy' false 1 β eq_refl eq_refl)).
+    rewrite zx_of_const_1' by (cbn; C_field; lca).
+    zxsrw (@X_1_n_state_0 1 β).
+    zxarw_lhs <- (X_wrap_under_bot_left  1 1 PI eq_refl eq_refl).
+    zxsrw (to_gadget (Z_state_copy' false 2 PI eq_refl eq_refl)).
+    rewrite <- zx_of_const_mult'.
+    rewrite (f_equal zx_of_const (y:=/ C2)) by (cbn; C_field).
+    zxsrw (dominated_Z_spider_fusion_top_right 0 0 1 0 0 0).
+    zxsrw (dominated_Z_spider_fusion_top_left 0 0 1 1 0 0).
+    zxsrw (Z_1_2_state_0 0).
+    zxarw_rhs <- (X_wrap_under_bot_left 1 1 PI eq_refl eq_refl).
+    zxsrw (to_gadget (Z_state_copy' false 2 PI eq_refl eq_refl)).
+    symmetry.
+    rewrite (f_equal zx_of_const (y:=/√2)) by
+      (cbn; C_field; lca).
+    zxsrw (dominated_Z_spider_fusion_top_right 0 0 1 0 0 0).
+    zxsrw (Z_1_n_state0 0 0).
+    zxsrw (@X_1_n_state_0 1 β).
+    rewrite <- zx_of_const_mult'.
+    rewrite (f_equal zx_of_const (y:=/ C2)) by C_field.
+    zxscat.
+Qed.
+
+(* FIXME: Move *)
+Lemma to_const (zx : ZX 0 0) : zx ∝= zx_of_const (const_of_zx zx).
+Proof.
+  apply const_of_zx_inj.
+  now rewrite const_of_zx_of_const.
+Qed.
+
+Lemma Z_2_1_states_b b c α :
+  state_b b ↕ state_b c ⟷ Z 2 1 α ∝=
+  (if eqb b c then (if b then Cexp α else C1) .* state_b b else zx_zero).
+Proof.
+  rewrite <- (Rplus_0_l α), <- Z_spider_1_1_fusion.
+  rewrite <- compose_assoc.
+  rewrite (Z_2_1_0_states_b b c).
+  destruct (eqb b c); [|now rewrite compose_0_l].
+  rewrite (Z_1_n_state_b b 1 α).
+  rewrite Rplus_0_l, n_stack_1, 2 cast_id_eq.
+  done.
+Qed.
+
+
+Lemma JPV_2_25 :
+  (X 1 1 PI ⟷ Z 1 2 0) ↕
+  (X 0 1 0 ⟷ Z 1 2 PI) ⟷
+  (— ↕ (zx_triangle_left ↕ zx_triangle ⟷ Z 2 2 PI) ↕ —) ⟷
+  (X 2 1 0 ↕ X 2 1 0) ⟷ ⨉ ∝=
+  - C1 .*
+  (Z 1 2 PI) ↕
+  (X 0 1 PI ⟷ Z 1 2 PI) ⟷
+  (— ↕ (zx_triangle ↕ zx_triangle_left ⟷ Z 2 2 PI) ↕ —) ⟷
+  (X 2 1 0 ↕ X 2 1 0).
+Proof.
+  zxsolve.
+Qed.
+
+
+Fixpoint JPV_2_22_lhs_aux n : ZX (1 + (1 + n)) 1 :=
+  match n with
+  | 0 => Z (1 + 1) 1 0
+  | S n =>
+    — ↕ ((Z (1 + 1) 1 0 ⟷ zx_triangle_left) ↕ n_wire n) ⟷ JPV_2_22_lhs_aux n
+  end.
+
+
+
+Lemma JPV_2_22_aux :
+  ⊂ ⟷ (◁ ↕ —) ⟷ Z 2 1 0 ∝= Z 0 1 0.
+Proof.
+  zxsolve.
+Qed.
+
+
+(* @nocheck name *)
+(* Conventional name *)
+Lemma completeness_BW :
+	◁ ⟷ Z 1 1 PI ⟷ ▷ ∝= ▷ ⟷ X 1 1 PI.
+Proof.
+  zxsbypro.
+  zxsolve_mid; [apply _..|].
+  apply tensor_equiv_alt.
+  Import Aux.
+  vm_eval (sum_elements).
+  apply Forall_cons.
+  split; [|admit].
+  apply Forall_cons.
+  split; [|admit].
+  vm_eval (PRO_semantics _ _ _).
+
+  remember QCeq as f.
+  vm_compute.
+  zxsolve.
+Qed.
+
+Ring_polynom.Pol
+
+Lemma JPV_2_22 n :
+  Z 0 1 0 ↕ Z 0 1 0 ↕ n_wire n ⟷ JPV_2_22_lhs_aux n ∝=
+  (⊂ ⟷ (zx_triangle_left ↕ —)) ↕ n_wire n ⟷ JPV_2_22_lhs_aux n.
+Proof.
+  assert (n = 2) as -> by admit.
+  cbn.
+  zxsolve.
+  induction n.
+  - cbn.
+    zxfclean.
+    zxsrw JPV_2_22_aux.
+    done.
+  - cbn -[n_wire].
+
+    zxpsrw_rhs JPV_2_22_aux.
+
+  assert (n = 1)%nat as -> by admit.
+  cbn.
+  zxsclean.
+  zxfclean. *)
+
+
+(* Lemma JPV_2_26 *)
+
+End JPV.
 (* Goal True.
 eassert (Quote_R_div_PI4 _ ((- PI / 12 * -6 + /4 * - 4 * PI * / - 4))).
 apply _.

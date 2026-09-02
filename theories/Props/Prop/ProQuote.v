@@ -1,3 +1,4 @@
+From stdpp Require Import tactics. 
 From TensorRocq Require Import Props ProLike PropsGraphs PropGraphTerm Translation.AbstractTensorQuote.
 
 Definition PRO_denote {Struct T T'} (f : T -> T') {n m}
@@ -177,6 +178,56 @@ Lemma mk_PRO_unquote'_Frobenius {T}
 Proof.
   apply mk_PRO_unquote'.
 Qed.
+
+
+Lemma PRO_denote_semantics
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
+    EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STL : StrictTensorLike R A Struct}
+  {STL' : StrictTensorLike R' A Struct}
+  {STLH : StrictTensorLikeHom f A Struct}
+  {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
+  `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
+  (fT : T -> T')
+  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
+  {TLH : TensorLikeHom f A fT}
+  {n m} (p : PRO Struct T n m) :
+  PRO_semantics (PRO_denote fT p) ≡
+  tensor_apply_hom f (PRO_semantics p).
+Proof.
+  apply (map_PRO_id_semantics f A Struct fT p).
+Qed.
+
+Lemma PRO_semantics_eq_by_quote `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
+    EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STL : StrictTensorLike R A Struct}
+  {STL' : StrictTensorLike R' A Struct}
+  {STLH : StrictTensorLikeHom f A Struct}
+  {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
+  `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
+  (fT : T -> T')
+  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
+  {TLH : TensorLikeHom f A fT}
+  {n m} (dp dq : PRO Struct T n m) (p q : PRO Struct T' n m) :
+  PRO_quote fT dp p -> PRO_quote fT dq q ->
+  PRO_semantics dp ≡@{@Tensor _ n m A} PRO_semantics dq ->
+  PRO_semantics p ≡@{@Tensor _ n m A} PRO_semantics q.
+Proof.
+  intros Hp Hq Hdpq.
+  rewrite <- (Hp : _ ≡ _), <- (Hq : _ ≡ _).
+  rewrite 2 (PRO_denote_semantics f A _ fT).
+  f_equiv.
+  done.
+Qed.
+
 
 From Ltac2 Require Import Ltac2.
 From TensorRocq Require Import Ltac2.ConstrExtra Ltac2.FSetExtra.
@@ -2202,4 +2253,3 @@ mk_PRO_quote_interp_discrete_hg_inhab (). *)
 (* Ltac2 Eval CC.of_PRO_safe (Int.add) CC.of_nat (fun s => s) CC.of_pos
   '((Pgen 1 2 xH ;; Pgen 1 2 10%positive * Pgen 1 0 5%positive)%pro : PROP positive _ _). *)
 
-  

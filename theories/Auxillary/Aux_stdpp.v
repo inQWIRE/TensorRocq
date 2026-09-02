@@ -1,5 +1,5 @@
 (* Extra bits for stdpp *)
-Require Combinators.
+Require Combinators StrictProp.
 Require Import SetoidList SetoidPermutation.
 From stdpp Require Import decidable.
 From TensorRocq Require Import Aux.
@@ -771,6 +771,26 @@ Proof.
 Qed.
 
 
+Lemma fin_perm_inv_cast_eq_of_cancel {n m} (Hnm : n = m) (f : fin n -> fin m)
+  {Hf : Inj eq eq f} (fi : fin m -> fin n) :
+  Cancel eq f fi ->
+  fin_perm_inv_cast Hnm f ≡ fi.
+Proof.
+  subst.
+  intros Hffi.
+  rewrite fin_perm_inv_cast_id.
+  intros i.
+  apply (fin_perm_inv_spec f).
+  apply Hffi.
+Qed.
+
+Lemma fin_perm_inv_cast_fin_prod_comm {n m} (Hnm : n * m = m * n) :
+  fin_perm_inv_cast Hnm fin_prod_comm ≡ fin_prod_comm.
+Proof.
+  apply fin_perm_inv_cast_eq_of_cancel; apply _.
+Qed.
+
+
 Fixpoint list_split {A} (P : A -> Prop) {HP : forall a, Decision (P a)}
   (l : list A) : list A * list A :=
   match l with
@@ -1305,4 +1325,123 @@ Qed.
 #[export] Instance fin_add_comm_inj {n m} : Inj eq eq (@fin_add_comm n m).
 Proof.
   apply cancel_inj.
+Qed.
+
+
+
+(* FIXME: Move *)
+Lemma fmap_const' {A B} (a : A) (l : list B) :
+  (λ _, a) <$> l = replicate (length l) a.
+Proof.
+  apply fmap_const.
+Qed.
+
+Lemma sum_list_with_const {A} (n : nat) (l : list A) :
+  sum_list_with (λ _, n) l = length l * n.
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma list_bind_const {A B} (l : list A) (l' : list B) :
+  (_ ← l; l') = concat (replicate (length l) l').
+Proof.
+  induction l; cbn; congruence.
+Qed.
+
+Lemma fun_to_vec_mul {A} {n m} (f : fin (n * m) -> A) :
+  fun_to_vec f =
+  vjoin (fun_to_vec (λ i, fun_to_vec (λ j, f (fin_prod i j)))).
+Proof.
+  apply vec_eq; intros i.
+  rewrite lookup_vjoin, 3 lookup_fun_to_vec.
+  rewrite <- uncurry_alt, fin_prod_split.
+  done.
+Qed.
+
+
+
+Module Canonize.
+
+Require Import StrictProp.
+
+Definition dec_unsquash `{Decision P} (p : Squash P) : P :=
+  match decide P with
+  | left HP => HP
+  | right HnP => sEmpty_rect _ (let '(squash HP) := p in match (HnP HP) with end)
+  end.
+
+Lemma dec_unsquash_defn `{Decision P} (p : Squash P) :
+  dec_unsquash p =
+  match decide P with
+  | left HP => HP
+  | right HnP => sEmpty_rect _ (let '(squash HP) := p in match (HnP HP) with end)
+  end.
+Proof.
+  done.
+Qed.
+
+Opaque dec_unsquash.
+
+Lemma dec_unsquash_squash `{Decision P} (p : P) :
+  dec_unsquash (squash p) =
+  match decide P with
+  | left HP => HP
+  | right HnP => False_rect _ (HnP p)
+  end.
+Proof.
+  rewrite dec_unsquash_defn.
+  case_decide; done.
+Qed.
+
+Definition canonize `{Decision P} (p : P) : P :=
+  dec_unsquash (squash p).
+
+Lemma canonize_canonical `{Decision P} (p q : P) : canonize p = canonize q.
+Proof.
+  done.
+Qed.
+
+End Canonize.
+
+
+(* FIXME: Move *)
+#[export] Instance sum_equivalence {A B} `{EqA : Equiv A,
+  EquivA : Equivalence A equiv,
+  EqB : Equiv B, EquivB : Equivalence B equiv} :
+  @Equivalence (A + B) equiv.
+Proof.
+  split.
+  - now intros []; constructor.
+  - now intros ? ? []; constructor.
+  - intros ? ? ? Hab Hbc.
+    induction Hab; inversion Hbc; subst; constructor;
+    etransitivity; eauto.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma xorb_if {A} (a a' : A) (b b' : bool) :
+  (if xorb b b' then a else a') =
+  if b then if b' then a' else a else if b' then a else a'.
+Proof.
+  destruct b, b'; done.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance sum_map_proper `{RA : relation A, RA' : relation A',
+  RB : relation B, RB' : relation B'} (f : A -> B) (f' : A' -> B')
+  {Hf : Proper (RA ==> RB) f} {Hf' : Proper (RA' ==> RB') f'} :
+  Proper (sum_relation RA RA' ==> sum_relation RB RB') (sum_map f f').
+Proof.
+  intros a b Hab.
+  induction Hab; cbn; constructor; now f_equiv.
+Qed.
+
+#[export] Instance sum_rect_proper `{RA : relation A, RB : relation B, RC : relation C}
+  (f : A -> C) (g : B -> C) {Hf : Proper (RA ==> RC) f} {Hg : Proper (RB ==> RC) g} :
+  Proper (sum_relation RA RB ==> RC) (sum_rect (λ _, C) f g).
+Proof.
+  intros a b Hab.
+  induction Hab; cbn; now f_equiv.
 Qed.

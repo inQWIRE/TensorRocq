@@ -1275,3 +1275,143 @@ Fixpoint Pstack_n {Struct T} (k : nat) {n m} (d : PRO Struct T n m) :
 
 
 (* Lemma Pdelta_semantics_alt *)
+
+Section STLH.
+
+Context `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A, WFA : WFSummable A}.
+
+#[export] Instance STLH_morunion 
+  (T : Mor nat) `{EqT : ∀ n m, Equiv (T n m),
+    EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  (T' : Mor nat) `{EqT' : ∀ n m, Equiv (T' n m),
+    EquivT' : ∀ n m, @Equivalence (T' n m) equiv}
+  {STL : StrictTensorLike R A T}
+  {STL' : StrictTensorLike R' A T}
+  {ST'L : StrictTensorLike R A T'}
+  {ST'L' : StrictTensorLike R' A T'} 
+  {STLH : StrictTensorLikeHom f A T}
+  {ST'LH : StrictTensorLikeHom f A T'} : 
+  StrictTensorLikeHom f A (MorUnion T T').
+Proof.
+  split.
+  intros n m [t|t']; cbn; apply strictInterpretTensor_hom.
+Qed.
+
+
+
+#[export] Instance STLH_Monoidal : 
+  StrictTensorLikeHom f A Monoidal.
+Proof.
+  split.
+  intros n m t.
+  rewrite Monoidal_semantics.
+  rewrite (tensor_apply_hom_perm_tensor _).
+  rewrite <- Monoidal_semantics.
+  done.
+Qed.
+
+#[export] Instance STLH_Symmetry : 
+  StrictTensorLikeHom f A Symmetry.
+Proof.
+  split.
+  intros n m [n' m'].
+  cbn.
+  apply (tensor_apply_hom_swap _).
+Qed.
+
+#[export] Instance STLH_Autonomy : 
+  StrictTensorLikeHom f A Autonomy.
+Proof.
+  split.
+  intros n m [k|k];
+  cbn;
+  [apply (tensor_apply_hom_cup _)|apply (tensor_apply_hom_cap _)].
+Qed.
+
+#[export] Instance STLH_Frobenial : 
+  StrictTensorLikeHom f A Frobenial.
+Proof.
+  split.
+  intros n m t;
+  induction t as [|n m|k n m];
+  cbn.
+  - apply (tensor_apply_hom_delta_spider _).
+  - apply (tensor_apply_hom_delta_spider _).
+  - apply (tensor_apply_hom_delta_spider_bundled _).
+Qed.
+
+#[export] Instance STLH_SymmetricG : 
+  StrictTensorLikeHom f A SymmetricG := _.
+
+#[export] Instance STLH_Autonomous : 
+  StrictTensorLikeHom f A Autonomous := _.
+
+#[export] Instance STLH_Frobenius : 
+  StrictTensorLikeHom f A Frobenius := _.
+
+End STLH.
+  
+
+
+
+Lemma map_PRO_id_semantics
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
+    EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STL : StrictTensorLike R A Struct}
+  {STL' : StrictTensorLike R' A Struct}
+  {STLH : StrictTensorLikeHom f A Struct}
+  {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
+  `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
+  (fT : T -> T')
+  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
+  {TLH : TensorLikeHom f A fT}
+  {n m} (p : PRO Struct T n m) :
+  PRO_semantics (map_PRO (λ _ _ s, s) fT p) ≡
+  tensor_apply_hom f (PRO_semantics p).
+Proof.
+  induction p.
+  - cbn.
+    now rewrite tensor_apply_hom_delta.
+  - cbn.
+    rewrite tensor_apply_hom_compose_tensor by done.
+    apply compose_tensor_mor; done.
+  - cbn.
+    rewrite tensor_apply_hom_stack_tensor by done.
+    apply stack_tensor_mor; done.
+  - cbn.
+    rewrite strictInterpretTensor_hom.
+    done.
+  - cbn.
+    rewrite TLH.(interpretTensor_hom).
+    done.
+Qed.
+
+#[export] Instance PRO_semantics_equiv
+  `{SR : SemiRing R rO rI radd rmul req}
+  {A : Type} `{SA : Summable A, EQA : EqDecision A}
+  {Struct : Mor nat} `{EqS : ∀ n m, Equiv (Struct n m),
+    EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {T} `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {STL : StrictTensorLike R A Struct}
+  {TensT : TensorLike R A T} {n m} : 
+  Proper ((≡@{PRO Struct T n m}) ==> (≡@{@Tensor R n m A})) PRO_semantics.
+Proof.
+  intros p q Hpq.
+  induction Hpq.
+  - done.
+  - cbn.
+    now f_equiv.
+  - cbn.
+    now apply interpretTensorProper.
+  - cbn.
+    now apply compose_tensor_mor.
+  - cbn.
+    now apply stack_tensor_mor.
+Qed.

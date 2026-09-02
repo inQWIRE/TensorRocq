@@ -464,21 +464,6 @@ Tactic Notation "specialize_with_concr_asgn_list" constr(hrw) constr(c) :=
 
 
 
-(* FIXME: Move, to Aux? *)
-Ltac enable_timing :=
-  fail.
-
-Tactic Notation "time?" string(s) tactic3(tac) :=
-  tryif enable_timing then
-    idtac "Running" s"...";
-    time "time?_internal" tac
-  else tac.
-
-Tactic Notation "time?" tactic3(tac) :=
-  tryif enable_timing then
-    time "time?_internal" tac
-  else tac.
-
 
 
 

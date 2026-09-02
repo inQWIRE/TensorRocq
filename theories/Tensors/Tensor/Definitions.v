@@ -277,6 +277,16 @@ Section TensorOps.
 End TensorOps.
 
 
+Definition tensor_apply_hom {R R'} (f : R -> R')
+  {n m A} (t : @Tensor R n m A) : @Tensor R' n m A :=
+  fun v w => f (t v w).
+
+#[global] Arguments tensor_apply_hom {_ _} _ {_ _ _} _ _ _ / : assert.
+
+
+
+
+
 Definition MorUnion {A B} (T T' : A -> B -> Type) : A -> B -> Type :=
   λ a b, (T a b + T' a b)%type.
 
@@ -294,13 +304,6 @@ Definition MorUnion {A B} (T T' : A -> B -> Type) : A -> B -> Type :=
   `{EquivT' : forall n m, @Equivalence (T' n m) equiv} :
   forall n m, Equivalence (≡@{MorUnion T T' n m}) := λ n m, sum_relation_equiv _ _.
 
-#[local] Instance sum_rect_proper `{RA : relation A, RB : relation B, RC : relation C}
-  (f : A -> C) (g : B -> C) {Hf : Proper (RA ==> RC) f} {Hg : Proper (RB ==> RC) g} :
-  Proper (sum_relation RA RB ==> RC) (sum_rect (λ _, C) f g).
-Proof.
-  intros a b Hab.
-  induction Hab; cbn; now f_equiv.
-Qed.
 
 
 #[export] Instance strictTensorLike_MorUnion
