@@ -5762,7 +5762,7 @@ Proof.
     (intros [r'|l']; [f_equal/=; lia|]);
     (cbn;
     case_decide as Hl'; cbn;
-    [rewrite lengthN_correct_rel_rev; f_equal; lia|];
+    [rewrite lengthN_correct_rev; f_equal; lia|];
     rewrite list_index_eq_find;
     destruct (list_find _ _) as [[n ?]|]; done).
 Qed.

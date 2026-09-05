@@ -888,3 +888,11 @@ Proof.
   - split; intros [] [] [] [] [] []; split; cbn in *; f_equiv; done.
   - split; apply _.
 Qed.
+
+#[global] Instance Prop_SemiRing : SemiRing Prop False True or and iff.
+Proof.
+  split.
+  - split; tauto.
+  - split; apply _.
+  - apply (_ : Equivalence iff).
+Qed.

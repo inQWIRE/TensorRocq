@@ -2,7 +2,7 @@ From TensorRocq Require Import Summable.
 (* Require StringCustomNotation. *)
 
 From TensorRocq Require Import Syntax.Definitions.
-From TensorRocq Require Tensor.
+From TensorRocq Require Import Rel.Definitions.
 
 From TensorRocq Require Import Aux_pos Aux_stdpp PropAux.
 
@@ -19,69 +19,7 @@ From stdpp Require Import functions list.
 (* FIXME: Move *)
 
 
-
-Add Parametric Morphism : relabel_bounds with signature
-  pointwise_relation _ eq ==> eq ==>
-  eq as relabel_bound_mor.
-Proof.
-  intros f g Hfg v.
-  now apply relabel_bounds_ext.
-Qed.
-
-
-Add Parametric Morphism A B : (@mbind list list_bind A B) with signature
-  pointwise_relation A eq ==> eq ==> eq as list_bind_mor.
-Proof.
-  intros; apply list_bind_ext; naive_solver.
-Qed.
-
 (* FIXME: Move *)
-#[export] Instance Prop_SemiRing : SemiRing Prop False True or and iff.
-Proof.
-  split.
-  - split; tauto.
-  - split; apply _.
-  - apply (_ : Equivalence iff).
-Qed.
-
-Import Tensor.
-
-Definition Rel A n m := vec A n -> vec A m -> Prop.
-#[export] Instance Rel_equiv A n m : Equiv (Rel A n m) :=
-  fun R S => ∀ v w, R v w <-> S v w.
-#[export] Instance Rel_equivalence A n m : Equivalence (≡@{Rel A n m}) :=
-  (_ : Equivalence (pointwise_relation _ (pointwise_relation _ iff))).
-
-
-Definition id_rel {A} (n : nat) : Rel A n n := eq.
-Definition compose_rel {A} {n m o}
-  (R : Rel A n m) (S : Rel A m o) : Rel A n o :=
-  λ u w, ∃ v, R u v /\ S v w.
-Definition stack_rel {A} {n m n' m'}
-  (R : Rel A n m) (R' : Rel A n' m') : Rel A (n + n') (m + m') :=
-  fun v w => R (vsplitl v) (vsplitl w) /\ R' (vsplitr v) (vsplitr w).
-Definition rel_of_tensor {A n m} (t : @Tensor Prop n m A) : Rel A n m := t.
-Definition swap_rel {A} (n m : nat) : Rel A (n + m) (m + n) :=
-  fun v w =>
-  v = vsplitr w +++ vsplitl w.
-Definition transpose_rel {A n m} (R : Rel A n m) : Rel A m n :=
-  fun v w => R w v.
-Definition cup_rel {A} (n : nat) : Rel A 0 (n + n) :=
-  fun _ v => vsplitl v = vsplitr v.
-Definition cap_rel {A} (n : nat) : Rel A (n + n) 0 :=
-  fun v _ => vsplitl v = vsplitr v.
-
-Definition DimensionlessRel A := forall n m, Rel A n m.
-#[export] Instance DimensionlessRel_equiv A : Equiv (DimensionlessRel A) :=
-  fun A B => ∀ n m, A n m ≡ B n m.
-#[export] Instance DimensionlessRel_equivalence A : Equivalence (≡@{DimensionlessRel A}).
-Proof.
-  split.
-  - intros M n m; done.
-  - intros M N n m; now symmetry.
-  - intros B C D Hbc Hcd n m.
-    etransitivity; eauto.
-Qed.
 
 
 Section TensorExprDBrel_semantics.
@@ -97,6 +35,382 @@ Import SetoidList SetoidPermutation list.
 
 
 
+(* FIXME: Move*)
+Lemma list_to_map_swap_mid `{FinMap K M} {A}
+  (l : list (K * A)) ka l' :
+  ka.1 ∉ l.*1 ->
+  list_to_map (l ++ ka :: l') =@{M A} list_to_map (ka :: (l ++ l')).
+Proof.
+  intros Hka.
+  apply map_eq; intros i.
+  cbn.
+  rewrite 2 list_to_map_app.
+  cbn.
+  rewrite lookup_union, 2 lookup_insert_case, lookup_union.
+  case_decide.
+  - enough (list_to_map l !! i = None) as -> by done.
+    apply not_elem_of_list_to_map.
+    now subst.
+  - done.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance default_Proper {B} (R : relation B) :
+  Proper (R ==> option_Forall2 R ==> R) default.
+Proof.
+  intros r s Hrs ma mb Hab.
+  induction Hab; cbn; done.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance vcast_surj {B n m} (prf : n = m) :
+  Surj eq (λ v, @Vector.cast B _ v _ prf).
+Proof.
+  subst.
+  intros v.
+  exists v.
+  now rewrite cast_id.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma exists_vec_0 `(P : vec A 0 -> Prop) :
+  ex P <-> P [#].
+Proof.
+  split; [|eauto].
+  intros []; inv_all_vec_fin; done.
+Qed.
+Lemma exists_vec_S `(P : vec A (S n) -> Prop) :
+  ex P <-> exists a v, P (a ::: v).
+Proof.
+  split; [|naive_solver].
+  intros [x Hx].
+  inv_all_vec_fin; eauto.
+Qed.
+Lemma exists_vec_rev `(P : vec A n -> Prop) :
+  ex P <-> exists v, P (Vector.rev v).
+Proof.
+  split; [|intros []; eauto].
+  intros [v Hv].
+  exists (Vector.rev v).
+  rewrite Vector.rev_rev.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Lemma exists_vec_add {B n m} (P : vec B (n + m) -> Prop) :
+  ex P <-> exists v w, P (v +++ w).
+Proof.
+  split; [|now intros (?&?&?); eauto].
+  intros (v & Hv).
+  induction v using vec_add_inv.
+  eauto.
+Qed.
+Lemma exists_vec_1 {B} (P : vec B 1 -> Prop) :
+  ex P <-> exists a, P [#a].
+Proof.
+  split; [|now intros []; eauto].
+  intros []; inv_all_vec_fin; eauto.
+Qed.
+Lemma exists_comm {B C} `(P : B -> C -> Prop) :
+  (exists a b, P a b) <-> exists b a, P a b.
+Proof.
+  firstorder.
+Qed.
+Lemma exists_vec_cast {B n m} (P : vec B n -> Prop)
+  (prf : m = n) : ex P <-> exists v, P (Vector.cast v prf).
+Proof.
+  subst.
+  setoid_rewrite cast_id.
+  done.
+Qed.
+
+
+Section SVmap.
+
+Context {A : Type}.
+
+Definition WF_SVmap tys (m : Pmap A) : Prop :=
+  dom m =@{Pset} list_to_set tys.
+
+Definition SVmap (tys : list Idx) := @dsig _ (WF_SVmap tys)
+  (λ _, decide_rel (=@{Pset}) _ _).
+
+Definition SVmap_map {tys} (m : SVmap tys) : Pmap A :=
+  `m.
+
+Coercion SVmap_map : SVmap >-> Pmap.
+
+
+(* FIXME: Move *)
+Definition Vempty : SVmap [] := dexist ∅ dom_empty_L.
+
+Lemma SVmap_insert_prf {ty val tys svmap}
+  (Hv : WF_SVmap tys svmap) : WF_SVmap (ty :: tys) (<[ty := val]> svmap).
+Proof.
+  unfold WF_SVmap.
+  rewrite dom_insert_L.
+  cbn -[union].
+  f_equal.
+  apply Hv.
+Qed.
+
+Definition SVmap_insert ty val {tys} (m : SVmap tys) : SVmap (ty :: tys) :=
+  dexist (<[ty := val]> (`m)) (SVmap_insert_prf (proj2_dsig m)).
+
+
+
+Lemma exists_SVmap_perm tys tys' (f : Pmap A -> Prop) : tys ≡ₚ tys' ->
+  (∃ m : SVmap tys, f m) <-> (∃ m : SVmap tys', f m).
+Proof.
+  intros Hperm.
+  unfold SVmap, SVmap_map.
+  setoid_rewrite exists_dsig.
+  apply exists_iff; intros v.
+  f_equiv.
+  unfold WF_SVmap.
+  f_equiv.
+  now apply list_to_set_perm_L.
+Qed.
+
+(* FIXME: Move*)
+Lemma kmap_SVmap_prf {f : positive -> positive} {tys} {m : Pmap A}
+  (Hm : WF_SVmap tys m) : WF_SVmap (f <$> tys) (kmap f m).
+Proof.
+  hnf.
+  apply leibniz_equiv_iff.
+  rewrite dom_kmap'.
+  rewrite <- (set_map_list_to_set (SA:=Pset)).
+  rewrite Hm.
+  done.
+Qed.
+
+(* FIXME: Move*)
+Definition kmap_SVmap (f : positive -> positive) {tys} (m : SVmap tys) :
+  SVmap (f <$> tys) :=
+  dexist (kmap f (`m)) (kmap_SVmap_prf (proj2_dsig m)).
+
+
+#[export] Instance kmap_SVmap_surj (f : positive -> positive)
+  {Hf : Inj eq eq f}
+  {tys} : Surj eq (@kmap_SVmap f tys).
+Proof.
+  set (Hfi := partial_injection_extension (f <$> tys) (invfun f tys)).
+  assert (Hftys : ForallPairs (λ a a' : positive, f a = f a' → a = a') tys)
+    by (hnf; naive_solver).
+  tspecialize Hfi. 1:{
+    apply invfun_inj; done.
+  }
+  destruct Hfi as (fi & Hfi & Hfiinv').
+  intros [m Hm].
+  setoid_rewrite dsig_eq.
+  cbn.
+  apply bool_decide_spec in Hm.
+  apply (exists_dsig (Q:=(λ x, kmap f x = m))).
+  rewrite Forall_forall in Hfiinv'.
+  exists (kmap fi m).
+  split.
+  - apply (@kmap_SVmap_prf fi _ _) in Hm.
+    rewrite <- list_fmap_compose in Hm.
+    erewrite list_fmap_id' in Hm; [done|].
+    intros a Ha.
+    cbn.
+    rewrite Hfiinv' by set_solver + Ha.
+    apply invfun_linv, Ha; done.
+  - rewrite kmap_kmap by apply _.
+    rewrite <- (kmap_id m) at 2.
+    apply kmap_ext.
+    intros k a Hmk%elem_of_dom_2.
+    cbn.
+    rewrite Hm in Hmk.
+    apply elem_of_list_to_set in Hmk.
+    rewrite Hfiinv' by done.
+    now apply invfun_rinv.
+Qed.
+
+
+(* FIXME: Move*)
+Definition SVmap_cast {tys tys'} (Htys : tys = tys')
+  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v) (f_equal list_to_set Htys)).
+
+#[export] Instance SVmap_cast_cancel_r {tys tys'} (Htys : tys = tys') :
+  Cancel eq (SVmap_cast Htys) (SVmap_cast (eq_sym Htys)).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_cast_cancel_l {tys tys'} (Htys : tys = tys') :
+  Cancel eq (SVmap_cast (eq_sym Htys)) (SVmap_cast Htys).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_cast_inj {tys tys'} (Htys : tys = tys')
+  : Inj eq eq (SVmap_cast Htys).
+Proof.
+  apply cancel_inj.
+Qed.
+
+#[export] Instance SVmap_cast_surj {tys tys'} (Htys : tys = tys')
+  : Surj eq (SVmap_cast Htys).
+Proof.
+  apply cancel_surj.
+Qed.
+
+Definition SVmap_castP {tys tys'} (Htys : tys ≡ₚ tys')
+  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v)
+    (list_to_set_perm_L _ _ Htys)).
+
+#[export] Instance SVmap_castP_cancel_r {tys tys'} (Htys : tys ≡ₚ tys') :
+  Cancel eq (SVmap_castP Htys) (SVmap_castP (symmetry Htys)).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_castP_cancel_l {tys tys'} (Htys : tys ≡ₚ tys') :
+  Cancel eq (SVmap_castP (symmetry Htys)) (SVmap_castP Htys).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_castP_inj {tys tys'} (Htys : tys ≡ₚ tys')
+  : Inj eq eq (SVmap_castP Htys).
+Proof.
+  apply cancel_inj.
+Qed.
+
+#[export] Instance SVmap_castP_surj {tys tys'} (Htys : tys ≡ₚ tys')
+  : Surj eq (SVmap_castP Htys).
+Proof.
+  apply cancel_surj.
+Qed.
+
+(* FIXME: Move *)
+Lemma SVmap_union_prf {tys tys'} {v : Pmap A} {v' : Pmap A} :
+  WF_SVmap tys v -> WF_SVmap tys' v' ->
+  WF_SVmap (tys ++ tys') (v ∪ v').
+Proof.
+  intros [=Hv] [=Hv'].
+  hnf.
+  rewrite dom_union_L, list_to_set_app_L.
+  congruence.
+Qed.
+Definition SVmap_union {tys tys'} (v : SVmap tys) (v' : SVmap tys') : SVmap (tys ++ tys') :=
+  dexist _ (SVmap_union_prf (proj2_dsig v) (proj2_dsig v')).
+Lemma SVmap_insert_union_l {ty tys tys'}
+  (a : A) (v : SVmap tys) (v' : SVmap tys') : 
+  SVmap_insert ty a (SVmap_union v v') = 
+  SVmap_union (SVmap_insert ty a v) v'.
+Proof.
+  apply dsig_eq.
+  cbn.
+  apply insert_union_l.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma exists_SVmap_cons ty tys f :
+  (∃ mr : SVmap (ty :: tys), f mr) <->
+  ∃ mr' : SVmap tys, ∃ vty : A, f (SVmap_insert ty vty mr').
+Proof.
+  split.
+  - intros ([mr Hmr] & Hfmr).
+    assert (Hmty : is_Some (mr !! ty)). 1:{
+      apply elem_of_dom.
+      rewrite (bool_decide_unpack _ Hmr).
+      now apply elem_of_list_to_set; constructor.
+    }
+    destruct Hmty as [vty Hvty].
+    destruct_decide (decide (ty ∈ tys)) as Hty.
+    + assert (Hmr' : WF_SVmap tys mr) by
+        (unfold WF_SVmap in *; rewrite (bool_decide_unpack _ Hmr); set_solver +Hty).
+      exists (dexist _ Hmr').
+      exists vty.
+      refine (eq_rect _ _ Hfmr _ _).
+      apply dsig_eq.
+      cbn.
+      symmetry.
+      now apply insert_id.
+    + assert (Hmr' : WF_SVmap tys (delete ty mr)). 1:{
+        unfold WF_SVmap in *.
+        clear Hfmr.
+        apply bool_decide_spec in Hmr.
+        rewrite dom_delete_L.
+        rewrite Hmr.
+        set_solver + Hty.
+      }
+      exists (dexist _ Hmr').
+      exists vty.
+      refine (eq_rect _ _ Hfmr _ _).
+      apply dsig_eq.
+      cbn.
+      symmetry.
+      now apply insert_delete.
+  - naive_solver.
+Qed.
+
+
+Lemma exists_SVmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
+  (sums : list positive) (fr : _ -> Prop) :
+  (∃ v : SVmap (f <$> sums), fr v) <->
+  ∃ v : SVmap sums, fr (kmap_SVmap f v).
+Proof.
+  unfold SVmap;
+  eapply (exists_relabel'_r2l (kmap_SVmap f) _ _ (RA:=eq) (RB:=eq));
+  [apply _..|].
+  done.
+Qed.
+
+
+Lemma exists_SVmap_nil (fr : _ -> Prop) :
+  (∃ v : SVmap [], fr v) <-> fr Vempty.
+Proof.
+  apply exists_iff_of_unique.
+  intros [b Hb] _.
+  apply dsig_eq.
+  cbn.
+  apply bool_decide_spec in Hb.
+  apply dom_empty_iff_L in Hb.
+  done.
+Qed.
+
+Lemma exists_SVmap_cons' ty tys f :
+  (∃ mr : SVmap (ty :: tys), f mr) <->
+  ∃ vty : A, ∃ mr' : SVmap tys, f (SVmap_insert ty vty mr').
+Proof.
+  now rewrite exists_SVmap_cons, exists_comm.
+Qed.
+
+
+Lemma exists_SVmap_app
+  (sums sums' : list positive) (fr : _ -> Prop) :
+  (∃ v : SVmap (sums ++ sums'), fr v) <->
+  ∃ v : SVmap sums, ∃ v' : SVmap sums', fr (SVmap_union v v').
+Proof.
+  revert fr; induction sums; intros fr.
+  - rewrite exists_SVmap_nil.
+    cbn.
+    apply exists_iff; intros.
+    f_equiv.
+    apply dsig_eq.
+    cbn.
+    now rewrite map_empty_union.
+  - cbn.
+    rewrite 2 exists_SVmap_cons'.
+    apply exists_iff; intros va.
+    rewrite IHsums.
+    unfold SVmap.
+    setoid_rewrite SVmap_insert_union_l.
+    reflexivity.
+Qed.
+
+End SVmap.
 
 
 
@@ -1120,29 +1434,6 @@ Notation tl_total_rel_semantics_aux' mabs ml mr tl :=
   --(2) Add lemma rephrasing tl_total_rel_semantics using [∃ m : Vlist (reverse sums), _]
   (3) Put these together to prove the result connecting to tl_total_rel_semantics_alt *)
 
-(* FIXME: Move *)
-Lemma exists_vec_0 `(P : vec A 0 -> Prop) :
-  ex P <-> P [#].
-Proof.
-  split; [|eauto].
-  intros []; inv_all_vec_fin; done.
-Qed.
-Lemma exists_vec_S `(P : vec A (S n) -> Prop) :
-  ex P <-> exists a v, P (a ::: v).
-Proof.
-  split; [|naive_solver].
-  intros [x Hx].
-  inv_all_vec_fin; eauto.
-Qed.
-Lemma exists_vec_rev `(P : vec A n -> Prop) :
-  ex P <-> exists v, P (Vector.rev v).
-Proof.
-  split; [|intros []; eauto].
-  intros [v Hv].
-  exists (Vector.rev v).
-  rewrite Vector.rev_rev.
-  done.
-Qed.
 
 
 Lemma tl_total_rel_semantics_aux_alt_vec mabs ml mr sums abs delt :
@@ -1198,44 +1489,6 @@ Notation delta_rel_semantics_alt' ml mr delt :=
 
 
 
-Definition WF_SVmap tys (m : Pmap A) : Prop :=
-  dom m =@{Pset} list_to_set tys.
-
-Definition SVmap (tys : list Idx) := @dsig _ (WF_SVmap tys)
-  (λ _, decide_rel (=@{Pset}) _ _).
-
-Definition SVmap_map {tys} (m : SVmap tys) : Pmap A :=
-  `m.
-
-Coercion SVmap_map : SVmap >-> Pmap.
-
-Lemma SVmap_insert_prf {ty val tys svmap}
-  (Hv : WF_SVmap tys svmap) : WF_SVmap (ty :: tys) (<[ty := val]> svmap).
-Proof.
-  unfold WF_SVmap.
-  rewrite dom_insert_L.
-  cbn -[union].
-  f_equal.
-  apply Hv.
-Qed.
-
-Definition SVmap_insert ty val {tys} (m : SVmap tys) : SVmap (ty :: tys) :=
-  dexist (<[ty := val]> (`m)) (SVmap_insert_prf (proj2_dsig m)).
-
-
-
-Lemma exists_SVmap_perm tys tys' (f : Pmap A -> Prop) : tys ≡ₚ tys' ->
-  (∃ m : SVmap tys, f m) <-> (∃ m : SVmap tys', f m).
-Proof.
-  intros Hperm.
-  unfold SVmap, SVmap_map.
-  setoid_rewrite exists_dsig.
-  apply exists_iff; intros v.
-  f_equiv.
-  unfold WF_SVmap.
-  f_equiv.
-  now apply list_to_set_perm_L.
-Qed.
 
 Definition tl_total_rel_semantics_alt_aux mabs ml
   (tys : list Idx) abs delt : Prop :=
@@ -1266,14 +1519,6 @@ Proof.
     done.
 Qed.
 
-
-(* FIXME: Move *)
-#[export] Instance default_Proper {B} (R : relation B) :
-  Proper (R ==> option_Forall2 R ==> R) default.
-Proof.
-  intros r s Hrs ma mb Hab.
-  induction Hab; cbn; done.
-Qed.
 
 Lemma tl_total_rel_semantics_alt_aux_correct_rel mabs ml sums abs delt :
   tl_total_rel_semantics_aux mabs ml [] sums abs delt <->
@@ -1565,79 +1810,8 @@ Proof.
   now rewrite Hl, Hu.
 Qed.
 
-(* FIXME: Move*)
-Lemma kmap_SVmap_prf {f : positive -> positive} {tys} {m : Pmap A}
-  (Hm : WF_SVmap tys m) : WF_SVmap (f <$> tys) (kmap f m).
-Proof.
-  hnf.
-  apply leibniz_equiv_iff.
-  rewrite dom_kmap'.
-  rewrite <- (set_map_list_to_set (SA:=Pset)).
-  rewrite Hm.
-  done.
-Qed.
-
-(* FIXME: Move*)
-Lemma list_to_map_swap_mid `{FinMap K M}
-  (l : list (K * A)) ka l' :
-  ka.1 ∉ l.*1 ->
-  list_to_map (l ++ ka :: l') =@{M A} list_to_map (ka :: (l ++ l')).
-Proof.
-  intros Hka.
-  apply map_eq; intros i.
-  cbn.
-  rewrite 2 list_to_map_app.
-  cbn.
-  rewrite lookup_union, 2 lookup_insert_case, lookup_union.
-  case_decide.
-  - enough (list_to_map l !! i = None) as -> by done.
-    apply not_elem_of_list_to_map.
-    now subst.
-  - done.
-Qed.
-
-(* FIXME: Move*)
-Definition kmap_SVmap (f : positive -> positive) {tys} (m : SVmap tys) :
-  SVmap (f <$> tys) :=
-  dexist (kmap f (`m)) (kmap_SVmap_prf (proj2_dsig m)).
 
 
-#[export] Instance kmap_SVmap_surj (f : positive -> positive)
-  {Hf : Inj eq eq f}
-  {tys} : Surj eq (@kmap_SVmap f tys).
-Proof.
-  set (Hfi := partial_injection_extension (f <$> tys) (invfun f tys)).
-  assert (Hftys : ForallPairs (λ a a' : positive, f a = f a' → a = a') tys)
-    by (hnf; naive_solver).
-  tspecialize Hfi. 1:{
-    apply invfun_inj; done.
-  }
-  destruct Hfi as (fi & Hfi & Hfiinv').
-  intros [m Hm].
-  setoid_rewrite dsig_eq.
-  cbn.
-  apply bool_decide_spec in Hm.
-  apply (exists_dsig (Q:=(λ x, kmap f x = m))).
-  rewrite Forall_forall in Hfiinv'.
-  exists (kmap fi m).
-  split.
-  - apply (@kmap_SVmap_prf fi _ _) in Hm.
-    rewrite <- list_fmap_compose in Hm.
-    erewrite list_fmap_id' in Hm; [done|].
-    intros a Ha.
-    cbn.
-    rewrite Hfiinv' by set_solver + Ha.
-    apply invfun_linv, Ha; done.
-  - rewrite kmap_kmap by apply _.
-    rewrite <- (kmap_id m) at 2.
-    apply kmap_ext.
-    intros k a Hmk%elem_of_dom_2.
-    cbn.
-    rewrite Hm in Hmk.
-    apply elem_of_list_to_set in Hmk.
-    rewrite Hfiinv' by done.
-    now apply invfun_rinv.
-Qed.
 
 
 
@@ -1676,66 +1850,6 @@ Proof.
     [destruct l as [r|]|destruct u as [r|]]; try reflexivity;
     cbn;
     now rewrite (lookup_kmap _).
-Qed.
-
-(* FIXME: Move*)
-Definition SVmap_cast {tys tys'} (Htys : tys = tys')
-  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v) (f_equal list_to_set Htys)).
-
-#[export] Instance SVmap_cast_cancel_r {tys tys'} (Htys : tys = tys') :
-  Cancel eq (SVmap_cast Htys) (SVmap_cast (eq_sym Htys)).
-Proof.
-  intros m.
-  apply dsig_eq; done.
-Qed.
-
-#[export] Instance SVmap_cast_cancel_l {tys tys'} (Htys : tys = tys') :
-  Cancel eq (SVmap_cast (eq_sym Htys)) (SVmap_cast Htys).
-Proof.
-  intros m.
-  apply dsig_eq; done.
-Qed.
-
-#[export] Instance SVmap_cast_inj {tys tys'} (Htys : tys = tys')
-  : Inj eq eq (SVmap_cast Htys).
-Proof.
-  apply cancel_inj.
-Qed.
-
-#[export] Instance SVmap_cast_surj {tys tys'} (Htys : tys = tys')
-  : Surj eq (SVmap_cast Htys).
-Proof.
-  apply cancel_surj.
-Qed.
-
-Definition SVmap_castP {tys tys'} (Htys : tys ≡ₚ tys')
-  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v)
-    (list_to_set_perm_L _ _ Htys)).
-
-#[export] Instance SVmap_castP_cancel_r {tys tys'} (Htys : tys ≡ₚ tys') :
-  Cancel eq (SVmap_castP Htys) (SVmap_castP (symmetry Htys)).
-Proof.
-  intros m.
-  apply dsig_eq; done.
-Qed.
-
-#[export] Instance SVmap_castP_cancel_l {tys tys'} (Htys : tys ≡ₚ tys') :
-  Cancel eq (SVmap_castP (symmetry Htys)) (SVmap_castP Htys).
-Proof.
-  intros m.
-  apply dsig_eq; done.
-Qed.
-
-#[export] Instance SVmap_castP_inj {tys tys'} (Htys : tys ≡ₚ tys')
-  : Inj eq eq (SVmap_castP Htys).
-Proof.
-  apply cancel_inj.
-Qed.
-
-#[export] Instance SVmap_castP_surj {tys tys'} (Htys : tys ≡ₚ tys')
-  : Surj eq (SVmap_castP Htys).
-Proof.
-  apply cancel_surj.
 Qed.
 
 
@@ -1836,7 +1950,7 @@ Proof.
   destruct ntl as [isums abs delt]; cbn -[reverse abstracts_rel_semantics_alt].
   specialize (partial_injection_extension (pseq 1 (lengthP isums))
     (fun p => default p (isums !! (p:>nat)))) as Hinj.
-  pose proof (lengthN_correct_rel isums).
+  pose proof (lengthN_correct isums).
   tspecialize Hinj. 1:{
     intros a b Ha%elem_of_list_In%elem_of_pseq_1
       Hb%elem_of_list_In%elem_of_pseq_1.
@@ -2013,46 +2127,6 @@ Qed.
 (* Lemma SVmap_elements_cons_alt ty tys :
   SVmap_elements ty tys  *)
 
-(* FIXME: Move *)
-Lemma exists_SVmap_cons ty tys f :
-  (∃ mr : SVmap (ty :: tys), f mr) <->
-  ∃ mr' : SVmap tys, ∃ vty : A, f (SVmap_insert ty vty mr').
-Proof.
-  split.
-  - intros ([mr Hmr] & Hfmr).
-    assert (Hmty : is_Some (mr !! ty)). 1:{
-      apply elem_of_dom.
-      rewrite (bool_decide_unpack _ Hmr).
-      now apply elem_of_list_to_set; constructor.
-    }
-    destruct Hmty as [vty Hvty].
-    destruct_decide (decide (ty ∈ tys)) as Hty.
-    + assert (Hmr' : WF_SVmap tys mr) by
-        (unfold WF_SVmap in *; rewrite (bool_decide_unpack _ Hmr); set_solver +Hty).
-      exists (dexist _ Hmr').
-      exists vty.
-      refine (eq_rect _ _ Hfmr _ _).
-      apply dsig_eq.
-      cbn.
-      symmetry.
-      now apply insert_id.
-    + assert (Hmr' : WF_SVmap tys (delete ty mr)). 1:{
-        unfold WF_SVmap in *.
-        clear Hfmr.
-        apply bool_decide_spec in Hmr.
-        rewrite dom_delete_L.
-        rewrite Hmr.
-        set_solver + Hty.
-      }
-      exists (dexist _ Hmr').
-      exists vty.
-      refine (eq_rect _ _ Hfmr _ _).
-      apply dsig_eq.
-      cbn.
-      symmetry.
-      now apply insert_delete.
-  - naive_solver.
-Qed.
 
 Lemma deltas_rel_semantics_alt_cons ml mr lu delt :
   deltas_rel_semantics_alt ml mr (lu :: delt) =
@@ -2400,43 +2474,6 @@ Qed.
 
 
 
-(* FIXME: Move *)
-#[export] Instance vcast_surj {B n m} (prf : n = m) :
-  Surj eq (λ v, @Vector.cast B _ v _ prf).
-Proof.
-  subst.
-  intros v.
-  exists v.
-  now rewrite cast_id.
-Qed.
-
-(* FIXME: Move *)
-Lemma exists_vec_add {B n m} (P : vec B (n + m) -> Prop) :
-  ex P <-> exists v w, P (v +++ w).
-Proof.
-  split; [|now intros (?&?&?); eauto].
-  intros (v & Hv).
-  induction v using vec_add_inv.
-  eauto.
-Qed.
-Lemma exists_vec_1 {B} (P : vec B 1 -> Prop) :
-  ex P <-> exists a, P [#a].
-Proof.
-  split; [|now intros []; eauto].
-  intros []; inv_all_vec_fin; eauto.
-Qed.
-Lemma exists_comm {B C} `(P : B -> C -> Prop) :
-  (exists a b, P a b) <-> exists b a, P a b.
-Proof.
-  firstorder.
-Qed.
-Lemma exists_vec_cast {B n m} (P : vec B n -> Prop)
-  (prf : m = n) : ex P <-> exists v, P (Vector.cast v prf).
-Proof.
-  subst.
-  setoid_rewrite cast_id.
-  done.
-Qed.
 
 Lemma tl_total_rel_semantics_compose_tensorlist_aux mabs ml mids (l r : tensorlist) :
   tl_total_rel_semantics mabs ml (compose_tensorlist mids l r) <->
@@ -2590,7 +2627,6 @@ Proof.
 Qed.
 
 
-(* FIXME: Move *)
 
 Lemma ntl_total_rel_semantics_ntl_subst_free_as mabs ml l r ntl :
   r ∉ ntl.(ntl_sums) ->
@@ -2652,82 +2688,8 @@ Proof.
   apply infinite_is_fresh.
 Qed.
 
-Lemma exists_SVmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
-  (sums : list positive) (fr : _ -> Prop) :
-  (∃ v : SVmap (f <$> sums), fr v) <->
-  ∃ v : SVmap sums, fr (kmap_SVmap f v).
-Proof.
-  unfold SVmap;
-  eapply (exists_relabel'_r2l (kmap_SVmap f) _ _ (RA:=eq) (RB:=eq));
-  [apply _..|].
-  done.
-Qed.
 
-(* FIXME: Move *)
-Definition Vempty : SVmap [] := dexist ∅ dom_empty_L.
 
-Lemma sum_of_SVmap_nil (fr : _ -> Prop) :
-  (∃ v : SVmap [], fr v) <-> fr Vempty.
-Proof.
-  apply exists_iff_of_unique.
-  intros [b Hb] _.
-  apply dsig_eq.
-  cbn.
-  apply bool_decide_spec in Hb.
-  apply dom_empty_iff_L in Hb.
-  done.
-Qed.
-
-Lemma exists_SVmap_cons' ty tys f :
-  (∃ mr : SVmap (ty :: tys), f mr) <->
-  ∃ vty : A, ∃ mr' : SVmap tys, f (SVmap_insert ty vty mr').
-Proof.
-  now rewrite exists_SVmap_cons, exists_comm.
-Qed.
-
-(* FIXME: Move *)
-Lemma SVmap_union_prf {tys tys'} {v : Pmap A} {v' : Pmap A} :
-  WF_SVmap tys v -> WF_SVmap tys' v' ->
-  WF_SVmap (tys ++ tys') (v ∪ v').
-Proof.
-  intros [=Hv] [=Hv'].
-  hnf.
-  rewrite dom_union_L, list_to_set_app_L.
-  congruence.
-Qed.
-Definition SVmap_union {tys tys'} (v : SVmap tys) (v' : SVmap tys') : SVmap (tys ++ tys') :=
-  dexist _ (SVmap_union_prf (proj2_dsig v) (proj2_dsig v')).
-Lemma SVmap_insert_union_l {ty tys tys'}
-  (a : A) (v : SVmap tys) (v' : SVmap tys') : 
-  SVmap_insert ty a (SVmap_union v v') = 
-  SVmap_union (SVmap_insert ty a v) v'.
-Proof.
-  apply dsig_eq.
-  cbn.
-  apply insert_union_l.
-Qed.
-
-Lemma sum_of_SVmap_app
-  (sums sums' : list positive) (fr : _ -> Prop) :
-  (∃ v : SVmap (sums ++ sums'), fr v) <->
-  ∃ v : SVmap sums, ∃ v' : SVmap sums', fr (SVmap_union v v').
-Proof.
-  revert fr; induction sums; intros fr.
-  - rewrite sum_of_SVmap_nil.
-    cbn.
-    apply exists_iff; intros.
-    f_equiv.
-    apply dsig_eq.
-    cbn.
-    now rewrite map_empty_union.
-  - cbn.
-    rewrite 2 exists_SVmap_cons'.
-    apply exists_iff; intros va.
-    rewrite IHsums.
-    unfold SVmap.
-    setoid_rewrite SVmap_insert_union_l.
-    reflexivity.
-Qed.
 
 
 
@@ -2761,7 +2723,7 @@ Proof.
   rewrite ntl_total_rel_semantics_alt by now apply ntl_times_WF.
   rewrite 2 ntl_total_rel_semantics_alt by easy.
   cbn -[abstracts_rel_semantics_alt deltas_rel_semantics_alt list_to_set].
-  rewrite sum_of_SVmap_app, (exists_SVmap_fmap _).
+  rewrite exists_SVmap_app, (exists_SVmap_fmap _).
   rewrite exists_and_r.
   apply exists_iff; intros [mr_l Hmr_l].
   cbn.
@@ -2852,7 +2814,7 @@ Lemma ntl_total_rel_semantics_free_varset_ext mabs ml ml' ntl :
 Proof.
   intros Hml.
   apply tl_total_rel_semantics_free_varset_ext.
-  now rewrite <- ntl_free_varset_correct_rel.
+  now rewrite <- ntl_free_varset_correct.
 Qed.
 
 Lemma compose_namedtensorlist_correct_rel mabs {n m o} (ins : vec Idx n)
@@ -2974,7 +2936,7 @@ Lemma ntl_total_rel_semantics_kmap_ntl_relabel_absidx mabs ml
   ntl_total_rel_semantics mabs ml ntl.
 Proof.
   unfold ntl_total_rel_semantics.
-  rewrite ntl_relabel_absidx_correct_rel.
+  rewrite ntl_relabel_absidx_correct.
   apply (tl_total_rel_semantics_aux_kmap_tl_relabel_absidx _ _ _ _).
 Qed.
 
@@ -2987,7 +2949,7 @@ Proof.
   intros HWT.
   eapply ntl_delta_eq_correct_rel; [done..|].
   symmetry.
-  now apply simplify_ntl_deltas_correct_rel.
+  now apply simplify_ntl_deltas_correct.
 Qed.
 
 
