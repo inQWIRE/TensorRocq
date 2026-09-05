@@ -2,6 +2,107 @@ From TensorRocq Require Export Homomorphism Props PropsGraphs
   ProLike FreeSemiRing Summable CospanHyperGraph.
 From stdpp Require Import vector.
 
+
+(* FIXME: Move *)
+Class FreeStrictTensorLike
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
+    EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  {STL : forall `{SR : SemiRing R rO rI radd rmul req},
+    StrictTensorLike R A T} := {
+  strictInterpretTensor_free
+    `{SR : SemiRing R rO rI radd rmul req}
+    `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
+    (f : R -> R') {Hf : SemiRingHomomorphism f}
+    {n m} (t : T n m) :
+    tensor_apply_hom f (strictInterpretTensor t) ≡
+    strictInterpretTensor t
+}.
+
+#[export] Instance FSTL_MorUnion 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
+    EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  {STL : forall `{SR : SemiRing R rO rI radd rmul req},
+    StrictTensorLike R A T}
+  (T' : nat -> nat -> Type) `{EqT' : ∀ n m, Equiv (T' n m),
+    EquivT' : ∀ n m, @Equivalence (T' n m) equiv}
+  {STL' : forall `{SR : SemiRing R rO rI radd rmul req},
+    StrictTensorLike R A T'}
+  {FSTL : FreeStrictTensorLike A T}
+  {FSTL' : FreeStrictTensorLike A T'} : 
+  FreeStrictTensorLike A (MorUnion T T').
+Proof.
+  split.
+  intros until f.
+  intros Hf n m [t|t]; cbn; now apply strictInterpretTensor_free.
+Qed.
+
+
+#[export] Instance FSTL_Monoidal
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Monoidal.
+Proof.
+  split.
+  intros until f.
+  intros Hf n m t.
+  rewrite 2 Monoidal_semantics.
+  now rewrite (tensor_apply_hom_perm_tensor _).
+Qed.
+
+#[export] Instance FSTL_Symmetry
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Symmetry.
+Proof.
+  split.
+  intros until f.
+  intros Hf n m t.
+  induction t as [n m].
+  cbn.
+  now apply tensor_apply_hom_swap.
+Qed.
+
+#[export] Instance FSTL_Autonomy
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Autonomy.
+Proof.
+  split.
+  intros until f.
+  intros Hf n m t.
+  induction t as [n|n];
+  cbn;
+  [now apply tensor_apply_hom_cup|now apply tensor_apply_hom_cap].
+Qed.
+
+#[export] Instance FSTL_Frobenial
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Frobenial.
+Proof.
+  split.
+  intros until f.
+  intros Hf n m t.
+  induction t as [|n m|k n m]; cbn.
+  - apply (tensor_apply_hom_delta_spider _).
+  - apply (tensor_apply_hom_delta_spider _).
+  - apply (tensor_apply_hom_delta_spider_bundled _).
+Qed.
+
+
+#[export] Instance FSTL_SymmetricG
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A SymmetricG := _.
+
+#[export] Instance FSTL_Autonomous
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Autonomous := _.
+
+#[export] Instance FSTL_Frobenius
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  FreeStrictTensorLike A Frobenius := _.
+
+
+
+
 Structure Signature {Struct : Mor nat} {A : Type} `{SA : Summable A, EqA : EqDecision A} := {
   #[canonical=yes] gens : Type;
   #[canonical=no] gens_equiv :: Equiv gens;
@@ -196,21 +297,6 @@ Proof.
   apply PRO_graph_semantics_correct.
 Qed.
 
-(* FIXME: Move *)
-Class FreeStrictTensorLike
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
-  (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
-    EquivT : ∀ n m, @Equivalence (T n m) equiv}
-  {STL : forall `{SR : SemiRing R rO rI radd rmul req},
-    StrictTensorLike R A T} := {
-  strictInterpretTensor_free
-    `{SR : SemiRing R rO rI radd rmul req}
-    `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
-    (f : R -> R') {Hf : SemiRingHomomorphism f}
-    {n m} (t : T n m) :
-    tensor_apply_hom f (strictInterpretTensor t) ≡
-    strictInterpretTensor t
-}.
 
 
 Lemma SignatureTensorLike_base_correct {Struct A} 

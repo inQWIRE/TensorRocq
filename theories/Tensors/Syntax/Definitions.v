@@ -5660,3 +5660,144 @@ Definition add_loop_ntl_alt (l r : positive) (ntl : namedtensorlist) : namedtens
   add_loop_ntl_alt_as l r (fresh ntl.(ntl_sums)) ntl.
 
 
+Add Parametric Morphism : relabel_bounds with signature
+  pointwise_relation _ eq ==> eq ==>
+  eq as relabel_bound_mor.
+Proof.
+  intros f g Hfg v.
+  now apply relabel_bounds_ext.
+Qed.
+
+
+Add Parametric Morphism A B : (@mbind list list_bind A B) with signature
+  pointwise_relation A eq ==> eq ==> eq as list_bind_mor.
+Proof.
+  intros; apply list_bind_ext; naive_solver.
+Qed.
+
+
+(* FIXME: Move to syntax, rename *)
+Definition substbound (l : Idx) : var -> var :=
+  fun v => match v with
+  | bound r => Pos.peano_rect _ (free l) (λ r _, bound r) r
+  | free l => free l
+  end.
+
+Lemma shiftbound_alt_defn l v :
+  substbound l v =
+  match v with
+  | bound r => if decide (r = xH) then free l else bound (Pos.pred r)
+  | _ => v
+  end.
+Proof.
+  destruct v; [|reflexivity..].
+  cbn.
+  induction p using Pos.peano_rect.
+  - reflexivity.
+  - rewrite Pos.peano_rect_succ.
+    rewrite decide_False by lia.
+    now rewrite Pos.pred_succ.
+Qed.
+
+Definition swapbound (v : var) : var :=
+  match v with
+  | bound r => bound match r with
+    | xH => 2
+    | 2%positive => 1
+    | _ => r
+    end
+  | _ => v
+  end.
+
+Lemma elem_of_te_free_varset_free te l :
+  l ∈ te_free_varset te <-> free l ∈ te_varset te.
+Proof.
+  rewrite te_varset_decomp.
+  set_solver.
+Qed.
+
+Lemma elem_of_te_bound_varset_bound te l :
+  l ∈ te_bound_varset te <-> bound l ∈ te_varset te.
+Proof.
+  rewrite te_varset_decomp.
+  set_solver.
+Qed.
+
+
+Definition tl_subst_free (l : Idx) (tl : tensorlist) :=
+  tl_add_sums 1 (relabel_tl
+    (var_elim (bound ∘ Pos.succ)
+    (λ l', if decide (l' = l) then bound 1 else free l')) tl).
+
+
+Definition compose_tensorlist (mids : list Idx) (l r : tensorlist) : tensorlist :=
+  tl_add_sums (length mids) (relabel_tl
+    (var_elim (bound ∘ (λ p, pos_add_N p (lengthN mids))) (λ fr,
+      from_option (bound ∘ Pos.of_succ_nat ∘ (λ n, (length mids - S n)%nat))
+      (free fr) (list_index fr mids))) (tl_times l r)).
+
+Lemma compose_tensorlist_foldr mids l r :
+  compose_tensorlist mids l r =
+  foldr (fun mid tl => tl_subst_free mid tl) (tl_times l r) (reverse mids).
+Proof.
+  unfold compose_tensorlist.
+  set (lr := tl_times l r).
+  generalize lr.
+  clear l r lr.
+  induction mids; intros lr.
+  - cbn.
+    apply tl_ext; cbn; [reflexivity|..];
+    apply list_fmap_id'; intros ? _;
+    [apply relabel_abs_id'|apply relabel_delt_id'];
+    intros []; done.
+  - rewrite reverse_cons, foldr_app.
+    cbn.
+    rewrite <- IHmids.
+    apply tl_ext; [cbn; lia|..];
+    cbn;
+    rewrite <- list_fmap_compose;
+    apply list_fmap_ext; intros _ ? _; cbn;
+    [rewrite relabel_abs_compose; apply relabel_abs_ext|
+     rewrite relabel_delt_compose; apply relabel_delt_ext];
+    (intros [r'|l']; [f_equal/=; lia|]);
+    (cbn;
+    case_decide as Hl'; cbn;
+    [rewrite lengthN_correct_rel_rev; f_equal; lia|];
+    rewrite list_index_eq_find;
+    destruct (list_find _ _) as [[n ?]|]; done).
+Qed.
+
+(* FIXME: Move *)
+Definition tl_free_varset (tl : tensorlist) : Pset :=
+  abstracts_free_vars tl.(tl_abstracts) ∪
+  deltas_free_vars tl.(tl_deltas).
+
+
+Definition compose_namedtensorlist (mids : list Idx)
+  (l r : namedtensorlist) : namedtensorlist :=
+  foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) (reverse mids).
+
+
+Lemma compose_namedtensorlist_WF' mids l r :
+  WF_ntl l -> WF_ntl r ->
+  WF_ntl (foldr (fun mid tl => ntl_subst_free mid tl) (ntl_times l r) mids).
+Proof.
+  intros Hl Hr.
+  induction mids; [now apply ntl_times_WF|].
+  now apply ntl_subst_free_WF.
+Qed.
+
+Lemma compose_namedtensorlist_WF mids l r :
+  WF_ntl l -> WF_ntl r ->
+  WF_ntl (compose_namedtensorlist mids l r).
+Proof.
+  apply compose_namedtensorlist_WF'.
+Qed.
+
+Lemma ntl_free_varset_correct ntl :
+  ntl_free_varset ntl = tl_free_varset (ntl2tl ntl).
+Proof.
+  unfold ntl_free_varset, tl_free_varset.
+  destruct ntl as [isums abs delt]; cbn -[abstracts_free_vars deltas_free_vars];
+  now rewrite abstracts_free_vars_relabel_bounds, deltas_free_vars_relabel_bounds.
+Qed.

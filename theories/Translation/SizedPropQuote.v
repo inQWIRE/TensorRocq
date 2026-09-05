@@ -2,7 +2,7 @@ From TensorRocq Require Import BW BWQuote.
 From Ltac2 Require Import Ltac2.
 From TensorRocq Require Import Ltac2.ConstrExtra.
 From TensorRocq Require Import Props.
-From TensorRocq Require Import SizedProps.
+From TensorRocq Require Import SizedProps SizedProQuote.
 
 From TensorRocq Require Import BWQuote.
 
@@ -245,7 +245,11 @@ Fixpoint gbpath_to_MPRO {A T} {M : Mor (btree A)} {a b} (p : gbpath M a b) :
   end%mpro.
 
 Class StructuralMMorphism {A} (M : Mor (btree A)) (a b : btree A) :=
-  structuralMMor : forall {T}, MPRO M T a b.
+  structuralSMMor : SMPRO M a b.
+
+Definition structuralMMor {A} {M : Mor (btree A)} {a b : btree A} 
+  {Hab : StructuralMMorphism M a b} {T} : MPRO M T a b :=
+  map_MPRO (λ n m s, s) (Empty_set_rect _) Hab.
 
 Definition bmonoidal_MMonoidal {A} {a b : btree A} (p : bmonoidal a b) : MMonoidal a b :=
   match p with
@@ -272,21 +276,40 @@ Definition bautonomous_MAutonomous {A} {a b : btree A} (p : bautonomous a b) : M
   | bcap => MCap _
   end.
 
+  
+Definition structuralMMorphism_monoidal' {A} {a b : btree A} (p : bpath a b):
+  StructuralMMorphism MMonoidal a b :=
+  gbpath_to_MPRO (gbpath_map (@bmonoidal_MMonoidal A) p).
+
+Definition structuralMMorphism_symmetric' {A} {a b : btree A} (p : sbpath a b):
+  StructuralMMorphism MSymmetric a b :=
+  gbpath_to_MPRO (gbpath_map (@bsymmetric_MSymmetric A) p).
+
+Definition structuralMMorphism_autonomous' {A} {a b : btree A} (p : abpath a b):
+  StructuralMMorphism MAutonomous a b :=
+  gbpath_to_MPRO (gbpath_map (@bautonomous_MAutonomous A) p).
+
 
 Definition structuralMMorphism_monoidal `{EqDecision A} {a b : btree A} :
-  is_Some (may_bpath a b) -> StructuralMMorphism MMonoidal a b :=
-  fun Hab T => gbpath_to_MPRO (gbpath_map (@bmonoidal_MMonoidal A) (is_Some_proj Hab)).
+  is_Some (may_bpath' a b) -> StructuralMMorphism MMonoidal a b :=
+  fun Hab => gbpath_to_MPRO (gbpath_map (@bmonoidal_MMonoidal A) (is_Some_proj Hab)).
 
 Definition structuralMMorphism_symmetric `{EqDecision A} {a b : btree A} :
-  is_Some (may_sbpath a b) -> StructuralMMorphism MSymmetric a b :=
-  fun Hab T => gbpath_to_MPRO (gbpath_map (@bsymmetric_MSymmetric A) (is_Some_proj Hab)).
+  is_Some (may_sbpath' a b) -> StructuralMMorphism MSymmetric a b :=
+  fun Hab => gbpath_to_MPRO (gbpath_map (@bsymmetric_MSymmetric A) (is_Some_proj Hab)).
 
 Definition structuralMMorphism_autonomous `{EqDecision A} {a b : btree A} :
-  is_Some (may_abpath a b) -> StructuralMMorphism MAutonomous a b :=
-  fun Hab T => gbpath_to_MPRO (gbpath_map (@bautonomous_MAutonomous A) (is_Some_proj Hab)).
+  is_Some (may_abpath' a b) -> StructuralMMorphism MAutonomous a b :=
+  fun Hab => gbpath_to_MPRO (gbpath_map (@bautonomous_MAutonomous A) (is_Some_proj Hab)).
 
+
+  
 Class StructuralMorphism (M : Mor nat) (a b : nat) :=
-  structuralMor : forall {T}, PRO M T a b.
+  structuraSlMor : SPRO M a b.
+
+Definition structuralMor {M : Mor nat} {a b : nat} 
+  {Hab : StructuralMorphism M a b} {T} : PRO M T a b :=
+  map_PRO (λ n m s, s) (Empty_set_rect _) Hab.
 
 Definition structuralMMorphism_structuralMorphism {A} 
   (f : A -> nat) {M : Mor (btree A)} {M' : Mor nat}
@@ -295,10 +318,10 @@ Definition structuralMMorphism_structuralMorphism {A}
     {HM : InterpStruct M M'} (a b : btree A) :
   StructuralMMorphism M a b ->
   StructuralMorphism M' (btree_size f a) (btree_size f b) :=
-  fun p T => MPRO_to_PRO f (p T).
+  fun p => MPRO_to_PRO f p.
 
 
-#[export] Hint Extern 0 (StructuralMorphism Monoidal _ _) => 
+(* #[export] Hint Extern 0 (StructuralMorphism Monoidal _ _) => 
   ltac2:(
     lazy_match! goal with
   | [ |- StructuralMorphism Monoidal ?a ?b ] => 
@@ -310,12 +333,31 @@ Definition structuralMMorphism_structuralMorphism {A}
     let cns := CC.mk_list ns in 
     refine '(structuralMMorphism_structuralMorphism
       (λ k : option nat, from_option (default 0 ∘ (fun i =>
-        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructMonoidal)
+        @lookup nat nat (list nat) list_lookup i $cns))%stdpp 1 k) (HM:=interpStructMonoidal)
       $cta $ctb _);
     refine '(@structuralMMorphism_monoidal _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
     ltac1:(compute_done)
   end
-  ) : typeclass_instances.
+  ) : typeclass_instances. *)
+
+#[export] Hint Extern 0 (StructuralMorphism Monoidal _ _) => 
+  ltac2:(lazy_match! goal with
+  | [ |- StructuralMorphism Monoidal ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree_to_pos ns a in 
+    let (ns, tb) := parse_nat_btree_to_pos ns b in 
+    let cta := CC.to_btree_typed 'positive CC.to_pos ta in 
+    let ctb := CC.to_btree_typed 'positive CC.to_pos tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (@AbstractTensorQuote.interp_discrete_hg_inhab _ Nat.inhabited $cns) (HM:=interpStructMonoidal)
+      $cta $ctb _);
+    let cmayp := Std.eval_vm None constr:(may_bpath' $cta $ctb) in 
+    lazy_match! cmayp with
+    | Some ?p => 
+      exact (structuralMMorphism_monoidal' $p)
+    end
+  end) : typeclass_instances.
 
 Import Props.
 
@@ -323,7 +365,7 @@ Import Props.
 Definition interpStructSymmetric {A} : @InterpStruct A MSymmetric _ SymmetricG _:= _.
 Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous _ Autonomous _ := _.
 
-#[export] Hint Extern 0 (StructuralMorphism SymmetricG _ _) => 
+(* #[export] Hint Extern 0 (StructuralMorphism SymmetricG _ _) => 
   ltac2:(
     lazy_match! goal with
   | [ |- StructuralMorphism SymmetricG ?a ?b ] => 
@@ -335,15 +377,34 @@ Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous _ Autonomous
     let cns := CC.mk_list ns in 
     refine '(structuralMMorphism_structuralMorphism
       (λ k : option nat, from_option (default 0 ∘ (fun i =>
-        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructSymmetric)
+        @lookup nat nat (list nat) list_lookup i $cns))%stdpp 1 k) (HM:=interpStructSymmetric)
       $cta $ctb _);
     refine '(@structuralMMorphism_symmetric _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
     ltac1:(compute_done)
   end
-  ) : typeclass_instances.
+  ) : typeclass_instances. *)
+
+#[export] Hint Extern 0 (StructuralMorphism SymmetricG _ _) => 
+  ltac2:(lazy_match! goal with
+  | [ |- StructuralMorphism SymmetricG ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree_to_pos ns a in 
+    let (ns, tb) := parse_nat_btree_to_pos ns b in 
+    let cta := CC.to_btree_typed 'positive CC.to_pos ta in 
+    let ctb := CC.to_btree_typed 'positive CC.to_pos tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (@AbstractTensorQuote.interp_discrete_hg_inhab _ Nat.inhabited $cns) (HM:=interpStructSymmetric)
+      $cta $ctb _);
+    let cmayp := Std.eval_vm None constr:(may_sbpath' $cta $ctb) in 
+    lazy_match! cmayp with
+    | Some ?p => 
+      exact (structuralMMorphism_symmetric' $p)
+    end
+  end) : typeclass_instances.
 
 
-#[export] Hint Extern 0 (StructuralMorphism Autonomous _ _) => 
+(* #[export] Hint Extern 0 (StructuralMorphism Autonomous _ _) => 
   ltac2:(
     lazy_match! goal with
   | [ |- StructuralMorphism Autonomous ?a ?b ] => 
@@ -355,17 +416,37 @@ Definition interpStructAutonomous {A} : @InterpStruct A MAutonomous _ Autonomous
     let cns := CC.mk_list ns in 
     refine '(structuralMMorphism_structuralMorphism
       (λ k : option nat, from_option (default 0 ∘ (fun i =>
-        @lookup nat nat (list nat) list_lookup i $cns)) 1 k) (HM:=interpStructAutonomous)
+        @lookup nat nat (list nat) list_lookup i $cns))%stdpp 1 k) (HM:=interpStructAutonomous)
       $cta $ctb _);
     refine '(@structuralMMorphism_autonomous _ (@option_eq_dec _ Nat.eq_dec) _ _ _);
     ltac1:(compute_done)
   end
-  ) : typeclass_instances.
+  ) : typeclass_instances. *)
+
+
+#[export] Hint Extern 0 (StructuralMorphism Autonomous _ _) => 
+  ltac2:(lazy_match! goal with
+  | [ |- StructuralMorphism Autonomous ?a ?b ] => 
+    let ns : constr list := [] in 
+    let (ns, ta) := parse_nat_btree_to_pos ns a in 
+    let (ns, tb) := parse_nat_btree_to_pos ns b in 
+    let cta := CC.to_btree_typed 'positive CC.to_pos ta in 
+    let ctb := CC.to_btree_typed 'positive CC.to_pos tb in 
+    let cns := CC.mk_list ns in 
+    refine '(structuralMMorphism_structuralMorphism
+      (@AbstractTensorQuote.interp_discrete_hg_inhab _ Nat.inhabited $cns) (HM:=interpStructAutonomous)
+      $cta $ctb _);
+    let cmayp := Std.eval_vm None constr:(may_abpath' $cta $ctb) in 
+    lazy_match! cmayp with
+    | Some ?p => 
+      exact (structuralMMorphism_autonomous' $p)
+    end
+  end) : typeclass_instances.
 
 Definition Pcompose_join_Monoidal (* {Struct : Mor nat} *) {T}
   {a b b' c : nat} (f : PRO Monoidal T a b) (g : PRO Monoidal T b' c)
   (Hb : StructuralMorphism Monoidal b b') : PRO Monoidal T a c :=
-  f ;; Hb T ;; g.
+  f ;; structuralMor ;; g.
 (* 
 Notation " f  ;;ₘ g " := (Pcompose_join_Monoidal f%pro g%pro _) (at level 100) : pro_scope.
  *)
@@ -373,10 +454,10 @@ Notation " f  ;;ₘ g " := (Pcompose_join_Monoidal f%pro g%pro _) (at level 100)
 Definition Pcompose_join {Struct : Mor nat} {T}
   {a b b' c : nat} (f : PRO Struct T a b) (g : PRO Struct T b' c)
   (Hb : StructuralMorphism Struct b b') : PRO Struct T a c :=
-  f ;; Hb T ;; g.
+  f ;; structuralMor ;; g.
 
-Notation " f  ;;'@{ M } g " := (Pcompose_join (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
-Notation " f  ;;' g " := (Pcompose_join f%pro g%pro _) (at level 100) : pro_scope.
+Notation " f  ;;ₛ@{ M } g " := (Pcompose_join (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
+Notation " f  ;;ₛ g " := (Pcompose_join f%pro g%pro _) (at level 100) : pro_scope.
 
 
 (* #[global] Arguments substruct_refl /. *)
@@ -385,26 +466,37 @@ Definition Pcompose_join_sub (Struct : Mor nat) {Struct' : Mor nat}
   {SubS : SubStruct Struct Struct'} {T}
   {a b b' c : nat} (f : PRO Struct' T a b) (g : PRO Struct' T b' c)
   (Hb : StructuralMorphism Struct b b') : PRO Struct' T a c :=
-  f ;; map_PRO (fun _ _ => includeStruct) id (Hb T) ;; g.
+  f ;; map_PRO (fun _ _ => includeStruct) id structuralMor ;; g.
 
 Definition Pcompose_joinM {Struct : Mor nat} 
   {SubS : SubStruct Monoidal Struct} {T}
   {a b b' c : nat} (f : PRO Struct T a b) (g : PRO Struct T b' c)
   (Hb : StructuralMorphism Monoidal b b') : PRO Struct T a c :=
-  f ;; map_PRO (fun _ _ => includeStruct) id (Hb T) ;; g.
+  f ;; map_PRO (fun _ _ => includeStruct) (Empty_set_rect _) Hb ;; g.
 
 Notation " f  ;;ₘ@{ M } g " := (Pcompose_joinM (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
 
 Notation " f  ;;ₘ g " := (Pcompose_joinM f%pro g%pro _) (at level 100) : pro_scope.
 
+Notation " f  ;;'@{ M } g " := (Pcompose_joinM (Struct:=M) f%pro g%pro _) (at level 100, only parsing) : pro_scope.
+Notation " f  ;;' g " := (Pcompose_joinM f%pro g%pro _) (at level 100) : pro_scope.
 
-(* Open Scope pro_scope.
 
+ Open Scope pro_scope.
+
+(*
 Goal forall n m o : nat, True.
 intros n m o.
-Check Pgen (n + m) (n + m + o) true ;;ₘ@{Monoidal} Pgen (n + (m + o)) 0 false.
-Check Pgen (n + m) (n + m + o) true ;;ₘ@{SymmetricG} Pgen (n + (m + o)) 0 false.
-Check Pgen (n + m) (n + m + o) true ;;'@{SymmetricG} Pgen (n + (o + m)) 0 false. *)
+Check Pgen (n + m) (n + m + o) true ;;ₛ@{Monoidal} Pgen (n + (m + o)) 0 false.
+Check Pgen (n + m) (n + m + o) true ;;ₛ@{SymmetricG} Pgen (n + (m + o)) 0 false.
+Check Pgen (n + m) (n + m + o) true ;;ₛ@{SymmetricG} Pgen (n + (o + m)) 0 false.
+Check Pgen (n + m) (n + m + o) true ;;'@{SymmetricG} Pgen (n + (m + o)) 0 false.
+(* Check Pgen (n + m) (n + m + o) true ;;'@{SymmetricG} Pgen (n + (o + m)) 0 false. *)
+
+Check structuralMor :> PRO SymmetricG bool (1 + (1 + n)) (2 + n).
+Check structuralMor :> PRO Monoidal bool (1 + (n + 1) + m) (S n + S m).
+Check Pgen (1 + (n + 1) + m) (S n + S m) true ;;'@{SymmetricG} Pgen (n + (o + m)) 0 false.
+
 
 
 (* Goal forall n m o, StructuralMorphism Autonomous (n + 0 + 1 + m + o + 1) (n + (o + 0 + m)).
@@ -418,3 +510,4 @@ Proof.
 
 
 
+*)
