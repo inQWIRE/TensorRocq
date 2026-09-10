@@ -1,4 +1,4 @@
-Require Import Aux_stdpp Basics Setoid Morphisms Algebra.Definitions Summable.Definitions.
+Require Import Aux_stdpp Basics Setoid Morphisms Algebra.Definitions Algebra.Instances Summable.Definitions.
 
 
 

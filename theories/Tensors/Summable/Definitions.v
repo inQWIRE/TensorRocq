@@ -8,7 +8,6 @@ From stdpp Require Import vector fin.
 From stdpp Require Export base list.
 From TensorRocq Require Import Aux_stdpp Aux.
 From TensorRocq Require Export Algebra.Definitions.
-(* From TensorRocq Require Export  *)
 
 (* FIXME: Move to Algebra when it has stdpp*)
 Lemma Rlist_sum_bind `{SR : SemiRing R rO rI radd rmul req} {A} (f : A -> list R) l :
@@ -54,20 +53,42 @@ Class Summable (A : Type) := sum_over {
 #[global] Arguments sum_over {_} _ : assert.
 
 
+Class SummableOver R (A : Type) := sum_by {
+  sum_of_internal (f : A -> R) : R;
+  summable_element (a : A) : Prop;
+}.
+
+#[global] Arguments sum_by {_ _} _ _ : assert.
+#[global] Arguments summable_element {_ _ _} _ : assert.
+#[global] Arguments sum_of_internal {_ _ _} _%_function_scope : assert.
+
+Class SummedElement `{SRA : SummableOver R A} (a : A) :=
+  is_summable_element : summable_element a.
+
+
+(* The sum of a function over a domain [A]. *)
+Definition sum_of {R A} {SRA : SummableOver R A} (f : A -> R) : R :=
+  sum_of_internal f.
+
+#[global] Arguments sum_of {_ _ _} _%_function_scope : assert.
 
 (* The sum of a function over a summable domain [A].
   We require the codomain to be a SemiRing so that
   typeclass search can find the definitions of 0
   and addition.  *)
-Definition sum_of `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A}
-  (f : A -> R) : R :=
-  Rlist_sum (f <$> sum_elements).
+#[global] Instance summable_summableover
+  `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A} :
+  SummableOver R A := sum_by (fun f => Rlist_sum (f <$> sum_elements)) (.∈ sum_elements).
 
-Global Arguments sum_of {_ _ _ _ _ _ _ _ _} (_)%_function_scope : assert.
 
-(* As [sum_of] has many arguments, we have a notation which exposes
-  only the last three. *)
-Notation sum_of_with := (@sum_of _ _ _ _ _ _ _) (only parsing).
+Lemma sum_of_defn_abstract `{SRA : SummableOver R A} (f : A -> R) :
+  sum_of f = SRA.(sum_of_internal) f.
+Proof. reflexivity. Qed.
+
+Lemma sum_of_defn_abstract' `{SRA : SummableOver R A} :
+  sum_of = SRA.(sum_of_internal).
+Proof. reflexivity. Qed.
+
 
 (* Lemma to unfold [sum_of]. Should not be to reason about
   tensor expressions directly, only to reason about their
@@ -121,11 +142,15 @@ Ltac solve_sum_of basetac indtac :=
 Ltac solve_sum_of_ring :=
   solve_sum_of ltac:(simpl; ring) ltac:(fun IHl => simpl; ring [IHl]).
 
+(* We have a special notation to make it easier to refer to summing over
+  a uniformly summable domain *)
+Notation sum_of' SA :=
+  (@sum_of _ _ (summable_summableover (SA:=SA))).
 
 (* We have a specific notation for a sum over a single register, so
   that sums over many registers can look better. *)
 Notation " '∑' x ':' T ',' f " :=
-  (@sum_of_with T _ (fun x => f))
+  (@sum_of _ T _ (fun x => f))
   (at level 60,
   x name, T at level 200, f at level 69,
   right associativity).
@@ -136,6 +161,96 @@ Notation " '∑' x ',' f " :=
   x name, f at level 69,
   right associativity,
   only parsing).
+
+
+(* A class denoting that a [SummableOver R A] instance behaves like
+  a sum over (possibly a subset of) [A], with respect to the semiring
+  structure of [R] *)
+Class LawfulSummableOver R (A : Type)
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SRA : SummableOver R A} := {
+  sum_of_ext (f g : A -> R)
+    (Hfg : forall a, SummedElement a -> req (f a) (g a)) :
+    req (sum_of f) (sum_of g);
+  sum_of_0 : req (sum_of (fun _ => rO)) rO;
+  sum_of_add (f g : A -> R) :
+    req (sum_of (fun a => radd (f a) (g a))) (radd (sum_of f) (sum_of g));
+  sum_of_distr_l (f : A -> R) r :
+    req (rmul (sum_of f) r) (sum_of (fun a => rmul (f a) r));
+  sum_of_comm_abstract (f : A -> A -> R) :
+    req (∑ a, ∑ b, f a b) (∑ b, ∑ a, f a b);
+}.
+
+Section summable_lawfulsummableover.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+Context `{SA : Summable A}.
+
+#[global] Instance summable_lawfulsummableover : LawfulSummableOver R A.
+Proof.
+  assert (Hext : ∀ f g : A → R,
+  (∀ a : A, SummedElement (R:=R) a → f a == g a) → ∑ x : A, f x == ∑ x : A, g x).
+  1:{
+    unfold SummedElement.
+    cbn.
+    intros f g Hfg.
+    unfold_sum_of.
+    induction sum_elements as [|a l IHl]; [done|].
+    cbn.
+    f_equiv; auto using elem_of_list.
+  }
+  split.
+  - done.
+  - solve_sum_of_ring.
+  - intros; solve_sum_of_ring.
+  - intros; solve_sum_of_ring.
+  - intros f.
+    rewrite (Hext _ (λ a, Rlist_sum (map (λ b : A, f a b) sum_elements)))
+      by now intros; rewrite sum_of_defn.
+    rewrite sum_of_defn.
+    rewrite (Hext _ (λ b, Rlist_sum (map (λ a : A, f a b) sum_elements)))
+      by now intros; rewrite sum_of_defn.
+    rewrite sum_of_defn.
+    generalize sum_elements at 1 4.
+    generalize sum_elements.
+    intros lB lA.
+    induction lB.
+    + cbn.
+      symmetry.
+      induction lA; [done|].
+      cbn.
+      rewrite IHlA; ring.
+    + cbn.
+      rewrite IHlB.
+      clear IHlB. 
+      induction lA.
+      * cbn; ring.
+      * cbn.
+        rewrite <- IHlA.
+        ring.
+Qed.
+
+End summable_lawfulsummableover.
+
 
 Section SumTheory.
 
@@ -175,13 +290,6 @@ Proof.
   - apply IHl.
 Qed.
 
-Lemma sum_of_ext `{Summable A} (f g : A -> R) :
-  (forall x, f x == g x) ->
-  ∑ x, f x == ∑ x, g x.
-Proof.
-  apply sum_of_ext_gen; apply _.
-Qed.
-
 Lemma sum_of_ext_eq `{Summable A} (f g : A -> R) :
   (forall x, f x = g x) ->
   ∑ x, f x = ∑ x, g x.
@@ -190,43 +298,48 @@ Proof.
 Qed.
 
 
-Lemma sum_of_0 `{Summable A} :
-  ∑ _ : A, 0 == 0.
-Proof.
-  solve_sum_of_ring.
-Qed.
 
-Lemma sum_of_add `{Summable A} (f g : A -> R) :
-  ∑ x, f x + g x == (∑ x, f x) + (∑ x, g x).
-Proof.
-  solve_sum_of_ring.
-Qed.
-
-Lemma sum_of_distr_l `{Summable A} (f : A -> R) r:
-  (∑ x, f x) * r == ∑ x, f x * r.
-Proof.
-  solve_sum_of_ring.
-Qed.
-
-Lemma sum_of_distr_r `{Summable A} (f : A -> R) (r : R) :
+Lemma sum_of_distr_r `{SummableOver R A,
+  !LawfulSummableOver R A} (f : A -> R) (r : R) :
   r * (∑ x, f x) == ∑ x, r * f x.
 Proof.
-  solve_sum_of_ring.
+  rewrite rmul_comm, sum_of_distr_l.
+  apply sum_of_ext.
+  intros.
+  apply rmul_comm.
+Qed.
+
+Lemma sum_of_0' `{SummableOver R A,
+  !LawfulSummableOver R A} (f : A -> R) :
+  (forall a, SummedElement a -> f a == 0) ->
+  sum_of f == 0.
+Proof.
+  intros Hf.
+  rewrite <- sum_of_0.
+  apply sum_of_ext; done.
+Qed.
+
+
+Lemma sum_of_comm_l `{Summable A, SummableOver R B, !LawfulSummableOver R B} (f : A -> B -> R) :
+  ∑ x, ∑ y, f x y == ∑ y, ∑ x, f x y.
+Proof.
+  rewrite sum_of_defn.
+  erewrite sum_of_ext by
+    now intros; apply eq_reflexivity, sum_of_defn.
+  gen_sum_elem lA.
+  induction lA.
+  - cbn.
+    now rewrite sum_of_0.
+  - simpl.
+    rewrite sum_of_add.
+    rewrite IHlA.
+    reflexivity.
 Qed.
 
 Lemma sum_of_comm `{Summable A, Summable B} (f : A -> B -> R) :
   ∑ x, ∑ y, f x y == ∑ y, ∑ x, f x y.
 Proof.
-  erewrite sum_of_ext by
-    now intros; apply eq_reflexivity, sum_of_defn.
-  rewrite (sum_of_defn (A:=B)).
-  gen_sum_elem lB.
-  induction lB.
-  - apply sum_of_0.
-  - simpl.
-    rewrite sum_of_add.
-    rewrite IHlB.
-    reflexivity.
+  apply sum_of_comm_l.
 Qed.
 
 Lemma sum_of_mul_sum_of `{Summable A, Summable B} (f : A -> R) (g : B -> R) :
@@ -287,612 +400,18 @@ End SumTheory.
 
 
 Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req}
-  {A} {SA : Summable A} : (@sum_of_with A SA)
+  {A} {SRA : SummableOver R A} `{!LawfulSummableOver R A} : (@sum_of R A _)
   with signature Morphisms.pointwise_relation A req ==> req as
   sum_of_mor.
 Proof.
-  apply sum_of_ext.
+  intros; apply sum_of_ext; auto.
 Qed.
 
 Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req}
-  {A} {SA : Summable A} : (@sum_of_with A SA)
+  {A} {SA : Summable A} : (@sum_of R A _)
   with signature Morphisms.pointwise_relation A eq ==> (@eq R) as
   sum_of_mor_eq.
 Proof.
   apply sum_of_ext_eq.
 Qed.
 
-#[export] Instance Summable_bool : Summable bool :=
-  sum_over [false; true].
-
-(* TODO: Replace with stdpp's Finite's enum, if we want to use stdpp *)
-Fixpoint fin_elements (n : nat) : list (Fin.t n) :=
-  match n with
-  | 0 => []
-  | S n' => Fin.F1 :: (Fin.FS <$> fin_elements n')
-  end.
-
-Lemma fin_elements_NoDup n : NoDup (fin_elements n).
-Proof.
-  induction n.
-  - constructor.
-  - cbn.
-    constructor.
-    + rewrite elem_of_list_fmap.
-      firstorder discriminate.
-    + now apply (NoDup_fmap _).
-Qed.
-
-Lemma fin_elements_in n (i : Fin.t n) : In i (fin_elements n).
-Proof.
-  induction i.
-  - now left.
-  - cbn.
-    right.
-    now apply in_map.
-Qed.
-
-Lemma length_fin_elements n : length (fin_elements n) = n.
-Proof.
-  induction n; cbn; f_equal; now simpl_list.
-Qed.
-
-#[export] Instance Summable_fin n : Summable (Fin.t n) :=
-  sum_over (fin_elements n).
-
-
-Lemma fin_elements_eq_fun_to_vec n :
-  fin_elements n = fun_to_vec id.
-Proof.
-  induction n; [done|].
-  cbn.
-  rewrite IHn.
-  rewrite <- vec_to_list_map, vmap_fun_to_vec.
-  done.
-Qed.
-
-Lemma vec_to_list_fun_to_vec_gen
-  {A n} (f : fin n -> A) :
-  vec_to_list (fun_to_vec f) = f <$> fin_elements _.
-Proof.
-  rewrite fin_elements_eq_fun_to_vec.
-  rewrite <- vec_to_list_map, vmap_fun_to_vec.
-  done.
-Qed.
-
-
-Lemma NoDup_fun_to_vec {A n} (f : fin n -> A) (Hf : Inj eq eq f) :
-  NoDup (fun_to_vec f).
-Proof.
-  rewrite vec_to_list_fun_to_vec_gen.
-  apply (NoDup_fmap _), fin_elements_NoDup.
-Qed.
-
-(* TODO: Is there an existing function for this? *)
-Fixpoint vec_elements `(l : list A) (n : nat) : list (Vector.t A n) :=
-  match n with
-  | 0 => [@Vector.nil A]
-  | S n' => flat_map (fun a => map (@Vector.cons A a n') (vec_elements l n')) l
-  end.
-
-Lemma vec_elements_nonempty `(l : list A) n :
-  l <> [] -> vec_elements l n <> [].
-Proof.
-  intros Hl.
-  induction n; [easy|].
-  cbn.
-  destruct l; [easy|].
-  cbn.
-  destruct (vec_elements _ _); [easy|].
-  cbn.
-  easy.
-Qed.
-
-(* Lemma map_inj `(f : A -> B) l l' :
-  (forall a b, f a = f b -> a = b) ->
-  map  *)
-
-Lemma vec_elements_NoDup `(l : list A) (n : nat) :
-  NoDup l -> NoDup (vec_elements l n).
-Proof.
-  revert n.
-  assert (Haux : l <> [] -> forall x y n, map (@Vector.cons A x n) (vec_elements l n) =
-   map (@Vector.cons A y n) (vec_elements l n) <-> x = y). 1:{
-    intros Hl x y n.
-    split; [|now intros ->].
-    apply (vec_elements_nonempty _ n) in Hl.
-    destruct (vec_elements l n); [easy|].
-    cbn.
-    now intros [= ? _].
-  }
-  intros n Hl.
-  induction n.
-  - cbn.
-    constructor; [|constructor].
-    easy.
-  - cbn.
-    rewrite flat_map_concat_map.
-    apply NoDup_ListNoDup, NoDup_concat.
-    + apply Forall_map, Forall_forall.
-      intros x Hx.
-      apply NoDup_map_NoDup_ForallPairs; [|now apply NoDup_ListNoDup].
-      now intros ? ? ? ? []%Vector.cons_inj.
-    + apply ForallPairs_not_eq_ForallOrdPairs_NoDup.
-      1:{
-        apply NoDup_ListNoDup, NoDup_map_NoDup_ForallPairs;
-          [|now apply NoDup_ListNoDup].
-        hnf.
-        intros a b Ha Hb.
-        apply Haux.
-        now intros ->.
-      }
-      apply ForallPairs_map.
-      intros a b Ha Hb.
-      rewrite Haux by now intros ->.
-      intros Hab.
-      setoid_rewrite in_map_iff.
-      intros a_vs (vs & <- & _).
-      firstorder congruence.
-Qed.
-
-Lemma vec_elements_in `(l : list A) n v :
-  In v (vec_elements l n) <-> Vector.Forall (fun x => In x l) v.
-Proof.
-  induction v.
-  - cbn; firstorder constructor.
-  - cbn.
-    rewrite in_flat_map, Vector.Forall_cons_iff, <- IHv.
-    setoid_rewrite in_map_iff.
-    split.
-    + intros (h' & Hh & (? & [-> ->]%Vector.cons_inj & Hv)).
-      easy.
-    + intros [].
-      eauto.
-Qed.
-
-Lemma vec_elements_in' `(l : list A) n :
-  (forall a, In a l) -> forall v, In v (vec_elements l n).
-Proof.
-  intros Hl v.
-  rewrite vec_elements_in.
-  induction v; constructor; auto.
-Qed.
-
-Lemma length_vec_elements `(l : list A) n :
-  length (vec_elements l n) = Nat.pow (length l) n.
-Proof.
-  induction n; [reflexivity|].
-  cbn.
-  rewrite length_flat_map.
-  erewrite map_ext. 2:{
-    intros a.
-    rewrite length_map, IHn.
-    reflexivity.
-  }
-  clear IHn.
-  generalize (length l) at 1 3 as k.
-  intros k.
-  induction l; [reflexivity|].
-  cbn.
-  f_equal; apply IHl.
-Qed.
-
-#[export]
-Instance Summable_vec `{Summable A} n : Summable (Vector.t A n) :=
-  sum_over (vec_elements sum_elements n).
-
-Section fin_fun.
-
-(* Import Fin. *)
-
-Local Notation "'!S' f" := (fun i => f (Fin.FS i)) (only parsing, at level 10).
-
-Local Definition fin_S_inv {n} (P : Fin.t (S n) -> Type)
-  (H0 : P Fin.F1) (HS : forall i, P (Fin.FS i)) (i : Fin.t (S n)) : P i.
-Proof.
-  revert P H0 HS.
-  refine match i with Fin.F1 => fun _ H0 _ => H0
-  | Fin.FS i => fun _ _ HS => HS i end.
-Defined.
-
-Fixpoint fin_fun_elements_aux {n} : forall (f : Fin.t n -> Type)
-  (Sf : forall i, list (f i)), list (forall i, f i) :=
-  match n with
-  | 0 => fun f Sf => [Fin.case0 f]
-  | S n' =>
-    fun f Sf =>
-    let l :=
-      fin_fun_elements_aux (!S f) (!S Sf) in
-    flat_map (fun x => map (fin_S_inv f x) l) (Sf (Fin.F1))
-  end.
-
-
-Lemma fin_fun_elements_aux_ina_gen {n} (f : Fin.t n -> Type) Sf
-  (Rf : forall i, relation (f i)) g :
-  InA (forall_relation Rf) g (fin_fun_elements_aux f Sf) <->
-  forall i, (InA (Rf i) (g i) (Sf i)).
-Proof.
-  rewrite InA_altdef.
-  induction n.
-  - cbn.
-    rewrite Exists_cons, Exists_nil.
-    split; intros _; [|left]; exact (Fin.case0 _).
-  - cbn.
-    rewrite Exists_flat_map.
-    split.
-    + intros (x & Hx & HgS)%Exists_exists.
-      (* pose proof HgS as Hx'. *)
-      rewrite Exists_exists in HgS.
-      destruct HgS as (g' & (gS' & -> & HgS')%elem_of_list_fmap & Hgg').
-      specialize (Hgg' Fin.F1) as Hxeq.
-      cbn in Hxeq.
-      apply fin_S_inv.
-      * rewrite InA_altdef, Exists_exists.
-        eauto.
-      * apply IHn.
-        rewrite Exists_exists.
-        exists gS'.
-        split; [easy|].
-        intros i; apply Hgg'.
-    + intros Hg.
-      rewrite Exists_exists.
-      pose proof (Hg Fin.F1) as
-        (g1' & Hg1' & Hg1g1')%InA_altdef%Exists_exists.
-      exists g1'.
-      split; [auto|].
-      rewrite Exists_exists.
-      specialize (IHn (!S f) (!S Sf) (!S Rf) (!S g)).
-      apply proj2 in IHn.
-      specialize (IHn (!S Hg)).
-      rewrite Exists_exists in IHn.
-      destruct IHn as (gS' & HgS' & HgSgS').
-      eexists.
-      split; [apply elem_of_list_fmap_1; eassumption|].
-      hnf.
-      now apply fin_S_inv.
-Qed.
-
-Lemma fin_fun_elements_aux_ina_eq {n} (f : Fin.t n -> Type) Sf g :
-  InA (fun f g => forall x, f x = g x) g (fin_fun_elements_aux f Sf) <->
-  forall i, (In (g i) (Sf i)).
-Proof.
-  setoid_rewrite (fin_fun_elements_aux_ina_gen f Sf (fun _ => eq)).
-  apply forall_iff.
-  intros i.
-  split; [|apply In_InA, _].
-  now intros (_ & Hgi & <-)%InA_altdef%Exists_exists; apply elem_of_list_In.
-Qed.
-
-End fin_fun.
-
-
-#[export]
-Instance Summable_prod `{Summable A, Summable B} : Summable (A * B) :=
-  sum_over (list_prod sum_elements sum_elements).
-
-#[export]
-Instance Summable_sum `{Summable A, Summable B} : Summable (A + B) :=
-  sum_over ((inl <$> sum_elements) ++ (inr <$> sum_elements)).
-
-Fixpoint sum_of_fin `{SR : SemiRing R rO rI radd rmul req} {n : nat}
-  (f : Fin.t n -> R) : R :=
-  match n, f with
-  | O, _ => rO
-  | S k, _ => radd (f Fin.F1) (sum_of_fin (fun fin => f (Fin.FS fin)))
-  end.
-
-Fixpoint sum_of_vec `{SR : SemiRing R rO rI radd rmul req} {n : nat}
-  `{Summable A} : (Vector.t A n -> R) -> R :=
-    match n with
-    | O => fun f => f (Vector.nil)
-    | S n' => fun f => ∑ b : A,
-      sum_of_vec (fun bs => f (Vector.cons b bs))
-    end.
-
-Local Existing Instance fold_right_mor.
-
-
-
-Section SummableInstanceUnfold.
-
-Context `{SR : SemiRing R rO rI radd rmul req}.
-
-Notation "0" := rO.
-Notation "1" := rI.
-Notation "x '==' y" := (req x y) (at level 70).
-Infix "+" := radd.
-Infix "*" := rmul.
-
-Add Ring R : SR.(RSRth)
-  (setoid SR.(Req_equiv) SR.(Req_ext)).
-
-Let Req_equivalence : Equivalence req := Req_equiv.
-Local Existing Instance Req_equivalence.
-
-Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
-Local Existing Instance Radd_proper.
-
-Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
-Local Existing Instance Rmul_proper.
-
-
-Lemma sum_of_bool_defn (f : bool -> R) :
-  sum_of f == f false + f true.
-Proof.
-  unfold_sum_of.
-  cbn; ring.
-Qed.
-
-
-Lemma sum_of_fin_0 (f : Fin.t 0 -> R) :
-  sum_of f = 0.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma sum_of_fin_1 (f : Fin.t 1 -> R) :
-  sum_of f == f Fin.F1.
-Proof.
-  unfold_sum_of; cbn; ring.
-Qed.
-
-Lemma sum_of_fin_succ {n} (f : Fin.t (S n) -> R) :
-  sum_of f = f Fin.F1 + sum_of (fun x => f (Fin.FS x)).
-Proof.
-  unfold_sum_of.
-  cbn.
-  now rewrite map_map.
-Qed.
-
-Lemma sum_of_fin_defn {n} (f : Fin.t n -> R) :
-  sum_of f == sum_of_fin f.
-Proof.
-  induction n.
-  - now rewrite sum_of_fin_0.
-  - now rewrite sum_of_fin_succ, IHn.
-Qed.
-
-Lemma sum_of_fin_add {n m} (f : Fin.t (n + m) -> R) :
-  sum_of f == sum_of (fun x => f (Fin.L m x)) + sum_of (fun x => f (Fin.R n x)).
-Proof.
-  induction n.
-  - rewrite sum_of_fin_0.
-    cbn in *.
-    now rewrite radd_0_l.
-  - cbn.
-    rewrite 2 sum_of_fin_succ.
-    rewrite IHn.
-    rewrite radd_assoc.
-    reflexivity.
-Qed.
-
-Lemma sum_of_fin_mul {n m} (f : Fin.t (n * m) -> R) :
-  sum_of f == ∑ x : Fin.t n, ∑ y : Fin.t m, f (Fin.depair x y).
-Proof.
-  induction n.
-  - now rewrite 2 sum_of_fin_0.
-  - cbn.
-    rewrite sum_of_fin_succ, sum_of_fin_add.
-    rewrite IHn.
-    reflexivity.
-Qed.
-
-Section Vector.
-
-Context `{SA : Summable A}.
-
-Lemma sum_of_vec_0 (f : Vector.t A 0 -> R) :
-  sum_of f == f (Vector.nil).
-Proof.
-  unfold_sum_of.
-  cbn.
-  ring.
-Qed.
-
-Lemma sum_of_vec_1 (f : Vector.t A 1 -> R) :
-  sum_of f == ∑ a, f (Vector.cons a (Vector.nil)).
-Proof.
-  unfold_sum_of; cbn;
-  solve_sum_of_ring.
-Qed.
-
-Lemma sum_of_vec_succ {n} (f : Vector.t A (S n) -> R) :
-  sum_of f == ∑ a, sum_of (fun v => f (Vector.cons a v)).
-Proof.
-  rewrite sum_of_defn.
-  cbn.
-  rewrite flat_map_concat_map.
-  rewrite concat_map, map_map.
-  rewrite Rlist_sum_concat.
-  rewrite map_map.
-  rewrite sum_of_defn.
-  erewrite map_ext by now intros; rewrite map_map; reflexivity.
-  symmetry.
-  erewrite map_ext by now intros; rewrite sum_of_defn; reflexivity.
-  reflexivity.
-Qed.
-
-Lemma sum_of_vec_defn {n} (f : Vector.t A n -> R) :
-  sum_of f == sum_of_vec f.
-Proof.
-  induction n.
-  - now rewrite sum_of_vec_0.
-  - now rewrite sum_of_vec_succ; setoid_rewrite IHn.
-Qed.
-
-Lemma sum_of_vec_add {n m} (f : Vector.t A (n + m) -> R) :
-  sum_of f == ∑ v, ∑ w, f (Vector.append v w).
-Proof.
-  induction n.
-  - rewrite sum_of_vec_0.
-    reflexivity.
-  - cbn.
-    rewrite 2 sum_of_vec_succ.
-    setoid_rewrite IHn.
-    reflexivity.
-Qed.
-
-
-Lemma sum_of_vec_cast {n m} (f : vec A n -> R) (H : m = n) :
-  ∑ v : _, f v == ∑ v : vec A m, f (Vector.cast v H).
-Proof.
-  subst.
-  now setoid_rewrite cast_id.
-Qed.
-
-Lemma sum_of_vec_rev {n} (f : vec A n -> R) :
-  ∑ v : _, f v == ∑ v : _, f (Vector.rev v).
-Proof.
-  induction n.
-  - now rewrite 2 sum_of_vec_0, Vector.rev_nil.
-  - erewrite (sum_of_vec_cast f (Nat.add_comm n 1)).
-    rewrite sum_of_vec_add.
-    rewrite sum_of_comm.
-    rewrite sum_of_vec_1, sum_of_vec_succ.
-    f_equiv; intros a.
-    rewrite IHn.
-    f_equiv; intros v.
-    now rewrite vec_rev_cons_alt.
-Qed.
-
-End Vector.
-
-Lemma sum_of_prod_defn `{Summable A, Summable B} (f : A * B -> R) :
-  sum_of f == ∑ a, ∑ b, f (a, b).
-Proof.
-  unfold_sum_of.
-  cbn.
-  gen_sum_elem lA.
-  gen_sum_elem lB.
-  induction lA; [reflexivity|].
-  cbn.
-  rewrite map_app, Rlist_sum_app, map_map.
-  f_equiv.
-  apply IHlA.
-Qed.
-
-
-Lemma sum_of_sum_defn `{Summable A, Summable B} (f : A + B -> R) :
-  sum_of f == (∑ a, f (inl a)) + (∑ b, f (inr b)).
-Proof.
-  unfold_sum_of.
-  cbn.
-  rewrite map_app, Rlist_sum_app, 2 map_map.
-  reflexivity.
-Qed.
-
-
-End SummableInstanceUnfold.
-
-
-(* Common instances of semirings *)
-
-#[global] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); lia.
-Qed.
-
-#[global] Instance N_SemiRing : SemiRing N 0%N 1%N N.add N.mul eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); lia.
-Qed.
-
-#[global] Instance bool_SemiRing : SemiRing bool false true xorb andb eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); subst; Btauto.btauto.
-Qed.
-
-(* FIXME: Move *)
-Lemma fin_add_prf {n} (i j : fin n) : (i + j) mod n < n.
-Proof.
-  apply Nat.mod_upper_bound.
-  inversion i; done.
-Qed.
-Lemma fin_mul_prf {n} (i j : fin n) : (i * j) mod n < n.
-Proof.
-  apply Nat.mod_upper_bound.
-  inversion i; done.
-Qed.
-Definition fin_add {n} (i j : fin n) : fin n :=
-  nat_to_fin (fin_add_prf i j).
-Definition fin_mul {n} (i j : fin n) : fin n :=
-  nat_to_fin (fin_mul_prf i j).
-Lemma fin_to_nat_add {n} (i j : fin n) :
-  fin_add i j =@{nat} (i + j) mod n.
-Proof.
-  apply fin_to_nat_to_fin.
-Qed.
-Lemma fin_to_nat_mul {n} (i j : fin n) :
-  fin_mul i j =@{nat} (i * j) mod n.
-Proof.
-  apply fin_to_nat_to_fin.
-Qed.
-
-
-#[global] Instance fin_SemiRing n : SemiRing (fin (S (S n))) 0%fin 1%fin fin_add fin_mul eq.
-Proof.
-  constructor; [| split; apply _|apply eq_equivalence].
-  split; intros i; pose proof (fin_to_nat_lt i);
-  (try (intros j; pose proof (fin_to_nat_lt j)));
-  (try (intros k; pose proof (fin_to_nat_lt k))); apply fin_to_nat_inj; rewrite ?fin_to_nat_mul, ? fin_to_nat_add, ?fin_to_nat_mul.
-  - cbn -[Nat.modulo].
-    apply Nat.mod_small; done.
-  - f_equal; lia.
-  - rewrite Nat.Div0.add_mod_idemp_r, Nat.Div0.add_mod_idemp_l.
-    f_equal; lia.
-  - cbn -[Nat.modulo].
-    rewrite Nat.mod_small; lia.
-  - cbn -[Nat.modulo].
-    rewrite Nat.mod_small; lia.
-  - f_equal; lia.
-  - rewrite Nat.Div0.mul_mod_idemp_r, Nat.Div0.mul_mod_idemp_l.
-    f_equal; lia.
-  - rewrite Nat.Div0.mul_mod_idemp_l, <- Nat.Div0.add_mod.
-    f_equal; lia.
-Qed.
-
-#[global] Instance Z_SemiRing : SemiRing Z 0%Z 1%Z Z.add Z.mul eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); lia.
-Qed.
-
-Require Import Lqa.
-
-Import QArith.
-
-#[global] Instance Q_SemiRing : SemiRing Q 0%Q 1%Q Qplus Qmult Qeq.
-Proof.
-  constructor; [|split; apply _|split; apply _].
-  constructor; intros; lra.
-Qed.
-
-#[global] Instance unit_SemiRing : SemiRing unit () () (fun _ _ => ()) (fun _ _ => ()) eq.
-Proof.
-  do 2 constructor; repeat (hnf; intros); repeat_on_hyps ltac:(fun H => try destruct H); done.
-Qed.
-
-#[global] Instance prod_SemiRing {R S seq} `{SR : SemiRing R rO rI radd rmul req, 
-  SS : SemiRing S sO sI sadd smul seq} : SemiRing (R * S) (rO, sO) (rI, sI)
-    (λ '(r, s) '(r', s'), (radd r r', sadd s s'))
-    (λ '(r, s) '(r', s'), (rmul r r', smul s s')) (prod_relation req seq).
-Proof.
-  eassert (Equivalence _) by apply SR.
-  eassert (Hradd : Proper _ radd) by apply SR.
-  eassert (Hrmul : Proper (req ==> _) rmul) by apply SR.
-  eassert (Equivalence _) by apply SS.
-  eassert (Hsadd : Proper _ sadd) by apply SS.
-  eassert (Hsmul : Proper (seq ==> _) smul) by apply SS.
-  split.
-  - split; intros [r s]; (try intros [r' s']); (try intros [r'' s'']); split; cbn;
-    first [apply SR|apply SS].
-  - split; intros [] [] [] [] [] []; split; cbn in *; f_equiv; done.
-  - split; apply _.
-Qed.
-
-#[global] Instance Prop_SemiRing : SemiRing Prop False True or and iff.
-Proof.
-  split.
-  - split; tauto.
-  - split; apply _.
-  - apply (_ : Equivalence iff).
-Qed.

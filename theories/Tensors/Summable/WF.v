@@ -1,6 +1,17 @@
-From TensorRocq Require Import Aux Aux_stdpp Summable.Definitions Algebra.
+From TensorRocq Require Import Aux Aux_stdpp Summable.Definitions Summable.Instances Algebra.
 From stdpp Require Import vector fin fin_maps.
 From stdpp Require Export list.
+
+Class WFSummableOver (R A : Type)
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SRA : SummableOver R A, !LawfulSummableOver R A} := mk_WF_sum_over {
+  sum_of_unique (f : A -> R) r
+    (Hf : exists a, SummedElement a /\ req (f a) r /\ forall b, SummedElement b -> b <> a -> req (f b) rO) :
+    req (sum_of f) r
+}.
+
+#[global] Arguments mk_WF_sum_over {_ _ _ _ _ _ _ _ _ _} _ : assert.
+
 
 (* A Summable instance is WF if its list of elements is
   duplicate-free (hence a delta-tensor can be defined using
@@ -11,13 +22,134 @@ Class WFSummable (A : Type) `{Summable A} := mk_WF_sum {
 
 #[global] Arguments mk_WF_sum {_ _} _ : assert.
 
+
+Section summable.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+#[global] Instance WFSummable_WFSummableOver (A : Type) `{Summable A}
+  {WFA : WFSummable A} :
+  WFSummableOver R A.
+Proof.
+  split.
+  intros f r (a & Ha & Hfa & Hf).
+  unfold SummedElement in Ha, Hf.
+  cbn in Ha, Hf.
+  destruct WFA as [WFA].
+  revert WFA.
+  unfold_sum_of.
+  revert Ha Hf.
+  gen_sum_elem l.
+  intros Ha Hf Hl.
+  induction Ha; apply NoDup_cons in Hl as [Hx Hl].
+  - cbn.
+    rewrite Hfa.
+    rewrite Rlist_sum_zeros; [ring|].
+    rewrite Forall_fmap, Forall_forall.
+    intros b Hb.
+    apply Hf; set_solver + Hb Hx.
+  - cbn.
+    rewrite Hf by now constructor || congruence.
+    rewrite IHHa; [ring|..];
+    auto using elem_of_list.
+Qed.
+
+End summable.
+
 #[export] Instance SummableWF_fin {n} : WFSummable (fin n) :=
   mk_WF_sum (fin_elements_NoDup n).
 
 
-#[export] Program Instance SummableWF_vec `{WFSummable A} {n} :
-  WFSummable (vec A n) :=
-  mk_WF_sum (vec_elements_NoDup _ n NoDup_sum_elements).
+#[export] Instance WFSummableOver_prop A {EqA : EqDecision A} :
+  WFSummableOver Prop A.
+Proof.
+  split.
+  unfold SummedElement.
+  cbn.
+  intros f r (a & _ & Hfa & Hf).
+  rewrite sum_of_defn_abstract'; cbn.
+  split; [|intros ?%Hfa; eauto].
+  intros (b & Hb).
+  destruct_decide (decide (b = a)); [now subst; firstorder|].
+  firstorder.
+Qed.
+
+#[export] Instance SummedElement_prop {A} (a : A) : 
+  SummedElement a.
+Proof.
+  done.
+Qed.
+
+
+
+Section summable.
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+#[export] Instance WFSummableOver_vec `{SummableOver R A}
+  `{!LawfulSummableOver R A, !WFSummableOver R A} {n} :
+  WFSummableOver R (vec A n).
+Proof.
+  split.
+  intros f r (v & Hv & Hfv & Hf).
+  unfold SummedElement in Hv, Hf.
+  cbn in Hv, Hf.
+  induction v; [done|].
+  rewrite sum_of_vec_succ.
+  apply sum_of_unique.
+  exists h.
+  cbn in Hv.
+  apply Forall_cons in Hv as [Hh Hv].
+  split_and!.
+  - done.
+  - apply IHv.
+    + done.
+    + done.
+    + intros; apply Hf; [now constructor|].
+      now intros ?%vcons_inj.
+  - intros b Hb Hbh.
+    apply sum_of_0'.
+    intros w Hw.
+    apply Hf; [now constructor|].
+    now intros ?%vcons_inj.
+Qed.
+
 
 #[export] Program Instance SummableWF_bool : WFSummable bool.
 Next Obligation.
@@ -26,7 +158,7 @@ Next Obligation.
 Qed.
 
 #[export] Program Instance SummableWF_prod `{WFSummable A, WFSummable B}
-  : WFSummable (A * B).
+  : @WFSummable (A * B) Summable_prod.
 Next Obligation.
   intros A SA [HA] B SB [HB].
   cbn.
@@ -34,7 +166,7 @@ Next Obligation.
 Qed.
 
 #[export] Program Instance SummableWF_sum `{WFSummable A, WFSummable B}
-  : WFSummable (A + B).
+  : @WFSummable (A + B) Summable_sum.
 Next Obligation.
   intros A SA [HA] B SB [HB].
   cbn.
@@ -43,13 +175,12 @@ Next Obligation.
   firstorder congruence.
 Qed.
 
-Class SummedElement `{Summable A} (a : A) : Prop := {
-  element_summed : a ∈ sum_elements
-}.
+
+Local Notation SummedElement := (SummedElement (R:=R)).
 
 Lemma SummedElement_iff `{Summable A} (a : A) : SummedElement a <-> a ∈ sum_elements.
 Proof.
-  now split; [intros []|constructor].
+  done.
 Qed.
 
 #[export] Program Instance SummedElement_fin {n} (i : fin n) :
@@ -65,79 +196,64 @@ Next Obligation.
   intros []; cbn; compute_done.
 Qed.
 
-#[export] Program Instance SummedElement_vec `{Summable A}
+End summable.
+
+#[export] Program Instance SummedElement_vec `{SummableOver R A}
   {n} (v : vec A n) (Hv : forall a, a ∈ vec_to_list v -> SummedElement a) :
   SummedElement v.
 Next Obligation.
   intros A SA n v Hv.
-  apply elem_of_list_In, vec_elements_in.
-  rewrite Vector.to_list_Forall, Forall_forall.
-  intros a Ha.
-  rewrite <- vec_to_list_to_list in Ha.
-  now apply elem_of_list_In, Hv.
+  cbn.
+  rewrite Forall_forall; done.
 Qed.
 
-#[export] Instance SummedElement_vcons `{Summable A} (a : A) {n} (v : vec A n) :
+#[export] Instance SummedElement_vcons `{SummableOver R A} (a : A) {n} (v : vec A n) :
   SummedElement a -> SummedElement v -> SummedElement (a ::: v).
 Proof.
-  rewrite 3 SummedElement_iff.
-  rewrite 3 elem_of_list_In.
-  unfold sum_elements at 2 3; cbn [Summable_vec].
-  rewrite 2 vec_elements_in.
-  rewrite Vector.Forall_cons_iff.
-  easy.
+  now intros; constructor.
 Qed.
 
-#[export] Instance SummedElement_vnil `{Summable A} :
+#[export] Instance SummedElement_vnil `{SummableOver R A} :
   SummedElement ([#] :> vec A 0).
 Proof.
   now apply SummedElement_vec.
 Qed.
 
-#[export] Program Instance SummedElement_sum_l `{Summable A, Summable B}
+
+
+#[export] Program Instance SummedElement_sum_l
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SummableOver R A, SummableOver R B}
   (a : A) `{Ha : !SummedElement a} :
-  SummedElement (@inl A B a).
+  SummedElement (R:=R) (@inl A B a).
 Next Obligation.
-  intros A SA B SB a [Ha].
-  cbn.
-  apply elem_of_app; left.
-  now apply elem_of_list_fmap_1.
+  done.
 Qed.
 
-#[export] Program Instance SummedElement_sum_r `{Summable A, Summable B}
+#[export] Program Instance SummedElement_sum_r
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SummableOver R A, SummableOver R B}
   (b : B) `{Ha : !SummedElement b} :
-  SummedElement (@inr A B b).
+  SummedElement (R:=R) (@inr A B b).
 Next Obligation.
-  intros A SA B SB b [Hb].
-  cbn.
-  apply elem_of_app; right.
-  now apply elem_of_list_fmap_1.
+  done.
 Qed.
 
-#[export] Program Instance SummedElement_prod `{Summable A, Summable B}
+#[export] Program Instance SummedElement_prod `{SummableOver R A, SummableOver R B}
   (ab : A * B) `{Ha : !SummedElement ab.1, Hb : !SummedElement ab.2} :
   SummedElement ab.
 Next Obligation.
-  intros A SA B SB a [Ha] [Hb].
-  cbn.
-  rewrite <- list_cprod_list_prod.
-  now apply elem_of_list_cprod.
+  done.
 Qed.
 
 
-Lemma SummedElement_vec_iff `{Summable A} {n} (v : vec A n) :
+Lemma SummedElement_vec_iff `{SummableOver R A} {n} (v : vec A n) :
   SummedElement v <-> (forall a, a ∈@{list _} v -> SummedElement a).
 Proof.
-  split; [|apply SummedElement_vec].
-  setoid_rewrite SummedElement_iff.
-  setoid_rewrite elem_of_list_In.
-  intros Hv%vec_elements_in%Vector.to_list_Forall.
-  apply List.Forall_forall.
-  revert Hv.
-  now rewrite vec_to_list_to_list.
+  apply Forall_forall.
 Qed.
 
-Lemma SummedElement_vec_app_iff `{Summable A} {n m} (v : vec A n) (w : vec A m) :
+Lemma SummedElement_vec_app_iff `{SummableOver R A} {n m} (v : vec A n) (w : vec A m) :
   SummedElement (v +++ w) <-> SummedElement v /\ SummedElement w.
 Proof.
   rewrite 3 SummedElement_vec_iff.
@@ -147,26 +263,26 @@ Proof.
   naive_solver.
 Qed.
 
-Lemma SummedElement_vec_iff_Forall `{Summable A} {n} (v : vec A n) :
+Lemma SummedElement_vec_iff_Forall `{SummableOver R A} {n} (v : vec A n) :
   SummedElement v <-> Forall SummedElement v.
 Proof.
-  now rewrite SummedElement_vec_iff, <- Forall_forall.
+  done.
 Qed.
-#[export] Instance SummedElement_vsplitl `{Summable A} {n m} (v : vec A (n + m)) :
+#[export] Instance SummedElement_vsplitl `{SummableOver R A} {n m} (v : vec A (n + m)) :
   SummedElement v -> SummedElement (vsplitl v).
 Proof.
   rewrite 2 SummedElement_vec_iff_Forall.
   rewrite <- (app_vsplit v), vec_to_list_app, Forall_app at 1.
   easy.
 Qed.
-#[export] Instance SummedElement_vsplitr `{Summable A} {n m} (v : vec A (n + m)) :
+#[export] Instance SummedElement_vsplitr `{SummableOver R A} {n m} (v : vec A (n + m)) :
   SummedElement v -> SummedElement (vsplitr v).
 Proof.
   rewrite 2 SummedElement_vec_iff_Forall.
   rewrite <- (app_vsplit v), vec_to_list_app, Forall_app at 1.
   easy.
 Qed.
-#[export] Instance SummedElement_vec_app `{Summable A} {n m}
+#[export] Instance SummedElement_vec_app `{SummableOver R A} {n m}
   (v : vec A n) (w : vec A m) :
   SummedElement v -> SummedElement w -> SummedElement (v +++ w).
 Proof.
@@ -174,7 +290,7 @@ Proof.
   auto.
 Qed.
 
-Lemma make_vecs_map_SummedElements `{SA : Summable A} {n m}
+Lemma make_vecs_map_SummedElements `{SA : SummableOver R A} {n m}
   (ins : vec _ n) (outs : vec _ m) (v w : vec A _) :
   SummedElement v -> SummedElement w ->
   map_Forall (λ _ a, SummedElement a)
@@ -214,28 +330,16 @@ Local Existing Instance Radd_proper.
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
-Lemma sum_of_unique' `{HA : WFSummable A} (f : A -> R) (a : A) `{Ha : !SummedElement a} :
+Lemma sum_of_unique' `{SRA : SummableOver R A,
+  LSRA : !LawfulSummableOver R A,
+  WFA : !WFSummableOver R A} (f : A -> R) (a : A) `{Ha : !SummedElement a} :
   (forall b, SummedElement b -> a <> b -> f b == 0) ->
   ∑ b : A, f b == f a.
 Proof.
-  destruct HA as [HA].
-  revert HA Ha.
-  setoid_rewrite SummedElement_iff.
-  unfold_sum_of.
-  gen_sum_elem l.
-  intros Hl Ha Hf.
-  induction Hl as [|b l IHl]; [easy|].
-  apply elem_of_cons in Ha as [<- | Ha].
-  - cbn.
-    rewrite Rlist_sum_zeros; [apply radd_0_r|].
-    rewrite Forall_fmap, Forall_forall.
-    cbn.
-    intros b Hb.
-    apply Hf; [now constructor|congruence].
-  - cbn.
-    rewrite Hf, radd_0_l by now constructor || congruence.
-    apply IHHl; [easy|].
-    intros ? ?; apply Hf; now constructor.
+  intros Hb.
+  apply sum_of_unique.
+  exists a.
+  split_and!; done || auto.
 Qed.
 
 

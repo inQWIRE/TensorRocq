@@ -1,1 +1,1 @@
-From TensorRocq Require Export Algebra.Definitions Algebra.Homomorphism Algebra.Monoid.
+From TensorRocq Require Export Algebra.Definitions Algebra.Instances Algebra.Homomorphism Algebra.Monoid.
