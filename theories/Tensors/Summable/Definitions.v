@@ -32,6 +32,15 @@ Proof.
   apply IHl.
 Qed.
 
+
+
+(* FIXME: Move *)
+#[export] Instance SR_equiv `{SR : SemiRing R rO rI radd rmul req} :
+  Equiv R := req.
+
+#[export] Instance SR_equivalence `{SR : SemiRing R rO rI radd rmul req} :
+  @Equivalence R equiv := SR.(Req_equiv).
+
 (* A typeclass indicating a type can be summed over, hence
   used in tensor expressions. Note that this is in fact just
   expressing that there are some distinguished elements of the

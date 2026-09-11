@@ -134,13 +134,6 @@ Proof.
 Qed.
 
 
-(* FIXME: Move *)
-#[export] Instance SR_equiv `{SR : SemiRing R rO rI radd rmul req} :
-  Equiv R := req.
-
-#[export] Instance SR_equivalence `{SR : SemiRing R rO rI radd rmul req} :
-  @Equivalence R equiv := SR.(Req_equiv).
-
 
 
 (* A matrix with dimensions [n] and [m] with values in [R] *)

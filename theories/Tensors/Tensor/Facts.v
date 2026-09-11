@@ -21,7 +21,6 @@ From TensorRocq Require Export Summable Homomorphism.
   interpretTensor_hom t : interpretTensor (f t) ≡ interpretTensor t
 }. *)
 
-
 Class TensorLikeHom
   `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
@@ -34,7 +33,7 @@ Class TensorLikeHom
   TLH_SRH :: SemiRingHomomorphism f;
   TLH_proper : Proper (equiv ==> equiv) fT;
   interpretTensor_hom t n m :
-    tensor_apply_hom f (interpretTensor t n m) ≡
+    tensor_apply_hom f (interpretTensor t n m) ≡@{@Tensor R' n m A}
     interpretTensor (fT t) n m
 }.
 
@@ -64,39 +63,47 @@ Class StrictTensorLikeHom
   {STL : StrictTensorLike R A T}
   {STL' : StrictTensorLike R' A T} := {
   strictInterpretTensor_hom {n m} (t : T n m) :
-    tensor_apply_hom f (strictInterpretTensor t) ≡
+    tensor_apply_hom f (strictInterpretTensor t) ≡@{@Tensor R' n m A}
     strictInterpretTensor t
 }.
 
 
 Section tensoreq.
 
-Context `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A}.
+Context `{EqR : Equiv R} `{SA : SummableOver R A}.
 
-Lemma tensoreq_refl {n m} (t : @Tensor R n m A) : t ≡ t.
-Proof. hnf; intros; apply SR. Qed.
-Lemma tensoreq_symm {n m} (t t' : @Tensor R n m A) : t ≡ t' -> t' ≡ t.
+Lemma tensoreq_refl `{HR : Reflexive R equiv}
+  {n m} (t : @Tensor R n m A) : t ≡ t.
+Proof. hnf; intros; reflexivity. Qed.
+Lemma tensoreq_symm `{HR : Symmetric R equiv}
+  {n m} (t t' : @Tensor R n m A) :
+  t ≡ t' -> t' ≡ t.
 Proof.
   intros Ht.
   hnf; intros.
-  now apply SR.(Req_equiv).(Equivalence_Symmetric), Ht.
+  symmetry.
+  now apply Ht.
 Qed.
-Lemma tensoreq_trans {n m} (t t' t'' : @Tensor R n m A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
+Lemma tensoreq_trans `{HR : Transitive R equiv}
+  {n m} (t t' t'' : @Tensor R n m A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
 Proof.
   intros Ht Ht'.
   hnf; intros.
-  now eapply SR.(Req_equiv).(Equivalence_Transitive); [apply Ht|apply Ht'].
+  etransitivity; [now apply Ht|now apply Ht'].
 Qed.
 
-Lemma dimensionlesstensoreq_refl (t : @DimensionlessTensor R A) : t ≡ t.
+Lemma dimensionlesstensoreq_refl `{HR : Reflexive R equiv}
+  (t : @DimensionlessTensor R A) : t ≡ t.
 Proof. hnf; intros; apply tensoreq_refl. Qed.
-Lemma dimensionlesstensoreq_symm (t t' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t.
+Lemma dimensionlesstensoreq_symm `{HR : Symmetric R equiv}
+  (t t' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t.
 Proof.
   intros Ht.
   hnf; intros.
   now apply tensoreq_symm.
 Qed.
-Lemma dimensionlesstensoreq_trans (t t' t'' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
+Lemma dimensionlesstensoreq_trans `{HR : Transitive R equiv}
+  (t t' t'' : @DimensionlessTensor R A) : t ≡ t' -> t' ≡ t'' -> t ≡ t''.
 Proof.
   intros Ht Ht'.
   hnf; intros.
@@ -104,27 +111,62 @@ Proof.
 Qed.
 
 
-Lemma tensor_equiv_alt
+#[global] Instance Tensor_equivalence `{EquivR : Equivalence R equiv}
+  {n m} : Equivalence (≡@{@Tensor R n m A}).
+Proof.
+  split.
+  - hnf; apply tensoreq_refl.
+  - hnf; apply tensoreq_symm.
+  - hnf; apply tensoreq_trans.
+Qed.
+
+#[global] Instance DimensionlessTensor_equivalence
+  `{EquivR : Equivalence R equiv}
+  : Equivalence (≡@{@DimensionlessTensor R A}).
+Proof.
+  split.
+  - hnf; apply dimensionlesstensoreq_refl.
+  - hnf; apply dimensionlesstensoreq_symm.
+  - hnf; apply dimensionlesstensoreq_trans.
+Qed.
+
+End tensoreq.
+
+
+Lemma tensor_equiv_alt `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A}
   {n m} (t t' : @Tensor R n m A) :
-  t ≡ t' <-> Forall (λ v, Forall (λ w, req (t v w) (t' v w)) sum_elements) sum_elements.
+  t ≡ t' <-> Forall (λ v, Forall (λ w, (t v w) ≡ (t' v w))
+    (@sum_elements _ Summable_vec)) (@sum_elements _ Summable_vec).
 Proof.
   rewrite Forall_forall.
   setoid_rewrite Forall_forall.
-  unfold equiv, Tensor_equiv, tensoreq.
-  setoid_rewrite SummedElement_iff.
+  unfold equiv at 1, Tensor_equiv, tensoreq.
+  cbn.
+  setoid_rewrite elem_of_list_In.
+  setoid_rewrite vec_elements_in.
+  setoid_rewrite Vector.to_list_Forall.
+  setoid_rewrite <- vec_to_list_to_list.
+  setoid_rewrite <- elem_of_list_In.
+  setoid_rewrite <- (Forall_proper SummedElement _ 
+    (fun _ => (SummedElement_iff (SR:=SR) (A:=A)) _) _ _ eq_refl).
   firstorder.
 Qed.
 
-#[export] Instance tensor_equiv_dec (HRdec : RelDecision req)
+#[export] Instance tensor_equiv_dec `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A} (HRdec : RelDecision req)
   {n m} : RelDecision (≡@{@Tensor R n m A}).
-refine (fun t t' => cast_if (decide (Forall (λ v, Forall (λ w, req (t v w) (t' v w)) sum_elements) sum_elements)));
+refine (fun t t' => cast_if (decide (Forall (λ v, Forall (λ w, (t v w) ≡ (t' v w))
+    (@sum_elements _ Summable_vec)) (@sum_elements _ Summable_vec))));
 abstract (now rewrite tensor_equiv_alt).
 Defined.
 
-Lemma tensor_equiv_to_bool
+Lemma tensor_equiv_to_bool `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : Summable A}
   (reqb : R -> R -> bool) (Hreqb : forall r s, reqb r s = true <-> req r s)
   {n m} (t t' : @Tensor R n m A) :
-  t ≡ t' <-> forallb (λ v, forallb (λ w, reqb (t v w) (t' v w)) sum_elements) sum_elements = true.
+  t ≡ t' <-> forallb (λ v, forallb (λ w, reqb (t v w) (t' v w)) 
+    (@sum_elements _ Summable_vec)) (@sum_elements _ Summable_vec) = true.
 Proof.
   rewrite <- Is_true_true.
   rewrite forallb_True.
@@ -136,23 +178,6 @@ Proof.
   intros w.
   now rewrite Is_true_true, Hreqb.
 Qed.
-
-End tensoreq.
-
-Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} {n m} : (@Tensor R n m A) tensoreq
-  reflexivity proved by tensoreq_refl
-  symmetry proved by tensoreq_symm
-  transitivity proved by tensoreq_trans
-  as tensoreq_setoid.
-
-Add Parametric Relation `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A} : (@DimensionlessTensor R A) dimensionlesstensoreq
-  reflexivity proved by dimensionlesstensoreq_refl
-  symmetry proved by dimensionlesstensoreq_symm
-  transitivity proved by dimensionlesstensoreq_trans
-  as dimensionlesstensoreq_setoid.
-
 
 
 
@@ -168,7 +193,7 @@ Section TensorOpsFacts.
 
   Let Tensor := (@Tensor R).
 
-  Lemma SummedElement_fun_to_vec_iff `{Summable A} {n}
+  Lemma SummedElement_fun_to_vec_iff `{SummableOver R A} {n}
     (f : fin n -> A) : SummedElement (fun_to_vec f) <->  (forall i, SummedElement (f i)).
   Proof.
     rewrite SummedElement_vec_iff_Forall.
@@ -178,53 +203,56 @@ Section TensorOpsFacts.
     now rewrite lookup_fun_to_vec.
   Qed.
 
-  #[export] Instance SummedElement_fun_to_vec `{Summable A} {n}
+  #[export] Instance SummedElement_fun_to_vec `{SummableOver R A} {n}
     (f : fin n -> A) : (forall i, SummedElement (f i)) -> SummedElement (fun_to_vec f).
   Proof.
     now rewrite SummedElement_fun_to_vec_iff.
   Qed.
 
-  #[export] Instance SummedElement_vlookup `{Summable A} {n}
+  (* Hint Cut [( _* ) (SummableOver_vec|SummableOver_prod|SummableOver_sum) 
+    (SummableOver_vec|SummableOver_prod|SummableOver_sum)] : typeclass_instances. *)
+
+  #[export] Instance SummedElement_vlookup `{SummableOver R A} {n}
     (v : vec A n) i : SummedElement v -> SummedElement (v !!! i).
   Proof.
     rewrite SummedElement_vec_iff_Forall, Forall_vlookup.
     auto.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m n' m'} f :
-      (@strong_permute_tensor R A n m n' m' f) with signature
-      equiv ==> equiv as strong_permute_tensor_mor.
+  #[export] Instance strong_permute_tensor_mor `{SA : SummableOver R A,
+    EqR : Equiv R} {n m n' m'} f :
+    Proper (equiv ==> equiv) (@strong_permute_tensor R A n m n' m' f).
   Proof.
     intros r r' Hr v w Hv Hm; apply Hr; apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m} :
-      (@const_tensor R A n m) with signature
-      req ==> equiv as const_tensor_mor.
+  #[export] Instance const_tensor_mor `{SA : SummableOver R A,
+    EqR : Equiv R} {n m} :
+      Proper (equiv ==> equiv) (@const_tensor R A n m).
   Proof.
     intros r r' Hr v w _ _; apply Hr.
   Qed.
 
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m o} :
-      (compose_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
-      equiv ==> equiv ==> equiv as compose_tensor_mor.
+  #[export] Instance compose_tensor_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
+    {n m o} :
+    Proper (equiv ==> equiv ==> equiv)
+      (compose_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
-    apply sum_of_ext'; intros u Hu%SummedElement_iff.
+    apply sum_of_ext; intros u Hu.
     apply SR.
     - now apply Hl.
     - now apply Hr.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
-      (stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
-      equiv ==> equiv ==> equiv as stack_tensor_mor.
+  #[export] Instance stack_tensor_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req} 
+    {n m n' m'} :
+    Proper (equiv ==> equiv ==> equiv)
+      (stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
@@ -233,10 +261,11 @@ Section TensorOpsFacts.
     - now apply Hr; try apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
-      (swapped_stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
-      equiv ==> equiv ==> equiv as swapped_stack_tensor_mor.
+  #[export] Instance swapped_stack_tensor_mor`{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req} 
+     {n m n' m'} :
+      Proper (equiv ==> equiv ==> equiv)
+      (swapped_stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
@@ -245,21 +274,23 @@ Section TensorOpsFacts.
     - now apply Hr; try apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m} :
-      (join_stack_1_tl_tr (SA:=SA) (SR:=SR) (n:=n) (m:=m)) with signature
-      equiv ==> equiv as join_stack_1_tl_tr_mor.
+  #[export] Instance join_stack_1_tl_tr_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
+     {n m} :
+    Proper (equiv ==> equiv)
+      (join_stack_1_tl_tr (A:=A) (R:=R) (n:=n) (m:=m)).
   Proof.
     intros t t' Ht v w Hv Hw.
     cbn.
-    apply sum_of_ext'; intros a Ha%SummedElement_iff.
+    apply sum_of_ext; intros a Ha.
     apply Ht; apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m o} :
-      (join_stack_tl_tr (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
-      equiv ==> equiv as join_stack_tl_tr_mor.
+  #[export] Instance join_stack_tl_tr_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
+     {n m o} :
+    Proper (equiv ==> equiv)
+      (join_stack_tl_tr (A:=A) (R:=R) (n:=n) (m:=m) (o:=o)).
   Proof.
     intros t t' Ht.
     induction n; [done|].
@@ -268,21 +299,23 @@ Section TensorOpsFacts.
     now f_equiv.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m o} :
-      (join_stack_1_tr_bl (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
-      equiv ==> equiv as join_stack_1_tr_bl_mor.
+  #[export] Instance join_stack_1_tr_bl_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
+     {n m o} :
+    Proper (equiv ==> equiv)
+      (join_stack_1_tr_bl (A:=A) (R:=R) (n:=n) (m:=m) (o:=o)).
   Proof.
     intros t t' Ht v w Hv Hw.
     cbn.
-    apply sum_of_ext'; intros a Ha%SummedElement_iff.
+    apply sum_of_ext; intros a Ha.
     apply Ht; apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
-    SR : SemiRing R rO rI radd rmul req} {n m o} :
-      (join_stack_tr_bl (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)) with signature
-      equiv ==> equiv as join_stack_tr_bl_mor.
+  #[export] Instance join_stack_tr_bl_mor `{SA : SummableOver R A,
+    SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
+     {n m o} :
+    Proper (equiv ==> equiv)
+      (join_stack_tr_bl (A:=A) (R:=R) (n:=n) (m:=m) (o:=o)).
   Proof.
     intros t t' Ht.
     induction m.
@@ -294,7 +327,7 @@ Section TensorOpsFacts.
   Qed.
 
   (* FIXME: Move *)
-  Lemma SummedElement_vlookup_iff `{Summable A} {n} (v : vec A n) :
+  Lemma SummedElement_vlookup_iff `{SummableOver R A} {n} (v : vec A n) :
     SummedElement v <-> forall i : fin n, SummedElement (v !!! i).
   Proof.
     split; [apply _|].
@@ -305,7 +338,7 @@ Section TensorOpsFacts.
   Qed.
 
   (* FIXME: Move *)
-  #[export] Instance vjoin_SummedElement `{Summable A} {n m} (v : vec (vec A n) m) :
+  #[export] Instance vjoin_SummedElement `{SummableOver R A} {n m} (v : vec (vec A n) m) :
     SummedElement v -> SummedElement (vjoin v).
   Proof.
     intros Hv.
@@ -315,7 +348,7 @@ Section TensorOpsFacts.
     apply _.
   Qed.
 
-  #[export] Instance vjoin'_SummedElement `{Summable A} {n m} (v : vec (vec A n) m) :
+  #[export] Instance vjoin'_SummedElement `{SummableOver R A} {n m} (v : vec (vec A n) m) :
     SummedElement v -> SummedElement (vjoin' v).
   Proof.
     intros Hv.
@@ -325,7 +358,7 @@ Section TensorOpsFacts.
     apply _.
   Qed.
 
-  #[export] Instance vunjoin_SummedElement `{Summable A} {n m} (v : vec A (n * m)) :
+  #[export] Instance vunjoin_SummedElement `{SummableOver R A} {n m} (v : vec A (n * m)) :
     SummedElement v -> SummedElement (vunjoin v).
   Proof.
     intros Hv.
@@ -337,7 +370,7 @@ Section TensorOpsFacts.
     apply _.
   Qed.
 
-  #[export] Instance vunjoin'_SummedElement `{Summable A} {n m} (v : vec A (n * m)) :
+  #[export] Instance vunjoin'_SummedElement `{SummableOver R A} {n m} (v : vec A (n * m)) :
     SummedElement v -> SummedElement (vunjoin' v).
   Proof.
     intros Hv.
@@ -349,7 +382,7 @@ Section TensorOpsFacts.
     apply _.
   Qed.
 
-  #[export] Instance permute_vec_SummedElement `{Summable A} {n m}
+  #[export] Instance permute_vec_SummedElement `{SummableOver R A} {n m}
     (f : fin n -> fin m) (v : vec A m) :
     SummedElement v -> SummedElement (permute_vec f v).
   Proof.
@@ -361,7 +394,7 @@ Section TensorOpsFacts.
   Qed.
 
   (* FIXME: Move *)
-  #[export] Instance vhd_SummedElement `{Summable A} {n} (v : vec A (S n)) :
+  #[export] Instance vhd_SummedElement `{SummableOver R A} {n} (v : vec A (S n)) :
     SummedElement v -> SummedElement (vhd v).
   Proof.
     rewrite SummedElement_vlookup_iff.
@@ -372,10 +405,10 @@ Section TensorOpsFacts.
 
 
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance copy_tensor_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} k {n m} :
-    (copy_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)) with signature
-    (≡) ==> (≡) as copy_tensor_mor.
+    Proper ((≡) ==> (≡))
+      (copy_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)).
   Proof.
     intros f g Hfg.
     intros v w Hv Hw.
@@ -390,10 +423,10 @@ Section TensorOpsFacts.
 
 
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance stack_n_tensor_1_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n} :
-    (stack_n_tensor_1 (SA:=SA) (SR:=SR) (n:=n)) with signature
-    (≡) ==> (≡) as stack_n_tensor_1_mor.
+    Proper ((≡) ==> (≡))
+      (stack_n_tensor_1 (SA:=SA) (SR:=SR) (n:=n)).
   Proof.
     intros f g Hfg v w Hv Hw.
     cbn.
@@ -410,10 +443,10 @@ Section TensorOpsFacts.
     - now apply IHvw.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance n_stack_tensor_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} k {n m} :
-    (n_stack_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)) with signature
-    (≡) ==> (≡) as n_stack_tensor_mor.
+    Proper ((≡) ==> (≡))
+      (n_stack_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)).
   Proof.
     intros f g Hfg.
     induction k; [done|].
@@ -421,10 +454,10 @@ Section TensorOpsFacts.
     now f_equiv.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance tensor_to_dimensionless_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n m} :
-    (tensor_to_dimensionless (SR:=SR) (A:=A) (n:=n) (m:=m)) with signature
-    (≡) ==> (≡) as tensor_to_dimensionless_mor.
+    Proper ((≡) ==> (≡))
+      (tensor_to_dimensionless (SR:=SR) (A:=A) (n:=n) (m:=m)).
   Proof.
     intros f g Hfg n' m' v w Hv Hw.
     cbn.
@@ -433,10 +466,10 @@ Section TensorOpsFacts.
     apply Hfg; now rewrite cast_id.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance permute_tensor_l_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n m o} :
-    (permute_tensor_l (R:=R) (A:=A) (n:=n) (m:=m) (o := o)) with signature
-    pointwise_relation _ eq ==> (≡) ==> (≡) as permute_tensor_l_mor.
+    Proper (pointwise_relation _ eq ==> (≡) ==> (≡))
+      (permute_tensor_l (R:=R) (A:=A) (n:=n) (m:=m) (o := o)).
   Proof.
     intros f g Hfg t t' Ht.
     intros v w Hv Hw.
@@ -445,10 +478,10 @@ Section TensorOpsFacts.
     apply Ht; apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance permute_tensor_r_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n m o} :
-    (permute_tensor_r (R:=R) (A:=A) (n:=n) (m:=m) (o := o)) with signature
-    pointwise_relation _ eq ==> (≡) ==> (≡) as permute_tensor_r_mor.
+    Proper (pointwise_relation _ eq ==> (≡) ==> (≡))
+      (permute_tensor_r (R:=R) (A:=A) (n:=n) (m:=m) (o := o)).
   Proof.
     intros f g Hfg t t' Ht.
     intros v w Hv Hw.
@@ -457,11 +490,10 @@ Section TensorOpsFacts.
     apply Ht; apply _.
   Qed.
 
-  Add Parametric Morphism `{SA : Summable A,
+  #[export] Instance permute_tensor_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n m n' m'} :
-    (permute_tensor (R:=R) (A:=A) (n:=n) (m:=m) (n':=n') (m':=m')) with signature
-    equiv ==> equiv ==>
-      (≡) ==> (≡) as permute_tensor_mor.
+    Proper (equiv ==> equiv ==> ((≡) ==> (≡)))
+      (permute_tensor (R:=R) (A:=A) (n:=n) (m:=m) (n':=n') (m':=m')).
   Proof.
     intros fl fl' Hfl fr fr' Hfr t t' Ht.
     intros v w Hv Hw.
@@ -472,7 +504,7 @@ Section TensorOpsFacts.
 
 
   #[export] Instance perm_tensor_proper
-    `{SA : Summable A, EqA : EqDecision A, SR : SemiRing R rO rI radd rmul req}
+    `{SA : SummableOver R A, EqA : EqDecision A, SR : SemiRing R rO rI radd rmul req}
     {n m} : Proper (equiv ==> equiv) (perm_tensor (A:=A) (R:=R) (n:=n) (m:=m)).
   Proof.
     intros f f' Hf v w _ _.
@@ -502,7 +534,7 @@ Section TensorOpsFacts.
   Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
   Local Existing Instance Rmul_proper.
 
-  Context `{Summable A, EqDecision A}.
+  Context `{SummableOver R A, EqDecision A, !LawfulSummableOver R A}.
 
   Lemma delta_tensor_eq {n} (v : vec A n) :
     delta_tensor v v = 1.
@@ -530,7 +562,7 @@ Section TensorOpsFacts.
     now apply decide_ext.
   Qed.
 
-  Lemma sum_of_delta_l `{!WFSummable A} {n} {w : vec A n}
+  Lemma sum_of_delta_l `{!WFSummableOver R A} {n} {w : vec A n}
     `{Hw : !SummedElement w} (f : vec A n -> R) :
     ∑ v : vec A n, delta_tensor v w * f v == f w.
   Proof.
@@ -539,7 +571,7 @@ Section TensorOpsFacts.
     rewrite delta_tensor_neq; [ring|easy].
   Qed.
 
-  Lemma sum_of_delta_r `{!WFSummable A} {n} {w : vec A n}
+  Lemma sum_of_delta_r `{!WFSummableOver R A} {n} {w : vec A n}
     `{Hw : !SummedElement w} (f : vec A n -> R) :
     ∑ v : vec A n, delta_tensor w v * f v == f w.
   Proof.
@@ -548,12 +580,12 @@ Section TensorOpsFacts.
   Qed.
 
 
-  Lemma sum_of_delta_l_1 `{!WFSummable A} {w : vec A 1}
+  Lemma sum_of_delta_l_1 `{!WFSummableOver R A} {w : vec A 1}
     `{Hw : !SummedElement w} (f : A -> R) :
     ∑ a : A, delta_tensor [#a] w * f a == f (Vector.hd w).
   Proof.
     erewrite sum_of_ext. 2:{
-      intros a.
+      intros a Ha.
       change (f a) with (f (Vector.hd [# a])).
       refine (reflexivity _).
     }
@@ -561,7 +593,7 @@ Section TensorOpsFacts.
     now rewrite sum_of_delta_l.
   Qed.
 
-  Lemma sum_of_delta_r_1 `{!WFSummable A} {w : vec A 1}
+  Lemma sum_of_delta_r_1 `{!WFSummableOver R A} {w : vec A 1}
     `{Hw : !SummedElement w} (f : A -> R) :
     ∑ a : A, delta_tensor w [#a] * f a == f (Vector.hd w).
   Proof.
@@ -570,7 +602,7 @@ Section TensorOpsFacts.
   Qed.
 
 
-  Lemma compose_delta_l `{!WFSummable A} {n m} (t : Tensor n m A) :
+  Lemma compose_delta_l `{!WFSummableOver R A} {n m} (t : Tensor n m A) :
     compose_tensor delta_tensor t ≡ t.
   Proof.
     intros v w Hv Hw.
@@ -578,7 +610,7 @@ Section TensorOpsFacts.
     now rewrite sum_of_delta_r.
   Qed.
 
-  Lemma compose_delta_r `{!WFSummable A} {n m} (t : Tensor n m A) :
+  Lemma compose_delta_r `{!WFSummableOver R A} {n m} (t : Tensor n m A) :
     compose_tensor t delta_tensor ≡ t.
   Proof.
     intros v w Hv Hw.
@@ -595,7 +627,7 @@ Section TensorOpsFacts.
     unfold stack_tensor.
     unfold delta_tensor.
     rewrite (decide_ext _ _ _ _ (vsplit_eq v w)).
-    case_decide; case_decide; case_decide; tauto + ring.
+    case_decide; case_decide; case_decide; tauto + hnf; ring.
   Qed.
 
   Lemma compose_succ_mid {n m o} (t : Tensor n (S m) A) (t' : Tensor (S m) o A) :
@@ -618,10 +650,11 @@ Section TensorOpsFacts.
     - cbn.
       rewrite IHm.
       intros v w Hv Hw.
-      rewrite sum_of_vec_succ, sum_of_comm.
-      apply sum_of_ext; intros u.
+      rewrite sum_of_vec_succ.
+      rewrite sum_of_vec_comm_1.
+      apply sum_of_ext; intros u Hu.
       cbn.
-      apply sum_of_ext; intros a.
+      apply sum_of_ext; intros a Ha.
       now rewrite vsplitl_app, vsplitr_app.
   Qed.
 
@@ -647,7 +680,7 @@ Section TensorOpsFacts.
       rewrite IHn.
       intros v w Hv Hw.
       cbn.
-      rewrite sum_of_vec_succ, sum_of_comm.
+      rewrite sum_of_vec_succ, sum_of_vec_comm_1.
       reflexivity.
   Qed.
 
@@ -658,7 +691,7 @@ Section TensorOpsFacts.
     rewrite join_stack_tl_tr_alt.
     intros v w Hv Hw.
     cbn.
-    apply sum_of_ext; intros u.
+    apply sum_of_ext; intros u Hu.
     now rewrite !vsplitl_app, !vsplitr_app.
   Qed.
 
@@ -702,7 +735,7 @@ Section TensorOpsFacts.
     now destruct (vec_cast_opt _ _).
   Qed.
 
-  Lemma delta_spider_tensor_alt {n m} `{!WFSummable A} : (n + m <> 0)%nat ->
+  Lemma delta_spider_tensor_alt {n m} `{!WFSummableOver R A} : (n + m <> 0)%nat ->
     delta_spider_tensor (n:=n) (m:=m) ≡ (fun v w =>
     if decide (Forall (λ a, Some a = head (v +++ w)) (v +++ w)) then rI else rO).
   Proof.
@@ -731,7 +764,7 @@ Section TensorOpsFacts.
       naive_solver.
   Qed.
 
-  Lemma delta_spider_tensor_alt_posdim {n m} `{!WFSummable A} : (n + m <> O)%nat ->
+  Lemma delta_spider_tensor_alt_posdim {n m} `{!WFSummableOver R A} : (n + m <> O)%nat ->
     delta_spider_tensor (n:=n) (m:=m) ≡ (fun v w =>
     if decide (Sorted.Sorted eq (v +++ w)) then rI else rO).
   Proof.
@@ -807,7 +840,7 @@ Section TensorOpsFacts.
   Qed.
 
 
-  Lemma compose_perm_tensor_l `{WFA : !WFSummable A}
+  Lemma compose_perm_tensor_l `{WFA : !WFSummableOver R A}
     {n m o} (Hnm : n = m)
     (f : fin n -> fin m) {Hf : Inj eq eq f}
     (g : Tensor m o A) : compose_tensor (perm_tensor f) g ≡
@@ -821,6 +854,7 @@ Section TensorOpsFacts.
     - rewrite (permute_vec_cancel _ _ _).
       rewrite decide_True by done.
       rewrite permute_vec_id.
+      hnf.
       ring.
     - intros b Hb.
       intros Hbneq.
@@ -830,7 +864,7 @@ Section TensorOpsFacts.
       done.
   Qed.
 
-  Lemma compose_perm_tensor_r `{WFA : !WFSummable A}
+  Lemma compose_perm_tensor_r `{WFA : !WFSummableOver R A}
     {n m o} (g : Tensor n m A)
     (f : fin m -> fin o) {Hf : Inj eq eq f} (Hmo : m = o) : compose_tensor g (perm_tensor f) ≡
     permute_tensor id f g.
@@ -839,9 +873,9 @@ Section TensorOpsFacts.
     cbn.
     rewrite (sum_of_unique' _ (permute_vec f w)).
     - rewrite decide_True by done.
-      rewrite permute_vec_id; ring.
+      rewrite permute_vec_id; hnf; ring.
     - intros; rewrite decide_False by done.
-      ring.
+      hnf; ring.
   Qed.
 
   Lemma perm_tensor_ext
@@ -862,7 +896,7 @@ Section TensorOpsFacts.
     done.
   Qed.
 
-  Lemma perm_tensor_compose {WFA : WFSummable A}
+  Lemma perm_tensor_compose {WFA : WFSummableOver R A}
     {n m o} (f : fin n -> fin m) (g : fin m -> fin o) :
     compose_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor n o A} perm_tensor (g ∘ f).
   Proof.
@@ -886,7 +920,7 @@ Section TensorOpsFacts.
   Qed.
 
 
-  Lemma perm_tensor_stack {WFA : WFSummable A}
+  Lemma perm_tensor_stack {WFA : WFSummableOver R A}
     {n m n' m'} (f : fin n -> fin m) (g : fin n' -> fin m') :
     stack_tensor (perm_tensor f) (perm_tensor g) ≡@{@Tensor _ _ A}
     perm_tensor (fin_perm_stack f g).
@@ -1028,7 +1062,7 @@ Proof.
   cbn.
   rewrite (sum_of_SRH f).
   apply sum_of_ext.
-  intros a.
+  intros a Ha.
   case_decide; apply Hf.
 Qed.
 
@@ -1069,16 +1103,19 @@ Lemma tensor_apply_hom_compose_tensor (f : R -> R')
 Proof.
   intros v w Hv Hw.
   cbn.
+  hnf.
+  rewrite (sum_of_vec_defn_alt (SR:=SR')).
+  erewrite SRH_Proper by apply (sum_of_vec_defn_alt (SR:=SR)).
   rewrite (sum_of_SRH _).
   apply sum_of_ext.
-  intros a.
+  intros a Ha.
   apply Hf.
 Qed.
 
 Lemma tensor_apply_hom_perm_tensor (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EQA : EqDecision A} 
+  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EQA : EqDecision A}
   {n m} (fi : fin n -> fin m) :
-  tensor_apply_hom f (perm_tensor fi) ≡
+  tensor_apply_hom f (perm_tensor fi) ≡@{@Tensor R' n m A}
   perm_tensor fi.
 Proof.
   intros v w _ _; cbn; case_decide; apply Hf.
@@ -1086,45 +1123,47 @@ Qed.
 
 Lemma tensor_apply_hom_tensor_to_dimensionless (f : R -> R')
   {Hf : SemiRingHomomorphism f} `{SA : Summable A}
-  {n m} (t : @Tensor R n m A) n' m' : 
+  {n m} (t : @Tensor R n m A) n' m' :
   tensor_apply_hom f (tensor_to_dimensionless t n' m') ≡
   tensor_to_dimensionless (tensor_apply_hom f t) n' m'.
 Proof.
   intros v w Hv Hw.
   cbn.
-  do 2 (destruct (vec_cast_opt _ _); cbn); 
+  do 2 (destruct (vec_cast_opt _ _); cbn);
   [done|apply Hf..].
 Qed.
 
 
-Lemma tensor_apply_hom_id `{SA : Summable A} 
+Lemma tensor_apply_hom_id `{SA : Summable A}
   {n m} (t : @Tensor R n m A) :
   tensor_apply_hom id t ≡ t.
 Proof.
   done.
 Qed.
 
-Lemma tensor_apply_hom_ext_strong 
+Lemma tensor_apply_hom_ext_strong
   (f g : R -> R')
-  `{SA : Summable A} 
-  {n m} (t : @Tensor R n m A) 
-  (Hfg : forall v w, SummedElement v -> SummedElement w -> f (t v w) ==' g (t v w)):
+  `{SA : Summable A}
+  {n m} (t : @Tensor R n m A)
+  (Hfg : forall v w, SummedElement (R:=R) v -> SummedElement (R:=R) w -> f (t v w) ==' g (t v w)):
   tensor_apply_hom f t ≡ tensor_apply_hom g t.
 Proof.
   intros v w Hv Hw.
   cbn.
+  hnf;
   auto.
 Qed.
 
 Lemma tensor_apply_hom_ext
   (f g : R -> R')
-  (Hfg : forall r, f r ==' g r) 
-  `{SA : Summable A} 
+  (Hfg : forall r, f r ==' g r)
+  `{SA : Summable A}
   {n m} (t : @Tensor R n m A) :
   tensor_apply_hom f t ≡ tensor_apply_hom g t.
 Proof.
   intros v w Hv Hw.
   cbn.
+  hnf.
   auto.
 Qed.
 

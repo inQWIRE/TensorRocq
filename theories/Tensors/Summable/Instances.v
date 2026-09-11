@@ -196,7 +196,7 @@ Fixpoint sum_of_vec `{SummableOver R A} {n : nat}
       sum_of_vec (fun bs => f (Vector.cons b bs))
     end.
 
-Definition Summable_vec `{Summable A} n : Summable (Vector.t A n) :=
+Definition Summable_vec `{Summable A} {n} : Summable (Vector.t A n) :=
   sum_over (vec_elements sum_elements n).
 
 #[export] Instance SummableOver_vec `{SummableOver R A} {n : nat}
@@ -614,6 +614,28 @@ Qed.
 
 End Vector.
 
+
+Lemma sum_of_vec_defn_alt `{Summable A} {n} (f : vec A n -> R) :
+  sum_of f == sum_of' Summable_vec f.
+Proof.
+  rewrite sum_of_defn.
+  rewrite sum_of_defn_abstract'.
+  cbn.
+  induction n; [cbn; ring|].
+  cbn.
+  rewrite flat_map_concat_map.
+  rewrite concat_map, map_map.
+  rewrite Rlist_sum_concat.
+  rewrite map_map.
+  erewrite map_ext by now intros; rewrite map_map; reflexivity.
+  rewrite sum_of_defn.
+  apply Rlist_sum_ext.
+  rewrite Forall2_fmap.
+  apply Forall_Forall2_diag.
+  rewrite Forall_forall.
+  intros a Ha.
+  apply IHn.
+Qed.
 
 Lemma sum_of_prod_defn `{SummableOver R A, SummableOver R B} (f : A * B -> R) :
   sum_of f == ∑ a, ∑ b, f (a, b).
