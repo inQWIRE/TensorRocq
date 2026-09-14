@@ -35,11 +35,13 @@ Qed.
 
 
 (* FIXME: Move *)
-#[export] Instance SR_equiv `{SR : SemiRing R rO rI radd rmul req} :
+Definition SR_equiv `{SR : SemiRing R rO rI radd rmul req} :
   Equiv R := req.
 
 #[export] Instance SR_equivalence `{SR : SemiRing R rO rI radd rmul req} :
-  @Equivalence R equiv := SR.(Req_equiv).
+  @Equivalence R (@equiv _ SR_equiv) := SR.(Req_equiv).
+
+#[export] Hint Immediate SR_equiv : typeclass_instances.
 
 (* A typeclass indicating a type can be summed over, hence
   used in tensor expressions. Note that this is in fact just

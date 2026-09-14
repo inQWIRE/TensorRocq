@@ -1,10 +1,10 @@
-Require Import Summable.
+From TensorRocq Require Import Summable.
 (* Require StringCustomNotation. *)
 
-Require Import Syntax.Definitions.
-Require Tensor.
+From TensorRocq Require Import Syntax.Definitions Homomorphism.
+From TensorRocq Require Tensor.
 
-Require Import Aux_pos Aux_stdpp.
+From TensorRocq Require Import Aux_pos Aux_stdpp.
 
 From stdpp Require Import strings fin_maps pmap gmap hlist.
 From stdpp Require Import pretty.
@@ -17,6 +17,769 @@ From stdpp Require Import functions list.
 #[local] Coercion N.of_nat : nat >-> N.
 
 (* FIXME: Move *)
+
+
+(* FIXME: Move*)
+Lemma list_to_map_swap_mid `{FinMap K M} {A}
+  (l : list (K * A)) ka l' :
+  ka.1 ∉ l.*1 ->
+  list_to_map (l ++ ka :: l') =@{M A} list_to_map (ka :: (l ++ l')).
+Proof.
+  intros Hka.
+  apply map_eq; intros i.
+  cbn.
+  rewrite 2 list_to_map_app.
+  cbn.
+  rewrite lookup_union, 2 lookup_insert_case, lookup_union.
+  case_decide.
+  - enough (list_to_map l !! i = None) as -> by done.
+    apply not_elem_of_list_to_map.
+    now subst.
+  - done.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance default_Proper {B} (R : relation B) :
+  Proper (R ==> option_Forall2 R ==> R) default.
+Proof.
+  intros r s Hrs ma mb Hab.
+  induction Hab; cbn; done.
+Qed.
+
+
+(* FIXME: Move *)
+#[export] Instance vcast_surj {B n m} (prf : n = m) :
+  Surj eq (λ v, @Vector.cast B _ v _ prf).
+Proof.
+  subst.
+  intros v.
+  exists v.
+  now rewrite cast_id.
+Qed.
+
+
+(* FIXME: Move *)
+Lemma exists_vec_0 `(P : vec A 0 -> Prop) :
+  ex P <-> P [#].
+Proof.
+  split; [|eauto].
+  intros []; inv_all_vec_fin; done.
+Qed.
+Lemma exists_vec_S `(P : vec A (S n) -> Prop) :
+  ex P <-> exists a v, P (a ::: v).
+Proof.
+  split; [|naive_solver].
+  intros [x Hx].
+  inv_all_vec_fin; eauto.
+Qed.
+Lemma exists_vec_rev `(P : vec A n -> Prop) :
+  ex P <-> exists v, P (Vector.rev v).
+Proof.
+  split; [|intros []; eauto].
+  intros [v Hv].
+  exists (Vector.rev v).
+  rewrite Vector.rev_rev.
+  done.
+Qed.
+
+(* FIXME: Move *)
+Lemma exists_vec_add {B n m} (P : vec B (n + m) -> Prop) :
+  ex P <-> exists v w, P (v +++ w).
+Proof.
+  split; [|now intros (?&?&?); eauto].
+  intros (v & Hv).
+  induction v using vec_add_inv.
+  eauto.
+Qed.
+Lemma exists_vec_1 {B} (P : vec B 1 -> Prop) :
+  ex P <-> exists a, P [#a].
+Proof.
+  split; [|now intros []; eauto].
+  intros []; inv_all_vec_fin; eauto.
+Qed.
+Lemma exists_comm {B C} `(P : B -> C -> Prop) :
+  (exists a b, P a b) <-> exists b a, P a b.
+Proof.
+  firstorder.
+Qed.
+Lemma exists_vec_cast {B n m} (P : vec B n -> Prop)
+  (prf : m = n) : ex P <-> exists v, P (Vector.cast v prf).
+Proof.
+  subst.
+  setoid_rewrite cast_id.
+  done.
+Qed.
+
+
+Section SVmap.
+
+Context {A : Type}.
+
+Definition WF_SVmap tys (m : Pmap A) : Prop :=
+  dom m =@{Pset} list_to_set tys.
+
+Definition SVmap (tys : list Idx) := @dsig _ (WF_SVmap tys)
+  (λ _, decide_rel (=@{Pset}) _ _).
+
+Definition SVmap_map {tys} (m : SVmap tys) : Pmap A :=
+  `m.
+
+Coercion SVmap_map : SVmap >-> Pmap.
+
+
+(* FIXME: Move *)
+Definition SVempty : SVmap [] := dexist ∅ dom_empty_L.
+
+Lemma SVmap_insert_prf {ty val tys svmap}
+  (Hv : WF_SVmap tys svmap) : WF_SVmap (ty :: tys) (<[ty := val]> svmap).
+Proof.
+  unfold WF_SVmap.
+  rewrite dom_insert_L.
+  cbn -[union].
+  f_equal.
+  apply Hv.
+Qed.
+
+Definition SVmap_insert ty val {tys} (m : SVmap tys) : SVmap (ty :: tys) :=
+  dexist (<[ty := val]> (`m)) (SVmap_insert_prf (proj2_dsig m)).
+
+
+
+Lemma exists_SVmap_perm tys tys' (f : Pmap A -> Prop) : tys ≡ₚ tys' ->
+  (∃ m : SVmap tys, f m) <-> (∃ m : SVmap tys', f m).
+Proof.
+  intros Hperm.
+  unfold SVmap, SVmap_map.
+  setoid_rewrite exists_dsig.
+  apply exists_iff; intros v.
+  f_equiv.
+  unfold WF_SVmap.
+  f_equiv.
+  now apply list_to_set_perm_L.
+Qed.
+
+(* FIXME: Move*)
+Lemma kmap_SVmap_prf {f : positive -> positive} {tys} {m : Pmap A}
+  (Hm : WF_SVmap tys m) : WF_SVmap (f <$> tys) (kmap f m).
+Proof.
+  hnf.
+  apply leibniz_equiv_iff.
+  rewrite dom_kmap'.
+  rewrite <- (set_map_list_to_set (SA:=Pset)).
+  rewrite Hm.
+  done.
+Qed.
+
+(* FIXME: Move*)
+Definition kmap_SVmap (f : positive -> positive) {tys} (m : SVmap tys) :
+  SVmap (f <$> tys) :=
+  dexist (kmap f (`m)) (kmap_SVmap_prf (proj2_dsig m)).
+
+
+#[export] Instance kmap_SVmap_surj (f : positive -> positive)
+  {Hf : Inj eq eq f}
+  {tys} : Surj eq (@kmap_SVmap f tys).
+Proof.
+  set (Hfi := partial_injection_extension (f <$> tys) (invfun f tys)).
+  assert (Hftys : ForallPairs (λ a a' : positive, f a = f a' → a = a') tys)
+    by (hnf; naive_solver).
+  tspecialize Hfi. 1:{
+    apply invfun_inj; done.
+  }
+  destruct Hfi as (fi & Hfi & Hfiinv').
+  intros [m Hm].
+  setoid_rewrite dsig_eq.
+  cbn.
+  apply bool_decide_spec in Hm.
+  apply (exists_dsig (Q:=(λ x, kmap f x = m))).
+  rewrite Forall_forall in Hfiinv'.
+  exists (kmap fi m).
+  split.
+  - apply (@kmap_SVmap_prf fi _ _) in Hm.
+    rewrite <- list_fmap_compose in Hm.
+    erewrite list_fmap_id' in Hm; [done|].
+    intros a Ha.
+    cbn.
+    rewrite Hfiinv' by set_solver + Ha.
+    apply invfun_linv, Ha; done.
+  - rewrite kmap_kmap by apply _.
+    rewrite <- (kmap_id m) at 2.
+    apply kmap_ext.
+    intros k a Hmk%elem_of_dom_2.
+    cbn.
+    rewrite Hm in Hmk.
+    apply elem_of_list_to_set in Hmk.
+    rewrite Hfiinv' by done.
+    now apply invfun_rinv.
+Qed.
+
+
+(* FIXME: Move*)
+Definition SVmap_cast {tys tys'} (Htys : tys = tys')
+  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v) (f_equal list_to_set Htys)).
+
+#[export] Instance SVmap_cast_cancel_r {tys tys'} (Htys : tys = tys') :
+  Cancel eq (SVmap_cast Htys) (SVmap_cast (eq_sym Htys)).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_cast_cancel_l {tys tys'} (Htys : tys = tys') :
+  Cancel eq (SVmap_cast (eq_sym Htys)) (SVmap_cast Htys).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_cast_inj {tys tys'} (Htys : tys = tys')
+  : Inj eq eq (SVmap_cast Htys).
+Proof.
+  apply cancel_inj.
+Qed.
+
+#[export] Instance SVmap_cast_surj {tys tys'} (Htys : tys = tys')
+  : Surj eq (SVmap_cast Htys).
+Proof.
+  apply cancel_surj.
+Qed.
+
+Definition SVmap_castP {tys tys'} (Htys : tys ≡ₚ tys')
+  (v : SVmap tys) : SVmap tys' := dexist (`v) (eq_trans (proj2_dsig v)
+    (list_to_set_perm_L _ _ Htys)).
+
+#[export] Instance SVmap_castP_cancel_r {tys tys'} (Htys : tys ≡ₚ tys') :
+  Cancel eq (SVmap_castP Htys) (SVmap_castP (symmetry Htys)).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_castP_cancel_l {tys tys'} (Htys : tys ≡ₚ tys') :
+  Cancel eq (SVmap_castP (symmetry Htys)) (SVmap_castP Htys).
+Proof.
+  intros m.
+  apply dsig_eq; done.
+Qed.
+
+#[export] Instance SVmap_castP_inj {tys tys'} (Htys : tys ≡ₚ tys')
+  : Inj eq eq (SVmap_castP Htys).
+Proof.
+  apply cancel_inj.
+Qed.
+
+#[export] Instance SVmap_castP_surj {tys tys'} (Htys : tys ≡ₚ tys')
+  : Surj eq (SVmap_castP Htys).
+Proof.
+  apply cancel_surj.
+Qed.
+
+(* FIXME: Move *)
+Lemma SVmap_union_prf {tys tys'} {v : Pmap A} {v' : Pmap A} :
+  WF_SVmap tys v -> WF_SVmap tys' v' ->
+  WF_SVmap (tys ++ tys') (v ∪ v').
+Proof.
+  intros [=Hv] [=Hv'].
+  hnf.
+  rewrite dom_union_L, list_to_set_app_L.
+  congruence.
+Qed.
+Definition SVmap_union {tys tys'} (v : SVmap tys) (v' : SVmap tys') : SVmap (tys ++ tys') :=
+  dexist _ (SVmap_union_prf (proj2_dsig v) (proj2_dsig v')).
+Lemma SVmap_insert_union_l {ty tys tys'}
+  (a : A) (v : SVmap tys) (v' : SVmap tys') :
+  SVmap_insert ty a (SVmap_union v v') =
+  SVmap_union (SVmap_insert ty a v) v'.
+Proof.
+  apply dsig_eq.
+  cbn.
+  apply insert_union_l.
+Qed.
+
+
+Fixpoint sum_of_svmap `{SummableOver R A}
+  {sums} : forall (f : SVmap sums -> R), R :=
+  match sums with
+  | [] => fun f => f SVempty
+  | ty :: sums => fun f =>
+    ∑ a, sum_of_svmap (fun m => f (SVmap_insert ty a m))
+  end.
+
+#[export] Instance SummableOver_svmap `{SummableOver R A} {sums} :
+  SummableOver R (SVmap sums) :=
+  sum_by sum_of_svmap (fun m => map_Forall (λ _, SummedElement) (m :> Pmap A)).
+
+Lemma sum_of_svmap_nil `{SummableOver R A} (f : SVmap [] -> R) : sum_of f = f SVempty.
+Proof.
+  done.
+Qed.
+
+Lemma sum_of_svmap_cons `{SummableOver R A} {ty sums}
+  (f : SVmap (ty :: sums) -> R) :
+  sum_of f = ∑ a, ∑ m, f (SVmap_insert ty a m).
+Proof.
+  done.
+Qed.
+
+Lemma SVmap_insert_inverse {ty tys} (m : SVmap (ty :: tys)) :
+  exists a m', (m :> Pmap _) !! ty = Some a /\ m = SVmap_insert ty a m'.
+Proof.
+  destruct m as [mr Hmr].
+  cbn.
+  assert (Hmty : is_Some (mr !! ty)). 1:{
+    apply elem_of_dom.
+    rewrite (bool_decide_unpack _ Hmr).
+    now apply elem_of_list_to_set; constructor.
+  }
+  destruct Hmty as [a Ha].
+  exists a.
+  setoid_rewrite dsig_eq.
+  cbn.
+  apply bool_decide_unpack in Hmr.
+  destruct_decide (decide (ty ∈ tys)) as Hty.
+  - assert (Hmr' : WF_SVmap tys mr) by
+      (unfold WF_SVmap in *; rewrite Hmr; set_solver +Hty).
+    exists (dexist _ Hmr').
+    split; [done|].
+    symmetry.
+    now apply insert_id.
+  - assert (Hmr' : WF_SVmap tys (delete ty mr)). 1:{
+      unfold WF_SVmap in *.
+      rewrite dom_delete_L.
+      rewrite Hmr.
+      set_solver + Hty.
+    }
+    exists (dexist _ Hmr').
+    cbn.
+    split; [done|].
+    symmetry.
+    now apply insert_delete.
+Qed.
+
+Lemma SVmap_empty_inverse (m : SVmap []) : m = SVempty.
+Proof.
+  destruct m as [m Hm].
+  apply dsig_eq.
+  cbn.
+  apply bool_decide_unpack in Hm.
+  apply dom_empty_iff_L, Hm.
+Qed.
+
+
+Lemma SVmap_empty_inv (P : SVmap [] -> Prop)
+  (HP : P SVempty) :
+  forall (m : SVmap []), P m.
+Proof.
+  intros m.
+  rewrite SVmap_empty_inverse.
+  done.
+Qed.
+
+Lemma SVmap_insert_inv {ty tys} (P : SVmap (ty :: tys) -> Prop)
+  (HP : forall a m', P (SVmap_insert ty a m')) :
+  forall (m : SVmap (ty :: tys)), P m.
+Proof.
+  intros m.
+  specialize (SVmap_insert_inverse m) as (a & m' & _ & ->).
+  auto.
+Qed.
+
+Lemma sum_of_svmap_exists {sums}
+  (f : SVmap sums -> Prop) :
+  sum_of f <-> ex f.
+Proof.
+  induction sums as [|ty sums IHsums].
+  - rewrite sum_of_svmap_nil.
+    split; [eauto|].
+    intros (m & Hm).
+    induction m using SVmap_empty_inv.
+    done.
+  - rewrite sum_of_svmap_cons.
+    setoid_rewrite IHsums.
+    rewrite sum_of_defn_abstract.
+    cbn.
+    split; [naive_solver|].
+    intros (m & Hm).
+    induction m as [a m] using SVmap_insert_inv.
+    eauto.
+Qed.
+
+
+Section summable.
+
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+Context `{SA : SummableOver R A,
+  LSA : !LawfulSummableOver R A}.
+
+Lemma sum_of_svmap_ext {tys} (f g : SVmap tys -> R)
+  (Hfg : forall m, SummedElement (R:=R) m -> f m == g m) :
+  sum_of f == sum_of g.
+Proof.
+  induction tys as [|ty tys IHtys].
+  - rewrite 2 sum_of_svmap_nil.
+    apply Hfg.
+    apply map_Forall_empty.
+  - rewrite 2 sum_of_svmap_cons.
+    apply sum_of_ext; intros a Ha.
+    apply IHtys.
+    intros m Hm.
+    apply Hfg.
+    now apply map_Forall_insert_2.
+Qed.
+
+#[local] Instance sum_of_svmap_ext_mor {tys} :
+  Proper (pointwise_relation (SVmap tys) req ==> req) sum_of.
+Proof.
+  intros f g Hfg; apply sum_of_svmap_ext; auto.
+Qed.
+
+Local Lemma sum_of_svmap_nil' (f : SVmap [] -> R) :
+  sum_of f == f SVempty.
+Proof.
+  done.
+Qed.
+
+Local Lemma sum_of_svmap_cons' {ty tys} (f : SVmap (ty :: tys) -> R) :
+  sum_of f == ∑ a, ∑ m, f (SVmap_insert ty a m).
+Proof.
+  apply eq_reflexivity, sum_of_svmap_cons.
+Qed.
+
+Lemma SVmap_contract_prf {ty tys} {m : Pmap A} :
+  WF_SVmap (ty :: ty :: tys) m <-> WF_SVmap (ty :: tys) m.
+Proof.
+  unfold WF_SVmap.
+  f_equiv.
+  set_solver +.
+Qed.
+
+Definition SVmap_contract {ty tys} (m : SVmap (ty :: ty :: tys)) : SVmap (ty :: tys) :=
+  dexist _ (SVmap_contract_prf.1 (proj2_dsig m)).
+
+Definition SVmap_expand {ty tys} (m : SVmap (ty :: tys)) : SVmap (ty :: ty :: tys) :=
+  dexist _ (SVmap_contract_prf.2 (proj2_dsig m)).
+
+
+Lemma SVmap_insert_insert {tys} ty a b (m : SVmap tys) :
+  SVmap_insert ty a (SVmap_insert ty b m) = SVmap_expand (SVmap_insert ty a m).
+Proof.
+  apply dsig_eq.
+  apply insert_insert.
+Qed.
+
+Lemma SVmap_insert_comm {tys} ty ty' a b (m : SVmap tys) : ty <> ty' ->
+  SVmap_insert ty a (SVmap_insert ty' b m) = SVmap_castP (perm_swap _ _ _)
+    (SVmap_insert ty' b (SVmap_insert ty a m)).
+Proof.
+  intros Hty.
+  apply dsig_eq.
+  now apply insert_commute.
+Qed.
+
+Lemma SVmap_castP_id {tys} (Htys : tys ≡ₚ tys) m :
+  SVmap_castP Htys m = m.
+Proof.
+  now apply dsig_eq.
+Qed.
+
+Lemma SVmap_castP_compose {tys tys' tys''} (Htys : tys ≡ₚ tys') (Htys' : tys' ≡ₚ tys'') m :
+  SVmap_castP Htys' (SVmap_castP Htys m) = SVmap_castP (perm_trans Htys Htys') m.
+Proof.
+  now apply dsig_eq.
+Qed.
+
+Lemma sum_of_svmap_castP {tys tys'} (Htys : tys ≡ₚ tys') (f : SVmap tys' -> R) :
+  ∑ m, f (SVmap_castP Htys m) == ∑ m, f m.
+Proof.
+  generalize Htys as Htys'.
+  induction Htys; intros Htys'.
+  - rewrite 2 sum_of_svmap_nil.
+    now rewrite SVmap_castP_id.
+  - rewrite 2 sum_of_svmap_cons.
+
+    (* apply sum_of_ext; intros a Ha. *)
+    setoid_rewrite <- (IHHtys _ Htys).
+    apply sum_of_ext; intros a Ha.
+    apply sum_of_svmap_ext; intros m Hm.
+    f_equiv.
+    now apply dsig_eq.
+  - destruct_decide (decide (x = y)).
+    1:{
+      subst.
+      apply sum_of_svmap_ext.
+      intros; now rewrite SVmap_castP_id.
+    }
+    rewrite 2 sum_of_svmap_cons.
+    setoid_rewrite sum_of_svmap_cons'.
+    rewrite sum_of_comm_abstract.
+    apply sum_of_ext; intros a Ha.
+    apply sum_of_ext; intros b Hb.
+    apply sum_of_svmap_ext; intros m Hm.
+    rewrite SVmap_insert_comm by done.
+    rewrite SVmap_castP_compose, SVmap_castP_id.
+    done.
+  - rewrite <- (IHHtys2 _ Htys2).
+    rewrite <- (IHHtys1 _ Htys1).
+    apply sum_of_svmap_ext; intros m Hm.
+    rewrite SVmap_castP_compose.
+    f_equiv; now apply dsig_eq.
+Qed.
+
+
+Lemma sum_of_svmap_comm_1
+  {tys} (f : A -> SVmap tys -> R) :
+  ∑ a, ∑ m, f a m ==
+  ∑ m, ∑ a, f a m.
+Proof.
+  induction tys as [|ty' tys IHtys].
+  - rewrite sum_of_svmap_nil.
+    apply sum_of_ext; intros a Ha.
+    now rewrite sum_of_svmap_nil.
+  - setoid_rewrite sum_of_svmap_cons'.
+    rewrite sum_of_comm_abstract.
+    apply sum_of_ext; intros a Ha.
+    rewrite IHtys.
+    done.
+Qed.
+
+Lemma sum_of_svmap_comm
+  {tys tys'} (f : SVmap tys -> SVmap tys' -> R) :
+  ∑ a, ∑ m, f a m ==
+  ∑ m, ∑ a, f a m.
+Proof.
+  induction tys as [|ty' tys IHtys].
+  - setoid_rewrite sum_of_svmap_nil'.
+    done.
+  - setoid_rewrite sum_of_svmap_cons'.
+    setoid_rewrite IHtys.
+    rewrite sum_of_svmap_comm_1.
+    done.
+Qed.
+
+#[global] Instance LawfulSummableOver_SVmap {tys} : LawfulSummableOver R (SVmap tys).
+Proof.
+  split.
+  - apply sum_of_svmap_ext.
+  - induction tys; [done|].
+    rewrite sum_of_svmap_cons.
+    setoid_rewrite IHtys.
+    apply sum_of_0.
+  - intros f g.
+    induction tys.
+    + now rewrite 3 sum_of_svmap_nil.
+    + rewrite 3 sum_of_svmap_cons.
+      setoid_rewrite IHtys.
+      rewrite sum_of_add.
+      ring.
+  - intros f r.
+    induction tys.
+    + now rewrite sum_of_svmap_nil.
+    + rewrite 2 sum_of_svmap_cons.
+      rewrite sum_of_distr_l.
+      setoid_rewrite IHtys.
+      done.
+  - apply sum_of_svmap_comm.
+Qed.
+
+Lemma sum_of_svmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
+  tys fr :
+  ∑ m : SVmap (f <$> tys), fr m ==
+  ∑ m, fr (kmap_SVmap f m).
+Proof.
+  induction tys.
+  - cbn.
+    rewrite 2 sum_of_svmap_nil.
+    f_equiv; now apply dsig_eq.
+  - cbn.
+    rewrite 2 sum_of_svmap_cons.
+    setoid_rewrite IHtys.
+    apply sum_of_ext; intros b Hb.
+    apply sum_of_ext; intros m Hm.
+    f_equiv.
+    apply dsig_eq; cbn.
+    now rewrite kmap_insert.
+Qed.
+
+Lemma sum_of_svmap_app {tys tys'} f :
+  (∑ v : SVmap (tys ++ tys'), f v) ==
+  ∑ v : SVmap tys, ∑ v' : SVmap tys', f (SVmap_union v v').
+Proof.
+  induction tys.
+  - rewrite sum_of_svmap_nil.
+    apply sum_of_ext; intros v Hv.
+    f_equiv; apply dsig_eq; cbn.
+    now rewrite map_empty_union.
+  - cbn.
+    rewrite 2 sum_of_svmap_cons.
+    setoid_rewrite IHtys.
+    setoid_rewrite SVmap_insert_union_l.
+    done.
+Qed.
+
+Lemma SVmap_cast_id {tys} (Htys : tys = tys) m :
+  SVmap_cast Htys m = m.
+Proof.
+  now apply dsig_eq.
+Qed.
+
+Lemma SVmap_cast_compose {tys tys' tys''} (Htys : tys = tys') (Htys' : tys' = tys'') m :
+  SVmap_cast Htys' (SVmap_cast Htys m) = SVmap_cast (eq_trans Htys Htys') m.
+Proof.
+  now apply dsig_eq.
+Qed.
+
+Lemma sum_of_svmap_cast {tys tys'} (Htys : tys = tys') f :
+  ∑ m, f (SVmap_cast Htys m) == ∑ m, f m.
+Proof.
+  subst.
+  setoid_rewrite SVmap_cast_id.
+  done.
+Qed.
+
+Fixpoint SVmap_of_vec {sums} : forall (v : vec A (length sums)), SVmap sums :=
+  match sums with
+  | [] => fun _ => SVempty
+  | ty :: sums =>
+    fun v => SVmap_insert ty (vhd v) (@SVmap_of_vec sums (vtl v))
+  end.
+
+#[global] Arguments SVmap_of_vec {!_} !_ / : assert.
+
+(* Fixpoint vec_of_SVmap {sums} (m : SVmap sums) : vec A (length sums) *)
+
+Lemma sum_of_svmap_to_vec {sums} (f : SVmap sums -> R) :
+  sum_of f == ∑ v, f (SVmap_of_vec v).
+Proof.
+  induction sums.
+  - rewrite sum_of_vec_0, sum_of_svmap_nil.
+    done.
+  - cbn.
+    rewrite sum_of_svmap_cons, sum_of_vec_succ.
+    setoid_rewrite IHsums.
+    done.
+Qed.
+
+(* Lemma sum_of_vec_to_svmap *)
+
+Context `{SR' : SemiRing R' rO' rI' radd' rmul' req'}.
+
+Notation "0'" := rO'.
+Notation "1'" := rI'.
+Notation "x '=='' y" := (req' x y) (at level 70).
+Infix "+'" := radd' (at level 50, left associativity).
+Infix "*'" := rmul' (at level 40, left associativity).
+
+Add Ring R' : SR'.(RSRth)
+  (setoid SR'.(Req_equiv) SR'.(Req_ext)).
+
+Let Req_equivalence' : Equivalence req' := Req_equiv.
+Local Existing Instance Req_equivalence'.
+
+Let Radd_proper' := Req_ext.(SRadd_ext) : Proper (req' ==> req' ==> req') radd'.
+Local Existing Instance Radd_proper'.
+
+Let Rmul_proper' := Req_ext.(SRmul_ext) : Proper (req' ==> req' ==> req') rmul'.
+Local Existing Instance Rmul_proper'.
+
+#[export] Instance SummableOverHomomorphism_svmap
+(f : R -> R') `{Hf : !SemiRingHomomorphism f}
+  `{SA' : SummableOver R' A, LSA' : !LawfulSummableOver R' A} 
+  {HfS : SummableOverHomomorphism f A} {tys} : 
+  SummableOverHomomorphism f (SVmap tys).
+Proof.
+  split.
+  - pose proof Hf as [Hfprop _ _ _ _].
+    intros g.
+    induction tys.
+    + rewrite 2 sum_of_svmap_nil.
+      done.
+    + rewrite 2 sum_of_svmap_cons.
+      rewrite SRH_sum_of.
+      setoid_rewrite IHtys.
+      done.
+  - intros v. 
+    unfold SummedElement.
+    cbn.
+    unfold map_Forall.
+    destruct HfS as [_ ?].
+    firstorder.
+Qed.
+
+
+
+End summable.
+
+
+(* FIXME: Move *)
+Lemma exists_SVmap_cons ty tys f :
+  (∃ mr : SVmap (ty :: tys), f mr) <->
+  ∃ mr' : SVmap tys, ∃ vty : A, f (SVmap_insert ty vty mr').
+Proof.
+  rewrite <- 2 sum_of_svmap_exists.
+  rewrite sum_of_svmap_cons.
+  rewrite sum_of_svmap_comm_1.
+  done.
+Qed.
+
+
+
+Lemma exists_SVmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
+  (sums : list positive) (fr : _ -> Prop) :
+  (∃ v : SVmap (f <$> sums), fr v) <->
+  ∃ v : SVmap sums, fr (kmap_SVmap f v).
+Proof.
+  rewrite <- 2 sum_of_svmap_exists.
+  apply (sum_of_svmap_fmap _).
+Qed.
+
+
+Lemma exists_SVmap_nil (fr : _ -> Prop) :
+  (∃ v : SVmap [], fr v) <-> fr SVempty.
+Proof.
+  rewrite <- sum_of_svmap_exists.
+  done.
+Qed.
+
+Lemma exists_SVmap_cons' ty tys f :
+  (∃ mr : SVmap (ty :: tys), f mr) <->
+  ∃ vty : A, ∃ mr' : SVmap tys, f (SVmap_insert ty vty mr').
+Proof.
+  now rewrite exists_SVmap_cons, exists_comm.
+Qed.
+
+
+Lemma exists_SVmap_app
+  (sums sums' : list positive) (fr : _ -> Prop) :
+  (∃ v : SVmap (sums ++ sums'), fr v) <->
+  ∃ v : SVmap sums, ∃ v' : SVmap sums', fr (SVmap_union v v').
+Proof.
+  rewrite <- 2 sum_of_svmap_exists.
+  setoid_rewrite <- sum_of_svmap_exists.
+  apply sum_of_svmap_app.
+Qed.
+
+End SVmap.
 
 
 
@@ -59,7 +822,7 @@ Local Existing Instance Rmul_proper.
 
 
 
-Context `{SA : Summable A, AEQ : EqDecision A}.
+Context `{SA : SummableOver R A, AEQ : EqDecision A, LSA : !LawfulSummableOver R A}.
 
 
 
@@ -208,7 +971,7 @@ Proof.
   - cbn.
     f_equiv; [apply IHte1|apply IHte2]; cbn in Hp; set_solver +Hp.
   - cbn.
-    apply sum_of_ext; intros val.
+    apply sum_of_ext; intros val Hval.
     rewrite (IHte Hp (val :: mr)).
     cbn.
     f_equiv.
@@ -250,7 +1013,7 @@ Lemma total_semantics_tsum_alt mabs ml te :
     (relabel_te (substbound (fresh (te_free_varset te))) te).
 Proof.
   cbn.
-  apply sum_of_ext; intros x.
+  apply sum_of_ext; intros x Hx.
   apply total_semantics_aux_cons.
   apply is_fresh.
 Qed.
@@ -591,7 +1354,7 @@ Proof.
       intros [l u] [l' u'] [Hl Hu]; cbn in *.
       split; unfold get_var; [destruct l, l'|destruct u, u']; cbn; now subst.
   - cbn.
-    apply sum_of_ext; intros x.
+    apply sum_of_ext; intros x Hx.
     apply IHsums.
     + apply (Forall2_impl _ _ _ _ Habs).
       intros flu flu' [Hf Hlu].
@@ -683,7 +1446,7 @@ Proof.
     2:{
       cbn.
       rewrite sum_of_distr_r.
-      apply sum_of_ext; intros x.
+      apply sum_of_ext; intros x Hx.
       rewrite <- (IHrsums (x :: mr')) by
         now cbn in Hrabs |- *; intros ? ?%Hrabs; lia.
       (* 2: cbn; intros ? ?%Hrabs; lia. *)
@@ -755,7 +1518,7 @@ Proof.
         now rewrite 2 lookup_ge_None_2 by now rewrite ?length_app; lia.
   - cbn.
     rewrite sum_of_distr_l.
-    apply sum_of_ext; intros x.
+    apply sum_of_ext; intros x Hx.
     rewrite <- IHlsums.
     apply tl_total_semantics_aux_ext_mr.
     + apply Forall2_app; clear; apply Forall2_fmap, Forall_Forall2_diag;
@@ -889,7 +1652,7 @@ Proof.
     rewrite <- IHte1, <- IHte2.
     now rewrite tl_total_semantics_aux_tl_times; f_equiv.
   - cbn.
-    apply sum_of_ext; intros x.
+    apply sum_of_ext; intros x Hx.
     apply IHte.
 Qed.
 
@@ -1105,7 +1868,7 @@ Lemma tl_total_semantics_alt_vec mabs ml tl :
 Proof.
   rewrite tl_total_semantics_aux_alt_vec.
   rewrite sum_of_vec_rev.
-  f_equiv; intros mr.
+  apply sum_of_ext; intros mr Hmr.
   now rewrite vec_to_list_rev, rev_append_reverse, reverse_involutive, app_nil_r.
 Qed.
 
@@ -1136,13 +1899,13 @@ Definition delta_semantics_alt ml mr (l u : var) : R :=
 Notation delta_semantics_alt' ml mr delt :=
   (delta_semantics_alt ml mr delt.1 delt.2).
 
-
+(*
 Definition Vmap (tys : list Idx) : Type :=
   Pmap A.
 
 Definition WF_Vmap {tys} (m : Vmap tys) : Prop :=
   dom m =@{Pset} list_to_set tys /\
-  map_Forall (fun _ v => v ∈ sum_elements) m.
+  map_Forall (fun _ v => SummedElement v) m.
 
 Fixpoint Vmap_elements tys : list (Vmap tys) :=
   match tys with
@@ -1247,31 +2010,31 @@ Proof.
   rewrite list_map_fmap.
   apply Rlist_sum_perm.
   now rewrite (Vmap_elements_perm tys tys').
-Qed.
+Qed. *)
 
 
 Definition tl_total_semantics_alt_aux mabs ml
   (tys : list Idx) abs delt : R :=
-  ∑ mr : Vmap tys,
+  ∑ mr : SVmap tys,
   Rlist_prod ((λ '(f, low, up),
     abstract_semantics_alt mabs ml mr f low up) <$> abs) *
   Rlist_prod ((λ '(l, u), delta_semantics_alt ml mr l u) <$> delt).
 
 Lemma tl_total_semantics_alt_aux_unfold mabs ml tys abs delt :
-  tl_total_semantics_alt_aux mabs ml tys abs delt =
-  ∑ mr : Vmap tys,
+  tl_total_semantics_alt_aux mabs ml tys abs delt ==
+  ∑ mr : SVmap tys,
   Rlist_prod ((λ flu,
     abstract_semantics_alt' mabs ml mr flu) <$> abs) *
   Rlist_prod ((λ lu, delta_semantics_alt' ml mr lu) <$> delt).
 Proof.
-  apply sum_of_ext_eq.
-  intros m.
-  f_equiv; f_equal; (apply list_fmap_mor; [|reflexivity]);
+  apply sum_of_ext.
+  intros m Hm.
+  f_equiv; apply Rlist_prod_ext, eq_reflexivity; (apply list_fmap_mor; [|reflexivity]);
   [intros [[]]|intros []]; reflexivity.
 Qed.
 
 
-Lemma list_to_map_vec_elements_gen f sums :
+(* Lemma list_to_map_vec_elements_gen f sums :
   (λ mr : vec A sums,
     list_to_map (imap (fun i v => (f (Pos.of_succ_nat i), v)) mr)) <$>
     @vec_elements A sum_elements sums ≡ₚ
@@ -1314,7 +2077,46 @@ Proof.
   pose proof (list_to_map_vec_elements_gen id sums) as Heq.
   rewrite list_fmap_id in Heq.
   apply Heq.
+Qed. *)
+
+Lemma SVmap_map_SVmap_of_vec {B} sums v :
+  SVmap_map (@SVmap_of_vec B sums v) =
+  list_to_map (zip sums v).
+Proof.
+  unfold SVmap_map.
+  induction sums; cbn in *; inv_all_vec_fin; [done|].
+  cbn.
+  f_equal.
+  rewrite IHsums.
+  done.
 Qed.
+
+Lemma SVmap_of_vec_pseq {B} n v :
+  @SVmap_of_vec B (pseq 1 n) v =@{Pmap _}
+  vec_to_map v.
+Proof.
+  rewrite SVmap_map_SVmap_of_vec.
+  unfold vec_to_map.
+  rewrite imap_to_zip_with_seq.
+  symmetry.
+  rewrite <- zip_with_fmap_l.
+  rewrite length_vec_to_list, length_pseq at 1.
+  rewrite pseq_to_seq at 2.
+  done.
+Qed.
+
+Lemma lookup_SVmap_of_vec_pseq {B} n {m} (Hnm : m = _) v r :
+  SVmap_map (@SVmap_of_vec B (pseq 1 n) (Vector.cast v Hnm)) !! r =
+  vec_to_list v !! pos_to_nat_pred r.
+Proof.
+  subst.
+  rewrite cast_id.
+  rewrite SVmap_of_vec_pseq.
+  rewrite lookup_vec_to_map_to_list'.
+  done.
+Qed.
+
+
 
 Lemma tl_total_semantics_alt_aux_correct mabs ml sums abs delt :
   tl_total_semantics_aux mabs ml [] sums abs delt ==
@@ -1326,10 +2128,12 @@ Proof.
   rewrite tl_total_semantics_aux_alt_vec.
   change (rev_append ?x []) with (reverse x).
   unfold tl_total_semantics_alt_aux.
-
-  rewrite (sum_of_relabel _ _ (vec_to_map_vec_sum_elements sums)).
+  rewrite sum_of_svmap_to_vec.
+  symmetry.
+  unshelve erewrite sum_of_vec_cast; [|abstract (now rewrite length_pseq, Nat2N.id)|].
+  symmetry.
   rewrite sum_of_vec_rev.
-  apply sum_of_ext; intros v.
+  apply sum_of_ext; intros v Hv.
   rewrite vec_to_list_rev, reverse_involutive.
   cbn.
   f_equiv;
@@ -1339,20 +2143,20 @@ Proof.
   [intros [[f low] up] _|intros [l u] _].
   - unfold abstract_semantics, abstract_semantics_alt.
     f_equiv.
-    apply option_bind_ext; [intros largs;
+    apply eq_reflexivity, option_bind_ext; [intros largs;
       apply option_bind_ext; [reflexivity|]|];
     f_equal; apply list_fmap_ext; (intros _ [r|] _; [|reflexivity]); cbn;
     symmetry;
-    apply lookup_vec_to_map_to_list'.
+    apply lookup_SVmap_of_vec_pseq.
   - unfold delta_semantics, delta_semantics_alt.
     f_equiv.
-    apply option_bind_ext; [intros largs;
+    apply eq_reflexivity, option_bind_ext; [intros largs;
       apply option_bind_ext; [reflexivity|]|];
     f_equal.
     + destruct u as [r|]; [|reflexivity].
-      cbn; symmetry; apply lookup_vec_to_map_to_list'.
+      cbn; symmetry; apply lookup_SVmap_of_vec_pseq.
     + destruct l as [r|]; [|reflexivity].
-      cbn; symmetry; apply lookup_vec_to_map_to_list'.
+      cbn; symmetry; apply lookup_SVmap_of_vec_pseq.
 Qed.
 
 
@@ -1386,7 +2190,7 @@ Proof.
   now rewrite Hl, Hu.
 Qed.
 
-Lemma kmap_Vmap_elements (f : positive -> positive) {Hf : Inj eq eq f}
+(* Lemma kmap_Vmap_elements (f : positive -> positive) {Hf : Inj eq eq f}
   (sums : list Idx) :
   kmap (M2:=Pmap) f <$> Vmap_elements sums =
   Vmap_elements (f <$> sums).
@@ -1405,7 +2209,7 @@ Proof.
   intros _ b _.
   unfold Vmap in *.
   now rewrite (kmap_insert _).
-Qed.
+Qed. *)
 
 
 Lemma tl_total_semantics_alt_aux_relabel mabs ml mr (f : Idx -> Idx)
@@ -1416,9 +2220,8 @@ Lemma tl_total_semantics_alt_aux_relabel mabs ml mr (f : Idx -> Idx)
     (relabel_delt (relabel_bounds f) <$> delt).
 Proof.
   unfold tl_total_semantics_alt_aux.
-  unshelve (eapply sum_of_relabel'_l2r); [exact (kmap f)| |
-  unfold sum_elements; cbn; now rewrite ?kmap_Vmap_elements].
-  intros m Hm%elem_of_Vmap_elements_1.
+  rewrite (sum_of_svmap_fmap _).
+  apply sum_of_ext; intros m Hm.
   f_equiv.
   - apply Rlist_prod_ext.
     rewrite Forall2_fmap_l, 2 Forall2_fmap_r; unfold compose.
@@ -1631,6 +2434,16 @@ Proof.
 Qed. *)
 
 
+(* FIXME: Move *)
+Lemma make_pwf_posperm p f (Hpf : posperm p f) : posperm p (make_pwf p f).
+Proof.
+  unfold posperm in *.
+  rewrite <- Hpf at 2.
+  apply eq_reflexivity, list_fmap_ext.
+  intros _ k Hk%elem_of_list_lookup_2%elem_of_pseq_1.
+  unfold make_pwf.
+  case_decide; lia.
+Qed.
 
 
 Lemma tl_aeq_correct mabs ml tl tl' :
@@ -1645,19 +2458,12 @@ Proof.
   unfold tl_total_semantics_alt_aux.
   set (p:=Pos.of_succ_nat tl.(tl_sums)) in *.
   assert (Hfinj : Inj (=) (=) (make_pwf p f)) by now apply make_pwf_inj.
-  apply (sum_of_relabel'_r2l (kmap (M2:=Pmap) (M1:=Pmap) (make_pwf p f))).
-  2: {
-    unfold sum_elements; cbn.
-    rewrite (kmap_Vmap_elements _).
-    apply Vmap_elements_perm.
-    replace (N.of_nat tl.(tl_sums)) with (Pos.pred_N p) by lia.
-    rewrite <- Hf at 2.
-    apply eq_reflexivity, list_fmap_ext;
-      intros _ k Hk%elem_of_list_lookup_2%elem_of_pseq_1.
-    apply decide_False.
-    lia.
-  }
-  intros m Hm%elem_of_Vmap_elements_1.
+  assert (Hperm : posperm p (make_pwf p f)) by now apply make_pwf_posperm.
+  unfold posperm in Hperm.
+  replace (Pos.pred_N p) with (N.of_nat tl.(tl_sums)) in Hperm by lia.
+  rewrite <- (sum_of_svmap_castP Hperm).
+  rewrite (sum_of_svmap_fmap _).
+  apply sum_of_ext; intros m Hm.
   f_equiv.
   - erewrite Rlist_prod_perm by now rewrite Habs.
     apply Rlist_prod_ext.
@@ -2733,7 +3539,7 @@ Definition ntl_total_semantics mabs ml ntl :=
 
 Lemma tl_total_semantics_alt_aux_eq mabs ml mr abs delt :
   tl_total_semantics_alt_aux mabs ml mr abs delt =
-  ∑ mr : Vmap mr,
+  ∑ mr : SVmap mr,
     abstracts_semantics_alt mabs ml mr abs *
     deltas_semantics_alt ml mr delt.
 Proof.
@@ -2743,7 +3549,7 @@ Qed.
 Lemma ntl_total_semantics_alt mabs ml ntl :
   WF_ntl ntl ->
   ntl_total_semantics mabs ml ntl ==
-  ∑ mr : Vmap ntl.(ntl_sums),
+  ∑ mr : SVmap ntl.(ntl_sums),
   abstracts_semantics_alt mabs ml mr ntl.(ntl_abstracts) *
   deltas_semantics_alt ml mr ntl.(ntl_deltas).
 Proof.
@@ -2898,18 +3704,17 @@ Proof.
   rewrite 2 ntl_total_semantics_alt by first [apply HWT|apply HWT'].
   cbn [ntl_sums ntl_abstracts ntl_deltas].
   destruct Hidemp as (<- & -> & ->).
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  apply sum_of_ext; intros mr Hmr.
   cbn [deltas_semantics_alt fmap list_fmap Rlist_prod].
   enough (delta_semantics_alt ml mr v v == 1) as Heq
     by now unfold deltas_semantics_alt; ring [Heq].
   destruct v as [r|l].
   - cbn.
-    assert (Hr : r ∈ dom mr). 1:{
-      rewrite Hmr.1.
+    assert (Hr : r ∈ dom (mr :> Pmap _)). 1:{
+      rewrite (proj2_dsig mr).
       apply HWT'.2.2.2.2.
       set_solver +.
     }
-    unfold Vmap in *.
     apply elem_of_dom in Hr as [a Ha].
     rewrite Ha.
     cbn.
@@ -2919,7 +3724,6 @@ Proof.
       apply HWT'.2.1.
       set_solver +.
     }
-    unfold Vmap in *.
     apply elem_of_dom in Hl as [a Ha].
     rewrite Ha.
     cbn.
@@ -2929,21 +3733,6 @@ Qed.
 (* Lemma Vmap_elements_cons_alt ty tys :
   Vmap_elements ty tys  *)
 
-Lemma sum_of_Vmap_cons ty tys f :
-  ∑ mr : Vmap (ty :: tys), f mr ==
-  ∑ mr' : Vmap tys, ∑ vty : A, f (<[ty := vty]> mr').
-Proof.
-  unfold_sum_of.
-  cbn.
-  rewrite list_bind_fmap.
-
-  rewrite Rlist_sum_bind.
-  apply Rlist_sum_ext, Forall2_fmap, Forall_Forall2_diag.
-  rewrite Forall_forall.
-  intros mr Hmr%elem_of_Vmap_elements_1.
-  rewrite <- list_fmap_compose.
-  reflexivity.
-Qed.
 
 Lemma deltas_semantics_alt_cons ml mr lu delt :
   deltas_semantics_alt ml mr (lu :: delt) =
@@ -2953,7 +3742,7 @@ Proof.
   now destruct lu.
 Qed.
 
-Context {HAWF : WFSummable A}.
+Context {HAWF : WFSummableOver R A}.
 
 
 
@@ -3024,16 +3813,15 @@ Proof.
     apply (ntl_aeq_WF _ _ Heq), Hwt.
   rewrite ntl_total_semantics_alt by apply Hwt'.
   cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
-  rewrite sum_of_Vmap_cons.
-  apply sum_of_ext'; intros mr' Hmr'%elem_of_Vmap_elements_1.
+  rewrite sum_of_svmap_cons.
+  rewrite sum_of_svmap_comm_1.
+  apply sum_of_ext; intros mr' Hmr'.
   assert (Hr : exists ar, get_var_alt ml mr' r = Some ar /\
     SummedElement ar). 1:{
     destruct r as [r|l].
     - cbn.
-      assert (r ∈ dom mr') as Hdom.
-      + pose proof Hmr'.1 as Hdom.
-        unfold Vmap in *.
-        rewrite Hdom.
+      assert (r ∈ dom (mr' :> Pmap _)) as Hdom.
+      + rewrite (proj2_dsig mr').
         assert (Hne' : r ≠ lb) by congruence.
         enough (r ∈@{Pset} list_to_set (lb :: sums')) as Hen by
           now rewrite elem_of_list_to_set in Hen |- *;
@@ -3041,12 +3829,11 @@ Proof.
         rewrite <- Hsums.
         apply Hwt.2.2.2.2.
         set_solver +.
-      + unfold Vmap in Hdom.
-        apply elem_of_dom in Hdom as [ar Har].
+      + apply elem_of_dom in Hdom as [ar Har].
         exists ar.
         split; [easy|].
-        specialize (Hmr'.2 r ar Har) as Harsum.
-        now constructor.
+        specialize (Hmr' r ar Har) as Harsum.
+        done.
     - cbn.
       assert (l ∈ dom ml) as Hdom.
       + apply Hwt.2.1.
@@ -3055,23 +3842,22 @@ Proof.
         specialize (Hml l ar Har).
         eauto.
   }
-  assert (Hgetr : forall a, get_var_alt ml (<[lb:=a]> mr') r =
+  assert (Hgetr : forall a, get_var_alt ml (<[lb:=a]> (mr' :> Pmap _)) r =
     get_var_alt ml mr' r). 1:{
     intros a.
     destruct r as [r|]; [|easy].
     cbn.
-    unfold Vmap.
     apply lookup_insert_ne; congruence.
   }
   destruct Hr as (ar & Har & Harsum).
   erewrite (sum_of_ext _ (fun a => delta_tensor [#a] [#ar] *
-    (abstracts_semantics_alt mabs ml (<[lb:=a]> mr') abs *
-    deltas_semantics_alt ml (<[lb:=a]> mr') delt))). 2:{
-    intros a.
+    (abstracts_semantics_alt mabs ml (<[lb:=a]> (mr' :> Pmap _)) abs *
+    deltas_semantics_alt ml (<[lb:=a]> (mr' :> Pmap _)) delt))). 2:{
+    intros a Ha.
     rewrite deltas_semantics_alt_cons.
-    unfold delta_semantics_alt.
+    unfold delta_semantics_alt, SVmap_map.
     cbn [fst snd get_var_alt].
-    unfold Vmap.
+    cbn.
     rewrite lookup_insert.
     cbn [mbind option_bind from_option id].
     rewrite Hgetr, Har.
@@ -3082,7 +3868,6 @@ Proof.
   cbn.
   f_equiv.
   - apply eq_reflexivity.
-    unfold Vmap.
     apply abstracts_semantics_alt_ext, Forall2_fmap_r, Forall_Forall2_diag.
     rewrite Forall_forall; intros [[f low] up] Hflu.
     cbn.
@@ -3097,7 +3882,6 @@ Proof.
   - apply eq_reflexivity, deltas_semantics_alt_ext, Forall2_fmap_r, Forall_Forall2_diag.
     rewrite Forall_forall; intros [l u] Hlu.
     cbn.
-    unfold Vmap.
     split;
     [rename l into v|rename u into v];
     (destruct v as [vr|vl]; [|reflexivity]);
@@ -3130,7 +3914,7 @@ Proof.
   destruct ntl as [sums abs delt], ntl' as [sums' abs' delt'];
   cbn [ntl_sums ntl_abstracts ntl_deltas] in *.
   destruct Heq as (<- & <- & Hdelt).
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  apply sum_of_ext; intros mr Hmr.
   f_equiv.
   unfold deltas_semantics_alt.
   apply Rlist_prod_perm_mor.
@@ -3272,11 +4056,10 @@ Proof.
   rewrite tl_total_semantics_alt_vec.
   cbn [tl_subst_free tl_add_sums relabel_tl tl_sums tl_abstracts tl_deltas].
   rewrite sum_of_vec_succ.
-  apply sum_of_ext'.
-  intros a Ha.
+  apply sum_of_ext; intros a Ha.
   rewrite (tl_total_semantics_alt_vec _ _ (mk_tl sums abs delt)).
   cbn [tl_sums tl_abstracts tl_deltas].
-  apply sum_of_ext'; intros m Hm.
+  apply sum_of_ext; intros m Hm.
   apply tl_total_semantics_aux_ext_base.
   - apply Forall2_fmap_l, Forall_Forall2_diag.
     rewrite Forall_forall.
@@ -3339,12 +4122,12 @@ Proof.
       exact eq_refl).
     }
     setoid_rewrite vec_to_list_cast.
-    rewrite sum_of_vec_add, sum_of_comm.
+    rewrite sum_of_vec_add, sum_of_vec_comm.
     rewrite tl_total_semantics_tl_subst_free.
     rewrite sum_of_vec_1.
-    apply sum_of_ext'; intros a Ha.
+    apply sum_of_ext; intros a Ha.
     rewrite IHmid.
-    apply sum_of_ext; intros mr.
+    apply sum_of_ext; intros mr Hmr.
     f_equiv.
     rewrite reverse_cons, vec_to_list_app.
     rewrite zip_with_app by now rewrite length_vec_to_list.
@@ -3361,7 +4144,7 @@ Lemma tl_total_semantics_free_varset_ext mabs ml ml' tl :
 Proof.
   intros Hml.
   rewrite 2 tl_total_semantics_alt_vec.
-  apply sum_of_ext; intros mr.
+  apply sum_of_ext; intros mr Hmr.
   apply tl_total_semantics_aux_ext_base;
   apply Forall_Forall2_diag; rewrite Forall_forall.
   - intros [[f low] up] Hflu.
@@ -3400,7 +4183,7 @@ Proof.
   1:{
     abstract (now rewrite reverse_involutive, length_vec_to_list).
   }
-  apply sum_of_ext'; intros mr Hmr.
+  apply sum_of_ext; intros mr Hmr.
   rewrite vec_to_list_cast.
   rewrite tl_total_semantics_aux_tl_times.
   f_equiv.
@@ -3440,7 +4223,7 @@ Proof.
     rewrite elem_of_list_to_set, elem_of_app in Hl'.
     destruct Hl' as [Hl'|Hl'].
     + unfold make_vecs_map.
-      now rewrite 3 lookup_union, 2 union_eq_l, <- vec_to_list_zip_with by now 
+      now rewrite 3 lookup_union, 2 union_eq_l, <- vec_to_list_zip_with by now
         rewrite <- elem_of_dom, dom_list_to_map, elem_of_list_to_set,
           ?vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list.
     + rewrite lookup_union_r. 2:{
@@ -3472,9 +4255,9 @@ Proof.
   setoid_rewrite ntl_total_semantics_alt; [|easy].
   destruct ntl as [sums abs delt].
   cbn -[abstracts_semantics_alt deltas_semantics_alt].
-  rewrite sum_of_Vmap_cons, sum_of_comm.
-  apply sum_of_ext; intros a.
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  rewrite sum_of_svmap_cons.
+  apply sum_of_ext; intros a Ha.
+  apply sum_of_ext; intros mr Hmr.
   f_equiv.
   - apply eq_reflexivity, abstracts_semantics_alt_ext.
     apply Forall2_fmap_l, Forall_Forall2_diag.
@@ -3489,11 +4272,11 @@ Proof.
     intros v Hv;
     cbn;
     (destruct v as [r'|l']; cbn;
-    [unfold Vmap; apply lookup_insert_ne; intros Heq;
+    [apply lookup_insert_ne; intros Heq;
      apply Hr; subst r; cbn; rewrite <- (elem_of_list_to_set (C:=Pset));
      apply HWF.2.1, elem_of_abstracts_bound_vars; set_solver +Hv Hflu|
      rewrite lookup_insert_case; do 2 case_decide; cbn;
-      done || unfold Vmap; apply lookup_insert]).
+      done || apply lookup_insert]).
   - apply eq_reflexivity, deltas_semantics_alt_ext.
     apply Forall2_fmap_l, Forall_Forall2_diag.
     rewrite Forall_forall.
@@ -3501,11 +4284,11 @@ Proof.
     cbn.
     split; [rename lv into v|rename uv into v];
     (destruct v as [r'|l']; cbn;
-    [unfold Vmap; apply lookup_insert_ne; intros Heq;
+    [apply lookup_insert_ne; intros Heq;
      apply Hr; subst r; cbn; rewrite <- (elem_of_list_to_set (C:=Pset));
      apply HWF.2.2, elem_of_deltas_bound_vars; set_solver +Hlu|
     rewrite lookup_insert_case; do 2 case_decide; cbn;
-      done || unfold Vmap; apply lookup_insert]).
+      done || apply lookup_insert]).
 Qed.
 
 
@@ -3519,49 +4302,6 @@ Proof.
   apply infinite_is_fresh.
 Qed.
 
-Lemma sum_of_Vmap_fmap (f : positive -> positive) `{Hf : !Inj eq eq f}
-  (sums : list positive) (fr : _ -> R) :
-  ∑ v : Vmap (f <$> sums), fr v ==
-  ∑ v : Vmap sums, fr (kmap f v).
-Proof.
-  unfold Vmap;
-  apply (sum_of_relabel'_r2l (kmap f));
-  [|apply eq_reflexivity, (kmap_Vmap_elements _)].
-  easy.
-Qed.
-
-Lemma sum_of_Vmap_nil (fr : _ -> R) :
-  ∑ v : Vmap [], fr v == fr ∅.
-Proof.
-  unfold_sum_of.
-  cbn.
-  ring.
-Qed.
-
-Lemma sum_of_Vmap_cons' ty tys f :
-  ∑ mr : Vmap (ty :: tys), f mr ==
-  ∑ vty : A, ∑ mr' : Vmap tys, f (<[ty := vty]> mr').
-Proof.
-  now rewrite sum_of_Vmap_cons, sum_of_comm.
-Qed.
-
-Lemma sum_of_Vmap_app
-  (sums sums' : list positive) (fr : _ -> R) :
-  ∑ v : Vmap (sums ++ sums'), fr v ==
-  ∑ v : Vmap sums, ∑ v' : Vmap sums', fr ((v :> Pmap _) ∪ v').
-Proof.
-  revert fr; induction sums; intros fr.
-  - rewrite sum_of_Vmap_nil.
-    cbn.
-    apply sum_of_ext; intros; unfold Vmap; now rewrite map_empty_union.
-  - cbn.
-    rewrite 2 sum_of_Vmap_cons'.
-    apply sum_of_ext; intros va.
-    rewrite IHsums.
-    unfold Vmap.
-    setoid_rewrite insert_union_l.
-    reflexivity.
-Qed.
 
 
 
@@ -3586,7 +4326,7 @@ Proof.
   now rewrite fmap_app, Rlist_prod_app.
 Qed.
 
-(* 
+(*
 Lemma ntl_total_semantics_ntl_times_aux mabs ml l r :
   WF_ntl l -> WF_ntl r ->
   ntl_total_semantics mabs ml (ntl_times l r) ==
@@ -3598,9 +4338,9 @@ Proof.
   cbn -[abstracts_semantics_alt deltas_semantics_alt list_to_set].
   rewrite sum_of_Vmap_app, (sum_of_Vmap_fmap _).
   rewrite sum_of_distr_l.
-  apply sum_of_ext'; intros mr_l Hmr_l.
+  apply sum_of_ext; intros mr_l Hmr_l.
   rewrite sum_of_distr_r, (sum_of_Vmap_fmap _).
-  apply sum_of_ext'; intros mr_r Hmr_r.
+  apply sum_of_ext; intros mr_r Hmr_r.
   rewrite abstracts_semantics_alt_app, deltas_semantics_alt_app.
   symmetry.
   rewrite rmul_comm_double.
@@ -3639,11 +4379,11 @@ Proof.
   rewrite ntl_total_semantics_alt by now apply ntl_times_WF.
   rewrite 2 ntl_total_semantics_alt by easy.
   cbn -[abstracts_semantics_alt deltas_semantics_alt list_to_set].
-  rewrite sum_of_Vmap_app, (sum_of_Vmap_fmap _).
+  rewrite sum_of_svmap_app, (sum_of_svmap_fmap _).
   rewrite sum_of_distr_l.
-  apply sum_of_ext'; intros mr_l Hmr_l.
-  rewrite sum_of_distr_r, (sum_of_Vmap_fmap _).
-  apply sum_of_ext'; intros mr_r Hmr_r.
+  apply sum_of_ext; intros mr_l Hmr_l.
+  rewrite sum_of_distr_r, (sum_of_svmap_fmap _).
+  apply sum_of_ext; intros mr_r Hmr_r.
   rewrite abstracts_semantics_alt_app, deltas_semantics_alt_app.
   symmetry.
   rewrite rmul_comm_double.
@@ -3704,12 +4444,12 @@ Proof.
       exact eq_refl).
     }
     setoid_rewrite vec_to_list_cast.
-    rewrite sum_of_vec_add, sum_of_comm.
+    rewrite sum_of_vec_add, sum_of_vec_comm.
     rewrite ntl_total_semantics_ntl_subst_free by now apply compose_namedtensorlist_WF'.
     rewrite sum_of_vec_1.
-    apply sum_of_ext'; intros a Ha.
+    apply sum_of_ext; intros a Ha.
     rewrite IHmid.
-    apply sum_of_ext; intros mr.
+    apply sum_of_ext; intros mr Hmr.
     f_equiv.
     rewrite reverse_cons, vec_to_list_app.
     rewrite zip_with_app by now rewrite length_vec_to_list.
@@ -3749,7 +4489,7 @@ Proof.
   1:{
     abstract (now rewrite reverse_involutive, length_vec_to_list).
   }
-  apply sum_of_ext'; intros mr Hmr.
+  apply sum_of_ext; intros mr Hmr.
   rewrite vec_to_list_cast.
   rewrite ntl_total_semantics_ntl_times by easy.
   f_equiv.
@@ -3829,7 +4569,7 @@ Proof.
   rewrite 2 tl_total_semantics_aux_alt_vec.
   destruct tl as [sums abs delt];
   cbn -[tl_total_semantics_aux].
-  apply sum_of_ext; intros m.
+  apply sum_of_ext; intros m Hm.
   apply tl_total_semantics_aux_ext_base;
   [|apply Forall_Forall2_diag; rewrite Forall_forall; intros ? _; split; done].
   apply Forall2_fmap_l, Forall_Forall2_diag.
@@ -3853,10 +4593,10 @@ Proof.
 Qed.
 
 
-Lemma simplify_ntl_deltas_correct_sem mabs ml ntl : 
+Lemma simplify_ntl_deltas_correct_sem mabs ml ntl :
   map_Forall (λ (_ : positive) (a : A), SummedElement a) ml ->
   WT_ntl (dom ml) ntl ->
-  ntl_total_semantics mabs ml ntl == 
+  ntl_total_semantics mabs ml ntl ==
   ntl_total_semantics mabs ml (simplify_ntl_deltas ntl).
 Proof.
   intros Hsum HWT.

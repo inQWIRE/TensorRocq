@@ -1,4 +1,7 @@
-Require Import Aux_stdpp Basics Setoid Morphisms Algebra.Definitions Algebra.Instances Summable.Definitions.
+Require Import Basics Setoid Morphisms.
+From stdpp Require Import vector.
+From TensorRocq Require Import Aux_stdpp Algebra.Definitions Algebra.Instances 
+  Summable.Definitions Summable.Instances.
 
 
 
@@ -96,6 +99,47 @@ Proof.
     rewrite Hfmul; auto.
 Qed.
 
+Class SummableOverHomomorphism `{SR : SemiRing R rO rI radd rmul req,
+  SR' : SemiRing R' rO' rI' radd' rmul' req'} (f : R -> R') 
+  {Hf : SemiRingHomomorphism f} (A : Type) 
+  {SA : SummableOver R A} {SA' : SummableOver R' A} := {
+  SRH_sum_of (g : A -> R) : req' (f (∑ a, g a)) (∑ a, f (g a));
+  SRH_summed a : SummedElement (R:=R) a <-> SummedElement (R:=R') a
+}.
+
+#[export] Instance id_SOH `{SR : SemiRing R rO rI radd rmul req,
+  SA : SummableOver R A}
+  : SummableOverHomomorphism (@id R) A.
+Proof.
+  split.
+  - intros; apply SR.
+  - done.
+Qed.
+
+
+#[export] Instance compose_SOH `{SR : SemiRing R rO rI radd rmul req,
+  SR' : SemiRing R' rO' rI' radd' rmul' req',
+  SR'' : SemiRing R'' rO'' rI'' radd'' rmul'' req'',
+  SA : SummableOver R A,
+  SA' : SummableOver R' A,
+  SA'' : SummableOver R'' A}
+  (f : R -> R') (g : R' -> R'') 
+  {Hf : SemiRingHomomorphism f} {Hg : SemiRingHomomorphism g} :
+  SummableOverHomomorphism g A -> SummableOverHomomorphism f A ->
+  SummableOverHomomorphism (compose g f) A.
+Proof.
+  intros Hg' Hf'.
+  split.
+  - intros h.
+    cbn.
+    pose proof (SR_equivalence (SR:=SR'')).
+    pose proof Hg as [Hgprop _ _ _ _].
+    rewrite 2 SRH_sum_of.
+    done.
+  - destruct Hg' as [_ ?], Hf' as [_ ?].
+    firstorder.
+Qed.
+
 Section HomomorphismFacts.
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
@@ -175,6 +219,40 @@ Proof.
   now rewrite <- list_fmap_compose.
 Qed.
 
+#[export] Instance SummableOverHomomorphism_Summable 
+  (f : R -> R')
+  `{Hf : !SemiRingHomomorphism f}
+  `{Summable A} : SummableOverHomomorphism f A.
+Proof.
+  split.
+  - intros.
+    now rewrite sum_of_SRH.
+  - done.
+Qed.
+
+
+#[export] Instance SummableOverHomomorphism_vec 
+  (f : R -> R') `{Hf : !SemiRingHomomorphism f}
+  `{SA : SummableOver R A, SA' : SummableOver R' A, LSA' : !LawfulSummableOver R' A} 
+  {HfS : SummableOverHomomorphism f A} {n} : SummableOverHomomorphism f (vec A n).
+Proof.
+  split.
+  - pose proof Hf as [Hfprop _ _ _ _].
+    intros g.
+    induction n.
+    + rewrite 2 sum_of_vec_0.
+      done.
+    + rewrite 2 sum_of_vec_succ.
+      rewrite SRH_sum_of.
+      setoid_rewrite IHn.
+      done.
+  - intros v. 
+    unfold SummedElement.
+    cbn.
+    rewrite 2 Forall_forall.
+    destruct HfS as [_ ?].
+    firstorder.
+Qed.
 
 End HomomorphismFacts.
 

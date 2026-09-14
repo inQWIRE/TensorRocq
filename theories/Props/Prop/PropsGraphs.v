@@ -14,8 +14,6 @@ From TensorRocq Require Import Props CospanHyperGraph.Facts.
 
 
 
-(* FIXME: Move *)
-Notation Mor A := (A -> A -> Type).
 
 Class StructGraphable (Struct : Mor nat) (T : Type) : Type :=
   graph_of_struct (n m : nat) (s : Struct n m) : CospanHyperGraph T n m.
@@ -27,18 +25,20 @@ Class StructGraphable (Struct : Mor nat) (T : Type) : Type :=
 #[global] Hint Mode SemiRing - - - - - - : typeclass_instances.
 
 Class LawfulStructGraphable (Struct : Mor nat) (T : Type)
-  `{TensT : TensorLike R rO rI radd rmul req A T}
+  `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensT : !TensorLike R A T}
   `{EqS : forall n m, Equiv (Struct n m), 
     EquivS : forall n m, Equivalence (≡@{(Struct n m)})}
   `{TensS : !StrictTensorLike R A Struct}
   `{GraphS : StructGraphable Struct T} : Prop := mk_LSG {
   graph_of_struct_correct {n m} (s : Struct n m) :
-    graph_semantics (graph_of_struct s)
+    graph_semantics (graph_of_struct s :> CospanHyperGraph T n m)
     ≡ strictInterpretTensor s
 }.
 
-#[global] Hint Mode LawfulStructGraphable + - - -
-  - - - - - - - - - - - - - - - : typeclass_instances.
+#[global] Hint Mode LawfulStructGraphable + - - - -
+  - - - - - - - - - - - - - - - - : typeclass_instances.
 
 
 
@@ -59,15 +59,22 @@ Definition PRO_graph_eq `{StructGraphable Struct T} `{Equiv T}
   {n m} (p p' : PRO Struct T n m) :=
   PRO_graph_semantics p ≡ₛ PRO_graph_semantics p'.
 
+#[export] Instance PRO_graph_equiv `{StructGraphable Struct T} 
+  `{Equiv T, Equivalence T equiv} {n m} : @Equivalence (PRO Struct T n m) PRO_graph_eq.
+Proof.
+  apply Aux_relset.rel_preimage_equiv, _.
+Qed.
+
 Lemma PRO_graph_semantics_correct {Struct : Mor nat}
   `{EqS : forall n m, Equiv (Struct n m), 
     EquivS : forall n m, Equivalence (≡@{(Struct n m)})}
   {T : Type} {StructG : StructGraphable Struct T}
-  `{TensT : TensorLike R rO rI radd rmul req A T}
+  `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensT : !TensorLike R A T}
   `{TensS : !StrictTensorLike R A Struct}
   `{GraphS : StructGraphable Struct T}
   `{LawGraphS : !LawfulStructGraphable Struct T}
-  `{WFA : !WFSummable A}
   {n m} (p : PRO Struct T n m) :
   graph_semantics (PRO_graph_semantics p) ≡
   PRO_semantics p.
@@ -124,8 +131,8 @@ Qed.
 
 Section lawful.
 
-Context `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A, EQA : EqDecision A,
-    WFA : !WFSummable A} `{equivT : Equiv T, equivalenceT : Equivalence T equiv}
+Context `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
+  `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{TensT : !TensorLike R A T}.
 
 (* FIXME: Move *)

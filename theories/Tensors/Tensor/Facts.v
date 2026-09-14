@@ -25,12 +25,14 @@ Class TensorLikeHom
   `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
   (f : R -> R') (A : Type)
-  `{SA : Summable A, EQA : EqDecision A}
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
   {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
   `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
   (fT : T -> T')
   {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'} := {
   TLH_SRH :: SemiRingHomomorphism f;
+  TLH_SOH :: SummableOverHomomorphism f A;
   TLH_proper : Proper (equiv ==> equiv) fT;
   interpretTensor_hom t n m :
     tensor_apply_hom f (interpretTensor t n m) ≡@{@Tensor R' n m A}
@@ -57,7 +59,9 @@ Class StrictTensorLikeHom
   `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (A : Type) 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
   (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
     EquivT : ∀ n m, @Equivalence (T n m) equiv}
   {STL : StrictTensorLike R A T}
@@ -1002,18 +1006,22 @@ Local Existing Instance Rmul_proper'.
 
 
 
-#[export] Instance tensor_apply_hom_mor (f : R -> R')
-  {Hf : SemiRingHomomorphism f} {n m} `{SA : Summable A} :
+#[export] Instance tensor_apply_hom_mor 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSA' : !LawfulSummableOver R' A} (f : R -> R')
+  {Hf : SemiRingHomomorphism f}
+  {HfS : SummableOverHomomorphism f A} {n m}  :
   Proper (equiv ==> equiv) (tensor_apply_hom f (n:=n) (m:=m) (A:=A)).
 Proof.
   intros t t' Ht v w Hv Hw.
   cbn.
   apply Hf.
-  now apply Ht.
+  apply Ht; apply SRH_summed; assumption.
 Qed.
 
-Lemma tensor_apply_hom_delta (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_delta 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n} :
   tensor_apply_hom f (delta_tensor (n:=n)) ≡ delta_tensor (A:=A) (n:=n).
 Proof.
@@ -1022,8 +1030,9 @@ Proof.
   case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_swap (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_swap 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n m} :
   tensor_apply_hom f (swap_tensor (n:=n) (m:=m)) ≡ swap_tensor (A:=A).
 Proof.
@@ -1032,8 +1041,9 @@ Proof.
   case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_cup (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_cup 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n} :
   tensor_apply_hom f (cup_tensor (n:=n)) ≡ cup_tensor (A:=A) (n:=n).
 Proof.
@@ -1042,8 +1052,9 @@ Proof.
   case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_cap (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_cap 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n} :
   tensor_apply_hom f (cap_tensor (n:=n)) ≡ cap_tensor (A:=A) (n:=n).
 Proof.
@@ -1052,22 +1063,26 @@ Proof.
   case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_delta_spider (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_delta_spider 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSR' : !LawfulSummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f} {HfS : SummableOverHomomorphism f A}
   {n m} :
   tensor_apply_hom f (delta_spider_tensor (n:=n) (m:=m))
     ≡ delta_spider_tensor (A:=A).
 Proof.
   intros v w Hv Hw.
   cbn.
-  rewrite (sum_of_SRH f).
+  rewrite SRH_sum_of.
   apply sum_of_ext.
   intros a Ha.
   case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_delta_spider_bundled (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EqA : EqDecision A}
+Lemma tensor_apply_hom_delta_spider_bundled 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSR' : !LawfulSummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f} {HfS : SummableOverHomomorphism f A}
   {k n m} :
   tensor_apply_hom f (delta_spider_tensor_bundled k (n:=n) (m:=m))
     ≡ delta_spider_tensor_bundled (A:=A) k.
@@ -1081,11 +1096,13 @@ Proof.
   intros i.
   cbn.
   rewrite 2 vlookup_zip_with.
-  apply tensor_apply_hom_delta_spider; apply _.
+  hnf.
+  apply (tensor_apply_hom_delta_spider f); apply _.
 Qed.
 
-Lemma tensor_apply_hom_stack_tensor (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+Lemma tensor_apply_hom_stack_tensor 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n m o p} (t : Tensor n m A) (t' : Tensor o p A) :
   tensor_apply_hom f (stack_tensor t t') ≡
   stack_tensor (tensor_apply_hom f t) (tensor_apply_hom f t').
@@ -1095,8 +1112,10 @@ Proof.
   apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_compose_tensor (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+Lemma tensor_apply_hom_compose_tensor 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSR' : !LawfulSummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f} {HfS : SummableOverHomomorphism f A}
   {n m o} (t : Tensor n m A) (t' : Tensor m o A) :
   tensor_apply_hom f (compose_tensor t t') ≡
   compose_tensor (tensor_apply_hom f t) (tensor_apply_hom f t').
@@ -1104,16 +1123,14 @@ Proof.
   intros v w Hv Hw.
   cbn.
   hnf.
-  rewrite (sum_of_vec_defn_alt (SR:=SR')).
-  erewrite SRH_Proper by apply (sum_of_vec_defn_alt (SR:=SR)).
-  rewrite (sum_of_SRH _).
-  apply sum_of_ext.
-  intros a Ha.
-  apply Hf.
+  rewrite SRH_sum_of.
+  setoid_rewrite SRH_rmul.
+  done.
 Qed.
 
-Lemma tensor_apply_hom_perm_tensor (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A, EQA : EqDecision A}
+Lemma tensor_apply_hom_perm_tensor 
+  `{SA : SummableOver R A, SA' : SummableOver R' A, EqA : EqDecision A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n m} (fi : fin n -> fin m) :
   tensor_apply_hom f (perm_tensor fi) ≡@{@Tensor R' n m A}
   perm_tensor fi.
@@ -1121,8 +1138,9 @@ Proof.
   intros v w _ _; cbn; case_decide; apply Hf.
 Qed.
 
-Lemma tensor_apply_hom_tensor_to_dimensionless (f : R -> R')
-  {Hf : SemiRingHomomorphism f} `{SA : Summable A}
+Lemma tensor_apply_hom_tensor_to_dimensionless 
+  `{SA : SummableOver R A, SA' : SummableOver R' A}
+  (f : R -> R') {Hf : SemiRingHomomorphism f}
   {n m} (t : @Tensor R n m A) n' m' :
   tensor_apply_hom f (tensor_to_dimensionless t n' m') ≡
   tensor_to_dimensionless (tensor_apply_hom f t) n' m'.
@@ -1134,7 +1152,7 @@ Proof.
 Qed.
 
 
-Lemma tensor_apply_hom_id `{SA : Summable A}
+Lemma tensor_apply_hom_id `{SA : SummableOver R A}
   {n m} (t : @Tensor R n m A) :
   tensor_apply_hom id t ≡ t.
 Proof.

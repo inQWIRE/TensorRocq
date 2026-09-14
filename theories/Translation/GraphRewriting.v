@@ -1357,7 +1357,10 @@ Qed.
   Qed.
 
 
-  Lemma DPO_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+  Lemma DPO_equiv {n m} `{SR : SemiRing R rO rI radd rmul req,
+    SA : SummableOver R A, LSA : LawfulSummableOver R A,
+    EqA : EqDecision A, !WFSummableOver R A,
+    EqT : Equiv T, EquivT : Equivalence T equiv, TensT : !TensorLike R A T} 
     (Target : CospanHyperGraph T n m)
     (G : HyperGraph T) (L : list positive) :
       (forall {o p} (v0 : vec positive o) (v1 : vec positive p),
@@ -1394,7 +1397,10 @@ Qed.
     elements (decompose_jset H L (decompose_C1 H L (list_to_set H.(inputs)))
       (isolated_vertices H) (list_to_set H.(outputs))).
 
-  Lemma DPO_equiv_unsafe {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+  Lemma DPO_equiv_unsafe {n m} `{SR : SemiRing R rO rI radd rmul req,
+    SA : SummableOver R A, LSA : LawfulSummableOver R A,
+    EqA : EqDecision A, !WFSummableOver R A,
+    EqT : Equiv T, EquivT : Equivalence T equiv, TensT : !TensorLike R A T} 
     (Target : CospanHyperGraph T n m)
     (G : HyperGraph T) (L : list positive) :
     vertices_hg G ∖ vertices_hg (decompose_L1 Target L) ## vertices Target ->
@@ -1714,7 +1720,10 @@ Qed.
       now rewrite list_to_set_elements_L.
   Qed.
 
-  Lemma DPO_with_equiv {n m} `{TensT : TensorLike R rO rI radd rmul req A T, !WFSummable A}
+  Lemma DPO_with_equiv {n m} `{SR : SemiRing R rO rI radd rmul req,
+    SA : SummableOver R A, LSA : LawfulSummableOver R A,
+    EqA : EqDecision A, !WFSummableOver R A,
+    EqT : Equiv T, EquivT : Equivalence T equiv, TensT : !TensorLike R A T} 
     (Target : CospanHyperGraph T n m) (G : HyperGraph T) (L : list positive)
     {ni nj} (i : vec _ ni) (j : vec _ nj) :
     list_to_set i =@{Pset} list_to_set $ decompose_ilist Target L ->

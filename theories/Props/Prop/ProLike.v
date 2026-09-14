@@ -313,7 +313,8 @@ Qed.
 Section Lawful.
 
 Context (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A}.
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : WFSummableOver R A}.
 
 
 Class LawfulCompositional (D : nat -> nat -> Type)

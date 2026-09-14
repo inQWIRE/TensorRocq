@@ -184,7 +184,9 @@ Lemma PRO_denote_semantics
   `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (A : Type) `{SA : SummableOver R A, EQA : EqDecision A,
+    SA' : SummableOver R' A, LSA : !LawfulSummableOver R' A}
+  {HfS : SummableOverHomomorphism f A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
   {STL : StrictTensorLike R A Struct}
@@ -196,7 +198,7 @@ Lemma PRO_denote_semantics
   {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
   {TLH : TensorLikeHom f A fT}
   {n m} (p : PRO Struct T n m) :
-  PRO_semantics (PRO_denote fT p) ≡
+  PRO_semantics (PRO_denote fT p) ≡@{@Tensor R' n m A}
   tensor_apply_hom f (PRO_semantics p).
 Proof.
   apply (map_PRO_id_semantics f A Struct fT p).
@@ -205,7 +207,9 @@ Qed.
 Lemma PRO_semantics_eq_by_quote `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (A : Type) `{SA : SummableOver R A, EQA : EqDecision A,
+    SA' : SummableOver R' A, LSA : !LawfulSummableOver R' A}
+  {HfS : SummableOverHomomorphism f A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
   {STL : StrictTensorLike R A Struct}

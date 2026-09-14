@@ -1,3 +1,4 @@
+From TensorRocq Require Import Aux_relset.
 From TensorRocq Require Export CospanHyperGraph.Definitions CospanHyperGraph.Expr
   CospanHyperGraph.Semantics.
 
@@ -243,9 +244,9 @@ Proof.
   done.
 Qed.
 
-Lemma graph_apply_hom_cast_graph {n m n' m'} (Hn : n = n') (Hm : m = m') 
-  (cohg : CospanHyperGraph T n m) : 
-  graph_apply_hom f (cast_graph Hn Hm cohg) = 
+Lemma graph_apply_hom_cast_graph {n m n' m'} (Hn : n = n') (Hm : m = m')
+  (cohg : CospanHyperGraph T n m) :
+  graph_apply_hom f (cast_graph Hn Hm cohg) =
   cast_graph Hn Hm (graph_apply_hom f cohg).
 Proof.
   subst.
@@ -595,16 +596,10 @@ Qed.
 Section correctness.
 
 
-Context `{SR : SemiRing R rO rI radd rmul req,
-  SA : Summable A, EQA : EqDecision A} `{Equiv T} `{Equivalence T equiv}
-    `{Equiv T'} `{Equivalence T' equiv}.
+Context `{SR : SemiRing R rO rI radd rmul req}.
 
-Context `{TensT : !TensorLike R A T, TensT' : !TensorLike R A T'}.
-
-
-
-(* Notation "0" := rO.
-Notation "1" := rI. *)
+Notation "0" := rO.
+Notation "1" := rI.
 Notation "x '==' y" := (req x y) (at level 70).
 Infix "+" := radd.
 Infix "*" := rmul.
@@ -621,39 +616,126 @@ Local Existing Instance Radd_proper.
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
-Lemma graph_apply_hom_correct (f : T -> T') `{Hf : !Proper (equiv ==> equiv) f}
-  `{Hfhom : !TensorLikeHom id A f}
-  {n m} (cohg : CospanHyperGraph T n m) :
-  graph_semantics (SR:=SR) (graph_apply_hom f cohg) ≡ graph_semantics cohg.
+
+Context `{SR' : SemiRing R' rO' rI' radd' rmul' req'}.
+
+Notation "0'" := rO'.
+Notation "1'" := rI'.
+Notation "x '=='' y" := (req' x y) (at level 70).
+Infix "+'" := radd' (at level 50, left associativity).
+Infix "*'" := rmul' (at level 40, left associativity).
+
+Add Ring R' : SR'.(RSRth)
+  (setoid SR'.(Req_equiv) SR'.(Req_ext)).
+
+Let Req_equivalence' : Equivalence req' := Req_equiv.
+Local Existing Instance Req_equivalence'.
+
+Let Radd_proper' := Req_ext.(SRadd_ext) : Proper (req' ==> req' ==> req') radd'.
+Local Existing Instance Radd_proper'.
+
+Let Rmul_proper' := Req_ext.(SRmul_ext) : Proper (req' ==> req' ==> req') rmul'.
+Local Existing Instance Rmul_proper'.
+
+Context `{SA : SummableOver R A, SA' : SummableOver R' A,
+    LSA : !LawfulSummableOver R A, LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
+    `{EqT : Equiv T} `{EquivT : Equivalence T equiv}
+    `{EqT' : Equiv T'} `{EquivT' : Equivalence T' equiv}.
+
+Context `{TensT : !TensorLike R A T, TensT' : !TensorLike R' A T'}.
+
+Lemma apply_from_option {A' B C} (g : B -> C) (f : A' -> B) d ma :
+  g (from_option f d ma) = from_option (g ∘ f) (g d) ma.
 Proof.
+  now destruct ma.
+Qed.
+
+Lemma join_list_get_var_alt_Forall_SummedElement
+  {sums} (mr : SVmap sums) {Hmr : SummedElement mr}
+  {n m} (v : vec A n) (w : vec A m) is os
+  {Hv : SummedElement v} {Hw : SummedElement w} io :
+  forall l,
+  join_list
+    (get_var_alt
+       (make_vecs_map is os v w)
+       (SVmap_map mr) <$> io) = Some l -> Forall SummedElement l.
+Proof.
+  intros l Hl.
+  apply join_list_Some in Hl.
+  rewrite Forall_lookup.
+  intros i x Hli.
+  apply (f_equal (.!!i)) in Hl.
+  rewrite 2 list_lookup_fmap, Hli in Hl.
+  cbn in Hl.
+  destruct (io !! i) as [var|]; [|done].
+  cbn in Hl.
+  apply (inj Some) in Hl.
+  destruct var as [rel|loc]; cbn in Hl.
+  - apply Hmr in Hl.
+    done.
+  - apply make_vecs_map_SummedElements in Hl; done.
+Qed.
+
+Lemma graph_apply_hom_correct (fr : R -> R') (f : T -> T') `{Hf : !Proper (equiv ==> equiv) f}
+  `{Hfhom : !TensorLikeHom fr A f}
+  {n m} (cohg : CospanHyperGraph T n m) :
+  graph_semantics (SR:=SR') (graph_apply_hom f cohg) ≡@{@Tensor R' n m A}
+  tensor_apply_hom fr (graph_semantics cohg).
+Proof.
+  pose proof Hfhom as [Hfr HfrS HfP interp_hom].
+  pose proof Hfr as [HfrP _ _ _ _].
   intros v w Hv Hw.
   cbn -[ntl_total_semantics graph_mabs].
-
   rewrite 2 ntl_total_semantics_alt by apply graph_namedtensorlist_semantics_WF.
   cbn -[abstracts_semantics_alt deltas_semantics_alt].
   rewrite vertices_graph_apply_hom.
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
-  f_equiv; [|done].
+  rewrite SRH_sum_of.
+  apply sum_of_ext; intros mr Hmr.
+  rewrite (SRH_rmul (f:=fr)).
+  f_equiv.
+  2:{
+    unfold deltas_semantics_alt.
+    rewrite (SRH_Rlist_prod _).
+    rewrite <- list_fmap_compose.
+    apply Rlist_prod_ext, Forall2_fmap.
+    apply Forall_Forall2_diag.
+    rewrite Forall_forall.
+    intros [l r] _.
+    cbn.
+    unfold delta_semantics_alt.
+    rewrite (apply_from_option fr).
+    symmetry.
+    erewrite from_option_proper;
+    [|solve_proper|apply Hfr.(SRH_rO)|done].
+    destruct (get_var_alt _); [|cbn; rewrite 2 option_bind_None_r; done].
+    destruct (get_var_alt _); [|cbn; done].
+    cbn.
+    case_decide;
+    apply Hfr.
+  }
   setoid_rewrite tg_abstracts_hypergraph_apply_hom.
+  unfold abstracts_semantics_alt.
+  rewrite (SRH_Rlist_prod _).
   apply Rlist_prod_ext.
+  rewrite <- list_fmap_compose.
   apply Forall2_fmap, Forall_Forall2_diag.
   rewrite Forall_forall.
   intros [[t i] o] _.
-  apply abstract_semantics_alt_ext_tens.
-  - unfold graph_mabs.
-    rewrite <- map_fmap_compose.
-    rewrite 2 lookup_fmap.
-    destruct ((hedges cohg).(hyperedges) !! t) as [dt|]; [|done].
-    cbn.
-    constructor.
-    simpl.
-    intros n' m'.
-    erewrite <- (interpretTensor_hom dt.1.1).
-    now rewrite tensor_apply_hom_id.
-  - eapply map_Forall_impl; [apply Hmr.2|].
-    cbn.
-    intros ? ?; apply SummedElement_iff.
-  - now apply make_vecs_map_SummedElements.
+  cbn.
+  unfold abstract_semantics_alt.
+  destruct (join_list _) as [l|] eqn:Hl; [|cbn; rewrite 2 option_bind_None_r; cbn; symmetry; apply SRH_rO].
+  destruct (join_list _) as [l'|] eqn:Hl' in |- * ; [|cbn; symmetry; apply SRH_rO].
+  cbn.
+  unfold graph_mabs.
+  rewrite 3 lookup_fmap.
+  destruct (_ !! _); [|cbn; symmetry; apply SRH_rO].
+  cbn.
+  unfold Vapplys.
+  simpl.
+  symmetry.
+  apply join_list_get_var_alt_Forall_SummedElement in Hl, Hl'; [|done..].
+  apply interp_hom; unfold SummedElement; cbn;
+  rewrite vec_to_list_to_vec; done.
 Qed.
 
 

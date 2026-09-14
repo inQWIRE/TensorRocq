@@ -1,4 +1,4 @@
-From TensorRocq Require Import Isomorphism.IsoAux Isomorphism.Testing CospanHyperGraph.Definitions
+From TensorRocq Require Import Aux_relset Isomorphism.IsoAux Isomorphism.Testing CospanHyperGraph.Definitions
   CospanHyperGraph.Ops.
 Require Ltac2.Ltac2.
 

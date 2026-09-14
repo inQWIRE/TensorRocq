@@ -44,7 +44,7 @@ Definition dimensionlesstensoreq `{SummableOver R A} req :
 (* A class registering that elements [T] can be interpreted as
   dimensionless tensors with arguments in [A] and values in [R].
   This interpretation should respect the [Equiv] instance of [T]. *)
-Class TensorLike (R : Type) `{EqT : Equiv R, EquivR : Equivalence R equiv}
+Class TensorLike (R : Type) `{EqR : Equiv R, EquivR : Equivalence R equiv}
   (A : Type) `{SRA : SummableOver R A, EQA : EqDecision A} (T : Type) `{EqT : Equiv T}
     `{EquivT : Equivalence T equiv} := {
   interpretTensor (x : T) : DimensionlessTensor (R:=R) A;
@@ -53,7 +53,7 @@ Class TensorLike (R : Type) `{EqT : Equiv R, EquivR : Equivalence R equiv}
 
 #[global] Hint Mode TensorLike - - -  - - -   + - - : typeclass_instances.
 
-Class StrictTensorLike (R : Type) `{EqT : Equiv R, EquivR : Equivalence R equiv}
+Class StrictTensorLike (R : Type) `{EqR : Equiv R, EquivR : Equivalence R equiv}
   (A : Type) `{SRA : SummableOver R A, EQA : EqDecision A} 
   (T : nat -> nat -> Type)
   `{EqT : forall n m, Equiv (T n m)} `{EquivT : forall n m, @Equivalence (T n m) equiv} := {

@@ -1,7 +1,8 @@
 (* A file containing rewriting theory, especially for rewriting in
   autonomous and frobenius categories *)
 
-From TensorRocq Require Import CospanHyperGraph.Definitions
+From TensorRocq Require Import Aux_relset
+  CospanHyperGraph.Definitions
   CospanHyperGraph.Facts
   Isomorphism.IsoAux Isomorphism.Testing CospanHyperGraph.Matching
   Props.Prop.Props
@@ -105,7 +106,7 @@ Lemma PRO_graph_semantics_map_cohg_syntactic_eq `{StructGraphable Struct T,
     graph_apply_hom ft (PRO_graph_semantics p).
 Proof.
   apply PRO_graph_semantics_map_full_gen.
-  - apply _.
+  - intros; apply Aux_relset.rel_preimage_equiv, _.
   - intros; apply compose_graphs_cohg_syntactic_eq.
   - intros; apply stack_graphs_cohg_syntactic_eq.
   - done.
@@ -414,14 +415,15 @@ From TensorRocq Require Import ProLike.
 
 Program Definition LawfulProLike_LawfulPRORewritingRelation
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
   {TensStruct : StrictTensorLike R A Struct}
-  {TensT : TensorLike R A T}
+  {TensT : TensorLike R A T} 
   {TensD : StrictTensorLike R A D}
   (LawPro : LawfulProLike R A Struct T D)
   `{GraphS : StructGraphable Struct T,
@@ -451,7 +453,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m p [d Hd].
   exists d, d.
   split_and!; [constructor; apply eq_reflexivity, Hd..|].
@@ -459,13 +461,13 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   unfold Symmetric.
   naive_solver.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m p q r (dp & dq & Hdp & Hdq & Hdpq)
     (dq' & dr & Hdq' & Hdr & Hdqr).
   exists dp, dr.
@@ -475,7 +477,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m p p' q [dp' Hdp'] Hpp' (dp & dq & Hdp & Hdq & Hdpq).
   exists dp', dq.
   split_and!; [now constructor; apply eq_reflexivity|done|].
@@ -494,7 +496,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m o p p' (dp & dp' & Hdp & Hdp' & Hdpp') q q' (dq & dq' & Hdq & Hdq' & Hdqq').
   eexists _, _.
   split; [apply _|].
@@ -503,7 +505,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m n' m' p p' (dp & dp' & Hdp & Hdp' & Hdpp') q q' (dq & dq' & Hdq & Hdq' & Hdqq').
   eexists _, _.
   split; [apply _|].
@@ -512,7 +514,7 @@ Next Obligation.
 Qed.
 Next Obligation.
   cbn.
-  intros * ? * ? ? ?.
+  intros * ? * ?.
   intros n m p q (? & ? & [Hp%(f_equiv is_Some)] & [Hq%(f_equiv is_Some)] & _).
   naive_solver.
 Qed.
@@ -534,7 +536,8 @@ Import PropGraphTerm.
 
 Lemma LawfulProLike_PRO_quote_test_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -582,7 +585,8 @@ Qed.
 
 Lemma LawfulProLike_RW_dom_of_Quote
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -606,7 +610,8 @@ Qed.
 
 Lemma LawfulProLike_RW_dom_of_Denote
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -632,7 +637,8 @@ Qed.
 
 Lemma LawfulProLike_equiv_of_RW_Quote
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -957,7 +963,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_monog_quote_rewrite_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1036,7 +1043,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_monog_quote_clean_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1458,7 +1466,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_bimonog_quote_rewrite_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1543,7 +1552,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_bimonog_quote_clean_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1603,7 +1613,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1688,7 +1699,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_frobenius_quote_clean_correct `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -2333,7 +2345,7 @@ Definition PRO_gen_quote_graph_multi_rewrite_aux
     CospanHyperGraph T' n ((i + j) + m) + Err)
   (f : T' -> T)
   (R' : forall n m, relation (PRO Struct T' n m) := fun n m =>
-    rel_preimage (PRO_denote f) (R n m))
+    Aux_relset.rel_preimage (PRO_denote f) (R n m))
   {Idx State}
   (RWS : PRO_graph_rewriter R' MatchSelector QuotientSelector Idx State Err)
   {n m} (Qtgt : PRO Struct T' n m) : State * PRO Struct T' n m + Err :=
@@ -2672,7 +2684,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct_aux `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -2742,7 +2755,7 @@ Proof.
   }
   tspecialize Hequiv. 1:{
     eapply LawfulProLike_RW_dom_of_Quote with dtgt; [done|].
-    eapply DiagramQuote_proper_semantics; [eauto|.. |eauto];
+    eapply DiagramQuote_proper_semantics; [eauto|eauto|.. |eauto];
     pose proof (@quote_pro _ _ _ _ _ _ _ _ _ _ HQtgt) as Hrw;
     [unshelve (eapply PRO_to_diagram_equiv_is_Some; done);
     eapply ofTensor_proper; apply _|].
@@ -2752,7 +2765,7 @@ Proof.
   }
   tspecialize Hequiv. 1:{
     eapply LawfulProLike_RW_dom_of_Denote with dres; [done|].
-    eapply DiagramDenote_proper_semantics; [eauto|.. |eauto];
+    eapply DiagramDenote_proper_semantics; [eauto|eauto|.. |eauto];
     pose proof (@quote_pro _ _ _ _ _ _ _ _ _ _ HQres) as Hrw;
     [unshelve (eapply PRO_to_diagram_equiv_is_Some; done);
     eapply ofTensor_proper; apply _|].
@@ -2769,7 +2782,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_autonomous_quote_multi_rewrite_correct_aux `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -2838,7 +2852,7 @@ Proof.
   }
   tspecialize Hequiv. 1:{
     eapply LawfulProLike_RW_dom_of_Quote with dtgt; [done|].
-    eapply DiagramQuote_proper_semantics; [eauto|.. |eauto];
+    eapply DiagramQuote_proper_semantics; [eauto|eauto|.. |eauto];
     pose proof (@quote_pro _ _ _ _ _ _ _ _ _ _ HQtgt) as Hrw;
     [unshelve (eapply PRO_to_diagram_equiv_is_Some; done);
     eapply ofTensor_proper; apply _|].
@@ -2848,7 +2862,7 @@ Proof.
   }
   tspecialize Hequiv. 1:{
     eapply LawfulProLike_RW_dom_of_Denote with dres; [done|].
-    eapply DiagramDenote_proper_semantics; [eauto|.. |eauto];
+    eapply DiagramDenote_proper_semantics; [eauto|eauto|.. |eauto];
     pose proof (@quote_pro _ _ _ _ _ _ _ _ _ _ HQres) as Hrw;
     [unshelve (eapply PRO_to_diagram_equiv_is_Some; done);
     eapply ofTensor_proper; apply _|].
@@ -2867,7 +2881,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_to_diagram_Proper_equiv
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -2899,7 +2914,8 @@ Qed.
 
 Lemma LawfulProLike_RW_Proper_equiv
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -2941,7 +2957,8 @@ Qed.
 
 Program Definition PGR_lemma `{Countable T'}
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -3543,7 +3560,8 @@ Qed.
 
 Lemma RWS_of_expr_base_lemma_l2r `{Countable T'}
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -3574,7 +3592,8 @@ Qed.
 
 Lemma RWS_of_expr_base_lemma_r2l `{Countable T'}
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -3860,7 +3879,8 @@ End quote_RWS.
 
 Lemma LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct `{Countable T'}
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -3925,7 +3945,8 @@ Qed.
 
 Lemma LawfulProLike_PRO_autonomous_quote_multi_rewrite_correct `{Countable T'}
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}

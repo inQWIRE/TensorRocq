@@ -1,4 +1,4 @@
-From TensorRocq Require Export Homomorphism Props PropsGraphs 
+From TensorRocq Require Export Homomorphism Props PropsGraphs
   ProLike FreeSemiRing Summable CospanHyperGraph.
 From stdpp Require Import vector.
 
@@ -15,11 +15,11 @@ Class FreeStrictTensorLike
     `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
     {n m} (t : T n m) :
-    tensor_apply_hom f (strictInterpretTensor t) ≡
+    tensor_apply_hom f (strictInterpretTensor t) ≡@{@Tensor R' n m A}
     strictInterpretTensor t
 }.
 
-#[export] Instance FSTL_MorUnion 
+#[export] Instance FSTL_MorUnion
   (A : Type) `{SA : Summable A, EQA : EqDecision A}
   (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
     EquivT : ∀ n m, @Equivalence (T n m) equiv}
@@ -30,7 +30,7 @@ Class FreeStrictTensorLike
   {STL' : forall `{SR : SemiRing R rO rI radd rmul req},
     StrictTensorLike R A T'}
   {FSTL : FreeStrictTensorLike A T}
-  {FSTL' : FreeStrictTensorLike A T'} : 
+  {FSTL' : FreeStrictTensorLike A T'} :
   FreeStrictTensorLike A (MorUnion T T').
 Proof.
   split.
@@ -40,7 +40,7 @@ Qed.
 
 
 #[export] Instance FSTL_Monoidal
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Monoidal.
 Proof.
   split.
@@ -51,7 +51,7 @@ Proof.
 Qed.
 
 #[export] Instance FSTL_Symmetry
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Symmetry.
 Proof.
   split.
@@ -63,7 +63,7 @@ Proof.
 Qed.
 
 #[export] Instance FSTL_Autonomy
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Autonomy.
 Proof.
   split.
@@ -75,7 +75,7 @@ Proof.
 Qed.
 
 #[export] Instance FSTL_Frobenial
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Frobenial.
 Proof.
   split.
@@ -89,15 +89,15 @@ Qed.
 
 
 #[export] Instance FSTL_SymmetricG
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A SymmetricG := _.
 
 #[export] Instance FSTL_Autonomous
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Autonomous := _.
 
 #[export] Instance FSTL_Frobenius
-  (A : Type) `{SA : Summable A, EQA : EqDecision A} : 
+  (A : Type) `{SA : Summable A, EQA : EqDecision A} :
   FreeStrictTensorLike A Frobenius := _.
 
 
@@ -126,73 +126,89 @@ Inductive SigTens {Struct} `{SA : Summable A, EqA : EqDecision A}
 
 
 Definition SignatureTensorLike_base {Struct} `{SA : Summable A, EqA : EqDecision A}
-  (Sig : Signature Struct A) : @TensorLike (FreeSemiRing nat (SigTens Sig))
-    _ _ _ _ _ (FSR_SR nat)
-    A _ _
-    (Sig.(gens)) eq eq_equivalence := {|
+  (Sig : Signature Struct A) : TensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR := SR_equiv)
+    (EquivR := SR_equivalence)
+    A
+    (Sig.(gens)) (EqT:=eq) := {|
   interpretTensor f :=
     fun n m v w => FSR_mono nat (SigTensApp Sig f v w);
 |}.
 
-Inductive PROEqRel {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+Inductive PROEqRel {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct}
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct}
   {n m} (lhs rhs : PRO Struct Sig.(gens) n m) :
   relation (FreeSemiRing nat (SigTens Sig)) :=
   | PROEqRelAt (v : vec A n) (w : vec A m) :
-    SummedElement v -> SummedElement w ->
+    SummedElement (R:=FreeSemiRing nat (SigTens Sig)) v -> SummedElement (R:=FreeSemiRing nat (SigTens Sig)) w ->
     PROEqRel Sig lhs rhs
       (PRO_semantics (TensT:=SignatureTensorLike_base Sig) lhs v w)
       (PRO_semantics (TensT:=SignatureTensorLike_base Sig) rhs v w).
 
-Inductive SigTensRel {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+Inductive SigTensRel {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct}
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct}
   : relation (FreeSemiRing nat (SigTens Sig)) :=
   | SigTensRelIn {n m} (lhs rhs : PRO Struct Sig.(gens) n m) :
     Sig.(rules) lhs rhs ->
     forall x y,
     PROEqRel Sig lhs rhs x y -> SigTensRel Sig x y
   | SigTensRelEquiv (f f' : Sig.(gens)) {n m} (v : vec A n) (w : vec A m) :
-    SummedElement v -> SummedElement w ->
+    SummedElement (R:=FreeSemiRing nat (SigTens Sig)) v ->
+    SummedElement (R:=FreeSemiRing nat (SigTens Sig)) w ->
     f ≡ f' ->
     SigTensRel Sig (FSR_mono nat $ SigTensApp Sig f v w)
     (FSR_mono nat $ SigTensApp Sig f' v w).
 
 
-#[export] Instance SignatureTensorLike {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+#[export, program] Instance SignatureTensorLike {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct} : TensorLike (FreeSemiRing nat (SigTens Sig))
-    (SR:=FSR_SR_eqg nat (SigTensRel Sig)) A
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct} : TensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv (SR:=FSR_SR_eqg nat (SigTensRel Sig)))
+    (EquivR:=SR_equivalence) A
+    (SRA:=summable_summableover (SR:=FSR_SR_eqg nat (SigTensRel Sig)))
     Sig.(gens) := {|
   interpretTensor f := fun n m v w => FSR_mono _ (SigTensApp Sig f v w);
-  interpretTensorProper f f' Hf n m v w Hv Hw :=
-    FSR_eqg_R_subrelation _ _ _ _ (SigTensRelEquiv Sig f f' v w Hv Hw Hf)
+  (* interpretTensorProper f f' Hf n m v w Hv Hw :=
+    FSR_eqg_R_subrelation _ _ _ _ (SigTensRelEquiv Sig f f' v w Hv Hw Hf) *)
 |}.
+Next Obligation.
+  intros until TensS.
+  intros f f' Hf n m v w Hv Hw.
+  apply FSR_eqg_R_subrelation.
+  apply SigTensRelEquiv; done.
+Qed.
 
-Definition SigTensPRO_eq {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+Definition SigTensPRO_eq {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct}
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct}
    {n m} : relation (PRO Struct Sig.(gens) n m) :=
   fun d d' =>
-  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  @equiv _ (@Tensor_equiv _ _ _ (SR_equiv (SR:=FSR_SR_eqg nat (SigTensRel Sig))) _ _)
   (PRO_semantics (TensT:=SignatureTensorLike_base Sig) d)
   (PRO_semantics (TensT:=SignatureTensorLike_base Sig) d').
 
-#[export] Instance SigTensPRO_equivalence {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+#[export] Instance SigTensPRO_equivalence {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct} {n m} : @Equivalence (PRO Struct Sig.(gens) n m)
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct} {n m} : @Equivalence (PRO Struct Sig.(gens) n m)
     (SigTensPRO_eq Sig) := Aux_relset.rel_preimage_equiv _ _ _.
 
-#[export] Instance Pstack_sigeq {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+#[export] Instance Pstack_sigeq {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct} {n m n' m'} :
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct} {n m n' m'} :
   Proper (SigTensPRO_eq Sig ==> SigTensPRO_eq Sig ==> SigTensPRO_eq Sig)
   (@Pstack Struct Sig.(gens) n m n' m').
 Proof.
@@ -204,10 +220,11 @@ Proof.
   - apply Hy; apply _.
 Qed.
 
-#[export] Instance Pcompose_sigeq {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+#[export] Instance Pcompose_sigeq {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct} {n m o} :
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct} {n m o} :
   Proper (SigTensPRO_eq Sig ==> SigTensPRO_eq Sig ==> SigTensPRO_eq Sig)
   (@Pcompose Struct Sig.(gens) n m o).
 Proof.
@@ -215,13 +232,14 @@ Proof.
   unfold SigTensPRO_eq in *.
   cbn.
   change (sum_of ?f) with (id (sum_of f)).
+  rewrite 2 sum_of_vec_defn_alt.
   rewrite 2 (sum_of_SRH id (Hf:=id_FSR_eq_eqg _ _)).
-  apply (sum_of_ext' (SR:=FSR_SR_eqg nat (SigTensRel Sig))).
-  intros u Hu%SummedElement_iff.
-  cbn.
+  rewrite <- 2 sum_of_vec_defn_alt.
+  apply sum_of_ext.
+  intros a Ha.
   apply FSR_eqg_mul.
-  - apply Hx; apply _.
-  - apply Hy; apply _.
+  - apply Hx; assumption.
+  - apply Hy; assumption.
 Qed.
 
 
@@ -231,10 +249,11 @@ Notation "d  '≡ᵣ@{' Sig '}'  d'" := (SigTensPRO_eq Sig d%pro d'%pro)
 Notation "d '≡ᵣ' d'" := (d%pro ≡ᵣ@{_} d'%pro)
   (at level 70).
 
-Lemma rules_hold {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+Lemma rules_hold {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   `{SA : Summable A, EqA : EqDecision A} (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct} {n m} (lhs rhs : PRO Struct Sig.(gens) n m) :
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct} {n m} (lhs rhs : PRO Struct Sig.(gens) n m) :
   Sig.(rules) lhs rhs ->
   lhs ≡ᵣ rhs.
 Proof.
@@ -247,13 +266,14 @@ Proof.
 Qed.
 
 
-Lemma SigTens_graph_semantics_correct {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A} 
+Lemma SigTens_graph_semantics_correct {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
   (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct}
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct}
   {GraphS : StructGraphable Struct Sig.(gens)}
-  {LawGraphS : LawfulStructGraphable Struct _ 
+  {LawGraphS : LawfulStructGraphable Struct _
   (TensT:=SignatureTensorLike_base Sig)}
    {n m} (ap : PRO Struct Sig.(gens) n m) :
   graph_semantics (TensT:=SignatureTensorLike_base Sig) (PRO_graph_semantics ap) ≡
@@ -263,15 +283,16 @@ Proof.
 Qed.
 
 
-Lemma SigTens_graph_semantics_correct' {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A} 
+Lemma SigTens_graph_semantics_correct' {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
   (Sig : Signature Struct A)
-  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig)) A Struct}
+  {TensS : StrictTensorLike (FreeSemiRing nat (SigTens Sig))
+    (EqR:=SR_equiv) (EquivR:=SR_equivalence) A Struct}
   {GraphS : StructGraphable Struct Sig.(gens)}
-  {LawGraphS : LawfulStructGraphable Struct _ 
+  {LawGraphS : LawfulStructGraphable Struct _
   (TensT:=SignatureTensorLike_base Sig)} {n m} (ap : PRO Struct Sig.(gens) n m) :
-  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  @equiv _ (@Tensor_equiv _ _ _ (SR_equiv (SR:=FSR_SR_eqg nat (SigTensRel Sig))) _ _)
   (graph_semantics (TensT:=SignatureTensorLike_base Sig) (PRO_graph_semantics ap))
   (PRO_semantics (TensT:=SignatureTensorLike_base Sig) ap).
 Proof.
@@ -280,17 +301,19 @@ Proof.
   now apply SigTens_graph_semantics_correct.
 Qed.
 
-Lemma SigTens_graph_semantics_correct'' {Struct} 
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A} 
+Lemma SigTens_graph_semantics_correct'' {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
   (Sig : Signature Struct A)
-  {TensS : forall `{SR : SemiRing R rO rI radd rmul req}, 
+  {TensS : forall `{SR : SemiRing R rO rI radd rmul req},
     StrictTensorLike R A Struct}
+  (SAR : SummableOver _ A := summable_summableover (SR:=FSR_SR_eqg nat (SigTensRel Sig)))
   {GraphS : StructGraphable Struct Sig.(gens)}
-  {LawGraphS : LawfulStructGraphable Struct _ 
+  {LawGraphS : LawfulStructGraphable Struct _
   (SR:=FSR_SR_eqg nat (SigTensRel Sig))
-  (TensT:=SignatureTensorLike Sig)} {n m} (ap : PRO Struct Sig.(gens) n m) :
-  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  (TensT:=SignatureTensorLike Sig)
+  (TensS:=TensS)} {n m} (ap : PRO Struct Sig.(gens) n m) :
+  @equiv _ (@Tensor_equiv _ _ _ (SR_equiv (SR:=FSR_SR_eqg nat (SigTensRel Sig))) _ _)
   (graph_semantics (TensT:=SignatureTensorLike Sig) (PRO_graph_semantics ap))
   (PRO_semantics (TensT:=SignatureTensorLike Sig) ap).
 Proof.
@@ -299,15 +322,15 @@ Qed.
 
 
 
-Lemma SignatureTensorLike_base_correct {Struct A} 
+Lemma SignatureTensorLike_base_correct {Struct A}
   `{SA : !Summable A, EqA : !EqDecision A}
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   {STL : forall `{SR : SemiRing R rO rI radd rmul req},
     StrictTensorLike R A Struct}
   {FSTL : FreeStrictTensorLike A Struct}
    (Sig : Signature Struct A)
   {n m} (p : PRO Struct Sig.(gens) n m) :
-  @equiv _ (@Tensor_equiv _ _ _ _ _ _ (FSR_SR_eqg nat (SigTensRel Sig)) _ _ _ _)
+  @equiv _ (@Tensor_equiv _ _ _ (SR_equiv (SR:=FSR_SR_eqg nat (SigTensRel Sig))) _ _)
   (PRO_semantics (TensT:=SignatureTensorLike_base Sig) p)
   (PRO_semantics (TensT:=SignatureTensorLike Sig) p).
 Proof.
@@ -318,13 +341,16 @@ Proof.
     cbn.
     (* symmetry. *)
     change (sum_of ?f) with (id (sum_of f)) at 1.
+    rewrite sum_of_vec_defn_alt.
     rewrite (sum_of_SRH id (Hf:=id_FSR_eq_eqg _ _)).
-    apply (sum_of_ext' (SR:=FSR_SR_eqg nat (SigTensRel Sig))).
-    intros u Hu%SummedElement_iff.
+    rewrite <- sum_of_vec_defn_alt.
+    set (s := @sum_of).
+    apply sum_of_ext.
+    intros u Hu.
     cbn.
     apply FSR_eqg_mul.
-    + apply IHp1; apply _.
-    + apply IHp2; apply _.
+    + apply IHp1; assumption.
+    + apply IHp2; assumption.
   - cbn.
     intros v w Hv Hw.
     cbn.
@@ -332,21 +358,22 @@ Proof.
     + apply IHp1; apply _.
     + apply IHp2; apply _.
   - etransitivity; [symmetry; apply (tensor_apply_hom_id (PRO_semantics _))|].
-    apply strictInterpretTensor_free.
+    intros v w Hv Hw.
+    apply strictInterpretTensor_free; [|assumption..].
     apply id_SRH_subrel.
     apply _.
   - done.
 Qed.
 
-Lemma SigTens_graph_semantics_syntactic_eq {Struct A} 
+Lemma SigTens_graph_semantics_syntactic_eq {Struct A}
   `{SA : !Summable A, EqA : !EqDecision A, WFA : !WFSummable A}
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   {STL : forall `{SR : SemiRing R rO rI radd rmul req},
     StrictTensorLike R A Struct}
-  {FSTL : FreeStrictTensorLike A Struct}  
+  {FSTL : FreeStrictTensorLike A Struct}
    (Sig : Signature Struct A)
   {GraphS : StructGraphable Struct Sig.(gens)}
-  {LawGraphS : LawfulStructGraphable Struct _ 
+  {LawGraphS : LawfulStructGraphable Struct _
     (SR:=FSR_SR_eqg nat (SigTensRel Sig))
     (TensT:=SignatureTensorLike Sig)}
 
@@ -364,15 +391,15 @@ Qed.
 
 
 
-Lemma SigTens_graph_semantics_semantic_eq{Struct A} 
+Lemma SigTens_graph_semantics_semantic_eq{Struct A}
   `{SA : !Summable A, EqA : !EqDecision A, WFA : !WFSummable A}
-  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})} 
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
   {STL : forall `{SR : SemiRing R rO rI radd rmul req},
     StrictTensorLike R A Struct}
-  {FSTL : FreeStrictTensorLike A Struct}  
+  {FSTL : FreeStrictTensorLike A Struct}
    (Sig : Signature Struct A)
   {GraphS : StructGraphable Struct Sig.(gens)}
-  {LawGraphS : LawfulStructGraphable Struct _ 
+  {LawGraphS : LawfulStructGraphable Struct _
     (SR:=FSR_SR_eqg nat (SigTensRel Sig))
     (TensT:=SignatureTensorLike Sig)}
   {n m} (ap ap' : PRO Struct Sig.(gens) n m) :

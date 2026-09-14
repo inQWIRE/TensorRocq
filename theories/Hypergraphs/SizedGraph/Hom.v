@@ -1,3 +1,4 @@
+From TensorRocq Require Import Aux_relset.
 From TensorRocq Require Export SizedGraph.Definitions.
 
 

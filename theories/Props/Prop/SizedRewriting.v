@@ -1320,7 +1320,8 @@ Qed.
 Program Definition LawfulProLike_LawfulMPRORewritingRelation
   (MStruct : Mor (btree positive))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
@@ -1405,7 +1406,8 @@ Import SizedPropGraphTerm.
 Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
   (MStruct : Mor (btree positive))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
@@ -1469,7 +1471,8 @@ Qed.
 Lemma LawfulMProLike_MPRO_quote_test_correct_casted `{Countable T'}
   (MStruct : Mor (btree positive))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct n m)}
@@ -1536,7 +1539,8 @@ Qed.
 
 Lemma LawfulProLike_RW_dom_of_Quote
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1560,7 +1564,8 @@ Qed.
 
 Lemma LawfulProLike_RW_dom_of_Denote
   (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   (Struct : Mor nat) (T : Type) (D : Mor nat)
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1586,7 +1591,8 @@ Qed.
 
 Lemma LawfulProLike_equiv_of_RW_Quote
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
@@ -1769,10 +1775,11 @@ Proof.
     rewrite <- HMtl in Htl.
     rewrite Htl.
     cbn [make_bw_sized_monog_pushout].
-    rewrite 2 bw_sized_graph_to_graph_compose.
+    rewrite 2 bw_sized_graph_to_graph_compose by apply equiv.
+
     f_equiv; [f_equiv; [done|]|done].
-    rewrite bw_sized_graph_to_graph_stack.
-    rewrite bw_sized_graph_to_graph_id.
+    rewrite bw_sized_graph_to_graph_stack by apply equiv.
+    rewrite bw_sized_graph_to_graph_id by apply equiv.
     f_equiv.
     rewrite MPRO_graph_semantics_correct.
     rewrite MPRO_graph_semantics_correct in HMlhs.
@@ -1795,7 +1802,7 @@ Proof.
     rewrite <- HMtr in Htr.
     rewrite Htr.
     cbn [make_bw_sized_monog_pushout].
-    rewrite 2 bw_sized_graph_to_graph_compose.
+    rewrite 2 bw_sized_graph_to_graph_compose by apply equiv.
     f_equiv; [f_equiv; [done|]|done].
     rewrite bw_sized_graph_to_graph_stack.
     rewrite bw_sized_graph_to_graph_id.
@@ -1960,7 +1967,8 @@ Qed.
 Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}
@@ -2059,7 +2067,8 @@ Qed.
 Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}
@@ -2512,7 +2521,8 @@ Qed.
 Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}
@@ -2618,7 +2628,8 @@ Qed.
 Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}
@@ -2698,7 +2709,8 @@ Qed.
 Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}
@@ -2804,7 +2816,8 @@ Qed.
 Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
   (MStruct : forall A, Mor (btree A))
   {R : Type} `{SR : SemiRing R rO rI radd rmul req} {A : Type}
-  `{SA : Summable A, EQA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EQA : EqDecision A, 
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {Struct : Mor nat} {T : Type} {D : Mor nat}
   {EqT : Equiv T} {EquivT : @Equivalence T equiv}
   {EqMStruct : forall n m, Equiv (MStruct positive n m)}

@@ -1578,6 +1578,9 @@ Definition MPRO_graph_eq {N} `{SizedStructGraphable N Struct T} `{Equiv T}
   {n m} (p p' : MPRO Struct T n m) :=
   MPRO_graph_semantics p ≡ₛ MPRO_graph_semantics p'.
 
+#[export] Instance MPRO_graph_equiv {N} `{SizedStructGraphable N Struct T} `{Equiv T, Equivalence T equiv}
+  {n m} : @Equivalence (MPRO Struct T n m) MPRO_graph_eq := Aux_relset.rel_preimage_equiv _ _ _.
+
 
 
 Definition Mcompose_assoc_def {N Struct T} `{!SubStruct MMonoidal Struct}

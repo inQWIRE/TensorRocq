@@ -1,8 +1,6 @@
 From TensorRocq Require Export Tensor Algebra Aux_stdpp.
 From stdpp Require sorting.
 
-
-
 (* FIXME: Move *)
 Notation Mor A := (A -> A -> Type).
 
@@ -35,7 +33,7 @@ Qed.
 
 #[export] Instance strictTensorLike_MorUnion
   (R : Type) `{SR : SemiRing R rO rI radd rmul req}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (A : Type) `{SA : SummableOver R A, EQA : EqDecision A}
   (T : nat -> nat -> Type) `{EqT : forall n m, Equiv (T n m)}
   `{EquivT : forall n m, @Equivalence (T n m) equiv} {TensT : StrictTensorLike R A T}
   (T' : nat -> nat -> Type) `{EqT' : forall n m, Equiv (T' n m)}
@@ -231,7 +229,7 @@ Qed.
 
 
 Fixpoint PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
+  `{SA : SummableOver R A, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
@@ -282,7 +280,7 @@ Section TensorLikePermutations.
 
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
-Context  `{SA : Summable A, EqA : EqDecision A}.
+Context  `{SA : SummableOver R A, EqA : EqDecision A}.
 
 
 (* Context (n m : nat). *)
@@ -453,7 +451,7 @@ Definition Pstruct' {Struct T n m} (s : SPRO Struct n m) : PRO Struct T n m :=
   map_PRO (λ n m, id) (Empty_set_rect _) s.
 
 Lemma map_PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
+  `{SA : SummableOver R A, LSA : !LawfulSummableOver R A, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqT' : Equiv T', EquivT' : Equivalence T' equiv}
   {Struct : nat -> nat -> Type}
@@ -466,11 +464,11 @@ Lemma map_PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
     `{TensS : !StrictTensorLike R A Struct}
     `{TensS' : !StrictTensorLike R A Struct'}
   (fs : forall n m, Struct n m -> Struct' n m)
-  (ft : T -> T')
-  (HS : forall n m (s : Struct n m), strictInterpretTensor (fs n m s) ≡ strictInterpretTensor s)
-  (HT : forall t, interpretTensor (ft t) ≡ interpretTensor t)
+  (ft : T -> T') 
+  (HS : forall n m (s : Struct n m), strictInterpretTensor (fs n m s) ≡@{@Tensor R n m A} strictInterpretTensor s)
+  (HT : forall t, interpretTensor (ft t) ≡@{@DimensionlessTensor R A} interpretTensor t)
   {n m} (p : PRO Struct T n m) :
-  PRO_semantics (map_PRO fs ft p) ≡ PRO_semantics p.
+  PRO_semantics (map_PRO fs ft p) ≡@{@Tensor R n m A} PRO_semantics p.
 Proof.
   induction p.
   - done.
@@ -487,20 +485,20 @@ Qed.
 
 (* FIXME: Move *)
 #[export] Instance Empty_set_tensorLike `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A} : TensorLike R A Empty_set := {
+  `{SA : SummableOver R A, EqA : EqDecision A} : TensorLike R A Empty_set := {
   interpretTensor t := match t with end;
   interpretTensorProper t := match t with end;
 }.
 
 Lemma Pstruct'_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
+  `{SA : SummableOver R A, LSA : !LawfulSummableOver R A, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
   {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
     `{TensT : !TensorLike R A T} `{TensS : !StrictTensorLike R A Struct}
   {n m} (s : SPRO Struct n m) :
-  PRO_semantics (Pstruct' s) ≡@{Tensor n m A} PRO_semantics s.
+  PRO_semantics (Pstruct' s) ≡@{@Tensor R n m A} PRO_semantics s.
 Proof.
   apply map_PRO_semantics; easy.
 Qed.
@@ -509,7 +507,7 @@ Qed.
 
 Definition PRO_tensor_equiv {R A T : Type}
   `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
+  `{SA : SummableOver R A, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
@@ -532,7 +530,7 @@ Section PRO_tensor_equiv.
 
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
-Context  `{SA : Summable A, EqA : EqDecision A}.
+Context  `{SA : SummableOver R A, EqA : EqDecision A, LSA : !LawfulSummableOver R A}.
 Context `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
@@ -597,7 +595,7 @@ Import Aux_stdpp vector.
 
 
 Lemma Monoidal_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A}
+  `{SA : SummableOver R A, EqA : EqDecision A}
   {n m} (p : Monoidal n m) :
   strictInterpretTensor p ≡@{@Tensor R n m A} perm_tensor (fun i => Fin.cast i (Monoidal_eq p)).
 Proof.
@@ -615,7 +613,8 @@ Qed.
 
 
 Lemma Monoidal_SPRO_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} (p : SPRO Monoidal n m) :
   PRO_semantics p ≡@{@Tensor R n m A} perm_tensor (fun i => Fin.cast i (Monoidal_SPRO_eq p)).
 Proof.
@@ -623,7 +622,7 @@ Proof.
   - rewrite perm_tensor_id' by auto using fcast_id.
     done.
   - cbn.
-    erewrite compose_tensor_mor by eassumption.
+    rewrite IHp1, IHp2.
     rewrite perm_tensor_compose.
     apply perm_tensor_ext.
     intros i.
@@ -631,7 +630,7 @@ Proof.
     rewrite fcast_cast.
     f_equal; apply proof_irrel.
   - cbn.
-    erewrite stack_tensor_mor by eassumption.
+    rewrite IHp1, IHp2.
     rewrite perm_tensor_stack.
     apply perm_tensor_ext.
     intros i.
@@ -656,7 +655,8 @@ Qed.
 
 
 Lemma Monoidal_SPRO_irrel `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} (p p' : SPRO Monoidal n m) :
   PRO_semantics p ≡@{@Tensor R n m A} PRO_semantics p'.
 Proof.
@@ -665,7 +665,8 @@ Proof.
 Qed.
 
 Lemma swap_tensor_perm_tensor `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} :
   swap_tensor (n:=n) (m:=m) ≡@{@Tensor R _ _ A}
   perm_tensor fin_add_comm.
@@ -714,7 +715,8 @@ Fixpoint SymmetricG_SPRO_perm {n m} (g : SPRO SymmetricG n m) : fin n -> fin m :
 
 
 Lemma SymmetricG_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} (p : SymmetricG n m) :
   strictInterpretTensor p ≡@{@Tensor R n m A} perm_tensor (SymmetricG_perm p).
 Proof.
@@ -727,7 +729,8 @@ Qed.
 
 
 Lemma SymmetricG_SPRO_semantics `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} (p : SPRO SymmetricG n m) :
   PRO_semantics p ≡@{@Tensor R n m A} perm_tensor (SymmetricG_SPRO_perm p).
 Proof.
@@ -735,11 +738,11 @@ Proof.
   - rewrite perm_tensor_id' by auto using fcast_id.
     done.
   - cbn.
-    erewrite compose_tensor_mor by eassumption.
+    rewrite IHp1, IHp2.
     rewrite perm_tensor_compose.
     done.
   - cbn.
-    erewrite stack_tensor_mor by eassumption.
+    rewrite IHp1, IHp2.
     rewrite perm_tensor_stack.
     done.
   - cbn.
@@ -750,7 +753,8 @@ Qed.
 
 
 Lemma SymmetricG_SPRO_irrel `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EqA : EqDecision A, WFA : !WFSummable A}
+  `{SA : SummableOver R A, EqA : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}
   {n m} (p p' : SPRO SymmetricG n m) :
   fun_to_vec (SymmetricG_SPRO_perm p) = fun_to_vec (SymmetricG_SPRO_perm p') ->
   PRO_semantics p ≡@{@Tensor R n m A} PRO_semantics p'.
@@ -1281,7 +1285,11 @@ Section STLH.
 Context `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A, WFA : WFSummable A}.
+  (A : Type) `{SA : SummableOver R A, EQA : EqDecision A,
+    LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A,
+    SA' : SummableOver R' A,
+    LSA' : !LawfulSummableOver R' A, WFA' : !WFSummableOver R' A}
+  {HfS : SummableOverHomomorphism f A}.
 
 #[export] Instance STLH_morunion 
   (T : Mor nat) `{EqT : ∀ n m, Equiv (T n m),
@@ -1361,7 +1369,8 @@ Lemma map_PRO_id_semantics
   `{SR : SemiRing R rO rI radd rmul req}
   `{SR' : SemiRing R' rO' rI' radd' rmul' req'}
     (f : R -> R') {Hf : SemiRingHomomorphism f}
-  (A : Type) `{SA : Summable A, EQA : EqDecision A}
+  (A : Type) `{SA : SummableOver R A, SA' : SummableOver R' A, 
+    LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
   {STL : StrictTensorLike R A Struct}
@@ -1373,18 +1382,18 @@ Lemma map_PRO_id_semantics
   {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
   {TLH : TensorLikeHom f A fT}
   {n m} (p : PRO Struct T n m) :
-  PRO_semantics (map_PRO (λ _ _ s, s) fT p) ≡
+  PRO_semantics (map_PRO (λ _ _ s, s) fT p) ≡@{@Tensor R' n m A}
   tensor_apply_hom f (PRO_semantics p).
 Proof.
   induction p.
   - cbn.
     now rewrite tensor_apply_hom_delta.
   - cbn.
-    rewrite tensor_apply_hom_compose_tensor by done.
-    apply compose_tensor_mor; done.
+    rewrite tensor_apply_hom_compose_tensor by apply TLH.
+    f_equiv; done.
   - cbn.
     rewrite tensor_apply_hom_stack_tensor by done.
-    apply stack_tensor_mor; done.
+    f_equiv; done.
   - cbn.
     rewrite strictInterpretTensor_hom.
     done.
@@ -1395,7 +1404,7 @@ Qed.
 
 #[export] Instance PRO_semantics_equiv
   `{SR : SemiRing R rO rI radd rmul req}
-  {A : Type} `{SA : Summable A, EQA : EqDecision A}
+  {A : Type} `{SA : SummableOver R A, LSA : !LawfulSummableOver R A, EQA : EqDecision A}
   {Struct : Mor nat} `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
   {T} `{EqT : Equiv T, EquivT : Equivalence T equiv}

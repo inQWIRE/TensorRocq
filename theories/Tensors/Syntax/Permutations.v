@@ -282,7 +282,7 @@ Local Existing Instance Radd_proper.
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
-Context `{SA : Summable A, AEQ : EqDecision A}.
+Context `{SA : SummableOver R A, AEQ : EqDecision A, LSA : !LawfulSummableOver R A}.
 
 
 Lemma tl_total_semantics_aux_absidxs_ext
@@ -294,7 +294,7 @@ Proof.
   intros Habs.
   revert mr;
   induction sums; intros mr;
-  [|cbn; apply sum_of_ext; intros ?; apply IHsums].
+  [|cbn; apply sum_of_ext; intros ? ?; apply IHsums].
   apply tl_total_semantics_aux_ext_base; apply Forall_Forall2_diag;
   rewrite Forall_forall.
   - intros [[f low] up] Hflu.

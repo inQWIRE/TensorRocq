@@ -1,5 +1,6 @@
 From stdpp Require Export list sorting fin_maps.
 From stdpp Require Export pmap gmap.
+From TensorRocq Require Import Aux_relset.
 From TensorRocq Require Export Aux_stdpp Aux_pos.
 From TensorRocq Require Export Tensor HyperGraph.
 From TensorRocq Require Import Syntax.

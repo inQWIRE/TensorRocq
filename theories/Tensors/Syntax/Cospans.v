@@ -862,7 +862,8 @@ Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
 
-Context `{SA : Summable A, AEQ : EqDecision A, WFA : !WFSummable A}.
+Context `{SA : SummableOver R A, AEQ : EqDecision A, 
+  LSA : !LawfulSummableOver R A, WFA : !WFSummableOver R A}.
 
 
 
@@ -877,10 +878,10 @@ Proof.
   rewrite ntl_total_semantics_alt by
     now apply add_loop_ntl_alt_as_WF; try apply Hntl.
   cbn -[abstracts_semantics_alt deltas_semantics_alt ntl_abstracts ntl_deltas].
-  rewrite sum_of_Vmap_cons'.
-  apply sum_of_ext; intros a.
+  rewrite sum_of_svmap_cons.
+  apply sum_of_ext; intros a Ha.
   rewrite ntl_total_semantics_alt by apply Hntl.
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  apply sum_of_ext; intros mr Hmr.
   f_equiv.
   - apply eq_reflexivity, abstracts_semantics_alt_ext.
     apply Forall2_fmap_l, Forall_Forall2_diag.
@@ -893,7 +894,6 @@ Proof.
       cbn.
       destruct v as [r|l].
       * cbn.
-        unfold Vmap;
         apply lookup_insert_ne.
         intros ->.
         apply Hx.
@@ -903,14 +903,12 @@ Proof.
       * cbn.
         case_decide as Hl_io.
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert.
           symmetry.
           rewrite 2 lookup_insert_case.
           do 2 (case_decide; [done|]).
           now destruct Hl_io as [-> | ->].
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
           done.
@@ -919,7 +917,6 @@ Proof.
       cbn.
       destruct v as [r|l].
       * cbn.
-        unfold Vmap;
         apply lookup_insert_ne.
         intros ->.
         apply Hx.
@@ -929,14 +926,12 @@ Proof.
       * cbn.
         case_decide as Hl_io.
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert.
           symmetry.
           rewrite 2 lookup_insert_case.
           do 2 (case_decide; [done|]).
           now destruct Hl_io as [-> | ->].
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
           done.
@@ -948,7 +943,6 @@ Proof.
     + rename l into v.
       destruct v as [r|l].
       * cbn.
-        unfold Vmap;
         apply lookup_insert_ne.
         intros ->.
         apply Hx.
@@ -958,14 +952,12 @@ Proof.
       * cbn.
         case_decide as Hl_io.
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert.
           symmetry.
           rewrite 2 lookup_insert_case.
           do 2 (case_decide; [done|]).
           now destruct Hl_io as [-> | ->].
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
           done.
@@ -973,7 +965,6 @@ Proof.
       rename l into l'.
       destruct v as [r|l].
       * cbn.
-        unfold Vmap;
         apply lookup_insert_ne.
         intros ->.
         apply Hx.
@@ -983,14 +974,12 @@ Proof.
       * cbn.
         case_decide as Hl_io.
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert.
           symmetry.
           rewrite 2 lookup_insert_case.
           do 2 (case_decide; [done|]).
           now destruct Hl_io as [-> | ->].
         --cbn.
-          unfold Vmap.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
           rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
           done.
@@ -1066,7 +1055,7 @@ Lemma relabel_tl_free_semantics_aux_kmap f `{Hf : !Inj eq eq f}
   tl_total_semantics_aux mabs ml mr sums abs delt.
 Proof.
   revert mr; induction sums; intros mr;
-    [|cbn; apply sum_of_ext; intros x; apply IHsums].
+    [|cbn; apply sum_of_ext; intros x Hx; apply IHsums].
   apply tl_total_semantics_aux_ext_base; apply Forall2_fmap_l, Forall_Forall2_diag;
   rewrite Forall_forall.
   - intros [[idx low] up] _.
@@ -1133,8 +1122,7 @@ Proof.
     2 vec_to_list_map, <- 2 zip_fmap_l.
 Qed.
 
-Lemma contl_interface_eq_correct
-  `{!WFSummable A} (mabs : abscontext) {n m}
+Lemma contl_interface_eq_correct (mabs : abscontext) {n m}
   (contl contl' : CospanNamedTensorList n m) :
   WT_contl contl ->
   contl_interface_eq contl contl' ->
@@ -1145,8 +1133,7 @@ Proof.
   now rewrite (contl_semantics_relabel_contl_free _ _).
 Qed.
 
-
-Lemma contl_eq_step_correct `{!WFSummable A} (mabs : abscontext) {n m}
+Lemma contl_eq_step_correct (mabs : abscontext) {n m}
   (contl contl' : CospanNamedTensorList n m) :
   WT_contl contl ->
   contl_eq_step contl contl' ->
@@ -1162,7 +1149,7 @@ Proof.
   - now apply contl_interface_eq_correct.
 Qed.
 
-Lemma contl_eq_correct `{!WFSummable A} (mabs : abscontext) {n m}
+Lemma contl_eq_correct (mabs : abscontext) {n m}
   (contl contl' : CospanNamedTensorList n m) :
   WT_contl contl ->
   contl_eq contl contl' ->
@@ -1193,7 +1180,7 @@ Proof.
   unfold contl_semantics;
   cbn -[ntl_total_semantics make_vecs_map].
   rewrite ntl_total_semantics_add_loop_ntl_alt by easy.
-  apply sum_of_ext; intros a.
+  apply sum_of_ext; intros a Ha.
   f_equiv.
   cbn.
   unfold make_vecs_map.
@@ -1410,569 +1397,4 @@ Qed.
 
 End Semantics.
 
-
-
-From TensorRocq Require Rel Syntax.RelSemantics.
-
-
-
-
-
-Module RelSemantics.
-
-Import Rel RelSemantics.
-
-Section RelSemantics.
-
-
-Context {A : Type}.
-
-
-
-Lemma ntl_total_rel_semantics_add_loop_ntl_alt_as mabs ml i o x ntl :
-  WF_ntl ntl ->
-  (* i ∈ dom ml -> o ∈ dom ml ->  *)x ∉ ntl.(ntl_sums) ->
-  ntl_total_rel_semantics mabs ml (add_loop_ntl_alt_as i o x ntl) <->
-  ∃ a : A,
-  ntl_total_rel_semantics mabs (<[i := a]> (<[o := a]> ml)) ntl.
-Proof.
-  intros Hntl (* Hi Ho *) Hx.
-  rewrite ntl_total_rel_semantics_alt by
-    now apply add_loop_ntl_alt_as_WF; try apply Hntl.
-  cbn -[abstracts_rel_semantics_alt deltas_rel_semantics_alt ntl_abstracts ntl_deltas].
-  rewrite exists_SVmap_cons'.
-  apply exists_iff; intros a.
-  rewrite ntl_total_rel_semantics_alt by apply Hntl.
-  apply exists_iff; intros [mr Hmr].
-  cbn [dexist SVmap_insert SVmap_map proj1_sig].
-  apply bool_decide_spec in Hmr.
-  f_equiv.
-  - apply eq_reflexivity, abstracts_rel_semantics_alt_ext.
-    apply Forall2_fmap_l, Forall_Forall2_diag.
-    rewrite Forall_forall; intros [[f low] up] Hflu.
-    cbn.
-    split; [done|].
-    split.
-    + rewrite <- list_fmap_compose.
-      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-      cbn.
-      destruct v as [r|l].
-      * cbn.
-        unfold SVmap;
-        apply lookup_insert_ne.
-        intros ->.
-        apply Hx.
-        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.1.
-        rewrite elem_of_abstracts_bound_vars.
-        set_solver + Hflu Hv.
-      * cbn.
-        case_decide as Hl_io.
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert.
-          symmetry.
-          rewrite 2 lookup_insert_case.
-          do 2 (case_decide; [done|]).
-          now destruct Hl_io as [-> | ->].
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
-          done.
-    + rewrite <- list_fmap_compose.
-      apply list_fmap_ext; intros _ v Hv%elem_of_list_lookup_2.
-      cbn.
-      destruct v as [r|l].
-      * cbn.
-        unfold SVmap;
-        apply lookup_insert_ne.
-        intros ->.
-        apply Hx.
-        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.1.
-        rewrite elem_of_abstracts_bound_vars.
-        set_solver + Hflu Hv.
-      * cbn.
-        case_decide as Hl_io.
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert.
-          symmetry.
-          rewrite 2 lookup_insert_case.
-          do 2 (case_decide; [done|]).
-          now destruct Hl_io as [-> | ->].
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
-          done.
-  - apply eq_reflexivity, deltas_rel_semantics_alt_ext.
-    apply Forall2_fmap_l, Forall_Forall2_diag.
-    rewrite Forall_forall; intros [l u] Hflu.
-    cbn.
-    split.
-    + rename l into v.
-      destruct v as [r|l].
-      * cbn.
-        unfold SVmap;
-        apply lookup_insert_ne.
-        intros ->.
-        apply Hx.
-        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.2.
-        rewrite elem_of_deltas_bound_vars.
-        set_solver + Hflu.
-      * cbn.
-        case_decide as Hl_io.
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert.
-          symmetry.
-          rewrite 2 lookup_insert_case.
-          do 2 (case_decide; [done|]).
-          now destruct Hl_io as [-> | ->].
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
-          done.
-    + rename u into v.
-      rename l into l'.
-      destruct v as [r|l].
-      * cbn.
-        unfold SVmap;
-        apply lookup_insert_ne.
-        intros ->.
-        apply Hx.
-        apply (elem_of_list_to_set (C:=Pset)), Hntl.2.2.
-        rewrite elem_of_deltas_bound_vars.
-        set_solver + Hflu.
-      * cbn.
-        case_decide as Hl_io.
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert.
-          symmetry.
-          rewrite 2 lookup_insert_case.
-          do 2 (case_decide; [done|]).
-          now destruct Hl_io as [-> | ->].
-        --cbn.
-          unfold SVmap.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; left.
-          rewrite lookup_insert_ne by now intros ->; apply Hl_io; right.
-          done.
-Qed.
-
-
-Lemma ntl_total_rel_semantics_add_loop_ntl_alt mabs ml i o ntl :
-  WF_ntl ntl ->
-  ntl_total_rel_semantics mabs ml (add_loop_ntl_alt i o ntl) <->
-  ∃ a : A,
-  ntl_total_rel_semantics mabs (<[i := a]> (<[o := a]> ml)) ntl.
-Proof.
-  intros HWF.
-  now apply ntl_total_rel_semantics_add_loop_ntl_alt_as, infinite_is_fresh.
-Qed.
-
-
-
-
-
-Notation Rel := (@Rel A).
-
-Notation DimensionlessRel := (@DimensionlessRel A).
-
-
-Notation varcontext := (Pmap A).
-
-Notation abscontext := (Pmap DimensionlessRel).
-
-Implicit Types ml : varcontext.
-
-
-Definition cote_rel_semantics (mabs : abscontext)
-  {n m} (cote : CospanTensorExpr n m) : Rel n m :=
-  fun v w =>
-  total_rel_semantics mabs (make_vecs_map cote.(cote_inputs) cote.(cote_outputs) v w)
-    cote.(cote_expr).
-
-Definition cotl_rel_semantics (mabs : abscontext)
-  {n m} (cotl : CospanTensorList n m) : Rel n m :=
-  fun v w =>
-  tl_total_rel_semantics mabs
-    (make_vecs_map cotl.(cotl_inputs) cotl.(cotl_outputs) v w)
-    cotl.(cotl_expr).
-
-Definition contl_rel_semantics (mabs : abscontext)
-  {n m} (contl : CospanNamedTensorList n m) : Rel n m :=
-  fun v w =>
-  ntl_total_rel_semantics mabs
-    (make_vecs_map contl.(contl_inputs) contl.(contl_outputs) v w)
-    contl.(contl_expr).
-
-#[global] Arguments cote_rel_semantics _ {_ _} _ _ _ / : assert.
-#[global] Arguments cotl_rel_semantics _ {_ _} _ _ _ / : assert.
-#[global] Arguments contl_rel_semantics _ {_ _} _ _ _ / : assert.
-
-
-Lemma contl_rel_semantics_WT_alt {n m} (contl : CospanNamedTensorList n m) (v w : vec A _) :
-  WT_contl contl ->
-  WT_ntl (dom (make_vecs_map contl.(contl_inputs) contl.(contl_outputs) v w))
-    contl.(contl_expr).
-Proof.
-  now rewrite dom_make_vecs_map.
-Qed.
-
-Definition relabel_tl_free (f : positive -> positive) (tl : tensorlist) : tensorlist :=
-  mk_tl tl.(tl_sums) (relabel_abs (relabel_frees f) <$> tl.(tl_abstracts))
-    (relabel_delt (relabel_frees f) <$> tl.(tl_deltas)).
-
-Lemma relabel_tl_free_rel_semantics_aux_kmap f `{Hf : !Inj eq eq f}
-  mabs ml mr sums abs delt :
-  tl_total_rel_semantics_aux mabs (kmap f ml) mr sums
-    (relabel_abs (relabel_frees f) <$> abs)
-    (relabel_delt (relabel_frees f) <$> delt) <->
-  tl_total_rel_semantics_aux mabs ml mr sums abs delt.
-Proof.
-  revert mr; induction sums; intros mr;
-    [|cbn; apply exists_iff; intros x; apply IHsums].
-  apply tl_total_rel_semantics_aux_ext_base; apply Forall2_fmap_l, Forall_Forall2_diag;
-  rewrite Forall_forall.
-  - intros [[idx low] up] _.
-    cbn.
-    split; [done|].
-    split; apply Forall2_fmap_l, Forall_Forall2_diag;
-    rewrite Forall_forall; (intros [|] _; [done|]; cbn; apply (lookup_kmap _)).
-  - intros [l u] _.
-    cbn.
-    split; [destruct l|destruct u]; try done; apply (lookup_kmap _).
-Qed.
-
-
-Lemma relabel_tl_free_rel_semantics_kmap f `{Hf : !Inj eq eq f} mabs ml tl :
-  tl_total_rel_semantics mabs (kmap f ml) (relabel_tl_free f tl) <->
-  tl_total_rel_semantics mabs ml tl.
-Proof.
-  apply (relabel_tl_free_rel_semantics_aux_kmap _).
-Qed.
-
-Lemma ntl2tl_ntl_relabel_free f ntl :
-  ntl2tl (ntl_relabel_free f ntl) = relabel_tl_free f (ntl2tl ntl).
-Proof.
-  destruct ntl as [isums abs delt];
-  apply tl_ext; cbn.
-  - done.
-  - rewrite <- 2 list_fmap_compose.
-    apply list_fmap_ext.
-    intros _ flu _.
-    cbn.
-    rewrite 2 relabel_abs_compose.
-    now apply relabel_abs_ext; intros [].
-  - rewrite <- 2 list_fmap_compose.
-    apply list_fmap_ext.
-    intros _ [[] []] _; done.
-Qed.
-
-Lemma ntl_relabel_free_rel_semantics_kmap mabs ml f `{Hf : !Inj eq eq f} ntl :
-  ntl_total_rel_semantics mabs (kmap f ml) (ntl_relabel_free f ntl) <->
-  ntl_total_rel_semantics mabs ml ntl.
-Proof.
-  unfold ntl_total_rel_semantics.
-  rewrite ntl2tl_ntl_relabel_free.
-  apply (relabel_tl_free_rel_semantics_kmap _).
-Qed.
-
-
-
-
-Lemma contl_rel_semantics_relabel_contl_free mabs f `{Hf : !Inj eq eq f} {n m}
-  (contl : CospanNamedTensorList n m) : WT_contl contl ->
-  contl_rel_semantics mabs (relabel_contl_free f contl) ≡ contl_rel_semantics mabs contl.
-Proof.
-  intros Hwf v w.
-  unfold contl_rel_semantics.
-  cbn -[ntl_total_rel_semantics].
-  rewrite <- (ntl_relabel_free_rel_semantics_kmap _ _ f contl).
-  f_equiv.
-  unfold make_vecs_map.
-  rewrite <- 2 list_to_map_app.
-  symmetry.
-  rewrite (kmap_list_to_map _).
-  now rewrite fmap_app, 4 vec_to_list_zip_with,
-    2 vec_to_list_map, <- 2 zip_fmap_l.
-Qed.
-
-Lemma contl_interface_eq_correct_rel
-  (mabs : abscontext) {n m}
-  (contl contl' : CospanNamedTensorList n m) :
-  WT_contl contl ->
-  contl_interface_eq contl contl' ->
-  contl_rel_semantics mabs contl ≡ contl_rel_semantics mabs contl'.
-Proof.
-  intros HWT Heq.
-  apply contl_interface_eq_iff_exists in Heq as (f & Hf & <-).
-  now rewrite (contl_rel_semantics_relabel_contl_free _ _).
-Qed.
-
-
-Lemma contl_eq_step_correct_rel (mabs : abscontext) {n m}
-  (contl contl' : CospanNamedTensorList n m) :
-  WT_contl contl ->
-  contl_eq_step contl contl' ->
-  contl_rel_semantics mabs contl ≡ contl_rel_semantics mabs contl'.
-Proof.
-  intros HWT Heq.
-  induction Heq.
-  - intros v w.
-    unfold contl_rel_semantics; cbn -[make_vecs_map].
-    apply ntl_eq_correct_rel;
-    rewrite dom_make_vecs_map; easy.
-  - now apply contl_interface_eq_correct_rel.
-Qed.
-
-Lemma contl_eq_correct_rel (mabs : abscontext) {n m}
-  (contl contl' : CospanNamedTensorList n m) :
-  WT_contl contl ->
-  contl_eq contl contl' ->
-  contl_rel_semantics mabs contl ≡ contl_rel_semantics mabs contl'.
-Proof.
-  intros HWF Heq.
-  induction Heq as [|contl contl' contl'' Hstep Hsteps IHeq]; [done|].
-  rewrite <- IHeq by now rewrite (contl_eq_step_WT _ _ Hstep) in HWF.
-  now apply contl_eq_step_correct_rel.
-Qed.
-
-Lemma contl_rel_semantics_add_top_loop_gen mabs
-  {n m} (contl : CospanNamedTensorList (S n) (S m)) :
-  WF_ntl contl ->
-  vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) ->
-  contl_rel_semantics mabs (add_top_loop_contl contl) ≡
-  join_rel_stack_1_tl_tr (contl_rel_semantics mabs contl).
-Proof.
-  destruct contl as [ntl ins outs].
-  induction ins as [i ins] using vec_S_inv.
-  induction outs as [o outs] using vec_S_inv.
-  unfold add_top_loop_contl; cbn.
-  intros Hwf Ho_ins.
-  intros v w.
-  cbn -[ntl_total_rel_semantics].
-  unfold contl_rel_semantics;
-  cbn -[ntl_total_rel_semantics make_vecs_map].
-  rewrite ntl_total_rel_semantics_add_loop_ntl_alt by easy.
-  apply exists_iff; intros a.
-  f_equiv.
-  cbn.
-  unfold make_vecs_map.
-  rewrite <- insert_union_l, <- insert_union_r, <- list_to_map_app; [done|].
-  apply not_elem_of_dom.
-  rewrite dom_list_to_map.
-  now rewrite vec_to_list_zip_with, fst_zip, elem_of_list_to_set
-    by now rewrite 2 length_vec_to_list.
-Qed.
-
-Definition contl_boundary {n m} (contl : CospanNamedTensorList n m) : Pset :=
-  list_to_set (contl.(contl_inputs) ++ contl.(contl_outputs)).
-
-Lemma contl_rel_semantics_swapped_stack_aux mabs {n m n' m'}
-  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
-  WF_ntl contl -> WF_ntl contl' ->
-  ntl_free_varset contl ## contl_boundary contl' ->
-  ntl_free_varset contl' ## contl_boundary contl ->
-  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
-  contl_rel_semantics mabs (swapped_stack_contl_aux contl contl') ≡
-  swapped_stack_rel (contl_rel_semantics mabs contl)
-    (contl_rel_semantics mabs contl').
-Proof.
-  intros Hwf Hwf' Hdisj Hdisj' v w.
-  unfold contl_rel_semantics;
-  cbn -[ntl_total_rel_semantics ntl_times].
-  induction v as [vl vr] using vec_add_inv.
-  induction w as [wl wr] using vec_add_inv.
-  rewrite 2 vsplitl_app, 2 vsplitr_app, 2 vzip_with_app,
-    2 vec_to_list_app, 2 list_to_map_app.
-  (* rewrite 4 vzip_map_l, 4 vec_to_list_map.
-  rewrite <- 4 (kmap_list_to_map (M1:=Pmap) _). *)
-
-  rewrite ntl_total_rel_semantics_ntl_times by easy.
-
-  f_equiv.
-  - apply ntl_total_rel_semantics_free_varset_ext.
-    intros l Hl.
-    apply Hdisj in Hl as Hl'.
-    change (l ∉ contl_boundary contl') in Hl'.
-    unfold contl_boundary in Hl'.
-    rewrite list_to_set_app, not_elem_of_union in Hl'.
-    rewrite 3 lookup_union.
-    unfold make_vecs_map.
-    rewrite lookup_union.
-    rewrite (not_elem_of_dom _ _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    rewrite (left_id None _).
-    f_equal.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ wr)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    apply (right_id _ _).
-  - apply ntl_total_rel_semantics_free_varset_ext.
-    intros l Hl.
-    apply Hdisj' in Hl as Hl'.
-    change (l ∉ contl_boundary contl) in Hl'.
-    unfold contl_boundary in Hl'.
-    rewrite list_to_set_app, not_elem_of_union in Hl'.
-    rewrite 3 lookup_union.
-    unfold make_vecs_map.
-    rewrite lookup_union.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ vr)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ wl)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    now rewrite (left_id None _), (right_id None _).
-Qed.
-
-Lemma contl_boundary_relabel_contl_free f {n m} 
-  (contl : CospanNamedTensorList n m) : 
-  contl_boundary (relabel_contl_free f contl) =
-  set_map f (contl_boundary contl).
-Proof.
-  unfold contl_boundary; cbn.
-  now rewrite 2 vec_to_list_map, set_map_list_to_set_L, fmap_app.
-Qed.
-
-Lemma contl_rel_semantics_swapped_stack mabs {n m n' m'}
-  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
-  WT_contl contl -> WT_contl contl' ->
-  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
-  contl_rel_semantics mabs (swapped_stack_contl contl contl') ≡
-  swapped_stack_rel (contl_rel_semantics mabs contl)
-    (contl_rel_semantics mabs contl').
-Proof.
-  intros Hwf Hwf'.
-  unfold swapped_stack_contl.
-  rewrite contl_rel_semantics_swapped_stack_aux by first [
-    now apply ntl_relabel_free_WF; apply Hwf || apply Hwf'|
-    rewrite contl_boundary_relabel_contl_free; cbn; 
-    rewrite ntl_free_varset_ntl_relabel_free;
-    intros ? []%elem_of_map []%elem_of_map; lia].
-  now apply swapped_stack_rel_mor; 
-  apply (contl_rel_semantics_relabel_contl_free _ _).
-Qed.
-
-
-Lemma contl_rel_semantics_stack_aux mabs {n m n' m'}
-  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
-  WF_ntl contl -> WF_ntl contl' ->
-  ntl_free_varset contl ## contl_boundary contl' ->
-  ntl_free_varset contl' ## contl_boundary contl ->
-  contl_rel_semantics mabs (stack_contl_aux contl contl') ≡
-  stack_rel (contl_rel_semantics mabs contl)
-    (contl_rel_semantics mabs contl').
-Proof.
-  intros Hwf Hwf' Hdisj Hdisj' v w.
-  unfold contl_rel_semantics;
-  cbn -[ntl_total_rel_semantics ntl_times].
-  induction v as [vl vr] using vec_add_inv.
-  induction w as [wl wr] using vec_add_inv.
-  rewrite 2 vsplitl_app, 2 vsplitr_app, 2 vzip_with_app,
-    2 vec_to_list_app, 2 list_to_map_app.
-  (* rewrite 4 vzip_map_l, 4 vec_to_list_map.
-  rewrite <- 4 (kmap_list_to_map (M1:=Pmap) _). *)
-
-  rewrite ntl_total_rel_semantics_ntl_times by easy.
-
-  f_equiv.
-  - apply ntl_total_rel_semantics_free_varset_ext.
-    intros l Hl.
-    apply Hdisj in Hl as Hl'.
-    change (l ∉ contl_boundary contl') in Hl'.
-    unfold contl_boundary in Hl'.
-    rewrite list_to_set_app, not_elem_of_union in Hl'.
-    rewrite 3 lookup_union.
-    unfold make_vecs_map.
-    rewrite lookup_union.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ vr)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    rewrite (right_id_L None _).
-    f_equal.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ wr)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    apply (right_id_L _ _).
-  - apply ntl_total_rel_semantics_free_varset_ext.
-    intros l Hl.
-    apply Hdisj' in Hl as Hl'.
-    change (l ∉ contl_boundary contl) in Hl'.
-    unfold contl_boundary in Hl'.
-    rewrite list_to_set_app, not_elem_of_union in Hl'.
-    rewrite 3 lookup_union.
-    unfold make_vecs_map.
-    rewrite lookup_union.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ vl)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    rewrite (not_elem_of_dom (list_to_map (vzip _ wl)) _).1 by now
-      rewrite dom_list_to_map, vec_to_list_zip_with, fst_zip by 
-        now rewrite 2 length_vec_to_list.
-    now rewrite 2 (left_id_L None _).
-Qed.
-
-Lemma contl_rel_semantics_stack mabs {n m n' m'}
-  (contl : CospanNamedTensorList n m) (contl' : CospanNamedTensorList n' m') :
-  WT_contl contl -> WT_contl contl' ->
-  (* vhd contl.(contl_outputs) ∉@{list _} vtl contl.(contl_inputs) -> *)
-  contl_rel_semantics mabs (stack_contl contl contl') ≡
-  stack_rel (contl_rel_semantics mabs contl)
-    (contl_rel_semantics mabs contl').
-Proof.
-  intros Hwf Hwf'.
-  unfold stack_contl.
-  rewrite contl_rel_semantics_stack_aux by first [
-    now apply ntl_relabel_free_WF; apply Hwf || apply Hwf'|
-    rewrite contl_boundary_relabel_contl_free; cbn; 
-    rewrite ntl_free_varset_ntl_relabel_free;
-    intros ? []%elem_of_map []%elem_of_map; lia].
-  now apply stack_rel_mor; 
-  apply (contl_rel_semantics_relabel_contl_free _ _).
-Qed.
-
-
-Lemma contl_rel_semantics_permute_contl {n n' m m'}
-  tm (fl : fin n -> fin n') {Hfl : Inj eq eq fl} (Hn : n = n')
-  (fr : fin m -> fin m') {Hfr : Inj eq eq fr} (Hm : m = m')
-  (contl : CospanNamedTensorList n m) : 
-  NoDup contl.(contl_inputs) -> NoDup contl.(contl_outputs) ->
-  contl_rel_semantics tm (permute_contl fl fr contl) ≡@{Rel n' m'}
-  permute_tensor fl fr (contl_rel_semantics tm contl).
-Proof.
-  destruct contl as [ntl ins outs].
-  intros Hins Houts v w.
-  subst n' m'.
-  rewrite (permute_contl_alt _ _).
-  cbn -[make_vecs_map] in *.
-  unfold make_vecs_map.
-  f_equiv.
-  symmetry; f_equal; (apply list_to_map_proper;
-  [now rewrite vec_to_list_zip_with, fst_zip by now rewrite 2 length_vec_to_list|]);
-  symmetry.
-  - rewrite <- (permute_vec_perm fl eq_refl).
-    apply eq_reflexivity.
-    f_equal.
-    apply vec_eq.
-    intros i.
-    rewrite lookup_permute_vec, 2 vlookup_zip_with, 2 lookup_permute_vec.
-    now rewrite (fin_perm_inv_linv fl).
-  - rewrite <- (permute_vec_perm fr eq_refl).
-    apply eq_reflexivity.
-    f_equal.
-    apply vec_eq.
-    intros i.
-    rewrite lookup_permute_vec, 2 vlookup_zip_with, 2 lookup_permute_vec.
-    now rewrite (fin_perm_inv_linv fr).
-Qed.
-
-
-End RelSemantics.
-
-End RelSemantics.
 

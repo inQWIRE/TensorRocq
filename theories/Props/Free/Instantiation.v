@@ -1,4 +1,4 @@
-From TensorRocq Require Export Homomorphism Props PropsGraphs 
+From TensorRocq Require Export Homomorphism Props PropsGraphs
   ProLike FreeSemiRing Summable CospanHyperGraph.
 From stdpp Require Import vector.
 From TensorRocq Require Export ProQuote FreeProp.
@@ -289,7 +289,7 @@ Proof.
   apply Heq.
 Qed. *)
 
-Lemma rules_of_rule_list_instantiation_helper 
+Lemma rules_of_rule_list_instantiation_helper
   {A : Type} `{SA : Summable A, EqA : EqDecision A}
   {Struct} `{∀ n m, Equiv (Struct n m), ∀ n m, Equivalence (≡@{Struct n m})}
   (Sig : Signature Struct A) `{SR : SemiRing R rO rI radd rmul req}
@@ -316,16 +316,7 @@ Section SignatureSemantics.
 
 #[local] Existing Instance instantiation_Proper. (* Not global as causes very bad typeclass resolution *)
 
-Context {A : Type} `{SA : Summable A, EqA : EqDecision A}
-  {Struct} `{∀ n m, Equiv (Struct n m), ∀ n m, Equivalence (≡@{Struct n m})}
-  {STL : forall `{SR : SemiRing R rO rI radd rmul req},
-    StrictTensorLike R A Struct}.
-
-Context {FSTL : FreeStrictTensorLike A Struct (STL:=STL)}.
-
-Context (Sig : Signature Struct A) `{SR : SemiRing R rO rI radd rmul req}
-  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}.
-
+Context `{SR : SemiRing R rO rI radd rmul req}.
 
 Notation "0" := rO.
 Notation "1" := rI.
@@ -345,6 +336,17 @@ Local Existing Instance Radd_proper.
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
+Context {Struct A}
+  `{SA : !Summable A, EqA : !EqDecision A, WFA : !WFSummable A}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  {STL : forall `{SR' : SemiRing R' rO' rI' radd' rmul' req'},
+    StrictTensorLike R' A Struct}
+  {FSTL : FreeStrictTensorLike A Struct}.
+
+
+Context (Sig : Signature Struct A) .
+
+Context `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}.
 
 
 
@@ -365,16 +367,18 @@ Definition SigFSR_map (f : Sig.(gens) -> T)
 Definition rel_image {A B} (f : A -> B) (RA : relation A) : relation B :=
   fun b b' => exists a a', f a = b /\ f a' = b' /\ RA a a'.
 
-#[local] Instance FSR_eval_map_hom (f : Sig.(gens) -> T) : 
+#[local] Instance FSR_eval_map_hom (f : Sig.(gens) -> T) :
   TensorLikeHom (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR) A f
   (TensT:=SignatureTensorLike_base Sig).
 Proof.
-  split; [apply _..|].
+  esplit; [apply _..|].
   intros t n' m'.
   cbn.
   intros v w Hv Hw.
   cbn [tensor_apply_hom compose].
   cbn.
+  hnf.
+  set (x := interpretTensor _ _ _ _ _).
   ring.
 Qed.
 
@@ -455,15 +459,15 @@ Qed.
 
 
 Lemma Instantiation_SigTens_graph_semantics_syntactic_eq_semantic
-  {StructS : StructGraphable Struct Sig.(gens)}
-  {LawStructS : LawfulStructGraphable Struct Sig.(gens)
-    (SR:=FSR_SR_eqg nat (SigTensRel Sig))}
-  `{WFA : !WFSummable A}
+  {GraphS : StructGraphable Struct Sig.(gens)}
+  {LawGraphS : LawfulStructGraphable Struct _
+    (SR:=FSR_SR_eqg nat (SigTensRel Sig))
+    (TensT:=SignatureTensorLike Sig)}
   (f : Sig.(gens) -> T) {Hf : Instantiation Sig f}
   (g : T -> Sig.(gens)) {Hfg : Cancel equiv f g}
   {n m} (ap ap' : PRO Struct T n m) :
   PRO_graph_semantics (PRO_denote g ap) ≡ₛ PRO_graph_semantics (PRO_denote g ap') ->
-  PRO_semantics ap ≡ PRO_semantics ap'.
+  PRO_semantics ap ≡@{@Tensor R n m A} PRO_semantics ap'.
 Proof.
   intros Heq%(SigTens_graph_semantics_syntactic_eq _)%(instantiates_holds _).
   rewrite 2 (PRO_denote_cancel _ _) in Heq.
@@ -474,7 +478,7 @@ Qed.
 End SignatureSemantics.
 
 
-(* 
+(*
 Ltac smc :=
   apply (Instantiation_SigTens_graph_semantics_syntactic_eq_semantic _ _ _ _);
   apply graph_iso_partial_test_correct;

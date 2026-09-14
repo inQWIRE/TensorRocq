@@ -37,7 +37,9 @@ Section TensorGraphFacts.
 
 
 Context `{SR : SemiRing R rO rI radd rmul req,
-  SA : Summable A, EQA : EqDecision A} `{Equiv T} `{Equivalence T equiv}.
+  SA : SummableOver R A, EQA : EqDecision A,
+  LSA : !LawfulSummableOver R A,
+  WFA : !WFSummableOver R A} `{Equiv T} `{Equivalence T equiv}.
 
 Context `{TensT : !TensorLike R A T}.
 
@@ -190,7 +192,7 @@ Proof.
   rewrite <- 2 kmap_fmap'.
   rewrite (ntl_total_semantics_kmap_ntl_relabel_absidx _ _ _).
   rewrite 2 ntl_total_semantics_alt by apply graph_namedtensorlist_semantics_WF.
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  apply sum_of_ext; intros mr Hmr.
   f_equiv.
   apply Rlist_prod_ext.
   apply Forall2_fmap, Forall_Forall2_diag.
@@ -532,7 +534,7 @@ Proof.
 Qed.
 
 
-Lemma graph_semantics_permute_graph {_ : WFSummable A} {n n' m m'}
+Lemma graph_semantics_permute_graph {n n' m m'}
   (fl : fin n -> fin n') {Hfl : Inj eq eq fl} (Hn : n = n')
   (fr : fin m -> fin m') {Hfr : Inj eq eq fr} (Hm : m = m') (cohg : CospanHyperGraph T n m) :
   graph_semantics (permute_graph fl fr cohg) ≡@{@Tensor R n' m' A}
@@ -761,9 +763,6 @@ Qed.
 
 
 
-
-
-Context `{!WFSummable A}.
 
 
 Lemma graph_mabs_relabel_abs f (hg : Pmap (HyperEdge T)) :
@@ -1034,7 +1033,7 @@ Lemma graph_semantics_compose_graphs_alt {n m o}
 Proof.
   unfold compose_graphs_alt.
   rewrite graph_semantics_add_top_loops.
-  erewrite join_stack_tl_tr_mor by now apply graph_semantics_swapped_stack_graphs.
+  rewrite graph_semantics_swapped_stack_graphs.
   symmetry; apply compose_to_swapped_stack.
 Qed.
 
@@ -1065,9 +1064,10 @@ Proof.
   cbn -[ntl_total_semantics ntl_times graph_mabs make_vecs_map].
   erewrite ntl_aeq_correct by first [apply graph_namedtensorlist_semantics_WF|
     apply graph_namedtensorlist_semantics_stack].
-  rewrite ntl_total_semantics_ntl_times by now apply ntl_relabel_absidx_WF;
-    apply graph_namedtensorlist_semantics_WF ||
-    apply graph_namedtensorlist_semantics_offset_WF.
+  rewrite ntl_total_semantics_ntl_times;
+  [|apply ntl_relabel_absidx_WF..];
+  [|apply graph_namedtensorlist_semantics_WF
+  |apply graph_namedtensorlist_semantics_offset_WF].
   f_equiv.
   - (* rewrite graph_namedtensorlist_semantics_offset_correct. *)
     symmetry.
@@ -1826,7 +1826,7 @@ Proof.
     [apply symmetry, graph_namedtensorlist_semantics_id_graph|
     apply graph_namedtensorlist_semantics_WF].
   cbn -[deltas_semantics_alt].
-  rewrite sum_of_Vmap_nil.
+  rewrite sum_of_svmap_nil.
   rewrite rmul_1_l.
   unfold deltas_semantics_alt.
   rewrite <- list_fmap_compose.
@@ -1847,11 +1847,10 @@ Proof.
   rewrite (right_id_L None _), (left_id_L None _).
   change ((Pos.of_succ_nat j)~1) with ((bcons true ∘ Pos.of_succ_nat) j).
   rewrite (lookup_kmap _).
-
-  rewrite <- (length_vec_to_list v) at 1.
+  replace (seq 0 n) with (seq 0 (length v)) by now rewrite length_vec_to_list.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ j).
-  replace (seq 0 n) with (seq 0 (length w)) by now rewrite length_vec_to_list.
+  replace (length v) with (length w) by now rewrite 2 length_vec_to_list.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ j).
   rewrite 2 option_fmap_id.
@@ -1883,7 +1882,7 @@ Proof.
     [apply symmetry, graph_namedtensorlist_semantics_swap_graph|
     apply graph_namedtensorlist_semantics_WF].
   cbn -[deltas_semantics_alt].
-  rewrite sum_of_Vmap_nil.
+  rewrite sum_of_svmap_nil.
   rewrite rmul_1_l.
   unfold deltas_semantics_alt.
   rewrite <- Rlist_prod_vec_if_eq.
@@ -1907,7 +1906,7 @@ Proof.
     change ((Pos.of_succ_nat (m + j))~1) with ((bcons true ∘ Pos.of_succ_nat) (m + j)%nat).
     rewrite (lookup_kmap _).
 
-    rewrite <- (length_vec_to_list v) at 1.
+    replace (seq 0 (n + m)) with (seq 0 (length v)) by now rewrite length_vec_to_list.
     rewrite <- imap_to_zip_with_seq.
     rewrite (lookup_list_to_map_imap id id _ j).
     replace (seq 0 (m + n)) with (seq 0 (length w)) by now rewrite length_vec_to_list.
@@ -1951,7 +1950,7 @@ Proof.
     change ((Pos.of_succ_nat (n + j))~0) with ((bcons false ∘ Pos.of_succ_nat) (n + j)%nat).
     rewrite (lookup_kmap _).
 
-    rewrite <- (length_vec_to_list v) at 1.
+    replace (seq 0 (n + m)) with (seq 0 (length v)) by now rewrite length_vec_to_list.
     rewrite <- imap_to_zip_with_seq.
     rewrite (lookup_list_to_map_imap id id _ (n + j)).
     replace (seq 0 (m + n)) with (seq 0 (length w)) by now rewrite length_vec_to_list.
@@ -1979,6 +1978,7 @@ Proof.
     split; now intros [= ->].
 Qed.
 
+(* #[local] Hint Resolve eq_subrelation : typeclass_instances. *)
 
 Lemma graph_semantics_cup {n} :
   graph_semantics (SR:=SR) (@cup_graph T n) ≡ cup_tensor.
@@ -1995,7 +1995,7 @@ Proof.
     [apply symmetry, graph_namedtensorlist_semantics_cup_graph|
     apply graph_namedtensorlist_semantics_WF].
   cbn -[deltas_semantics_alt].
-  rewrite sum_of_Vmap_nil.
+  rewrite sum_of_svmap_nil.
   rewrite rmul_1_l.
   unfold deltas_semantics_alt.
   rewrite <- list_fmap_compose.
@@ -2008,7 +2008,7 @@ Proof.
   induction w as [wl wr] using vec_add_inv.
   rewrite vsplitl_app, vsplitr_app.
   cbn.
-  rewrite 2 map_empty_union.
+  rewrite 2 lookup_union, 2 lookup_empty, 2 (left_id_L None union).
   rewrite vec_to_list_zip_with, vec_to_list_map, vec_to_list_seq,
     zip_fmap_l, <- (kmap_list_to_map _).
   change ((Pos.of_succ_nat j)~1) with ((bcons true ∘ Pos.of_succ_nat) j).
@@ -2016,12 +2016,9 @@ Proof.
   change ((Pos.of_succ_nat (n + j))~1) with ((bcons true ∘ Pos.of_succ_nat) (n + j)%nat).
   rewrite (lookup_kmap _).
 
-  rewrite <- (length_vec_to_list (wl +++ wr)) at 1.
+  replace (seq 0 _) with (seq 0 (length (wl +++ wr))) by now rewrite length_vec_to_list.
   rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ j).
-  replace (seq 0 (n + n)) with (seq 0 (length (wl +++ wr))) by
-    now rewrite length_vec_to_list.
-  rewrite <- imap_to_zip_with_seq.
   rewrite (lookup_list_to_map_imap id id _ (n + j)).
   rewrite 2 option_fmap_id.
   rewrite vec_to_list_app.
@@ -2056,7 +2053,7 @@ Proof.
     [apply symmetry, graph_namedtensorlist_semantics_cap_graph|
     apply graph_namedtensorlist_semantics_WF].
   cbn -[deltas_semantics_alt].
-  rewrite sum_of_Vmap_nil.
+  rewrite sum_of_svmap_nil.
   rewrite rmul_1_l.
   unfold deltas_semantics_alt.
   rewrite <- list_fmap_compose.
@@ -2134,8 +2131,8 @@ Proof.
   change (_ !! 4%positive) with (Some v2).
   cbn.
   symmetry.
-  case_decide as Heq; [revert Heq; intros [= -> ->]; now rewrite 2 decide_True by done; ring|].
-  do 2 case_decide; [|ring..].
+  case_decide as Heq; [revert Heq; intros [= -> ->]; now rewrite 2 decide_True by done; hnf; ring|].
+  do 2 case_decide; [|hnf; ring..].
   congruence.
 Qed.
 
@@ -2300,7 +2297,7 @@ Proof.
   cbn -[abstracts_semantics_alt deltas_semantics_alt].
   apply vertices_cohg_eq in Heq as Heqv.
   rewrite <- Heqv.
-  apply sum_of_ext'; intros mr Hmr%elem_of_Vmap_elements_1.
+  apply sum_of_ext; intros mr Hmr.
   rewrite <- Heq.1, <- Heq.2.1.
   f_equiv.
   pose proof Heq.2.2.1 as Hequ%map_to_list_equiv.
@@ -2322,9 +2319,9 @@ Proof.
     induction Hequ as [t t' Htt'|]; [cbn|done].
     constructor.
     apply interpretTensorProper, Htt'.
-  - eapply map_Forall_impl; [apply Hmr.2|].
+  - eapply map_Forall_impl; [apply Hmr|].
     cbn.
-    intros ? ?; apply SummedElement_iff.
+    done.
   - now apply make_vecs_map_SummedElements.
 Qed.
 
@@ -2345,7 +2342,7 @@ Lemma graph_semantics_syntactic_eq {n m} (cohg cohg' : TensorGraph n m) :
   cohg ≡ₛ cohg' ->
   graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
 Proof.
-  intros Heq%(relation_equiv_iff.1 cohg_syntactic_eq_alt).
+  intros Heq%(Aux_relset.relation_equiv_iff.1 cohg_syntactic_eq_alt).
   induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].
   rewrite <- IH.
   destruct Heq as [[Hheq | Hiso] | Hveq].
@@ -2493,7 +2490,7 @@ Proof.
   simpl.
   rewrite lookup_insert.
   cbn.
-  erewrite sum_of_ext'. 2:{
+  erewrite sum_of_ext. 2:{
     intros a Ha.
     rewrite rmul_1_l at 1.
     rewrite fmap_app, <- 2 list_fmap_compose.
@@ -2580,7 +2577,7 @@ Proof.
       done.
   }
   apply sum_of_ext.
-  intros a.
+  intros a Ha.
   rewrite Rlist_prod_fmap_decide_Forall.
   apply eq_reflexivity, decide_ext.
   rewrite Forall_vlookup.
@@ -2630,10 +2627,9 @@ Qed.
 Lemma delta_spider_graph_bundled_semantics k n m :
   graph_semantics (@delta_spider_graph_bundled T k n m) ≡@{@Tensor R _ _ A} delta_spider_tensor_bundled k.
 Proof.
-  erewrite graph_semantics_syntactic_eq by
-    apply (subrel (delta_spider_graph_bundled_alt k n m)).
+  rewrite delta_spider_graph_bundled_alt.
   rewrite graph_semantics_copy_graph.
-  erewrite copy_tensor_mor by apply delta_spider_graph_semantics.
+  rewrite delta_spider_graph_semantics.
   done.
 Qed.
 

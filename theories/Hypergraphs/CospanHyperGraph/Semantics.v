@@ -1,11 +1,21 @@
-Require Export Syntax CospanHyperGraph.Definitions CospanHyperGraph.Expr.
+From TensorRocq Require Import Aux_relset.
+From TensorRocq Require Export Syntax CospanHyperGraph.Definitions CospanHyperGraph.Expr.
 
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
 
 
+Definition graph_mabs `{TensT : @TensorLike R EqR EquivR A SA EqA T EqT EquivT} 
+  (tm : Pmap (T * list positive * list positive)) : 
+  Pmap (@DimensionlessTensor R A) :=
+  interpretTensor ∘ fst ∘ fst <$> tm.
+
 Section TensorGraphSemantics.
 
-Context `{TensT : TensorLike R rO rI radd rmul req A T}.
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Context `{TensT : @TensorLike R _ _ A SA EqA T EqT EquivT}.
+
+
 
 Let TensorGraph := (CospanHyperGraph T).
 
@@ -15,14 +25,11 @@ Let TensorGraph := (CospanHyperGraph T).
 Definition graph_ml (minput : gmap nat A) (moutput : gmap nat A) :
   Pmap A := gmaps_to_Pmap minput moutput.
 
-Definition graph_mabs (tm : Pmap (T * list positive * list positive)) : 
-  Pmap (@DimensionlessTensor R A) :=
-  interpretTensor ∘ fst ∘ fst <$> tm.
 
 Definition graph_map_semantics
   {n m} (tg : TensorGraph n m)
   (minput : gmap nat A) (moutput : gmap nat A) : R :=
-  ntl_total_semantics (SR:=SR)
+  ntl_total_semantics
     (graph_mabs tg.(hedges))
     (graph_ml minput moutput)
     (graph_namedtensorlist_semantics tg).
@@ -82,11 +89,13 @@ Notation "cohg '≡ₜ@{' TensT '}' cohg'" :=
   (cohg_semantic_eq (TensT:=TensT) cohg%cohg cohg'%cohg) 
   (at level 70, only parsing) : cohg_scope.
 
-#[export] Hint Mode TensorLike - - - - - - - - - - + - - : typeclass_instances.
-
-Add Parametric Morphism `{TensT : TensorLike R rO rI radd rmul req A T, 
-  !EqDecision A} {n m} : (graph_semantics (TensT:=TensT) (n:=n) (m:=m)) 
-  with signature cohg_semantic_eq ==> equiv as graph_semantics_semantic_eq.
+#[export] Instance graph_semantics_semantic_eq
+   `{SR : SemiRing R rO rI radd rmul req,
+   SA : SummableOver R A, EqA : EqDecision A, 
+   EqT : Equiv T, EquivT : Equivalence T equiv,
+  TensT : !TensorLike R A T} {n m : nat} :
+  Proper (cohg_semantic_eq ==> equiv)
+    (graph_semantics (TensT:=TensT) (n:=n) (m:=m)).
 Proof.
-  done.
+  easy.
 Qed.
