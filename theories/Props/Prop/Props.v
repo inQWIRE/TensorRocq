@@ -1,48 +1,10 @@
 From TensorRocq Require Export Tensor Algebra Aux_stdpp.
 From stdpp Require sorting.
 
+
+
 (* FIXME: Move *)
 Notation Mor A := (A -> A -> Type).
-
-(* FIXME: Move *)
-Definition MorUnion {A B} (T T' : A -> B -> Type) : A -> B -> Type :=
-  λ a b, (T a b + T' a b)%type.
-
-
-#[local] Instance morunion_equiv {A B}
-  (T : A -> B -> Type) `{EqT : forall n m, Equiv (T n m)}
-  (T' : A -> B -> Type) `{EqT' : forall n m, Equiv (T' n m)} :
-  forall n m, Equiv (MorUnion T T' n m) := _.
-
-
-#[export] Instance morunion_equivalence {A B}
-  (T : A -> B -> Type) `{EqT : forall n m, Equiv (T n m)}
-  `{EquivT : forall n m, @Equivalence (T n m) equiv}
-  (T' : A -> B -> Type) `{EqT' : forall n m, Equiv (T' n m)}
-  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} :
-  forall n m, Equivalence (≡@{MorUnion T T' n m}) := λ n m, sum_relation_equiv _ _.
-
-#[local] Instance sum_rect_proper `{RA : relation A, RB : relation B, RC : relation C}
-  (f : A -> C) (g : B -> C) {Hf : Proper (RA ==> RC) f} {Hg : Proper (RB ==> RC) g} :
-  Proper (sum_relation RA RB ==> RC) (sum_rect (λ _, C) f g).
-Proof.
-  intros a b Hab.
-  induction Hab; cbn; now f_equiv.
-Qed.
-
-
-#[export] Instance strictTensorLike_MorUnion
-  (R : Type) `{SR : SemiRing R rO rI radd rmul req}
-  (A : Type) `{SA : SummableOver R A, EQA : EqDecision A}
-  (T : nat -> nat -> Type) `{EqT : forall n m, Equiv (T n m)}
-  `{EquivT : forall n m, @Equivalence (T n m) equiv} {TensT : StrictTensorLike R A T}
-  (T' : nat -> nat -> Type) `{EqT' : forall n m, Equiv (T' n m)}
-  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} {TensT' : StrictTensorLike R A T'} :
-  StrictTensorLike R A (MorUnion T T')%type := {
-  strictInterpretTensor n m s := sum_rect (λ _, _) strictInterpretTensor strictInterpretTensor s;
-  strictInterpretTensorProper n m := sum_rect_proper _ _
-}.
-
 
 #[universes(template)]
 Inductive PRO {Struct : nat -> nat -> Type} {Ty : Type} : nat -> nat -> Type :=
@@ -228,14 +190,11 @@ Qed.
 
 
 
-Fixpoint PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
+Fixpoint PRO_semantics `{SRD : SemiRingData R rO rI radd rmul}
   `{SA : SummableOver R A, EqA : EqDecision A}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
-  {Struct : nat -> nat -> Type}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
-    `{TensT : !TensorLike R A T}
-    `{TensS : !StrictTensorLike R A Struct}
+  {Struct : nat -> nat -> Type} {T}
+  {TensT : TensorLikeData R A T}
+  {TensS : StrictTensorLikeData R A Struct}
   {n m} (ap : PRO Struct T n m) : Tensor (R:=R) n m A :=
   match ap with
   | Pid n => delta_tensor
@@ -297,9 +256,13 @@ Definition monoidalToTensor (n m : nat) (p : Monoidal n m) : Tensor (R:=R) n m A
 
 #[export] Instance MonoidalEquiv {n m} : Equiv (Monoidal n m) := eq.
 
-#[export] Instance TensorLikeMonoidal : StrictTensorLike R A Monoidal :=
+#[export] Instance TensorLikeDataMonoidal : StrictTensorLikeData R A Monoidal :=
   {
     strictInterpretTensor := monoidalToTensor;
+  }.
+
+#[export] Instance TensorLikeMonoidal : StrictTensorLike R A Monoidal :=
+  {
   }.
 
 Definition symmetryToTensor (n m : nat) (p : Symmetry n m) : Tensor (R:=R) n m A :=
@@ -310,9 +273,13 @@ Definition symmetryToTensor (n m : nat) (p : Symmetry n m) : Tensor (R:=R) n m A
 
 #[export] Instance SymmetryEquiv {n m} : Equiv (Symmetry n m) := eq.
 
-#[export] Instance TensorLikeSymmetry : StrictTensorLike R A Symmetry :=
+#[export] Instance TensorLikeDataSymmetry : StrictTensorLikeData R A Symmetry :=
   {
     strictInterpretTensor := symmetryToTensor;
+  }.
+
+#[export] Instance TensorLikeSymmetry : StrictTensorLike R A Symmetry :=
+  {
   }.
 
 
@@ -324,9 +291,13 @@ Definition autoToTensor (n m : nat) (p : Autonomy n m) : Tensor (R:=R) n m A :=
 
 #[export] Instance AutonomyEquiv {n m} : Equiv (Autonomy n m) := eq.
 
-#[export] Instance TensorLikeAutonomy : StrictTensorLike R A Autonomy :=
+#[export] Instance TensorLikeDataAutonomy : StrictTensorLikeData R A Autonomy :=
   {
     strictInterpretTensor := autoToTensor;
+  }.
+  
+#[export] Instance TensorLikeAutonomy : StrictTensorLike R A Autonomy :=
+  {
   }.
 
 Definition FrobeniusToTensor (n m : nat) (p : Frobenial n m) : Tensor (R:=R) n m A :=
@@ -338,9 +309,13 @@ Definition FrobeniusToTensor (n m : nat) (p : Frobenial n m) : Tensor (R:=R) n m
 
 #[export] Instance FrobenialEquiv {n m} : Equiv (Frobenial n m) := eq.
 
-#[export] Instance TensorLikeFrobenial : StrictTensorLike R A Frobenial :=
+#[export] Instance TensorLikeDataFrobenial : StrictTensorLikeData R A Frobenial :=
   {
     strictInterpretTensor := FrobeniusToTensor;
+  }.
+
+#[export] Instance TensorLikeFrobenial : StrictTensorLike R A Frobenial :=
+  {
   }.
 
 End TensorLikePermutations.
@@ -460,6 +435,9 @@ Lemma map_PRO_semantics `{SR : SemiRing R rO rI radd rmul req}
   {Struct' : nat -> nat -> Type}
   {EqStruct' : forall n m, Equiv (Struct' n m)}
   {EquivStruct' : forall n m, Equivalence (≡@{Struct' n m})}
+    `{TensTD : !TensorLikeData R A T} `{TensTD' : !TensorLikeData R A T'}
+    `{TensSD : !StrictTensorLikeData R A Struct}
+    `{TensSD' : !StrictTensorLikeData R A Struct'}
     `{TensT : !TensorLike R A T} `{TensT' : !TensorLike R A T'}
     `{TensS : !StrictTensorLike R A Struct}
     `{TensS' : !StrictTensorLike R A Struct'}
@@ -484,9 +462,12 @@ Qed.
 
 
 (* FIXME: Move *)
-#[export] Instance Empty_set_tensorLike `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : SummableOver R A, EqA : EqDecision A} : TensorLike R A Empty_set := {
+#[export] Instance Empty_set_tensorLikeData {R A} : TensorLikeData R A Empty_set := {
   interpretTensor t := match t with end;
+}.
+
+#[export] Instance Empty_set_tensorLike (R : Type) `{EqR : Equiv R, EquivR : Equivalence R equiv}
+  (A : Type) `{SRA : SummableOver R A, EQA : EqDecision A} : TensorLike R A Empty_set := {
   interpretTensorProper t := match t with end;
 }.
 
@@ -496,11 +477,13 @@ Lemma Pstruct'_semantics `{SR : SemiRing R rO rI radd rmul req}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
   {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
-    `{TensT : !TensorLike R A T} `{TensS : !StrictTensorLike R A Struct}
+  `{TensTD : !TensorLikeData R A T} `{TensSD : !StrictTensorLikeData R A Struct}  
+  `{TensT : !TensorLike R A T} `{TensS : !StrictTensorLike R A Struct}
   {n m} (s : SPRO Struct n m) :
-  PRO_semantics (Pstruct' s) ≡@{@Tensor R n m A} PRO_semantics s.
+  PRO_semantics (Pstruct' (T:=T) s) ≡@{@Tensor R n m A} PRO_semantics s.
 Proof.
-  apply map_PRO_semantics; easy.
+  unfold Pstruct'.
+  rewrite map_PRO_semantics; easy.
 Qed.
 
 
@@ -508,15 +491,12 @@ Qed.
 Definition PRO_tensor_equiv {R A T : Type}
   `{SR : SemiRing R rO rI radd rmul req}
   `{SA : SummableOver R A, EqA : EqDecision A}
-  `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
-  {EqStruct : forall n m, Equiv (Struct n m)}
-  {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
-    (TensT : TensorLike R A T)
-    (TensS : StrictTensorLike R A Struct)
+  (TensT : TensorLikeData R A T)
+  (TensS : StrictTensorLikeData R A Struct)
   (n m : nat) : relation (PRO Struct T n m) := 
   fun p q =>
-  PRO_semantics p ≡ PRO_semantics q.
+  PRO_semantics p ≡@{@Tensor R n m A} PRO_semantics q.
 
 Notation "p '≡ₜ@{' TensT ',' TensS '}' q" :=
   (PRO_tensor_equiv TensT TensS _ _ p%pro q%pro) (at level 70, only parsing) : pro_scope.
@@ -535,15 +515,17 @@ Context `{EqT : Equiv T, EquivT : Equivalence T equiv}
   {Struct : nat -> nat -> Type}
   {EqStruct : forall n m, Equiv (Struct n m)}
   {EquivStruct : forall n m, Equivalence (≡@{Struct n m})}
+    `{TensTD : !TensorLikeData R A T}
+    `{TensSD : !StrictTensorLikeData R A Struct}
     `{TensT : !TensorLike R A T}
     `{TensS : !StrictTensorLike R A Struct}.
 
 #[export] Instance PRO_tensor_equiv_equiv {n m} : 
-  Equivalence (PRO_tensor_equiv TensT TensS n m) := Aux_relset.rel_preimage_equiv _ _ _.
+  Equivalence (PRO_tensor_equiv TensTD TensSD n m) := Aux_relset.rel_preimage_equiv _ _ _.
 
 #[export] Instance Pcompose_tensor_equiv {n m o} : 
-  Proper (PRO_tensor_equiv TensT TensS n m ==> PRO_tensor_equiv TensT TensS m o 
-    ==> PRO_tensor_equiv TensT TensS n o) Pcompose.
+  Proper (PRO_tensor_equiv TensTD TensSD n m ==> PRO_tensor_equiv TensTD TensSD m o 
+    ==> PRO_tensor_equiv TensTD TensSD n o) Pcompose.
 Proof.
   intros p p' Hp q q' Hq.
   unfold PRO_tensor_equiv.
@@ -552,8 +534,8 @@ Proof.
 Qed.
 
 #[export] Instance Pstack_tensor_equiv {n m n' m'} : 
-  Proper (PRO_tensor_equiv TensT TensS n m ==> PRO_tensor_equiv TensT TensS n' m'
-    ==> PRO_tensor_equiv TensT TensS _ _) Pstack.
+  Proper (PRO_tensor_equiv TensTD TensSD n m ==> PRO_tensor_equiv TensTD TensSD n' m'
+    ==> PRO_tensor_equiv TensTD TensSD _ _) Pstack.
 Proof.
   intros p p' Hp q q' Hq.
   unfold PRO_tensor_equiv.
@@ -1296,6 +1278,10 @@ Context `{SR : SemiRing R rO rI radd rmul req}
     EquivT : ∀ n m, @Equivalence (T n m) equiv}
   (T' : Mor nat) `{EqT' : ∀ n m, Equiv (T' n m),
     EquivT' : ∀ n m, @Equivalence (T' n m) equiv}
+  {STLD : StrictTensorLikeData R A T}
+  {STLD' : StrictTensorLikeData R' A T}
+  {ST'LD : StrictTensorLikeData R A T'}
+  {ST'LD' : StrictTensorLikeData R' A T'} 
   {STL : StrictTensorLike R A T}
   {STL' : StrictTensorLike R' A T}
   {ST'L : StrictTensorLike R A T'}
@@ -1373,12 +1359,15 @@ Lemma map_PRO_id_semantics
     LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STLD : StrictTensorLikeData R A Struct}
+  {STLD' : StrictTensorLikeData R' A Struct}
   {STL : StrictTensorLike R A Struct}
   {STL' : StrictTensorLike R' A Struct}
   {STLH : StrictTensorLikeHom f A Struct}
   {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
   `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
   (fT : T -> T')
+  {TensTD : TensorLikeData R A T} {TensTD' : TensorLikeData R' A T'}
   {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
   {TLH : TensorLikeHom f A fT}
   {n m} (p : PRO Struct T n m) :
@@ -1408,6 +1397,8 @@ Qed.
   {Struct : Mor nat} `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
   {T} `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {STLD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
   {STL : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T} {n m} : 
   Proper ((≡@{PRO Struct T n m}) ==> (≡@{@Tensor R n m A})) PRO_semantics.

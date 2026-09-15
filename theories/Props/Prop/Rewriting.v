@@ -422,6 +422,9 @@ Program Definition LawfulProLike_LawfulPRORewritingRelation
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T} 
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T} 
   {TensD : StrictTensorLike R A D}
@@ -543,6 +546,9 @@ Lemma LawfulProLike_PRO_quote_test_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -592,6 +598,9 @@ Lemma LawfulProLike_RW_dom_of_Quote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -617,6 +626,9 @@ Lemma LawfulProLike_RW_dom_of_Denote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -644,6 +656,9 @@ Lemma LawfulProLike_equiv_of_RW_Quote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -970,6 +985,9 @@ Lemma LawfulProLike_PRO_monog_quote_rewrite_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1050,6 +1068,9 @@ Lemma LawfulProLike_PRO_monog_quote_clean_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1473,6 +1494,9 @@ Lemma LawfulProLike_PRO_bimonog_quote_rewrite_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1559,6 +1583,9 @@ Lemma LawfulProLike_PRO_bimonog_quote_clean_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1620,6 +1647,9 @@ Lemma LawfulProLike_PRO_frobenius_quote_rewrite_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1706,6 +1736,9 @@ Lemma LawfulProLike_PRO_frobenius_quote_clean_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2691,6 +2724,9 @@ Lemma LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct_aux `{Countable T'
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2789,6 +2825,9 @@ Lemma LawfulProLike_PRO_autonomous_quote_multi_rewrite_correct_aux `{Countable T
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2888,6 +2927,9 @@ Lemma LawfulProLike_PRO_to_diagram_Proper_equiv
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2921,6 +2963,9 @@ Lemma LawfulProLike_RW_Proper_equiv
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2964,6 +3009,9 @@ Program Definition PGR_lemma `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -3567,6 +3615,9 @@ Lemma RWS_of_expr_base_lemma_l2r `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -3599,6 +3650,9 @@ Lemma RWS_of_expr_base_lemma_r2l `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -3886,6 +3940,9 @@ Lemma LawfulProLike_PRO_frobenius_quote_multi_rewrite_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -3952,6 +4009,9 @@ Lemma LawfulProLike_PRO_autonomous_quote_multi_rewrite_correct `{Countable T'}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -4166,6 +4226,9 @@ Lemma DiagramQuote_to_DiagramDenote_correct_rew {Struct T D} `{ProD : ProLike St
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}

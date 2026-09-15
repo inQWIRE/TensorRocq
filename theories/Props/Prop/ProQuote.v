@@ -189,13 +189,16 @@ Lemma PRO_denote_semantics
   {HfS : SummableOverHomomorphism f A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STLD : StrictTensorLikeData R A Struct}
+  {STLD' : StrictTensorLikeData R' A Struct}
   {STL : StrictTensorLike R A Struct}
   {STL' : StrictTensorLike R' A Struct}
   {STLH : StrictTensorLikeHom f A Struct}
   {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
   `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
   (fT : T -> T')
-  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
+  {TensTD : TensorLikeData R A T} {TensT : TensorLike R A T} 
+  {TensTD' : TensorLikeData R' A T'} {TensT' : TensorLike R' A T'}
   {TLH : TensorLikeHom f A fT}
   {n m} (p : PRO Struct T n m) :
   PRO_semantics (PRO_denote fT p) ≡@{@Tensor R' n m A}
@@ -212,13 +215,16 @@ Lemma PRO_semantics_eq_by_quote `{SR : SemiRing R rO rI radd rmul req}
   {HfS : SummableOverHomomorphism f A}
   (Struct : Mor nat) `{EqS : ∀ n m, Equiv (Struct n m),
     EquivS : ∀ n m, @Equivalence (Struct n m) equiv}
+  {STLD : StrictTensorLikeData R A Struct}
+  {STLD' : StrictTensorLikeData R' A Struct}
   {STL : StrictTensorLike R A Struct}
   {STL' : StrictTensorLike R' A Struct}
   {STLH : StrictTensorLikeHom f A Struct}
   {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
   `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
   (fT : T -> T')
-  {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'}
+  {TensTD : TensorLikeData R A T} {TensT : TensorLike R A T} 
+  {TensTD' : TensorLikeData R' A T'} {TensT' : TensorLike R' A T'}
   {TLH : TensorLikeHom f A fT}
   {n m} (dp dq : PRO Struct T n m) (p q : PRO Struct T' n m) :
   PRO_quote fT dp p -> PRO_quote fT dq q ->

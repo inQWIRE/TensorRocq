@@ -318,7 +318,8 @@ Context (R : Type) `{SR : SemiRing R rO rI radd rmul req} (A : Type)
 
 
 Class LawfulCompositional (D : nat -> nat -> Type)
-  {CompD : Compositional D} {TensD : StrictTensorLike R A D} := {
+  {CompD : Compositional D} {TensDD : StrictTensorLikeData R A D} 
+  {TensD : StrictTensorLike R A D} := {
   Did_correct n : strictInterpretTensor (Did n) ≡ delta_tensor;
   Dcompose_correct {n m o} (d : D n m) (d' : D m o) :
     strictInterpretTensor (Dcompose d d') ≡
@@ -335,10 +336,12 @@ Class LawfulCompositional (D : nat -> nat -> Type)
 Class LawfulStructableDiagram (Struct : Mor nat)
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
   (D : nat -> nat -> Type)
   `{EqD : forall n m, Equiv (D n m)}
   `{EquivD : forall n m, @Equivalence (D n m) equiv}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {StructD : StructableDiagram Struct D} := {
   ofStruct_proper {n m} : Proper ((≡@{Struct n m}) ==> (≡@{D n m})) ofStruct;
@@ -348,10 +351,12 @@ Class LawfulStructableDiagram (Struct : Mor nat)
 
 Class LawfulTensorableDiagram (T : Type)
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {TensTD : TensorLikeData R A T}
   {TensT : TensorLike R A T}
   (D : nat -> nat -> Type)
   `{EqD : forall n m, Equiv (D n m)}
   `{EquivD : forall n m, @Equivalence (D n m) equiv}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {StructD : TensorableDiagram T D} := {
   ofTensor_proper n m : Proper ((≡@{T}) ==> equiv) (ofTensor n m);
@@ -365,8 +370,11 @@ Class LawfulProLike
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTD : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   := {
   LPL_compD :: LawfulCompositional D;
@@ -379,8 +387,11 @@ Lemma PRO_to_diagram_correct {Struct T D} `{ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p : PRO Struct T n m) (d : D n m) :
@@ -410,9 +421,11 @@ Lemma DiagramQuote_proper_semantics_aux {Struct T D} `{ProD : ProLike Struct T D
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
-
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -440,8 +453,11 @@ Lemma DiagramQuote_proper_semantics {Struct T D} `{ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -456,8 +472,11 @@ Lemma DiagramDenote_proper_semantics {Struct T D} `{ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d : D n m) :
@@ -474,8 +493,11 @@ Lemma DiagramQuote_correct {Struct T D} `{ProD : ProLike Struct T D}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d d' : D n m) :
@@ -497,8 +519,11 @@ Lemma DiagramQuote_to_DiagramDenote_correct {Struct T D} `{ProD : ProLike Struct
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructS : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensTS : TensorLikeData R A T}
   {TensT : TensorLike R A T}
+  {TensDS : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawProD : LawfulProLike Struct T D}
   {n m} (p p' : PRO Struct T n m) (d d' : D n m) :
@@ -516,7 +541,9 @@ Class LawfulAbstractProLike
   {AbsProD : AbstractProLike Struct D}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   := {
   LAPL_compD :: LawfulCompositional D;
@@ -526,7 +553,9 @@ Class LawfulAbstractProLike
 Lemma SPRO_to_diagram_correct {Struct D} {AbsProD : AbstractProLike Struct D}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawAbsProD : LawfulAbstractProLike Struct D}
   {n m} (p : SPRO Struct n m) :
@@ -551,7 +580,9 @@ Qed.
 Lemma StructQuote_proper_semantics {Struct D} {AbsProD : AbstractProLike Struct D}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawAbsProD : LawfulAbstractProLike Struct D}
   {n m} (p p' : SPRO Struct n m) (d : D n m) :
@@ -569,7 +600,9 @@ Qed.
 Lemma StructDenote_proper_semantics {Struct D} {AbsProD : AbstractProLike Struct D}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
   {TensStruct : StrictTensorLike R A Struct}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D}
   {LawAbsProD : LawfulAbstractProLike Struct D}
   {n m} (p p' : SPRO Struct n m) (d : D n m) :
@@ -723,19 +756,28 @@ Definition WithDiagrams T (D : Mor nat) : Type := T + BundledDiagram D.
   {EquivD : forall n m, Equivalence (≡@{D n m})} :
   Equivalence (≡@{WithDiagrams T D}) := _.
 
-#[export, program] Instance bundledDiagram_tensorLike {R}
-  `{SR : SemiRing R rO rI radd rmul req}
-  `{SA : Summable A, EQA : EqDecision A}
+#[export, program] Instance bundledDiagram_tensorLikeData {R}
+  `{SRD : SemiRingData R rO rI radd rmul}
+  `{SA : SummableOver R A, EQA : EqDecision A}
   (D : Mor nat)
-  {EqD : forall n m, Equiv (D n m)}
-  {EquivD : forall n m, Equivalence (≡@{D n m})}
-  {TensD : StrictTensorLike R A D} : TensorLike R A (BundledDiagram D) := {
+  {TensD : StrictTensorLikeData R A D} : TensorLikeData R A (BundledDiagram D) := {
   interpretTensor d n m :=
     from_option strictInterpretTensor (const_tensor rO) (unbundleDiagram n m d)
 }.
+
+#[export, program] Instance bundledDiagram_tensorLike {R}
+  `{SR : SemiRing R rO rI radd rmul req}
+  `{SA : SummableOver R A, EQA : EqDecision A}
+  (D : Mor nat)
+  {EqD : forall n m, Equiv (D n m)}
+  {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensDD : StrictTensorLikeData R A D}
+  {TensD : StrictTensorLike R A D} : TensorLike R A (BundledDiagram D) := {
+    interpretTensorProper := _
+}.
 Next Obligation.
   intros until D.
-  intros ? ? ?.
+  intros ? ? ? ?.
   intros d d' Heq.
   induction Heq.
   cbn.
@@ -750,21 +792,36 @@ Next Obligation.
   cbn.
   now f_equiv.
 Qed.
+
+(* FIXME: Move *)
+#[export] Instance withDiagrams_tensorLikeData {R}
+  `{SRD : SemiRingData R rO rI radd rmul}
+  `{SA : Summable A, EQA : EqDecision A}
+  T
+  (TensT : TensorLikeData R A T)
+  (D : Mor nat)
+  {TensD : StrictTensorLikeData R A D} : TensorLikeData R A (WithDiagrams T D) := {
+  interpretTensor t :=
+    sum_rect (λ _, DimensionlessTensor A)
+      interpretTensor interpretTensor t;
+  }.
+
 (* FIXME: Move *)
 #[export] Instance withDiagrams_tensorLike {R}
   `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A, EQA : EqDecision A}
   T `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  {TensTD : TensorLikeData R A T}
   (TensT : TensorLike R A T)
   (D : Mor nat)
   {EqD : forall n m, Equiv (D n m)}
   {EquivD : forall n m, Equivalence (≡@{D n m})}
+  {TensDD : StrictTensorLikeData R A D}
   {TensD : StrictTensorLike R A D} : TensorLike R A (WithDiagrams T D) := {
-  interpretTensor t :=
-    sum_rect (λ _, DimensionlessTensor A)
-      interpretTensor interpretTensor t;
-  interpretTensorProper := sum_rect_proper _ _
+  interpretTensorProper := sum_rect_proper _ _ (Hf:=TensT.(interpretTensorProper))
+    (Hg:=(bundledDiagram_tensorLike D).(interpretTensorProper))
 }.
+
 (* FIXME: Move *)
 Lemma unbundleDiagram_Some {D : Mor nat} (n m : nat)
   (bd : BundledDiagram D) d :

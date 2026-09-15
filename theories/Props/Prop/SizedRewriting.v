@@ -1334,6 +1334,9 @@ Program Definition LawfulProLike_LawfulMPRORewritingRelation
   (* (SomeTTest : SizedOfTensorSomeTestable T D := SizedProD.(SPL_test)) *)
   {MStructG : @SizedStructGraphable positive MStruct T}
   {StructG : StructGraphable Struct T}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1421,6 +1424,9 @@ Lemma LawfulMProLike_MPRO_quote_test_correct `{Countable T'}
   {FreeMStructG : FreeSizedStructGraphable MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1486,6 +1492,9 @@ Lemma LawfulMProLike_MPRO_quote_test_correct_casted `{Countable T'}
   {FreeMStructG : FreeSizedStructGraphable MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1546,6 +1555,9 @@ Lemma LawfulProLike_RW_dom_of_Quote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1571,6 +1583,9 @@ Lemma LawfulProLike_RW_dom_of_Denote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1598,6 +1613,9 @@ Lemma LawfulProLike_equiv_of_RW_Quote
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
   `{EqStruct : forall n m, Equiv (Struct n m)}
   `{EquivStruct : forall n m, @Equivalence (Struct n m) equiv}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -1983,6 +2001,9 @@ Lemma LawfulProLike_MPRO_monog_quote_rewrite_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2083,6 +2104,9 @@ Lemma LawfulProLike_MPRO_monog_quote_clean_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2537,6 +2561,9 @@ Lemma LawfulProLike_MPRO_bimonog_quote_rewrite_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2644,6 +2671,9 @@ Lemma LawfulProLike_MPRO_bimonog_quote_clean_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2725,6 +2755,9 @@ Lemma LawfulProLike_MPRO_frobenius_quote_rewrite_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}
@@ -2832,6 +2865,9 @@ Lemma LawfulProLike_MPRO_frobenius_quote_clean_correct `{Countable T'}
   {MStructRes : ResizableStruct MStruct}
   {StructG : forall T, StructGraphable Struct T}
   {FreeStructG : FreeStructGraphable Struct}
+  {TensStructD : StrictTensorLikeData R A Struct}
+  {TensTD : TensorLikeData R A T}
+  {TensDD : StrictTensorLikeData R A D}
   {TensStruct : StrictTensorLike R A Struct}
   {TensT : TensorLike R A T}
   {TensD : StrictTensorLike R A D}

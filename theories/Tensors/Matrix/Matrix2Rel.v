@@ -21,7 +21,7 @@ Definition cup_rel {R n} : Rel R 0 (n + n) :=
 Definition cap_rel {R n} : Rel R (n + n) 0 :=
   fun v w => vsplitl v = vsplitr v.
 
-#[global] Arguments mx2rel {_ _ _ _ _ _ _} {_ _} _ _ _ / : assert.
+#[global] Arguments mx2rel {_ _ _ _ _ _ _ _} {_ _} _ _ _ / : assert.
 #[global] Arguments id_rel {_ _} _ _ / : assert.
 #[global] Arguments swap_rel {_ _ _} _ _ / : assert.
 #[global] Arguments cup_rel {_ _} _ _ / : assert.

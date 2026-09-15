@@ -10,7 +10,7 @@ Class WFSummableOver (R A : Type)
     req (sum_of f) r
 }.
 
-#[global] Arguments mk_WF_sum_over {_ _ _ _ _ _ _ _ _ _} _ : assert.
+#[global] Arguments mk_WF_sum_over {_ _ _ _ _ _ _ _ _ _ _} _ : assert.
 
 
 (* A Summable instance is WF if its list of elements is

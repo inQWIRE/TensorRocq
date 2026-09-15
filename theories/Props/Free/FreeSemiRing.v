@@ -1,5 +1,6 @@
-Require Import Algebra SetoidList SetoidPermutation Homomorphism.
-Require Import Aux Aux_relset Aux_stdpp.
+Require Import SetoidList SetoidPermutation.
+From TensorRocq Require Import Algebra Homomorphism.
+From TensorRocq Require Import Aux Aux_relset Aux_stdpp.
 From stdpp Require Import gmap gmultiset list.
 
 
@@ -340,6 +341,7 @@ Proof.
   etransitivity; [apply FSR_mul_equiv_l|apply FSR_mul_equiv_r]; eauto.
 Qed.
 
+#[export] Instance FSR_SRD {X} : SemiRingData (FreeSemiRing X) FSR_zero FSR_one FSR_add FSR_mul := mk_SRD.
 
 #[export] Instance FSR_SR {X} : SemiRing (FreeSemiRing X) FSR_zero FSR_one FSR_add FSR_mul equiv.
 Proof.
@@ -426,7 +428,7 @@ Context {X : Type}.
 Definition FSR_SR_eqg (RX : relation (FreeSemiRing X)) :
   SemiRing (FreeSemiRing X) FSR_zero FSR_one FSR_add FSR_mul (FSR_eqg RX).
 Proof.
-  split; [pose proof (@FSR_SR X) as [[] _ _]; 
+  split; [pose proof (@FSR_SR X) as [[] _ _];
     split; intros; apply (subrel' equiv); auto| |now constructor; apply _]; split.
   - intros ? ? ? ? ? ?; now apply FSR_eqg_add.
   - intros ? ? ? ? ? ?; now apply FSR_eqg_mul.
@@ -668,7 +670,7 @@ Proof.
   - now etransitivity; eauto.
 Qed.
 
-Lemma FSR_map_add (f : R -> R') {X} (r r' : FreeSemiRing R X) : 
+Lemma FSR_map_add (f : R -> R') {X} (r r' : FreeSemiRing R X) :
   FSR_map f (FSR_add r r') =
   FSR_add (FSR_map f r) (FSR_map f r').
 Proof.
@@ -724,7 +726,7 @@ Qed.
 Lemma FSR_map_homomorphism' (f : R -> R')
   {Hf : SemiRingHomomorphism f} {X} RX RX' :
   subrelation RX (rel_preimage (FSR_map f) RX') ->
-  SemiRingHomomorphism (SR:=FSR_SR_eqg R RX) 
+  SemiRingHomomorphism (SR:=FSR_SR_eqg R RX)
     (SR':=FSR_SR_eqg R' RX') (FSR_map (X:=X) f).
 Proof.
   split.
@@ -738,6 +740,137 @@ Qed.
 
 End FSR_map.
 
+
+Definition FSR_transform {R X Y}
+  (f : X -> Y) (r : FreeSemiRing R X) : FreeSemiRing R Y :=
+  prod_map id (fmap (M:=list) f) <$> r.
+
+
+Section FSR_transform.
+
+
+Context `{SR : SemiRing R rO rI radd rmul req}.
+
+Notation "0" := rO.
+Notation "1" := rI.
+Notation "x '==' y" := (req x y) (at level 70).
+Infix "+" := radd.
+Infix "*" := rmul.
+
+Add Ring R : SR.(RSRth)
+  (setoid SR.(Req_equiv) SR.(Req_ext)).
+
+Let Req_equivalence : Equivalence req := Req_equiv.
+Local Existing Instance Req_equivalence.
+
+Let Radd_proper := Req_ext.(SRadd_ext) : Proper (req ==> req ==> req) radd.
+Local Existing Instance Radd_proper.
+
+Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
+Local Existing Instance Rmul_proper.
+
+Lemma FSR_transform_id {X} (r : FreeSemiRing R X) :
+  FSR_transform id r = r.
+Proof.
+  apply list_fmap_id'.
+  now intros [] _; cbn; f_equal; apply list_fmap_id.
+Qed.
+
+Lemma FSR_transform_ext {X Y} (f g : X -> Y) 
+  (Hfg : forall x, f x = g x) (r : FreeSemiRing R X) :
+  FSR_transform f r = FSR_transform g r.
+Proof.
+  apply list_fmap_ext; intros _ [] _; cbn; f_equal.
+  now apply list_fmap_ext; auto.
+Qed.
+
+Lemma FSR_transform_compose {X Y Z} (g : Y -> Z) (f : X -> Y) 
+  (r : FreeSemiRing R X) :
+  FSR_transform g (FSR_transform f r) = 
+  FSR_transform (g ∘ f) r.
+Proof.
+  unfold FSR_transform.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [r' xs] _.
+  cbn.
+  now rewrite <- list_fmap_compose.
+Qed.
+
+Lemma FSR_transform_add {X Y} (f : X -> Y)
+  (r s : FreeSemiRing R X) : FSR_transform f (FSR_add r s) =
+    FSR_add (FSR_transform f r) (FSR_transform f s).
+Proof.
+  apply fmap_app.
+Qed.
+
+Lemma FSR_transform_mul {X Y} (f : X -> Y)
+  (r s : FreeSemiRing R X) : FSR_transform f (FSR_mul r s) =
+    FSR_mul (FSR_transform f r) (FSR_transform f s).
+Proof.
+  unfold FSR_transform, FSR_mul.
+  rewrite list_cprod_fmap_l, list_cprod_fmap_r.
+  rewrite <- 3 list_fmap_compose.
+  apply list_fmap_ext.
+  intros _ [[r' xs] [s' ys]] _.
+  cbn.
+  now rewrite fmap_app.
+Qed.
+
+#[export] Instance FSR_transform_FSReq {X Y} (f : X -> Y) :
+  Proper ((≡@{FreeSemiRing R X}) ==> equiv) (FSR_transform f).
+Proof.
+  intros r s Heq.
+  induction Heq; try solve [constructor].
+  - constructor.
+    eapply fmap_PermutationA; [|eassumption].
+    apply _.
+  - now symmetry.
+  - now etransitivity; eassumption.
+Qed.
+
+#[export] Instance FSR_transform_FSR_eqg {X Y} {RX RY} (f : X -> Y) 
+  (Hf : Proper (RX ==> FSR_eqg R RY) (FSR_transform f)) :
+  Proper (FSR_eqg R RX ==> FSR_eqg R RY) (FSR_transform f).
+Proof.
+  intros r s Heq.
+  induction Heq; try solve [constructor].
+  - constructor.
+    f_equiv.
+    done.
+  - auto.
+  - rewrite 2 FSR_transform_add.
+    now apply FSR_eqg_add.
+  - rewrite 2 FSR_transform_mul.
+    now apply FSR_eqg_mul.
+  - now symmetry.
+  - now etransitivity; eassumption.
+Qed.
+
+#[export] Instance FSR_transform_SRH_FSReq {X Y} (f : X -> Y) :
+  SemiRingHomomorphism (SR:=FSR_SR R) (SR':=FSR_SR R) (FSR_transform f).
+Proof.
+  split.
+  - apply _.
+  - done.
+  - done.
+  - intros; now rewrite FSR_transform_add.
+  - intros; now rewrite FSR_transform_mul.
+Qed.
+
+Lemma FSR_transform_SRH_FSR_eqg {X Y} {RX RY} (f : X -> Y) 
+  (Hf : Proper (RX ==> FSR_eqg R RY) (FSR_transform f)) :
+  SemiRingHomomorphism (SR:=FSR_SR_eqg R RX) (SR':=FSR_SR_eqg R RY) (FSR_transform f).
+Proof.
+  split.
+  - apply _.
+  - done.
+  - done.
+  - intros; now rewrite FSR_transform_add.
+  - intros; now rewrite FSR_transform_mul.
+Qed.
+
+End FSR_transform.
 
 
 

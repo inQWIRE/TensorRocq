@@ -596,7 +596,7 @@ Qed.
 Section correctness.
 
 
-Context `{SR : SemiRing R rO rI radd rmul req}.
+Context `{SR : @SemiRing R rO rI radd rmul req SRD}.
 
 Notation "0" := rO.
 Notation "1" := rI.
@@ -617,7 +617,7 @@ Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
 
-Context `{SR' : SemiRing R' rO' rI' radd' rmul' req'}.
+Context `{SR' : @SemiRing R' rO' rI' radd' rmul' req' SRD'}.
 
 Notation "0'" := rO'.
 Notation "1'" := rI'.
@@ -642,14 +642,17 @@ Context `{SA : SummableOver R A, SA' : SummableOver R' A,
     `{EqT : Equiv T} `{EquivT : Equivalence T equiv}
     `{EqT' : Equiv T'} `{EquivT' : Equivalence T' equiv}.
 
+Context `{TensTD : !TensorLikeData R A T, TensTD' : !TensorLikeData R' A T'}
 Context `{TensT : !TensorLike R A T, TensT' : !TensorLike R' A T'}.
 
+(* FIXME: Move *)
 Lemma apply_from_option {A' B C} (g : B -> C) (f : A' -> B) d ma :
   g (from_option f d ma) = from_option (g ∘ f) (g d) ma.
 Proof.
   now destruct ma.
 Qed.
 
+(* FIXME: Move *)
 Lemma join_list_get_var_alt_Forall_SummedElement
   {sums} (mr : SVmap sums) {Hmr : SummedElement mr}
   {n m} (v : vec A n) (w : vec A m) is os
@@ -679,7 +682,7 @@ Qed.
 Lemma graph_apply_hom_correct (fr : R -> R') (f : T -> T') `{Hf : !Proper (equiv ==> equiv) f}
   `{Hfhom : !TensorLikeHom fr A f}
   {n m} (cohg : CospanHyperGraph T n m) :
-  graph_semantics (SR:=SR') (graph_apply_hom f cohg) ≡@{@Tensor R' n m A}
+  graph_semantics (SRD:=SRD') (graph_apply_hom f cohg) ≡@{@Tensor R' n m A}
   tensor_apply_hom fr (graph_semantics cohg).
 Proof.
   pose proof Hfhom as [Hfr HfrS HfP interp_hom].

@@ -41,6 +41,7 @@ Context `{SR : SemiRing R rO rI radd rmul req,
   LSA : !LawfulSummableOver R A,
   WFA : !WFSummableOver R A} `{Equiv T} `{Equivalence T equiv}.
 
+Context `{TensTD : !TensorLikeData R A T}.
 Context `{TensT : !TensorLike R A T}.
 
 
@@ -791,7 +792,7 @@ Qed.
 
 Lemma graph_semantics_add_top_loop {n m} (tg : TensorGraph (S n) (S m)) :
   graph_semantics (add_top_loop tg) ≡
-  join_stack_1_tl_tr (graph_semantics (SR:=SR) tg).
+  join_stack_1_tl_tr (graph_semantics (SRD:=SRD) tg).
 Proof.
   rewrite 2 graph_semantics_to_contl.
   rewrite <- contl_semantics_add_top_loop_gen.
@@ -809,7 +810,7 @@ Qed.
 
 Lemma graph_semantics_add_top_loops {n m o} (tg : TensorGraph (n + m) (n + o)) :
   graph_semantics (add_top_loops tg) ≡
-  join_stack_tl_tr (graph_semantics (SR:=SR) tg).
+  join_stack_tl_tr (graph_semantics (SRD:=SRD) tg).
 Proof.
   induction n; [done|].
   cbn.
@@ -858,7 +859,7 @@ Qed.
 
 Lemma graph_semantics_swapped_stack_graphs {n m n' m'}
   (cohg : TensorGraph n m) (cohg' : TensorGraph n' m') :
-  graph_semantics (SR:=SR) (swapped_stack_graphs cohg cohg') ≡
+  graph_semantics (SRD:=SRD) (swapped_stack_graphs cohg cohg') ≡
   swapped_stack_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
   intros v w Hv Hw.
@@ -1028,7 +1029,7 @@ Qed.
 
 Lemma graph_semantics_compose_graphs_alt {n m o}
   (cohg : TensorGraph n m) (cohg' : TensorGraph m o) :
-  graph_semantics (SR:=SR) (compose_graphs_alt cohg cohg') ≡
+  graph_semantics (SRD:=SRD) (compose_graphs_alt cohg cohg') ≡
   compose_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
   unfold compose_graphs_alt.
@@ -1039,7 +1040,7 @@ Qed.
 
 Lemma graph_semantics_compose_graphs {n m o}
   (cohg : TensorGraph n m) (cohg' : TensorGraph m o) :
-  graph_semantics (SR:=SR) (compose_graphs cohg cohg') ≡
+  graph_semantics (SRD:=SRD) (compose_graphs cohg cohg') ≡
   compose_tensor (graph_semantics cohg) (graph_semantics cohg').
 Proof.
   rewrite <- graph_semantics_norm_verts.
@@ -1050,7 +1051,7 @@ Qed.
 
 Lemma graph_semantics_stack_graphs {n m n' m'}
   (tg : TensorGraph n m) (tg' : TensorGraph n' m') :
-  graph_semantics (SR:=SR) (stack_graphs tg tg') ≡
+  graph_semantics (SRD:=SRD) (stack_graphs tg tg') ≡
   stack_tensor (graph_semantics tg) (graph_semantics tg').
 Proof.
   intros v w Hv Hw.
@@ -1812,7 +1813,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_id {n} :
-  graph_semantics (SR:=SR) (@id_graph T n) ≡ delta_tensor.
+  graph_semantics (SRD:=SRD) (@id_graph T n) ≡ delta_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics].
@@ -1868,7 +1869,7 @@ Qed.
 
 
 Lemma graph_semantics_swap {n m} :
-  graph_semantics (SR:=SR) (@swap_graph T n m) ≡ swap_tensor.
+  graph_semantics (SRD:=SRD) (@swap_graph T n m) ≡ swap_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics].
@@ -1981,7 +1982,7 @@ Qed.
 (* #[local] Hint Resolve eq_subrelation : typeclass_instances. *)
 
 Lemma graph_semantics_cup {n} :
-  graph_semantics (SR:=SR) (@cup_graph T n) ≡ cup_tensor.
+  graph_semantics (SRD:=SRD) (@cup_graph T n) ≡ cup_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics make_vecs_map vseq].
@@ -2039,7 +2040,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_cap {n} :
-  graph_semantics (SR:=SR) (@cap_graph T n) ≡ cap_tensor.
+  graph_semantics (SRD:=SRD) (@cap_graph T n) ≡ cap_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics make_vecs_map vseq].
@@ -2102,7 +2103,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_swap_1_1 :
-  graph_semantics (SR:=SR) (@swap_graph T 1 1) ≡ swap_tensor.
+  graph_semantics (SRD:=SRD) (@swap_graph T 1 1) ≡ swap_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics make_vecs_map].
@@ -2137,7 +2138,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_cup_1_1 :
-  graph_semantics (SR:=SR) (@cup_graph T 1) ≡ cup_tensor.
+  graph_semantics (SRD:=SRD) (@cup_graph T 1) ≡ cup_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics make_vecs_map].
@@ -2166,7 +2167,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_cap_1_1 :
-  graph_semantics (SR:=SR) (@cap_graph T 1) ≡ cap_tensor.
+  graph_semantics (SRD:=SRD) (@cap_graph T 1) ≡ cap_tensor.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics make_vecs_map].
@@ -2195,7 +2196,7 @@ Proof.
 Qed.
 
 Lemma graph_semantics_graph_of_tensor (t : T) n m :
-  graph_semantics (SR:=SR) (graph_of_tensor t n m) ≡ interpretTensor t n m.
+  graph_semantics (SRD:=SRD) (graph_of_tensor t n m) ≡ interpretTensor t n m.
 Proof.
   intros v w Hv Hw.
   cbn -[ntl_total_semantics insert].
@@ -2287,7 +2288,7 @@ Qed.
 
 Lemma graph_semantics_cohg_eq {n m} (cohg cohg' : TensorGraph n m) :
   cohg_eq cohg cohg' ->
-  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+  graph_semantics (SRD:=SRD) cohg ≡ graph_semantics cohg'.
 Proof.
   intros Heq.
   intros v w Hv Hw.
@@ -2328,7 +2329,7 @@ Qed.
 
 Lemma graph_semantics_equiv {n m} (cohg cohg' : TensorGraph n m) :
   cohg ≡ cohg' ->
-  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+  graph_semantics (SRD:=SRD) cohg ≡ graph_semantics cohg'.
 Proof.
   intros Heq.
   induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].
@@ -2340,7 +2341,7 @@ Qed.
 
 Lemma graph_semantics_syntactic_eq {n m} (cohg cohg' : TensorGraph n m) :
   cohg ≡ₛ cohg' ->
-  graph_semantics (SR:=SR) cohg ≡ graph_semantics cohg'.
+  graph_semantics (SRD:=SRD) cohg ≡ graph_semantics cohg'.
 Proof.
   intros Heq%(Aux_relset.relation_equiv_iff.1 cohg_syntactic_eq_alt).
   induction Heq as [|cohg cohg' cohg'' Heq Heqs IH]; [done|].

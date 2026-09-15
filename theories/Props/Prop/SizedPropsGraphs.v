@@ -8,9 +8,6 @@ From TensorRocq Require Import sigT2_relation BW Props SizedProps PropsGraphs
 
 
 
-(* FIXME: Move *)
-Notation Mor A := (A -> A -> Type).
-
 Class SizedStructGraphable {A} (MStruct : Mor (btree A)) (T : Type) : Type :=
   sized_graph_of_struct (n m : btree A) (s : MStruct n m) :
   BWSizedCospanHyperGraph A T n m.
@@ -19,7 +16,7 @@ Class SizedStructGraphable {A} (MStruct : Mor (btree A)) (T : Type) : Type :=
 
 #[global] Hint Mode SizedStructGraphable - ! - : typeclass_instances.
 
-#[global] Hint Mode SemiRing - - - - - - : typeclass_instances.
+#[global] Hint Mode SemiRing - - - - - - - : typeclass_instances.
 
 Class LawfulSizedStructGraphable {A}
   (MStruct : Mor (btree A)) (Struct : Mor nat) (T : Type) `{EqT : Equiv T}

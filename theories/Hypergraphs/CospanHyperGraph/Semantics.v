@@ -4,7 +4,7 @@ From TensorRocq Require Export Syntax CospanHyperGraph.Definitions CospanHyperGr
 (* Semantics of tensor graphs into (semi)rings, via tensor expressions *)
 
 
-Definition graph_mabs `{TensT : @TensorLike R EqR EquivR A SA EqA T EqT EquivT} 
+Definition graph_mabs `{TensTD : TensorLikeData R A T} 
   (tm : Pmap (T * list positive * list positive)) : 
   Pmap (@DimensionlessTensor R A) :=
   interpretTensor ∘ fst ∘ fst <$> tm.
@@ -13,7 +13,7 @@ Section TensorGraphSemantics.
 
 Context `{SR : SemiRing R rO rI radd rmul req}.
 
-Context `{TensT : @TensorLike R _ _ A SA EqA T EqT EquivT}.
+Context `{TensT : @TensorLike R _ _ A SA EqA T EqT EquivT TensTD}.
 
 
 
@@ -39,7 +39,7 @@ Definition graph_map_semantics
   [namedtensorlist]s. *)
 Definition graph_semantics
   {n m} (tg : TensorGraph n m) : @Tensor R n m A :=
-  namedtensorlist_to_tensor (SR:=SR) (graph_mabs tg.(hedges))
+  namedtensorlist_to_tensor (SRD:=SRD) (graph_mabs tg.(hedges))
     (vmap (bcons false ∘ Pos.of_succ_nat) (vseq 0 n)) 
     (vmap (bcons true ∘ Pos.of_succ_nat) (vseq 0 m))
     (graph_namedtensorlist_semantics tg).
@@ -85,17 +85,16 @@ End TensorGraphSemantics.
 Notation "cohg ≡ₜ cohg'" := (cohg_semantic_eq cohg%cohg cohg'%cohg) 
   (at level 70) : cohg_scope.
 
-Notation "cohg '≡ₜ@{' TensT '}' cohg'" := 
-  (cohg_semantic_eq (TensT:=TensT) cohg%cohg cohg'%cohg) 
+Notation "cohg '≡ₜ@{' TensTD '}' cohg'" := 
+  (cohg_semantic_eq (TensTD:=TensTD) cohg%cohg cohg'%cohg) 
   (at level 70, only parsing) : cohg_scope.
 
 #[export] Instance graph_semantics_semantic_eq
    `{SR : SemiRing R rO rI radd rmul req,
-   SA : SummableOver R A, EqA : EqDecision A, 
-   EqT : Equiv T, EquivT : Equivalence T equiv,
-  TensT : !TensorLike R A T} {n m : nat} :
+   SA : SummableOver R A, EqA : EqDecision A,
+  TensTD : !TensorLikeData R A T} {n m : nat} :
   Proper (cohg_semantic_eq ==> equiv)
-    (graph_semantics (TensT:=TensT) (n:=n) (m:=m)).
+    (graph_semantics (TensTD:=TensTD) (n:=n) (m:=m)).
 Proof.
   easy.
 Qed.

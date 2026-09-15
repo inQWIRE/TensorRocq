@@ -41,27 +41,42 @@ Definition dimensionlesstensoreq `{SummableOver R A} req :
 #[global] Instance DimensionlessTensor_equiv `{SummableOver R A} `{Equiv R}
   : Equiv (DimensionlessTensor (R:=R) A) := fun t t' => forall n m, t n m ≡ t' n m.
 
+Class TensorLikeData (R : Type) (A : Type) (T : Type) := {
+  interpretTensor (x : T) : DimensionlessTensor (R:=R) A;
+}.
+
+#[global] Hint Mode TensorLikeData - - + : typeclass_instances.
+
+  
 (* A class registering that elements [T] can be interpreted as
   dimensionless tensors with arguments in [A] and values in [R].
   This interpretation should respect the [Equiv] instance of [T]. *)
 Class TensorLike (R : Type) `{EqR : Equiv R, EquivR : Equivalence R equiv}
   (A : Type) `{SRA : SummableOver R A, EQA : EqDecision A} (T : Type) `{EqT : Equiv T}
-    `{EquivT : Equivalence T equiv} := {
-  interpretTensor (x : T) : DimensionlessTensor (R:=R) A;
-  interpretTensorProper :: Proper (equiv ==> equiv) interpretTensor
+    `{EquivT : Equivalence T equiv} 
+  {TLD : TensorLikeData R A T} := {
+  interpretTensorProper :: Proper ((≡@{T}) ==> equiv) interpretTensor
 }.
 
-#[global] Hint Mode TensorLike - - -  - - -   + - - : typeclass_instances.
+#[global] Hint Mode TensorLike - - -  - - -   + - - - : typeclass_instances.
+
+
+Class StrictTensorLikeData (R : Type) (A : Type) (T : nat -> nat -> Type) := {
+  strictInterpretTensor {n m} (x : T n m) : Tensor (R:=R) n m A;
+}.
+
+#[global] Hint Mode StrictTensorLikeData - - + : typeclass_instances.
 
 Class StrictTensorLike (R : Type) `{EqR : Equiv R, EquivR : Equivalence R equiv}
   (A : Type) `{SRA : SummableOver R A, EQA : EqDecision A} 
   (T : nat -> nat -> Type)
-  `{EqT : forall n m, Equiv (T n m)} `{EquivT : forall n m, @Equivalence (T n m) equiv} := {
-  strictInterpretTensor {n m} (x : T n m) : Tensor (R:=R) n m A;
-  strictInterpretTensorProper :: forall n m, Proper (equiv ==> equiv) (@strictInterpretTensor n m)
+  `{EqT : forall n m, Equiv (T n m)} `{EquivT : forall n m, @Equivalence (T n m) equiv} 
+  {STLD : StrictTensorLikeData R A T} := {
+  strictInterpretTensorProper :: forall n m, Proper ((≡@{T n m}) ==> equiv) (strictInterpretTensor)
 }.
 
-#[global] Hint Mode StrictTensorLike - - -   - - -   + - - : typeclass_instances.
+#[global] Hint Mode StrictTensorLike - - -   - - -   + - - - : typeclass_instances.
+
 
 Section TensorOps.
 
@@ -73,20 +88,20 @@ Section TensorOps.
     fun _ _ => r.
 
   Definition delta_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req}
+    SRD : SemiRingData R rO rI radd rmul}
     {n : nat} : Tensor n n A :=
     fun v w => if decide (v = w) then rI else rO.
 
 
   Definition compose_tensor `{SA : SummableOver R A,
-    SR : SemiRing R rO rI radd rmul req}
+    SRD : SemiRingData R rO rI radd rmul}
     {n m o} (t : Tensor n m A) (t' : Tensor m o A) :
     Tensor n o A :=
     fun v w =>
     ∑ u : vec A m, rmul (t v u) (t' u w).
 
   Definition stack_tensor `{SA : SummableOver R A,
-    SR : SemiRing R rO rI radd rmul req}
+    SRD : SemiRingData R rO rI radd rmul}
     {n m n' m'} (t : Tensor n m A) (t' : Tensor n' m' A) :
     Tensor (n + n') (m + m') A :=
     fun v w =>
@@ -94,7 +109,7 @@ Section TensorOps.
 
 
   Definition swapped_stack_tensor `{SA : SummableOver R A,
-    SR : SemiRing R rO rI radd rmul req}
+    SRD : SemiRingData R rO rI radd rmul}
     {n m n' m'} (t : Tensor n m A) (t' : Tensor n' m' A) :
     Tensor (n' + n) (m + m') A :=
     fun v w =>
@@ -129,81 +144,81 @@ Section TensorOps.
     end.
 
   Definition cup_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n} :
+    SRD : SemiRingData R rO rI radd rmul} {n} :
     Tensor 0 (n + n) A := fun v w =>
     delta_tensor (vsplitl w) (vsplitr w).
 
   Definition cap_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n} :
+    SRD : SemiRingData R rO rI radd rmul} {n} :
     Tensor (n + n) 0 A := fun v w =>
     delta_tensor (vsplitl v) (vsplitr v).
 
   Definition swap_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m} :
+    SRD : SemiRingData R rO rI radd rmul} {n m} :
     Tensor (n + m) (m + n) A := fun v w =>
     delta_tensor v (vsplitr w +++ vsplitl w).
 
   Definition delta_spider_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m} : Tensor n m A :=
+    SRD : SemiRingData R rO rI radd rmul} {n m} : Tensor n m A :=
     fun v w => ∑ a : A, if decide (Forall (eq a) (v +++ w)) then rI else rO.
 
   Definition delta_spider_tensor' `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m}
+    SRD : SemiRingData R rO rI radd rmul} {n m}
       (vi : vec positive n) (wi : vec positive m) : Tensor n m A :=
     fun v w =>
       if decide (equal_on_indices (vzip (vi +++ wi) (v +++ w))) then rI else rO.
 
-  Definition copy_tensor {A} `{SR : SemiRing R rO rI radd rmul req} 
+  Definition copy_tensor {A} `{SRD : SemiRingData R rO rI radd rmul} 
     (k : nat) {n m} (f : Tensor n m A) : 
       Tensor (n * k) (m * k) A :=
     fun v w => 
       Rlist_prod (Vector.map2 f (vunjoin' v) (vunjoin' w)).
 
   Definition delta_spider_tensor_bundled `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} k n m : Tensor (n * k) (m * k) A :=
+    SRD : SemiRingData R rO rI radd rmul} k n m : Tensor (n * k) (m * k) A :=
     copy_tensor k delta_spider_tensor.
 
   Definition tensor_11_to_fun {A} (t : Tensor 1 1 A) : A -> A -> R :=
     fun a b => t [# a] [# b].
 
   Definition stack_n_tensor_1 `{SA : SummableOver R A,
-    SR : SemiRing R rO rI radd rmul req} {n} (t : Tensor 1 1 A) : Tensor n n A :=
+    SRD : SemiRingData R rO rI radd rmul} {n} (t : Tensor 1 1 A) : Tensor n n A :=
     fun v w =>
     Vector.fold_right rmul (vzip_with (tensor_11_to_fun t) v w) rI.
 
   Fixpoint n_stack_tensor `{SA : SummableOver R A,
-    SR : SemiRing R rO rI radd rmul req}
+    SRD : SemiRingData R rO rI radd rmul}
     k {n m} (t : Tensor n m A) : Tensor (k * n) (k * m) A :=
     match k with
     | 0 => const_tensor rI
     | S k => stack_tensor t (n_stack_tensor k t)
     end.
 
-  Definition tensor_to_dimensionless `{SR : SemiRing R rO rI radd rmul req}
+  Definition tensor_to_dimensionless `{SRD : SemiRingData R rO rI radd rmul}
     {A n m} (t : Tensor n m A) : @DimensionlessTensor R A :=
     fun n' m' v' w' =>
     default rO (vec_cast_opt v' n ≫= λ v, vec_cast_opt w' m ≫= λ w, Some (t v w)).
 
   Definition fn_delta_tensor_l `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m}
+    SRD : SemiRingData R rO rI radd rmul} {n m}
     (f : vec A n -> vec A m) : Tensor n m A :=
     fun v w => delta_tensor (f v) w.
 
   Definition fn_delta_tensor_r `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m}
+    SRD : SemiRingData R rO rI radd rmul} {n m}
     (f : vec A m -> vec A n) : Tensor n m A :=
     fun v w => delta_tensor v (f w).
 
   Definition assoc_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} n m o : Tensor (n + m + o) (n + (m + o)) A :=
+    SRD : SemiRingData R rO rI radd rmul} n m o : Tensor (n + m + o) (n + (m + o)) A :=
     fn_delta_tensor_l (fun v => vsplitl (vsplitl v) +++ (vsplitr (vsplitl v) +++ vsplitr v)).
 
   Definition invassoc_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} n m o : Tensor (n + (m + o)) (n + m + o) A :=
+    SRD : SemiRingData R rO rI radd rmul} n m o : Tensor (n + (m + o)) (n + m + o) A :=
     fn_delta_tensor_l (fun v => (vsplitl v +++ vsplitl (vsplitr v)) +++ vsplitr (vsplitr v)).
 
   Definition perm_tensor `{SA : SummableOver R A, EqA : EqDecision A,
-    SR : SemiRing R rO rI radd rmul req} {n m} (f : fin n -> fin m) : Tensor n m A :=
+    SRD : SemiRingData R rO rI radd rmul} {n m} (f : fin n -> fin m) : Tensor n m A :=
     fun v w =>
     delta_tensor v (permute_vec f w).
 
@@ -231,36 +246,36 @@ Section TensorOps.
 
 
   #[global] Arguments const_tensor {_} {_ _} _ _ _ / : assert.
-  #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
-  #[global] Arguments compose_tensor {_ _} {_ _ _ _ _ _} {_ _ _} (_ _) _ _ / : assert.
-  #[global] Arguments stack_tensor {_ _} {_ _ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
-  #[global] Arguments swapped_stack_tensor {_ _} {_ _ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
+  #[global] Arguments delta_tensor {_ _ _} {_ _ _ _ _} {_} _ _ / : assert.
+  #[global] Arguments compose_tensor {_ _} {_ _ _ _ _} {_ _ _} (_ _) _ _ / : assert.
+  #[global] Arguments stack_tensor {_ _} {_ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
+  #[global] Arguments swapped_stack_tensor {_ _} {_ _ _ _ _} {_ _ _ _} (_ _) _ _ / : assert.
   #[global] Arguments join_stack_1_tr_bl {_ _} {_ _ _} (_) _ _ / : assert.
   #[global] Arguments join_stack_tr_bl {_ _} {_ !_ _} (_) / _ _ : assert.
   #[global] Arguments join_stack_1_tl_tr {_ _} {_ _} (_) _ _ / : assert.
   #[global] Arguments join_stack_tl_tr {_ _} {!_ _ _} (_) / _ _ : assert.
 
-  #[global] Arguments cup_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
-  #[global] Arguments cap_tensor {_ _ _} {_ _ _ _ _ _} {_} _ _ / : assert.
-  #[global] Arguments swap_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
+  #[global] Arguments cup_tensor {_ _ _} {_ _ _ _ _} {_} _ _ / : assert.
+  #[global] Arguments cap_tensor {_ _ _} {_ _ _ _ _} {_} _ _ / : assert.
+  #[global] Arguments swap_tensor {_ _ _} {_ _ _ _ _} {_ _} _ _ / : assert.
 
-  #[global] Arguments delta_spider_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ / : assert.
-  #[global] Arguments delta_spider_tensor' {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ _ / : assert.
+  #[global] Arguments delta_spider_tensor {_ _ _} {_ _ _ _ _} {_ _} _ _ / : assert.
+  #[global] Arguments delta_spider_tensor' {_ _ _} {_ _ _ _ _} {_ _} _ _ _ _ / : assert.
 
-  #[global] Arguments copy_tensor {_} {_ _ _ _ _ _} _ {_ _} _ _ _ / : assert.
-  #[global] Arguments delta_spider_tensor_bundled {_ _ _} {_ _ _ _ _ _} _ {_ _} _ _ / : assert.
+  #[global] Arguments copy_tensor {_} {_ _ _ _ _} _ {_ _} _ _ _ / : assert.
+  #[global] Arguments delta_spider_tensor_bundled {_ _ _} {_ _ _ _ _} _ {_ _} _ _ / : assert.
 
-  #[global] Arguments stack_n_tensor_1 {_ _} {_ _ _ _ _ _} {_} _ _ _ / : assert.
-  #[global] Arguments n_stack_tensor {_ _} {_ _ _ _ _ _} !_ {_ _} / _ _ _ : assert.
-  #[global] Arguments tensor_to_dimensionless {_ _ _ _ _ _} {_} {_ _} _ _ _ _ _ / : assert.
+  #[global] Arguments stack_n_tensor_1 {_ _} {_ _ _ _ _} {_} _ _ _ / : assert.
+  #[global] Arguments n_stack_tensor {_ _} {_ _ _ _ _} !_ {_ _} / _ _ _ : assert.
+  #[global] Arguments tensor_to_dimensionless {_ _ _ _ _} {_} {_ _} _ _ _ _ _ / : assert.
   #[global] Arguments tensor_11_to_fun {_} _ _ _ / : assert.
 
-  #[global] Arguments fn_delta_tensor_l {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
-  #[global] Arguments fn_delta_tensor_r {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
+  #[global] Arguments fn_delta_tensor_l {_ _ _} {_ _ _ _ _} {_ _} _ _ _ / : assert.
+  #[global] Arguments fn_delta_tensor_r {_ _ _} {_ _ _ _ _} {_ _} _ _ _ / : assert.
 
-  #[global] Arguments assoc_tensor {_ _ _} {_ _ _ _ _ _} _ _ _ _ _ / : assert.
-  #[global] Arguments invassoc_tensor {_ _ _} {_ _ _ _ _ _} _ _ _ _ _ / : assert.
-  #[global] Arguments perm_tensor {_ _ _} {_ _ _ _ _ _} {_ _} _ _ _ / : assert.
+  #[global] Arguments assoc_tensor {_ _ _} {_ _ _ _ _} _ _ _ _ _ / : assert.
+  #[global] Arguments invassoc_tensor {_ _ _} {_ _ _ _ _} _ _ _ _ _ / : assert.
+  #[global] Arguments perm_tensor {_ _ _} {_ _ _ _ _} {_ _} _ _ _ / : assert.
 
   #[global] Arguments permute_tensor_l {_ _ _ _} _ _ _ _ / : assert.
   #[global] Arguments permute_tensor_r {_ _ _ _} _ _ _ _ / : assert.
@@ -302,15 +317,23 @@ Definition MorUnion {A B} (T T' : A -> B -> Type) : A -> B -> Type :=
   forall n m, Equivalence (≡@{MorUnion T T' n m}) := λ n m, sum_relation_equiv _ _.
 
 
+#[export] Instance strictTensorLikeData_MorUnion
+  (R : Type) (A : Type)
+  (T : nat -> nat -> Type) {TensT : StrictTensorLikeData R A T}
+  (T' : nat -> nat -> Type) {TensT' : StrictTensorLikeData R A T'} :
+  StrictTensorLikeData R A (MorUnion T T')%type := {
+  strictInterpretTensor n m s := sum_rect (λ _, _) strictInterpretTensor strictInterpretTensor s;
+}.
 
 #[export] Instance strictTensorLike_MorUnion
   (R : Type) `{EqT : Equiv R, EquivR : Equivalence R equiv}
   (A : Type) `{SA : SummableOver R A, EQA : EqDecision A}
   (T : nat -> nat -> Type) `{EqT : forall n m, Equiv (T n m)}
-  `{EquivT : forall n m, @Equivalence (T n m) equiv} {TensT : StrictTensorLike R A T}
+  `{EquivT : forall n m, @Equivalence (T n m) equiv} 
+  {TensTD : StrictTensorLikeData R A T} {TensT : StrictTensorLike R A T}
   (T' : nat -> nat -> Type) `{EqT' : forall n m, Equiv (T' n m)}
-  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} {TensT' : StrictTensorLike R A T'} :
+  `{EquivT' : forall n m, @Equivalence (T' n m) equiv} 
+  {TensTD' : StrictTensorLikeData R A T'} {TensT' : StrictTensorLike R A T'} :
   StrictTensorLike R A (MorUnion T T')%type := {
-  strictInterpretTensor n m s := sum_rect (λ _, _) strictInterpretTensor strictInterpretTensor s;
   strictInterpretTensorProper n m := sum_rect_proper _ _;
 }.

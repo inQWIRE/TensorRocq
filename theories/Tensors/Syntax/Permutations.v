@@ -288,7 +288,7 @@ Context `{SA : SummableOver R A, AEQ : EqDecision A, LSA : !LawfulSummableOver R
 Lemma tl_total_semantics_aux_absidxs_ext
   mabs mabs' ml mr sums abs delt :
   (forall i, i ∈ abstracts_indices abs -> mabs !! i = mabs' !! i) ->
-  req (tl_total_semantics_aux (SR:=SR) mabs ml mr sums abs delt)
+  req (tl_total_semantics_aux (SRD:=SRD) mabs ml mr sums abs delt)
     (tl_total_semantics_aux mabs' ml mr sums abs delt).
 Proof.
   intros Habs.
@@ -310,7 +310,7 @@ Qed.
 Lemma ntl_total_semantics_absidxs_ext
   mabs mabs' ml ntl :
   (forall i, i ∈ abstracts_indices ntl.(ntl_abstracts) -> mabs !! i = mabs' !! i) ->
-  req (ntl_total_semantics (SR:=SR) mabs ml ntl)
+  req (ntl_total_semantics (SRD:=SRD) mabs ml ntl)
     (ntl_total_semantics mabs' ml ntl).
 Proof.
   intros Habs.
@@ -323,7 +323,7 @@ Qed.
 
 Lemma ntl_total_semantics_relabel_free
   f `{Hf : !Inj eq eq f} mabs ml ntl :
-  req (ntl_total_semantics (SR:=SR) mabs (kmap f ml) (ntl_relabel_free f ntl))
+  req (ntl_total_semantics (SRD:=SRD) mabs (kmap f ml) (ntl_relabel_free f ntl))
     (ntl_total_semantics mabs ml ntl).
 Proof.
   unfold ntl_total_semantics.

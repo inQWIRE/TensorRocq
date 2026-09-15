@@ -265,17 +265,20 @@ Qed.
 Class Instantiation {A : Type} `{SA : Summable A, EqA : EqDecision A}
   {Struct} `{∀ n m, Equiv (Struct n m), ∀ n m, Equivalence (≡@{Struct n m})}
   (Sig : Signature Struct A) `{SR : SemiRing R rO rI radd rmul req}
-  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
+  `{Equiv T, Equivalence T equiv} 
+  {TensTD : TensorLikeData R A T}
+  {TensT : TensorLike R A T}
+  {STLD : StrictTensorLikeData R A Struct}
   {STL : StrictTensorLike R A Struct}
   (f : Sig.(gens) -> T) := {
   instantiation_rules_hold : forall n m (lhs rhs : PRO Struct _ n m),
   Sig.(rules) lhs rhs ->
-  PRO_semantics (TensT:=TensT) $ PRO_denote f lhs ≡
-  PRO_semantics (TensT:=TensT) $ PRO_denote f rhs;
+  PRO_semantics (TensT:=TensTD) $ PRO_denote f lhs ≡
+  PRO_semantics (TensT:=TensTD) $ PRO_denote f rhs;
   instantiation_Proper : Proper (equiv ==> equiv) f;
 }.
 
-#[global] Hint Mode Instantiation - - - - - - - - - - - - - - - - - - - - : typeclass_instances.
+#[global] Hint Mode Instantiation - - - - - - - - - - - - - - - - - - - - - - - : typeclass_instances.
 
 (* #[export] Instance Instantiation_id {A : Type} `{SA : Summable A,
   EqA : EqDecision A, WFA : !WFSummable A}
@@ -293,23 +296,51 @@ Lemma rules_of_rule_list_instantiation_helper
   {A : Type} `{SA : Summable A, EqA : EqDecision A}
   {Struct} `{∀ n m, Equiv (Struct n m), ∀ n m, Equivalence (≡@{Struct n m})}
   (Sig : Signature Struct A) `{SR : SemiRing R rO rI radd rmul req}
-  `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}
+  `{Equiv T, Equivalence T equiv} 
+  {TensTD : TensorLikeData R A T}
+  {TensT : TensorLike R A T}
+  {STLD : StrictTensorLikeData R A Struct}
   {STL : StrictTensorLike R A Struct}
   (f : Sig.(gens) -> T)
   (rule_list : list {n & {m & (PRO Struct Sig.(gens) n m * PRO Struct Sig.(gens) n m)%type}}) :
   Forall (fun '(existT n (existT m (lhs, rhs))) =>
-    PRO_semantics (TensT:=TensT) $ PRO_denote f lhs ≡
-    PRO_semantics (TensT:=TensT) $ PRO_denote f rhs) rule_list ->
+    PRO_semantics (TensT:=TensTD) $ PRO_denote f lhs ≡
+    PRO_semantics (TensT:=TensTD) $ PRO_denote f rhs) rule_list ->
   forall n m (lhs rhs : PRO Struct _ n m),
   rules_of_rule_list rule_list _ _ lhs rhs ->
-  PRO_semantics (TensT:=TensT) $ PRO_denote f lhs ≡
-  PRO_semantics (TensT:=TensT) $ PRO_denote f rhs.
+  PRO_semantics (TensT:=TensTD) $ PRO_denote f lhs ≡
+  PRO_semantics (TensT:=TensTD) $ PRO_denote f rhs.
 Proof.
   intros Hall n m lhs rhs Hin.
   unfold rules_of_rule_list in Hin.
   rewrite Forall_forall in Hall.
   apply Hall in Hin.
   done.
+Qed.
+
+Definition SigRing_SR_base {Struct A} {EqA : EqDecision A}
+  (Sig : Signature Struct A)
+  {SA : SummableOver (SigRing Sig) A}
+  {TensSD : StrictTensorLikeData (SigRing Sig) A Struct} :
+  SemiRing (SigRing Sig) FSR_zero FSR_one
+    FSR_add FSR_mul (≡@{FreeSemiRing nat (SigTens Sig)})
+    (SRD:=SigRing_SRD Sig) := FSR_SR nat.
+
+Definition SignatureTensorLike_base {Struct}
+  `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  `{EqA : EqDecision A} (Sig : Signature Struct A)
+  {SA : SummableOver (SigRing Sig) A}
+  {TensSD : StrictTensorLikeData (SigRing Sig) A Struct}
+  {TensS : StrictTensorLike (SigRing Sig)
+    (EqR:=SR_equiv (SR:=SigRing_SR_base Sig))
+    (EquivR:=SR_equivalence (SR:=SigRing_SR_base Sig)) A Struct} :
+  TensorLike (SigRing Sig) (EqR:=SR_equiv (SR:=SigRing_SR_base Sig))
+    (EquivR:=SR_equivalence (SR:=SigRing_SR_base Sig))  A Sig.(gens)
+    (EqT:=eq).
+Proof.
+  split.
+  intros f f' [] n m v w _ _.
+  apply SR_equivalence.
 Qed.
 
 Section SignatureSemantics.
@@ -339,14 +370,17 @@ Local Existing Instance Rmul_proper.
 Context {Struct A}
   `{SA : !Summable A, EqA : !EqDecision A, WFA : !WFSummable A}
   `{EqS : ∀ n m, Equiv (Struct n m), EquivS : ∀ n m, Equivalence (≡@{Struct n m})}
+  {STLD : forall `{SRD' : SemiRingData R' rO' rI' radd' rmul'},
+    StrictTensorLikeData R' A Struct}
   {STL : forall `{SR' : SemiRing R' rO' rI' radd' rmul' req'},
     StrictTensorLike R' A Struct}
   {FSTL : FreeStrictTensorLike A Struct}.
 
 
-Context (Sig : Signature Struct A) .
+Context (Sig : Signature Struct A).
 
-Context `{Equiv T, Equivalence T equiv} `{TensT : !TensorLike R A T}.
+Context `{Equiv T, Equivalence T equiv} {TensTD : TensorLikeData R A T} 
+  {TensT : TensorLike R A T}.
 
 
 
@@ -367,36 +401,58 @@ Definition SigFSR_map (f : Sig.(gens) -> T)
 Definition rel_image {A B} (f : A -> B) (RA : relation A) : relation B :=
   fun b b' => exists a a', f a = b /\ f a' = b' /\ RA a a'.
 
-#[local] Instance FSR_eval_map_hom (f : Sig.(gens) -> T) :
-  TensorLikeHom (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR) A f
-  (TensT:=SignatureTensorLike_base Sig).
+#[local] Existing Instance SigRing_SR_base.
+
+#[local] Instance FSR_eval_map_SRH (f : Sig.(gens) -> T) : 
+  SemiRingHomomorphism (SR:=SigRing_SR_base Sig)
+    (FSR_eval (SigTens_eval f)
+     ∘ FSR_map nat2SR).
 Proof.
-  esplit; [apply _..|].
-  intros t n' m'.
-  cbn.
-  intros v w Hv Hw.
-  cbn [tensor_apply_hom compose].
-  cbn.
-  hnf.
-  set (x := interpretTensor _ _ _ _ _).
-  ring.
+  apply compose_SRH.
+  - apply _.
+  - apply FSR_map_homomorphism. 
+    apply _.
 Qed.
 
+#[local] Instance FSR_eval_map_hom (f : Sig.(gens) -> T) 
+   `{Hf : !Instantiation Sig f} :
+  TensorLikeHom (SR:=SigRing_SR_base Sig) (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR) A f
+  (TensT:=SignatureTensorLike_base Sig
+    (TensS:=STL _ _ _ _ _ _ _ (SigRing_SR_base Sig))).
+Proof.
+  esplit.
+  - apply SummableOverHomomorphism_Summable.
+  - apply _.
+  - intros t n' m'.
+    cbn.
+    intros v w Hv Hw.
+    cbn [tensor_apply_hom compose].
+    cbn.
+    hnf.
+    set (x := interpretTensor _ _ _ _ _).
+    ring.
+Qed.
+
+
 #[local] Instance FSR_eval_map_strict_hom (f : Sig.(gens) -> T) :
-  StrictTensorLikeHom (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR) A
-  Struct.
+  StrictTensorLikeHom (SR:=SigRing_SR_base Sig) 
+    (SR':=SR) (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR) A
+  Struct (STLD:=STLD _ _ _ _ _ _) (STL:=STL _ _ _ _ _ _ _ _).
 Proof.
   split.
   now intros; rewrite (strictInterpretTensor_free _).
 Qed.
 
 
-Lemma PRO_semantics_via_free (f : Sig.(gens) -> T) {n m} (ap : PRO Struct Sig.(gens) n m) :
+Lemma PRO_semantics_via_free (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig f} 
+  {n m} (ap : PRO Struct Sig.(gens) n m) :
   PRO_semantics (PRO_denote f ap) ≡
   tensor_apply_hom (FSR_eval (SigTens_eval f) ∘ FSR_map nat2SR)
-     ((PRO_semantics (TensT:=SignatureTensorLike_base Sig) ap)).
+     ((PRO_semantics (TensT:=SignatureTensorLikeData Sig) ap)).
 Proof.
-  eapply PRO_denote_semantics; apply _.
+  unshelve eapply (PRO_denote_semantics _ A _
+    _ (TensT:=SignatureTensorLike_base Sig)); try apply _.
+  apply SummableOverHomomorphism_Summable.
 Qed.
 
 Lemma instantiation_eval_helper (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig f}
@@ -416,11 +472,12 @@ Proof.
 Qed.
 
 Lemma SigFSR_map_homomorphism (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig f} :
-  SemiRingHomomorphism (SR:=FSR_SR_eqg nat (SigTensRel Sig)) (SigFSR_map f).
+  SemiRingHomomorphism (SR:=SigRing_SR Sig) (SigFSR_map f).
 Proof.
   apply (compose_SRH (SR' := FSR_SR_eqg R (rel_image (FSR_map nat2SR) $ SigTensRel Sig))
     (FSR_map nat2SR) (FSR_eval (SigTens_eval f))).
   - apply FSR_eval_homomorphism'.
+    intros x y Hxy.
     now apply instantiation_eval_helper.
   - apply (FSR_map_homomorphism' _).
     firstorder.
@@ -430,7 +487,7 @@ Qed.
 Lemma instantiates_holds (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig f}
   {n m} (lhs rhs : PRO Struct Sig.(gens) n m) :
   lhs ≡ᵣ rhs ->
-  PRO_semantics (TensT:=TensT) $ PRO_denote f lhs ≡
+  PRO_semantics (TensT:=TensTD) $ PRO_denote f lhs ≡
   PRO_semantics $ PRO_denote f rhs.
 Proof.
   intros Heq.
@@ -448,7 +505,7 @@ Lemma instantiates_holds_cancel (f : Sig.(gens) -> T) `{Hf : !Instantiation Sig 
   (g : T -> Sig.(gens)) {Hfg : Cancel equiv f g}
   {n m} (lhs rhs : PRO Struct _ n m) :
   PRO_denote g lhs ≡ᵣ rhs ->
-  PRO_semantics (TensT:=TensT) $ lhs ≡
+  PRO_semantics (TensT:=TensTD) $ lhs ≡
   PRO_semantics $ PRO_denote f rhs.
 Proof.
   intros Heq%(instantiates_holds f).
@@ -457,12 +514,14 @@ Proof.
   now rewrite (PRO_denote_cancel _ _).
 Qed.
 
-
+Existing Instance STL.
+#[local] Typeclasses Transparent SigRing.
 Lemma Instantiation_SigTens_graph_semantics_syntactic_eq_semantic
-  {GraphS : StructGraphable Struct Sig.(gens)}
+  {GraphS : StructGraphable Struct Sig.(gens)} 
   {LawGraphS : LawfulStructGraphable Struct _
-    (SR:=FSR_SR_eqg nat (SigTensRel Sig))
-    (TensT:=SignatureTensorLike Sig)}
+    (SR:=SigRing_SR Sig)
+    (TensT:=SignatureTensorLike Sig
+      (TensS:=STL (SigRing Sig) _ _ _ _ _ _ (SigRing_SR Sig)))}
   (f : Sig.(gens) -> T) {Hf : Instantiation Sig f}
   (g : T -> Sig.(gens)) {Hfg : Cancel equiv f g}
   {n m} (ap ap' : PRO Struct T n m) :

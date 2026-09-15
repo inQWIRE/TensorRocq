@@ -502,16 +502,23 @@ End instances.
 
 
 
+#[local] Program Instance opttensor_TensorLikeData
+  `{SRD : SemiRingData R rO rI radd rmul}
+  `{SA : SummableOver R A, EqA : EqDecision A,
+    EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensTD : !TensorLikeData R A T} : TensorLikeData R A (option T) := {
+  interpretTensor mt := from_option interpretTensor (fun _ _ => const_tensor rO) mt;
+}.
 
 #[local] Program Instance opttensor_TensorLike 
   `{SR : SemiRing R rO rI radd rmul req}
   `{SA : SummableOver R A, EqA : EqDecision A,
     EqT : Equiv T, EquivT : Equivalence T equiv}
-  `{!TensorLike R A T} : TensorLike R A (option T) := {
-  interpretTensor mt := from_option interpretTensor (fun _ _ => const_tensor rO) mt;
+  `{TensTD : !TensorLikeData R A T} 
+  `{TensT : !TensorLike R A T} : TensorLike R A (option T) := {
 }.
 Next Obligation.
-  intros *.
+  intros * ?.
   intros mt mt' Hmt.
   induction Hmt as [mt mt' Hmt|]; [|done].
   cbn.
@@ -526,7 +533,8 @@ Qed.
 #[export] Instance Some_TensorLikeHom `{SR : SemiRing R rO rI radd rmul req}
   `{SA : Summable A, EqA : EqDecision A,
     EqT : Equiv T, EquivT : Equivalence T equiv}
-  `{!TensorLike R A T} :
+  `{TensTD : !TensorLikeData R A T} 
+  `{TensT : !TensorLike R A T} :
   TensorLikeHom (@id R) A (@Some T).
 Proof.
   esplit; [apply _..|].

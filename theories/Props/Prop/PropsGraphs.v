@@ -22,14 +22,16 @@ Class StructGraphable (Struct : Mor nat) (T : Type) : Type :=
 
 #[global] Hint Mode StructGraphable + - : typeclass_instances.
 
-#[global] Hint Mode SemiRing - - - - - - : typeclass_instances.
+#[global] Hint Mode SemiRing - - - - - - - : typeclass_instances.
 
 Class LawfulStructGraphable (Struct : Mor nat) (T : Type)
   `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensTD : !TensorLikeData R A T}
   `{TensT : !TensorLike R A T}
   `{EqS : forall n m, Equiv (Struct n m), 
     EquivS : forall n m, Equivalence (≡@{(Struct n m)})}
+  `{TensSD : !StrictTensorLikeData R A Struct}
   `{TensS : !StrictTensorLike R A Struct}
   `{GraphS : StructGraphable Struct T} : Prop := mk_LSG {
   graph_of_struct_correct {n m} (s : Struct n m) :
@@ -38,7 +40,7 @@ Class LawfulStructGraphable (Struct : Mor nat) (T : Type)
 }.
 
 #[global] Hint Mode LawfulStructGraphable + - - - -
-  - - - - - - - - - - - - - - - - : typeclass_instances.
+  - - - - - - - - - - - - - - - - - - - : typeclass_instances.
 
 
 
@@ -71,7 +73,9 @@ Lemma PRO_graph_semantics_correct {Struct : Mor nat}
   {T : Type} {StructG : StructGraphable Struct T}
   `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensTD : !TensorLikeData R A T}
   `{TensT : !TensorLike R A T}
+  `{TensSD : !StrictTensorLikeData R A Struct}
   `{TensS : !StrictTensorLike R A Struct}
   `{GraphS : StructGraphable Struct T}
   `{LawGraphS : !LawfulStructGraphable Struct T}
@@ -133,6 +137,7 @@ Section lawful.
 
 Context `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
   `{EqT : Equiv T, EquivT : Equivalence T equiv}
+  `{TensTD : !TensorLikeData R A T}
   `{TensT : !TensorLike R A T}.
 
 (* FIXME: Move *)
@@ -140,6 +145,8 @@ Context `{WFA : WFSummableOver R A rO rI radd rmul req, EqA : EqDecision A}
 #[export] Instance morunion_lawful_graphable
   `{EqS : forall n m, Equiv (Struct n m), EquivS : forall n m, Equivalence (≡@{(Struct n m)})}
   `{EqS' : forall n m, Equiv (Struct' n m), EquivS' : forall n m, Equivalence (≡@{(Struct' n m)})}
+  `{TensSD : !StrictTensorLikeData R A Struct, 
+  TensSD' : !StrictTensorLikeData R A Struct'}
   `{TensS : !StrictTensorLike R A Struct, 
   TensS' : !StrictTensorLike R A Struct'}
   `{GraphS : StructGraphable Struct T,

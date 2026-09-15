@@ -88,7 +88,7 @@ Definition sum_of {R A} {SRA : SummableOver R A} (f : A -> R) : R :=
   typeclass search can find the definitions of 0
   and addition.  *)
 #[global] Instance summable_summableover
-  `{SR : SemiRing R rO rI radd rmul req} `{SA : Summable A} :
+  `{SRD : SemiRingData R rO rI radd rmul} `{SA : Summable A} :
   SummableOver R A := sum_by (fun f => Rlist_sum (f <$> sum_elements)) (.∈ sum_elements).
 
 
@@ -104,7 +104,7 @@ Proof. reflexivity. Qed.
 (* Lemma to unfold [sum_of]. Should not be to reason about
   tensor expressions directly, only to reason about their
   definition, such as in relation to other libraries. *)
-Lemma sum_of_defn `{SemiRing R rO rI radd rmul req} `{Summable A} (f : A -> R) :
+Lemma sum_of_defn `{SemiRingData R rO rI radd rmul} `{Summable A} (f : A -> R) :
   sum_of f = Rlist_sum (List.map f sum_elements).
 Proof. reflexivity. Qed.
 

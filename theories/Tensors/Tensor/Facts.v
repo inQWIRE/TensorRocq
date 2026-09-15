@@ -30,6 +30,7 @@ Class TensorLikeHom
   {T T'} `{EqT : Equiv T, EqT' : Equiv T'}
   `{EquivT : Equivalence T equiv, EquivT' : Equivalence T' equiv}
   (fT : T -> T')
+  {TensTD : TensorLikeData R A T} {TensTD' : TensorLikeData R' A T'}
   {TensT : TensorLike R A T} {TensT' : TensorLike R' A T'} := {
   TLH_SRH :: SemiRingHomomorphism f;
   TLH_SOH :: SummableOverHomomorphism f A;
@@ -64,6 +65,8 @@ Class StrictTensorLikeHom
     LSA' : !LawfulSummableOver R' A, EQA : EqDecision A}
   (T : nat -> nat -> Type) `{EqT : ∀ n m, Equiv (T n m),
     EquivT : ∀ n m, @Equivalence (T n m) equiv}
+  {STLD : StrictTensorLikeData R A T}
+  {STLD' : StrictTensorLikeData R' A T}
   {STL : StrictTensorLike R A T}
   {STL' : StrictTensorLike R' A T} := {
   strictInterpretTensor_hom {n m} (t : T n m) :
@@ -153,7 +156,7 @@ Proof.
   setoid_rewrite <- vec_to_list_to_list.
   setoid_rewrite <- elem_of_list_In.
   setoid_rewrite <- (Forall_proper SummedElement _ 
-    (fun _ => (SummedElement_iff (SR:=SR) (A:=A)) _) _ _ eq_refl).
+    (fun _ => (SummedElement_iff (SRD:=SRD) (A:=A)) _) _ _ eq_refl).
   firstorder.
 Qed.
 
@@ -242,7 +245,7 @@ Section TensorOpsFacts.
     SR : SemiRing R rO rI radd rmul req, LSA : !LawfulSummableOver R A} 
     {n m o} :
     Proper (equiv ==> equiv ==> equiv)
-      (compose_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (o:=o)).
+      (compose_tensor (SA:=SA) (SRD:=SRD) (n:=n) (m:=m) (o:=o)).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
@@ -256,7 +259,7 @@ Section TensorOpsFacts.
     SR : SemiRing R rO rI radd rmul req} 
     {n m n' m'} :
     Proper (equiv ==> equiv ==> equiv)
-      (stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')).
+      (stack_tensor (SA:=SA) (SRD:=SRD) (n:=n) (m:=m) (n':=n') (m':=m')).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
@@ -269,7 +272,7 @@ Section TensorOpsFacts.
     SR : SemiRing R rO rI radd rmul req} 
      {n m n' m'} :
       Proper (equiv ==> equiv ==> equiv)
-      (swapped_stack_tensor (SA:=SA) (SR:=SR) (n:=n) (m:=m) (n':=n') (m':=m')).
+      (swapped_stack_tensor (SA:=SA) (SRD:=SRD) (n:=n) (m:=m) (n':=n') (m':=m')).
   Proof.
     intros l l' Hl r r' Hr v w Hv Hw.
     cbn.
@@ -412,7 +415,7 @@ Section TensorOpsFacts.
   #[export] Instance copy_tensor_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} k {n m} :
     Proper ((≡) ==> (≡))
-      (copy_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)).
+      (copy_tensor (A:=A) (SRD:=SRD) k (n:=n) (m:=m)).
   Proof.
     intros f g Hfg.
     intros v w Hv Hw.
@@ -430,7 +433,7 @@ Section TensorOpsFacts.
   #[export] Instance stack_n_tensor_1_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n} :
     Proper ((≡) ==> (≡))
-      (stack_n_tensor_1 (SA:=SA) (SR:=SR) (n:=n)).
+      (stack_n_tensor_1 (SA:=SA) (SRD:=SRD) (n:=n)).
   Proof.
     intros f g Hfg v w Hv Hw.
     cbn.
@@ -450,7 +453,7 @@ Section TensorOpsFacts.
   #[export] Instance n_stack_tensor_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} k {n m} :
     Proper ((≡) ==> (≡))
-      (n_stack_tensor (A:=A) (SR:=SR) k (n:=n) (m:=m)).
+      (n_stack_tensor (A:=A) (SRD:=SRD) k (n:=n) (m:=m)).
   Proof.
     intros f g Hfg.
     induction k; [done|].
@@ -461,7 +464,7 @@ Section TensorOpsFacts.
   #[export] Instance tensor_to_dimensionless_mor `{SA : SummableOver R A,
     SR : SemiRing R rO rI radd rmul req} {n m} :
     Proper ((≡) ==> (≡))
-      (tensor_to_dimensionless (SR:=SR) (A:=A) (n:=n) (m:=m)).
+      (tensor_to_dimensionless (SRD:=SRD) (A:=A) (n:=n) (m:=m)).
   Proof.
     intros f g Hfg n' m' v w Hv Hw.
     cbn.
@@ -781,7 +784,7 @@ Section TensorOpsFacts.
   Qed.
 
   Lemma delta_spider_tensor'_alt {n m} vi wi :
-    delta_spider_tensor' (SR:=SR) (n:=n) (m:=m) vi wi ≡
+    delta_spider_tensor' (SRD:=SRD) (n:=n) (m:=m) vi wi ≡
     (fun v w =>
     if decide (forall (i j : fin (n + m)),
       (vi +++ wi) !!! i = (vi +++ wi) !!! j ->
@@ -909,7 +912,7 @@ Section TensorOpsFacts.
     cbn.
     etransitivity;
     [refine (
-      sum_of_unique' (SR:=SR) _ (permute_vec g w)
+      sum_of_unique' (SRD:=SRD) _ (permute_vec g w)
       _)|].
     - intros b Hb Hne.
       rewrite (decide_False (P:=b = _)) by done.

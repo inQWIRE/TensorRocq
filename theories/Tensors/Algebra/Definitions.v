@@ -17,6 +17,19 @@ Require SetoidPermutation.
 Require Import Ring.
 Import Morphisms Setoid.
 
+(* A class defining the data of a semiring. This is factored 
+  out from the main [SemiRing] class (with correctness proofs)
+  to better support the definition of multiple semiring 
+  instances over the same domain. 
+  (Specifically, functions that use semiring data should use
+  only this class, while proofs requiring properties should use
+  [SemiRing] - this aleviates the need for proofs that functions
+  depend only on the data, not the proofs.) *)
+Class SemiRingData (R : Type) (rO : R) (rI : R)
+  (radd : R -> R -> R) (rmul : R -> R -> R) := mk_SRD {}.
+Global Hint Mode SemiRingData ! - - - - : typeclass_instances.
+
+#[global] Arguments mk_SRD {_ _ _ _ _} : assert.
 
 (** A semiring is a structure with associative and commutative
   addition and multiplication, which are also distributive. It
@@ -28,12 +41,13 @@ Import Morphisms Setoid.
   version. *)
 Class SemiRing (R : Type) (rO : R) (rI : R)
   (radd : R -> R -> R) (rmul : R -> R -> R)
-  (req : R -> R -> Prop) := {
+  (req : R -> R -> Prop) 
+  {SRD : SemiRingData R rO rI radd rmul} := {
   RSRth : Ring_theory.semi_ring_theory rO rI radd rmul req;
   Req_ext : Ring_theory.sring_eq_ext radd rmul req;
   Req_equiv : Setoid.Setoid_Theory R req;
 }.
-Global Hint Mode SemiRing ! - - - - - : typeclass_instances.
+Global Hint Mode SemiRing ! - - - - - - : typeclass_instances.
 
 (* The development is parametric over domain, which we require to be
   a semiring. *)
@@ -115,14 +129,14 @@ End SemiRing.
 
 Import List ListNotations Permutation SetoidPermutation.
 
-Fixpoint Rlist_sum `{SR : SemiRing R rO rI radd rmul req} (l : list R) : R :=
+Fixpoint Rlist_sum `{SRD : SemiRingData R rO rI radd rmul} (l : list R) : R :=
   match l with
   | [] => rO
   | r :: l => radd r (Rlist_sum l)
   end.
 
-Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req} :
-  Rlist_sum with signature PermutationA req ==> req as Rlist_sum_perm_mor.
+#[export] Instance Rlist_sum_perm_mor `{SR : SemiRing R rO rI radd rmul req} :
+  Proper (PermutationA req ==> req) Rlist_sum.
 Proof.
   set (HR := Req_equiv : Equivalence req).
   set (HRadd := SR.(Req_ext).(SRadd_ext)).
@@ -134,14 +148,14 @@ Proof.
   - etransitivity; eauto.
 Qed.
 
-Fixpoint Rlist_prod `{SR : SemiRing R rO rI radd rmul req} (l : list R) : R :=
+Fixpoint Rlist_prod `{SRD : SemiRingData R rO rI radd rmul} (l : list R) : R :=
   match l with
   | [] => rI
   | r :: l => rmul r (Rlist_prod l)
   end.
 
-Add Parametric Morphism `{SR : SemiRing R rO rI radd rmul req} :
-  Rlist_prod with signature PermutationA req ==> req as Rlist_prod_perm_mor.
+#[export] Instance Rlist_prod_perm_mor `{SR : SemiRing R rO rI radd rmul req} :
+  Proper (PermutationA req ==> req) Rlist_prod.
 Proof.
   set (HR := Req_equiv : Equivalence req).
   set (HRmul := SR.(Req_ext).(SRmul_ext)).

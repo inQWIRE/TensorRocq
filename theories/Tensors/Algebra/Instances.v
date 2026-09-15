@@ -6,6 +6,8 @@ From TensorRocq Require Export Algebra.Definitions.
 From stdpp Require Import vector fin.
 From stdpp Require Export base list.
 
+#[global] Instance Prop_SemiRingData : SemiRingData Prop False True or and := mk_SRD.
+
 #[global] Instance Prop_SemiRing : SemiRing Prop False True or and iff.
 Proof.
   split.
@@ -16,15 +18,21 @@ Qed.
 
 (* Common instances of semirings *)
 
+#[global] Instance nat_SemiRingData : SemiRingData nat 0 1 Nat.add Nat.mul := mk_SRD.
+
 #[global] Instance nat_SemiRing : SemiRing nat 0 1 Nat.add Nat.mul eq.
 Proof.
   do 2 constructor; repeat (hnf; intros); lia.
 Qed.
 
+#[global] Instance N_SemiRingData : SemiRingData N 0%N 1%N N.add N.mul := mk_SRD.
+
 #[global] Instance N_SemiRing : SemiRing N 0%N 1%N N.add N.mul eq.
 Proof.
   do 2 constructor; repeat (hnf; intros); lia.
 Qed.
+
+#[global] Instance bool_SemiRingData : SemiRingData bool false true xorb andb := mk_SRD.
 
 #[global] Instance bool_SemiRing : SemiRing bool false true xorb andb eq.
 Proof.
@@ -57,6 +65,7 @@ Proof.
   apply fin_to_nat_to_fin.
 Qed.
 
+#[global] Instance fin_SemiRingData n : SemiRingData (fin (S (S n))) 0%fin 1%fin fin_add fin_mul := mk_SRD.
 
 #[global] Instance fin_SemiRing n : SemiRing (fin (S (S n))) 0%fin 1%fin fin_add fin_mul eq.
 Proof.
@@ -80,6 +89,8 @@ Proof.
     f_equal; lia.
 Qed.
 
+#[global] Instance Z_SemiRingData : SemiRingData Z 0%Z 1%Z Z.add Z.mul := mk_SRD.
+
 #[global] Instance Z_SemiRing : SemiRing Z 0%Z 1%Z Z.add Z.mul eq.
 Proof.
   do 2 constructor; repeat (hnf; intros); lia.
@@ -89,16 +100,27 @@ Require Import Lqa.
 
 Import QArith.
 
+#[global] Instance Q_SemiRingData : SemiRingData Q 0%Q 1%Q Qplus Qmult := mk_SRD.
+
 #[global] Instance Q_SemiRing : SemiRing Q 0%Q 1%Q Qplus Qmult Qeq.
 Proof.
   constructor; [|split; apply _|split; apply _].
   constructor; intros; lra.
 Qed.
 
-#[global] Instance unit_SemiRing : SemiRing unit () () (fun _ _ => ()) (fun _ _ => ()) eq.
+#[global] Instance unit_SemiRingData : SemiRingData unit () () 
+  (fun _ _ => ()) (fun _ _ => ()) := mk_SRD.
+
+#[global] Instance unit_SemiRing : SemiRing unit () () 
+  (fun _ _ => ()) (fun _ _ => ()) eq.
 Proof.
   do 2 constructor; repeat (hnf; intros); repeat_on_hyps ltac:(fun H => try destruct H); done.
 Qed.
+
+#[global] Instance prod_SemiRingData {R S} `{SRD : SemiRingData R rO rI radd rmul,
+  SSD : SemiRingData S sO sI sadd smul} : SemiRingData (R * S) (rO, sO) (rI, sI)
+    (λ '(r, s) '(r', s'), (radd r r', sadd s s'))
+    (λ '(r, s) '(r', s'), (rmul r r', smul s s')) := mk_SRD.
 
 #[global] Instance prod_SemiRing {R S seq} `{SR : SemiRing R rO rI radd rmul req,
   SS : SemiRing S sO sI sadd smul seq} : SemiRing (R * S) (rO, sO) (rI, sI)
