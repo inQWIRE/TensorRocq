@@ -7,6 +7,19 @@ Import vector.
 From TensorRocq Require Import Aux Aux_stdpp.
 From TensorRocq Require Export Matrix.Definitions Algebra Summable.
 
+#[global] Typeclasses Opaque Matrix.
+
+
+#[export] Instance vec_equivalence {R}
+  `{EqR : Equiv R, EquivR : Equivalence R equiv} n :
+  Equivalence (≡@{vec R n}) := vec_rel_equiv _ _.
+#[export] Instance Matrix_equivalence {R}
+  `{EqR : Equiv R, EquivR : Equivalence R equiv} n m :
+  Equivalence (≡@{Matrix R n m}).
+Proof.
+  now do 2 apply vec_rel_equiv.
+Qed.
+
 
 Lemma permute_vec_vzip_with {A B C n m} (f : fin n -> fin m) (g : A -> B -> C)
   (v : vec A m) w :
@@ -112,6 +125,14 @@ Proof.
   done.
 Qed.
 
+Lemma vec_dot_comm {n} (v w : vec R n) :
+  vec_dot v w == vec_dot w v.
+Proof.
+  rewrite 2 vec_dot_to_sum_of.
+  apply sum_of_ext; intros i _.
+  ring.
+Qed.
+
 
 End VectorFacts.
 
@@ -136,7 +157,7 @@ Qed.
 Lemma mx_equiv `{Equiv R}
   {n m} (A B : Matrix R n m) : A ≡ B <-> forall i j, A i j ≡ B i j.
 Proof.
-  unfold equiv, Matrix_equiv, matrix_rel.
+  unfold equiv, Matrix_equiv, matrix_rel, vector_equiv.
   rewrite vec_rel_lookup.
   setoid_rewrite vec_rel_lookup.
   done.
@@ -255,6 +276,15 @@ Proof.
   apply vapp_mor; done.
 Qed.
 
+#[export] Instance stack_matrix_mor `{SR : SemiRing R rO rI radd rmul req}
+  {n m o p} :
+  Proper (equiv ==> equiv ==> equiv) (stack_matrix (R:=R) (n:=n) (m:=m) (o:=o) (p:=p)).
+Proof.
+  intros A A' HA B B' HB.
+  unfold stack_matrix.
+  solve_proper.
+Qed.
+
 
 Lemma mlookup_prepermute_matrix_l {R n m o} (f : fin n -> fin m) (A : Matrix R m o) i j :
   prepermute_matrix_l f A i j = A (f i) j.
@@ -275,7 +305,7 @@ Qed.
 Lemma mlookup_prepermute_matrix {R} {n m n' m'}
     (fl : fin n -> fin n') (fr : fin m -> fin m')
     (A : Matrix R n' m') i j :
-  prepermute_matrix fl fr A i j = 
+  prepermute_matrix fl fr A i j =
   A (fl i) (fr j).
 Proof.
   unfold mx_to_fun, prepermute_matrix, Matrix.
@@ -283,8 +313,8 @@ Proof.
   done.
 Qed.
 
-#[export] Instance prepermute_matrix_l_mor `{Equiv R} {n m o} : 
-  Proper (pointwise_relation (fin n) eq ==> equiv ==> equiv) 
+#[export] Instance prepermute_matrix_l_mor `{Equiv R} {n m o} :
+  Proper (pointwise_relation (fin n) eq ==> equiv ==> equiv)
   (@prepermute_matrix_l R n m o).
 Proof.
   intros f g Hfg A B HAB.
@@ -294,8 +324,8 @@ Proof.
   done.
 Qed.
 
-#[export] Instance prepermute_matrix_r_mor `{Equiv R} {n m o} : 
-  Proper (pointwise_relation _ eq ==> equiv ==> equiv) 
+#[export] Instance prepermute_matrix_r_mor `{Equiv R} {n m o} :
+  Proper (pointwise_relation _ eq ==> equiv ==> equiv)
   (@prepermute_matrix_r R n m o).
 Proof.
   intros f g Hfg A B HAB.
@@ -305,8 +335,8 @@ Proof.
   done.
 Qed.
 
-#[export] Instance prepermute_matrix_mor `{Equiv R} {n m n' m'} : 
-  Proper (pointwise_relation _ eq ==> pointwise_relation _ eq ==> equiv ==> equiv) 
+#[export] Instance prepermute_matrix_mor `{Equiv R} {n m n' m'} :
+  Proper (pointwise_relation _ eq ==> pointwise_relation _ eq ==> equiv ==> equiv)
   (@prepermute_matrix R n m n' m').
 Proof.
   intros fl fl' Hfl fr fr' Hfr A B HAB.
@@ -316,7 +346,7 @@ Proof.
   done.
 Qed.
 
-Lemma lookup_mx_to_vec_rowmajor {R n m} (A : Matrix R n m) i : 
+Lemma lookup_mx_to_vec_rowmajor {R n m} (A : Matrix R n m) i :
   mx_to_vec_rowmajor A !!! i = A (fin_split i).1 (fin_split i).2.
 Proof.
   unfold mx_to_vec_rowmajor.
@@ -331,7 +361,7 @@ Proof.
   done.
 Qed.
 
-Lemma lookup_mx_to_vec_colmajor {R n m} (A : Matrix R n m) i : 
+Lemma lookup_mx_to_vec_colmajor {R n m} (A : Matrix R n m) i :
   mx_to_vec_colmajor A !!! i = A (fin_split i).2 (fin_split i).1.
 Proof.
   unfold mx_to_vec_colmajor.
@@ -346,7 +376,7 @@ Proof.
   done.
 Qed.
 
-#[export] Instance mx_to_vec_rowmajor_mor `{Equiv R} {n m} : 
+#[export] Instance mx_to_vec_rowmajor_mor `{Equiv R} {n m} :
   Proper (equiv ==> vec_rel equiv) (@mx_to_vec_rowmajor R n m).
 Proof.
   intros A B HAB.
@@ -357,7 +387,7 @@ Proof.
   now apply mx_equiv.
 Qed.
 
-#[export] Instance mx_to_vec_colmajor_mor `{Equiv R} {n m} : 
+#[export] Instance mx_to_vec_colmajor_mor `{Equiv R} {n m} :
   Proper (equiv ==> vec_rel equiv) (@mx_to_vec_colmajor R n m).
 Proof.
   intros A B HAB.
@@ -374,14 +404,14 @@ Qed.
 
 
 
-Lemma mlookup_transpose {R n m} (A : Matrix R n m) i j : 
+Lemma mlookup_transpose {R n m} (A : Matrix R n m) i j :
   mx_transpose A i j = A j i.
 Proof.
   unfold mx_transpose.
   now rewrite mlookup_fun_to_mx.
 Qed.
 
-#[export] Instance mx_transpose_mor `{Equiv R} {n m} : 
+#[export] Instance mx_transpose_mor `{Equiv R} {n m} :
   Proper (equiv ==> equiv) (@mx_transpose R n m).
 Proof.
   intros A B.
@@ -391,7 +421,7 @@ Proof.
   done.
 Qed.
 
-Lemma cast_matrix_id {R n m} (Hn : n = n) (Hm : m = m) (A : Matrix R n m) : 
+Lemma cast_matrix_id {R n m} (Hn : n = n) (Hm : m = m) (A : Matrix R n m) :
   cast_matrix Hn Hm A = A.
 Proof.
   unfold cast_matrix.
@@ -402,7 +432,7 @@ Proof.
 Qed.
 
 
-Lemma mlookup_cast {R n m n' m'} (Hn : n = n') (Hm : m = m') (A : Matrix R n m) i j : 
+Lemma mlookup_cast {R n m n' m'} (Hn : n = n') (Hm : m = m') (A : Matrix R n m) i j :
   cast_matrix Hn Hm A i j = A (Fin.cast i (eq_sym Hn)) (Fin.cast j (eq_sym Hm)).
 Proof.
   subst.
@@ -411,7 +441,7 @@ Proof.
   done.
 Qed.
 
-#[export] Instance cast_matrix_mor `{Equiv R} {n m n' m'} (Hn : n = n') (Hm : m = m') : 
+#[export] Instance cast_matrix_mor `{Equiv R} {n m n' m'} (Hn : n = n') (Hm : m = m') :
   Proper (equiv ==> equiv) (@cast_matrix R n m n' m' Hn Hm).
 Proof.
   intros A B.
@@ -474,6 +504,44 @@ Proof.
   now rewrite mlookup_id_case, decide_False.
 Qed.
 
+Lemma mlookup_swap_case n m i j :
+  swap_matrix n m i j = if decide (fin_add_comm i = j) then 1 else 0.
+Proof.
+  apply mlookup_fun_to_mx.
+Qed.
+
+Lemma mlookup_swap n m i :
+  swap_matrix n m i (fin_add_comm i) = 1.
+Proof.
+  now rewrite mlookup_swap_case, decide_True.
+Qed.
+
+Lemma mlookup_swap_ne n m i j : fin_add_comm i <> j ->
+  swap_matrix n m i j = 0.
+Proof.
+  intros;
+  now rewrite mlookup_swap_case, decide_False.
+Qed.
+
+Lemma mlookup_E_case {n m} (i : fin n) (j : fin m) i' j' :
+  E i j i' j' = if decide (i' = i /\ j' = j) then 1 else 0.
+Proof.
+  apply mlookup_fun_to_mx.
+Qed.
+
+Lemma mlookup_E {n m} (i : fin n) (j : fin m) :
+  E i j i j = 1.
+Proof.
+  now rewrite mlookup_E_case, decide_True.
+Qed.
+
+Lemma mlookup_E_ne {n m} (i : fin n) (j : fin m) i' j' : i' <> i \/ j' <> j ->
+  E i j i' j' = 0.
+Proof.
+  intros;
+  now rewrite mlookup_E_case, decide_False by tauto.
+Qed.
+
 Lemma mlookup_J n m i j :
   J n m i j = 1.
 Proof.
@@ -534,11 +602,11 @@ Qed.
 Lemma mlookup_perm_matrix_ne {n m} (f : fin n -> fin m) i j : f i <> j ->
   perm_matrix f i j = 0.
 Proof.
-  intros; 
+  intros;
   now rewrite mlookup_perm_matrix_case, decide_False.
 Qed.
 
-#[export] Instance perm_matrix_mor {n m} : 
+#[export] Instance perm_matrix_mor {n m} :
   Proper (pointwise_relation (fin n) (@eq (fin m)) ==> eq) (perm_matrix (R:=R)).
 Proof.
   intros f f' Hf.
@@ -607,19 +675,10 @@ Qed.
 Proof.
   intros ? ?; easy.
 Qed.
-#[export] Instance vec_equiv {A} `{Equiv A} {n} : Equiv (vec A n) := vec_rel equiv.
-#[export] Instance vec_leibniz `{LeibnizEquiv A} {n} : LeibnizEquiv (vec A n).
-Proof.
-  intros v w Hvw.
-  apply vec_eq.
-  unfold equiv, vec_equiv in Hvw.
-  rewrite vec_rel_lookup in Hvw.
-  intros i.
-  apply leibniz_equiv, Hvw.
-Qed.
+#[export] Instance matrix_leibniz {A} `{LeibnizEquiv A} {n m} :
+  LeibnizEquiv (Matrix A n m) := vec_leibniz.
 
 
-Typeclasses Opaque Matrix.
 
 
 
@@ -682,7 +741,7 @@ Qed.
 
 
 (* FIXME: Move *)
-Lemma mx_transpose_involutive {R n m} : Cancel eq (@mx_transpose R n m) mx_transpose.
+#[export] Instance mx_transpose_involutive {R n m} : Cancel eq (@mx_transpose R n m) mx_transpose.
 Proof.
   intros A.
   apply mx_eq.
@@ -882,7 +941,20 @@ Definition mx_plus {R} `{SR : SemiRing R rO rI radd rmul req}
 
 Definition mx_vec_prod {R} `{SR : SemiRing R rO rI radd rmul req}
   {n m} (A : Matrix R n m) (v : vec R m) : vec R n :=
-  vmap (vec_dot v) A.
+  vmap (λ w, vec_dot w v) A.
+
+#[export] Instance mx_transpose_inj {R n m} :
+  Inj eq eq (@mx_transpose R n m) := cancel_inj.
+
+#[export] Instance mx_transpose_inj_equiv `{Equiv R} {n m} :
+  Inj equiv equiv (@mx_transpose R n m).
+Proof.
+  intros A B HAB.
+  rewrite @mx_equiv in *.
+  setoid_rewrite mlookup_transpose in HAB.
+  auto.
+Qed.
+
 
 Section mx_plus.
 
@@ -1046,6 +1118,274 @@ Proof.
   done.
 Qed.
 
+Lemma compose_matrix_zero_l {n m o} (B : Matrix R m o) :
+  compose_matrix (zero_matrix n m) B ≡ zero_matrix _ _.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_compose', mlookup_zero.
+  apply sum_of_0'; intros; rewrite mlookup_zero; hnf; ring.
+Qed.
+
+Lemma compose_matrix_zero_r {n m o} (A : Matrix R n m) :
+  compose_matrix A (zero_matrix m o) ≡ zero_matrix _ _.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_compose', mlookup_zero.
+  apply sum_of_0'; intros; rewrite mlookup_zero; hnf; ring.
+Qed.
+
+
+Lemma mx_hblock_vblock_distr {n m o p}
+  (A : Matrix R n m) B C (D : Matrix R o p) :
+  mx_hblock (mx_vblock A C) (mx_vblock B D) =
+  mx_vblock (mx_hblock A B) (mx_hblock C D).
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_hblock, mlookup_vblock.
+  induction i as [i|i] using fin_add_inv;
+  induction j as [j|j] using fin_add_inv;
+  rewrite ?fin_sum_case_L, ?fin_sum_case_R; cbn;
+  rewrite mlookup_vblock, mlookup_hblock;
+  rewrite ?fin_sum_case_L, ?fin_sum_case_R; done.
+Qed.
+
+(* FIXME: Move *)
+#[export] Instance fin_sum_case_inj {n m} : Inj eq eq (@fin_sum_case n m).
+Proof.
+  intros i j.
+  induction i as [i|i] using fin_add_inv;
+  induction j as [j|j] using fin_add_inv;
+  rewrite ?fin_sum_case_L, ?fin_sum_case_R; cbn; congruence.
+Qed.
+
+Lemma mlookup_stack {n m o p} (A : Matrix R n m) (B : Matrix R o p) i j :
+  (stack_matrix A B) i j =
+  match fin_sum_case i, fin_sum_case j with
+  | inl i, inl j => A i j
+  | inr i, inr j => B i j
+  | _, _ => 0
+  end.
+Proof.
+  unfold stack_matrix.
+  rewrite mx_hblock_vblock_distr.
+  rewrite mlookup_vblock.
+  destruct (fin_sum_case i); cbn; rewrite mlookup_hblock;
+  case_match; cbn; done || apply mlookup_zero.
+Qed.
+
+Lemma stack_matrix_id n m :
+  stack_matrix (I n) (I m) =@{Matrix R _ _} I (n + m).
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_stack, mlookup_id_case.
+  rewrite (@decide_ext _ _ _ _ (decide_rel (@eq (fin _ + fin _)) _ _))
+    by apply symmetry, (inj_iff fin_sum_case).
+  do 2 case_match; [|now rewrite decide_False by done..|];
+  rewrite mlookup_id_case;
+  apply decide_ext, symmetry, (inj_iff _).
+Qed.
+
+Lemma mx_hblock_const {n m m'} r :
+  mx_hblock (const_matrix r) (const_matrix r) = @const_matrix R n (m + m') r.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_hblock;
+  destruct (fin_sum_case _);
+  cbn;
+  now rewrite 2 mlookup_const.
+Qed.
+
+Lemma mx_vblock_const {n n' m} r :
+  mx_vblock (const_matrix r) (const_matrix r) = @const_matrix R (n + n') m r.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_vblock;
+  destruct (fin_sum_case _);
+  cbn;
+  now rewrite 2 mlookup_const.
+Qed.
+
+Lemma mx_hblock_zero {n m m'} :
+  mx_hblock (zero_matrix _ _) (zero_matrix _ _) = zero_matrix (R:=R) n (m + m').
+Proof.
+  apply mx_hblock_const.
+Qed.
+
+Lemma mx_vblock_zero {n n' m} :
+  mx_vblock (zero_matrix _ _) (zero_matrix _ _) = zero_matrix (R:=R) (n + n') m.
+Proof.
+  apply mx_vblock_const.
+Qed.
+
+Lemma mx_plus_zero_l {n m} (A : Matrix R n m) :
+  mx_plus (zero_matrix _ _) A ≡ A.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_plus, mlookup_zero.
+  hnf; ring.
+Qed.
+
+Lemma mx_plus_comm {n m} (A B : Matrix R n m) :
+  mx_plus A B ≡ mx_plus B A.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite 2 mlookup_plus; hnf; ring.
+Qed.
+
+Lemma mx_plus_zero_r {n m} (A : Matrix R n m) :
+  mx_plus A (zero_matrix _ _) ≡ A.
+Proof.
+  now rewrite mx_plus_comm, mx_plus_zero_l.
+Qed.
+
+Lemma mx_plus_zero_zero n m :
+  mx_plus (zero_matrix n m) (zero_matrix _ _) ≡ zero_matrix (R:=R) _ _.
+Proof.
+  apply mx_plus_zero_l.
+Qed.
+
+Lemma mx_hblock_plus_distr {n m m'} (A A' : Matrix R n m) (B B' : Matrix R n m') :
+  mx_hblock (mx_plus A A') (mx_plus B B') = mx_plus (mx_hblock A B) (mx_hblock A' B').
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_plus, 3 mlookup_hblock.
+  destruct (fin_sum_case _); cbn; rewrite mlookup_plus; done.
+Qed.
+
+Lemma mx_vblock_plus_distr {n n' m} (A A' : Matrix R n m) (B B' : Matrix R n' m) :
+  mx_vblock (mx_plus A A') (mx_plus B B') = mx_plus (mx_vblock A B) (mx_vblock A' B').
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_plus, 3 mlookup_vblock.
+  destruct (fin_sum_case _); cbn; rewrite mlookup_plus; done.
+Qed.
+
+Lemma stack_matrix_plus_distr {n m o p} (A A' : Matrix R n m) (B B' : Matrix R o p) :
+  stack_matrix (mx_plus A A') (mx_plus B B') ≡
+  mx_plus (stack_matrix A B) (stack_matrix A' B').
+Proof.
+  unfold stack_matrix.
+  rewrite <- (mx_plus_zero_zero o m), <- (mx_plus_zero_zero n p).
+  rewrite 2 mx_vblock_plus_distr, mx_hblock_plus_distr.
+  rewrite 2 mx_plus_zero_zero.
+  done.
+Qed.
+
+
+Lemma compose_matrix_plus_distr_l {n m o} (A A' : Matrix R n m) (B : Matrix R m o) :
+  compose_matrix (mx_plus A A') B ≡
+  mx_plus (compose_matrix A B) (compose_matrix A' B).
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_plus, 3 mlookup_compose'.
+  setoid_rewrite mlookup_plus.
+  setoid_rewrite distr_l.
+  now rewrite sum_of_add.
+Qed.
+
+Lemma compose_matrix_plus_distr_r {n m o} (A : Matrix R n m) (B B' : Matrix R m o) :
+  compose_matrix A (mx_plus B B') ≡
+  mx_plus (compose_matrix A B) (compose_matrix A B').
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_plus, 3 mlookup_compose'.
+  setoid_rewrite mlookup_plus.
+  setoid_rewrite distr_r.
+  now rewrite sum_of_add.
+Qed.
+
+
+
+Lemma stack_compose_matrix_distr {n m o p q r}
+  (A : Matrix R n m) (B : Matrix R m o) (C : Matrix R p q) (D : Matrix R q r) :
+  stack_matrix (compose_matrix A B) (compose_matrix C D) ≡
+  compose_matrix (stack_matrix A C) (stack_matrix B D).
+Proof.
+  unfold stack_matrix at 2 3.
+  rewrite (mx_hblock_vblock_distr B).
+  rewrite compose_matrix_hblock_vblock.
+  rewrite 2 compose_matrix_vblock_l, 4 compose_matrix_hblock_r.
+  rewrite 4 compose_matrix_zero_l, 2 compose_matrix_zero_r.
+  rewrite <- mx_vblock_plus_distr, <- 2 mx_hblock_plus_distr.
+  rewrite 3 mx_plus_zero_l, mx_plus_zero_r.
+  rewrite <- mx_hblock_vblock_distr.
+  done.
+Qed.
+
+Lemma compose_matrix_id_l {n m} (A : Matrix R n m) :
+  compose_matrix (I n) A ≡ A.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_compose'.
+  apply sum_of_unique.
+  exists i.
+  split; [apply _|].
+  rewrite mlookup_id.
+  split; [hnf; ring|].
+  intros i' _ Hi'.
+  rewrite mlookup_id_ne by done.
+  hnf; ring.
+Qed.
+
+Lemma mx_transpose_compose {n m o} (A : Matrix R n m) (B : Matrix R m o) :
+  mx_transpose (compose_matrix A B) ≡
+  compose_matrix (mx_transpose B) (mx_transpose A).
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite mlookup_transpose, 2 mlookup_compose'.
+  setoid_rewrite mlookup_transpose.
+  apply sum_of_ext; intros; hnf; ring.
+Qed.
+
+Lemma mx_transpose_stack {n m o p} (A : Matrix R n m) (B : Matrix R o p) :
+  mx_transpose (stack_matrix A B) =
+  stack_matrix (mx_transpose A) (mx_transpose B).
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, 2 mlookup_stack.
+  do 2 case_match; done || now rewrite mlookup_transpose.
+Qed.
+
+Lemma mx_transpose_id n :
+  mx_transpose (R:=R) (I n) = I n.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, 2 mlookup_id_case.
+  apply decide_ext; done.
+Qed.
+
+Lemma mx_transpose_swap n m :
+  mx_transpose (R:=R) (swap_matrix n m) = swap_matrix m n.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, 2 mlookup_swap_case.
+  apply decide_ext.
+  rewrite <- (inj_iff fin_add_comm), (fin_add_comm_involutive j).
+  done.
+Qed.
+
+
+Lemma compose_matrix_id_r {n m} (A : Matrix R n m) :
+  compose_matrix A (I m) ≡ A.
+Proof.
+  apply (inj mx_transpose).
+  rewrite mx_transpose_compose, mx_transpose_id, compose_matrix_id_l.
+  done.
+Qed.
+
+Lemma compose_matrix_assoc {n m o p} (A : Matrix R n m) (B : Matrix R m o)
+  (C : Matrix R o p) :
+  compose_matrix A (compose_matrix B C) ≡ compose_matrix (compose_matrix A B) C.
+Proof.
+  apply mx_equiv; intros i j.
+  rewrite 2 mlookup_compose'.
+  setoid_rewrite mlookup_compose'.
+  setoid_rewrite sum_of_distr_l.
+  setoid_rewrite sum_of_distr_r.
+  rewrite sum_of_comm.
+  apply sum_of_ext; intros; apply sum_of_ext; intros.
+  hnf; ring.
+Qed.
 
 
 End mx_plus.
@@ -1139,6 +1479,205 @@ Proof.
   done.
 Qed.
 
+Definition rowmx2vec {R n} (M : Matrix R 1 n) : vec R n :=
+  vhd M.
+
+Definition colmx2vec {R n} (M : Matrix R n 1) : vec R n :=
+  vmap vhd M.
+
+Lemma lookup_rowmx2vec {R n} (M : Matrix R 1 n) j :
+  rowmx2vec M !!! j = M 0%fin j.
+Proof.
+  unfold rowmx2vec.
+  rewrite <- vlookup_0_vhd.
+  done.
+Qed.
+
+Lemma lookup_colmx2vec {R n} (M : Matrix R n 1) i :
+  colmx2vec M !!! i = M i 0%fin.
+Proof.
+  unfold colmx2vec.
+  rewrite vlookup_map, <- vlookup_0_vhd.
+  done.
+Qed.
+
+#[export] Instance rowmx2vec_mor `{Equiv R} {n} :
+  Proper (equiv ==> equiv) (@rowmx2vec R n).
+Proof.
+  intros A A' HA.
+  apply vec_equiv; intros i.
+  rewrite 2 lookup_rowmx2vec.
+  now apply mx_equiv.
+Qed.
+
+#[export] Instance colmx2vec_mor `{Equiv R} {n} :
+  Proper (equiv ==> equiv) (@colmx2vec R n).
+Proof.
+  intros A A' HA.
+  apply vec_equiv; intros i.
+  rewrite 2 lookup_colmx2vec.
+  now apply mx_equiv.
+Qed.
+
+
+Definition vec2rowmx {R n} (v : vec R n) : Matrix R 1 n :=
+  [# v].
+
+Definition vec2colmx {R n} (v : vec R n) : Matrix R n 1 :=
+  vmap (.:::[#]) v.
+
+Lemma mlookup_vec2rowmx {R n} (v : vec R n) i j :
+  vec2rowmx v i j = v !!! j.
+Proof.
+  unfold vec2rowmx.
+  inv_all_vec_fin.
+  done.
+Qed.
+
+Lemma mlookup_vec2colmx {R n} (v : vec R n) i j :
+  vec2colmx v i j = v !!! i.
+Proof.
+  unfold vec2colmx.
+  unfold mx_to_fun.
+  inv_all_vec_fin.
+  unfold Matrix.
+  rewrite vlookup_map.
+  done.
+Qed.
+
+#[export] Instance vec2rowmx_mor `{Equiv R} {n} :
+  Proper (equiv ==> equiv) (@vec2rowmx R n).
+Proof.
+  intros v v' Hv.
+  apply mx_equiv; intros i j.
+  rewrite 2 mlookup_vec2rowmx.
+  now apply vec_equiv.
+Qed.
+
+#[export] Instance vec2colmx_mor `{Equiv R} {n} :
+  Proper (equiv ==> equiv) (@vec2colmx R n).
+Proof.
+  intros v v' Hv.
+  apply mx_equiv; intros i j.
+  rewrite 2 mlookup_vec2colmx.
+  now apply vec_equiv.
+Qed.
+
+#[export] Instance vec2rowmx2vec {R n} :
+  Cancel (@eq (vec R n)) rowmx2vec vec2rowmx.
+Proof.
+  intros v.
+  apply vec_eq; intros i.
+  now rewrite lookup_rowmx2vec, mlookup_vec2rowmx.
+Qed.
+
+#[export] Instance vec2colmx2vec {R n} :
+  Cancel (@eq (vec R n)) colmx2vec vec2colmx.
+Proof.
+  intros v.
+  apply vec_eq; intros i.
+  now rewrite lookup_colmx2vec, mlookup_vec2colmx.
+Qed.
+
+#[export] Instance rowmx2vec2rowmx {R n} :
+  Cancel (@eq (Matrix R 1 n)) vec2rowmx rowmx2vec.
+Proof.
+  intros v.
+  apply mx_eq; intros i j.
+  now rewrite mlookup_vec2rowmx, lookup_rowmx2vec; inv_all_vec_fin.
+Qed.
+
+#[export] Instance colmx2vec2colmx {R n} :
+  Cancel (@eq (Matrix R n 1)) vec2colmx colmx2vec.
+Proof.
+  intros v.
+  apply mx_eq; intros i j.
+  now rewrite mlookup_vec2colmx, lookup_colmx2vec; inv_all_vec_fin.
+Qed.
+
+#[local] Instance vec2rowmx2vec_equiv `{Equiv R, Reflexive R equiv} {n} :
+  Cancel (equiv (A := vec R n)) rowmx2vec vec2rowmx.
+Proof.
+  intros v.
+  apply vec_equiv; intros i.
+  now rewrite lookup_rowmx2vec, mlookup_vec2rowmx.
+Qed.
+
+#[local] Instance vec2colmx2vec_equiv `{Equiv R, Reflexive R equiv} {n} :
+  Cancel (equiv (A := vec R n)) colmx2vec vec2colmx.
+Proof.
+  intros v.
+  apply vec_equiv; intros i.
+  now rewrite lookup_colmx2vec, mlookup_vec2colmx.
+Qed.
+
+#[local] Instance rowmx2vec2rowmx_equiv `{Equiv R, Reflexive R equiv} {n} :
+  Cancel (equiv (A := Matrix R 1 n)) vec2rowmx rowmx2vec.
+Proof.
+  intros v.
+  apply mx_equiv; intros i j.
+  now rewrite mlookup_vec2rowmx, lookup_rowmx2vec; inv_all_vec_fin.
+Qed.
+
+#[local] Instance colmx2vec2colmx_equiv `{Equiv R, Reflexive R equiv} {n} :
+  Cancel (equiv (A := Matrix R n 1)) vec2colmx colmx2vec.
+Proof.
+  intros v.
+  apply mx_equiv; intros i j.
+  now rewrite mlookup_vec2colmx, lookup_colmx2vec; inv_all_vec_fin.
+Qed.
+
+#[export] Instance vec2colmx_inj_equiv `{Equiv R, Equivalence R equiv} {n} :
+  Inj equiv equiv (@vec2colmx R n) | 10 := cancel_inj.
+#[export] Instance vec2rowmx_inj_equiv `{Equiv R, Equivalence R equiv} {n} :
+  Inj equiv equiv (@vec2rowmx R n) | 10 := cancel_inj.
+#[export] Instance colmx2vec_inj_equiv `{Equiv R, Equivalence R equiv} {n} :
+  Inj equiv equiv (@colmx2vec R n) | 10 := cancel_inj.
+#[export] Instance rowmx2vec_inj_equiv `{Equiv R, Equivalence R equiv} {n} :
+  Inj equiv equiv (@rowmx2vec R n) | 10 := cancel_inj.
+
+
+#[export] Instance vec2colmx_inj {R n} : Inj eq eq (@vec2colmx R n) := cancel_inj.
+#[export] Instance vec2rowmx_inj {R n} : Inj eq eq (@vec2rowmx R n) := cancel_inj.
+#[export] Instance colmx2vec_inj {R n} : Inj eq eq (@colmx2vec R n) := cancel_inj.
+#[export] Instance rowmx2vec_inj {R n} : Inj eq eq (@rowmx2vec R n) := cancel_inj.
+
+
+Lemma colmx2vec2rowmx {R n} A :
+  vec2rowmx (@colmx2vec R n A) = mx_transpose A.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, mlookup_vec2rowmx, lookup_colmx2vec.
+  now inv_all_vec_fin.
+Qed.
+
+Lemma rowmx2vec2colmx {R n} A :
+  vec2colmx (@rowmx2vec R n A) = mx_transpose A.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, mlookup_vec2colmx, lookup_rowmx2vec.
+  now inv_all_vec_fin.
+Qed.
+
+Lemma mx_transpose_vec2rowmx {R n} v :
+  mx_transpose (@vec2rowmx R n v) = vec2colmx v.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, mlookup_vec2rowmx, mlookup_vec2colmx.
+  done.
+Qed.
+
+Lemma mx_transpose_vec2colmx {R n} v :
+  mx_transpose (@vec2colmx R n v) = vec2rowmx v.
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_transpose, mlookup_vec2rowmx, mlookup_vec2colmx.
+  done.
+Qed.
+
+
+
+
 
 Section mx_vec_prod.
 
@@ -1168,37 +1707,357 @@ Local Existing Instance Radd_proper.
 Let Rmul_proper := Req_ext.(SRmul_ext) : Proper (req ==> req ==> req) rmul.
 Local Existing Instance Rmul_proper.
 
+
+Lemma lookup_mx_vec_prod {n m} (A : Matrix R n m) v i :
+  mx_vec_prod A v !!! i =
+  ∑ j, A i j * v !!! j.
+Proof.
+  unfold mx_vec_prod.
+  rewrite vlookup_map, vec_dot_to_sum_of.
+  done.
+Qed.
+
+
 Lemma mx_vec_prod_0 {n} (A : Matrix R n 0) (v : vec R 0) :
   (mx_vec_prod A v) = (fun_to_vec (λ _, 0)).
 Proof.
   apply vec_eq.
   intros i.
-  unfold mx_vec_prod.
-  rewrite vlookup_map, lookup_fun_to_vec.
-  rewrite vec_dot_to_sum_of, sum_of_fin_0.
+  rewrite lookup_mx_vec_prod, sum_of_fin_0, lookup_fun_to_vec.
   done.
 Qed.
 
 Lemma mx_vec_prod_hblock_app {n m o} (A : Matrix R n m) (B : Matrix R n o)
   v w :
-  vec_rel equiv (mx_vec_prod (mx_hblock A B) (v +++ w))
-  (vzip_with radd (mx_vec_prod A v) (mx_vec_prod B w)).
+  mx_vec_prod (mx_hblock A B) (v +++ w) ≡
+  vzip_with radd (mx_vec_prod A v) (mx_vec_prod B w).
 Proof.
-  apply vec_rel_lookup.
-  intros i.
+  apply vec_equiv; intros i.
   unfold mx_vec_prod, mx_hblock.
   rewrite vlookup_zip_with, 3 vlookup_map, vlookup_zip_with.
   rewrite vec_dot_app.
   done.
 Qed.
 
-Lemma mx_vec_prod_vblock {n m o} (A : Matrix R n o) (B : Matrix R m o)
-  v :
+Lemma mx_vec_prod_vblock {n m o} (A : Matrix R n o) (B : Matrix R m o) v :
   mx_vec_prod (mx_vblock A B) v =
   (mx_vec_prod A v) +++ (mx_vec_prod B v).
 Proof.
   apply Vector.map_append.
 Qed.
+
+
+(* FIXME: Move *)
+Lemma mlookup_fold {n m} (A : Matrix R n m) i j :
+  ((A :> vec _ _) !!! i) !!! j = A i j.
+Proof.
+  done.
+Qed.
+
+
+Lemma mx_vec_prod_to_compose {n m} (A : Matrix R n m) (v : vec R m) :
+  mx_vec_prod A v = colmx2vec (compose_matrix A (vec2colmx v)).
+Proof.
+  apply vec_eq; intros i.
+  rewrite lookup_mx_vec_prod, lookup_colmx2vec, mlookup_compose'.
+  now setoid_rewrite mlookup_vec2colmx.
+Qed.
+
+Lemma mlookup_fun_to_vec {n m} (f : fin n -> vec R m) i j :
+  (fun_to_vec f :> Matrix R _ _) i j = f i !!! j.
+Proof.
+  unfold mx_to_fun, Matrix.
+  now rewrite lookup_fun_to_vec.
+Qed.
+
+Lemma compose_to_mx_vec_prod {n m o} (A : Matrix R n m) (B : Matrix R m o) :
+  compose_matrix A B = mx_transpose (fun_to_vec (fun j => mx_vec_prod A (mx_col B j))).
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_compose, mlookup_transpose, mlookup_fun_to_vec.
+  rewrite lookup_mx_vec_prod, vec_dot_to_sum_of.
+  done.
+Qed.
+
+
+Lemma mx_vec_prod_id {n} (v : vec R n) :
+  mx_vec_prod (id_matrix n) v ≡ v.
+Proof.
+  rewrite mx_vec_prod_to_compose, compose_matrix_id_l, (cancel (S:=eq) _ _).
+  done.
+Qed.
+
+Lemma mx_vec_prod_swap
+  {n m} (v : vec R _) :
+  mx_vec_prod (swap_matrix n m) v ≡ vsplitr v +++ vsplitl v.
+Proof.
+  apply vec_rel_lookup.
+  intros i.
+  rewrite lookup_mx_vec_prod.
+  apply sum_of_unique.
+  exists (fin_add_comm i).
+  split; [apply _|].
+  split.
+  - rewrite mlookup_swap.
+    induction i using fin_add_inv.
+    + rewrite lookup_vapp_L, fin_add_comm_L, lookup_vsplitr.
+      hnf; ring.
+    + rewrite lookup_vapp_R, fin_add_comm_R, lookup_vsplitl.
+      hnf; ring.
+  - intros b _ Hb.
+    rewrite mlookup_swap_ne by done.
+    hnf; ring.
+Qed.
+
+Lemma mx_vec_prod_compose {n m o} (A : Matrix R n m) (B : Matrix R m o)
+  (v : vec R o) :
+  mx_vec_prod (compose_matrix A B) v ≡ mx_vec_prod A (mx_vec_prod B v).
+Proof.
+  rewrite 3 mx_vec_prod_to_compose, <- compose_matrix_assoc.
+  rewrite (colmx2vec2colmx _).
+  done.
+Qed.
+
+Lemma mx_vec_prod_zero {n m} (v : vec R _) :
+  mx_vec_prod (zero_matrix n m) v ≡ fun_to_vec (fun _ => 0).
+Proof.
+  rewrite mx_vec_prod_to_compose.
+  rewrite compose_matrix_zero_l.
+  apply vec_equiv.
+  intros i.
+  rewrite lookup_colmx2vec, mlookup_zero, lookup_fun_to_vec.
+  done.
+Qed.
+
+Lemma mx_vec_prod_stack_app {n m o p} (A : Matrix R n m) (B : Matrix R o p)
+  v w :
+  mx_vec_prod (stack_matrix A B) (v +++ w) ≡
+  mx_vec_prod A v +++ mx_vec_prod B w.
+Proof.
+  unfold stack_matrix.
+  rewrite mx_vec_prod_hblock_app.
+  rewrite 2 mx_vec_prod_vblock, 2 mx_vec_prod_zero, vzip_with_app.
+  f_equiv; apply vec_equiv; intros i; rewrite vlookup_zip_with, lookup_fun_to_vec;
+  hnf; ring.
+Qed.
+
+(* FIXME: Move *)
+Lemma lookup_e_case {n} (i : fin n) i' :
+  e i !!! i' = if decide (i' = i) then 1 else 0.
+Proof.
+  apply lookup_fun_to_vec.
+Qed.
+
+Lemma lookup_e {n} (i : fin n) :
+  e i !!! i = 1.
+Proof.
+  now rewrite lookup_e_case, decide_True.
+Qed.
+
+Lemma lookup_e_ne {n} (i : fin n) j : i <> j ->
+  e i !!! j = 0.
+Proof.
+  intros;
+  now rewrite lookup_e_case, decide_False.
+Qed.
+
+Lemma vec2colmx_e {n} (i : fin n) :
+  vec2colmx (e (R:=R) i) = E i 0.
+Proof.
+  apply mx_eq; intros i' j.
+  inv_all_vec_fin.
+  rewrite mlookup_vec2colmx, lookup_e_case, mlookup_E_case.
+  apply decide_ext; easy.
+Qed.
+
+Lemma vec2rowmx_e {n} (i : fin n) :
+  vec2rowmx (e (R:=R) i) = E 0 i.
+Proof.
+  apply mx_eq; intros i' j.
+  inv_all_vec_fin.
+  rewrite mlookup_vec2rowmx, lookup_e_case, mlookup_E_case.
+  apply decide_ext; easy.
+Qed.
+
+Lemma mlookup_if `{HPQ : {P} + {Q}} {n m} (A B : Matrix R n m) i j :
+  (if HPQ then A else B) i j = if HPQ then A i j else B i j.
+Proof.
+  now destruct HPQ.
+Qed.
+
+Lemma decide_and `{Decision P, Decision Q, Decision (P /\ Q)} {A} (x y : A) :
+  (if decide (P /\ Q) then x else y) =
+  if decide P then if decide Q then x else y else y.
+Proof.
+  (repeat case_decide); first [reflexivity|exfalso; tauto].
+Qed.
+
+Lemma decide_or `{Decision P, Decision Q, Decision (P \/ Q)} {A} (x y : A) :
+  (if decide (P \/ Q) then x else y) =
+  if decide P then x else if decide Q then x else y.
+Proof.
+  (repeat case_decide); first [reflexivity|exfalso; tauto].
+Qed.
+
+Lemma decide_impl `{Decision P, Decision Q, Decision (P \/ Q)} {A} (x y : A) :
+  (if decide (P -> Q) then x else y) =
+  if decide P then if decide Q then x else y else x.
+Proof.
+  (repeat case_decide); first [reflexivity|exfalso; tauto].
+Qed.
+
+
+Lemma compose_matrix_E_case {n m o} (i : fin n) (j j' : fin m) (k : fin o) :
+  compose_matrix (R:=R) (E i j) (E j' k) ≡ if decide (j = j') then E i k else zero_matrix _ _.
+Proof.
+  apply mx_equiv; intros i' k'.
+  rewrite mlookup_if.
+  rewrite mlookup_zero, mlookup_E_case.
+  rewrite <- decide_and.
+  rewrite mlookup_compose'.
+  setoid_rewrite mlookup_E_case.
+  case_decide.
+  - destruct_and!; subst.
+    apply sum_of_unique.
+    exists j'.
+    split; [apply _|].
+    split; [now rewrite 2 decide_True by done; hnf; ring|].
+    intros j'' _ Hj''.
+    rewrite 2 decide_False by easy.
+    hnf; ring.
+  - apply sum_of_0'.
+    intros j'' _.
+    case_decide; [|hnf; ring].
+    case_decide; [|hnf; ring].
+    exfalso.
+    destruct_and!; subst.
+    auto.
+Qed.
+
+
+Lemma compose_matrix_E {n m o} (i : fin n) (j : fin m) (k : fin o) :
+  compose_matrix (R:=R) (E i j) (E j k) ≡ E i k.
+Proof.
+  now rewrite compose_matrix_E_case, decide_True.
+Qed.
+
+Lemma compose_matrix_E_ne {n m o} (i : fin n) (j j' : fin m) (k : fin o) : j <> j' ->
+  compose_matrix (R:=R) (E i j) (E j' k) ≡ zero_matrix _ _.
+Proof.
+  intros;
+  now rewrite compose_matrix_E_case, decide_False.
+Qed.
+
+
+Lemma E_to_compose {n m} (i : fin n) (j : fin m) :
+  E i j ≡ compose_matrix (R:=R) (vec2colmx (e i)) (vec2rowmx (e j)).
+Proof.
+  rewrite vec2colmx_e, vec2rowmx_e.
+  rewrite compose_matrix_E.
+  done.
+Qed.
+
+Lemma compose_matrix_E_1_r {n m} (A : Matrix R n m) i (j : fin 1) :
+  compose_matrix A (E i j) ≡ vec2colmx (mx_col A i).
+Proof.
+  apply mx_equiv; intros i' j'.
+  inv_all_vec_fin.
+  rewrite mlookup_compose'.
+  rewrite mlookup_vec2colmx.
+  rewrite lookup_mx_col.
+  apply sum_of_unique.
+  exists i.
+  split; [apply _|].
+  rewrite mlookup_E.
+  split; [hnf; ring|].
+  intros i'' _ Hi''.
+  rewrite mlookup_E_ne by tauto.
+  hnf; ring.
+Qed.
+
+Lemma mx_transpose_E {n m} (i : fin n) (j : fin m) :
+  mx_transpose (R:=R) (E i j) = E j i.
+Proof.
+  apply mx_eq; intros i' j'.
+  rewrite mlookup_transpose, 2 mlookup_E_case.
+  apply decide_ext; easy.
+Qed.
+
+Lemma mx_col_transpose {n m} (A : Matrix R n m) i :
+  mx_col (mx_transpose A) i = mx_row A i.
+Proof.
+  apply vec_eq; intros j.
+  rewrite lookup_mx_col, lookup_mx_row, mlookup_transpose.
+  done.
+Qed.
+
+Lemma mx_row_transpose {n m} (A : Matrix R n m) i :
+  mx_row (mx_transpose A) i = mx_col A i.
+Proof.
+  apply vec_eq; intros j.
+  rewrite lookup_mx_col, lookup_mx_row, mlookup_transpose.
+  done.
+Qed.
+
+Lemma compose_matrix_E_1_l {n m} (A : Matrix R n m) (i : fin 1) j :
+  compose_matrix (E i j) A ≡ vec2rowmx (mx_row A j).
+Proof.
+  apply (inj mx_transpose).
+  rewrite mx_transpose_compose, mx_transpose_E.
+  rewrite mx_transpose_vec2rowmx.
+  rewrite compose_matrix_E_1_r.
+  rewrite mx_col_transpose.
+  done.
+Qed.
+
+Lemma mx_vec_prod_e {n m} (A : Matrix R n m) i :
+  mx_vec_prod A (e i) ≡ mx_col A i.
+Proof.
+  rewrite mx_vec_prod_to_compose, vec2colmx_e, compose_matrix_E_1_r, vec2colmx2vec.
+  done.
+Qed.
+
+Lemma compose_vec2rowmx_vec2colmx {n} (v : vec R n) (w : vec R n) :
+  compose_matrix (vec2rowmx v) (vec2colmx w) =
+  const_matrix (vec_dot v w).
+Proof.
+  apply mx_eq; intros i j.
+  rewrite mlookup_compose', mlookup_const.
+  setoid_rewrite mlookup_vec2rowmx.
+  setoid_rewrite mlookup_vec2colmx.
+  rewrite vec_dot_to_sum_of.
+  done.
+Qed.
+
+Lemma vec_dot_to_compose {n} (v : vec R n) (w : vec R n) :
+  vec_dot v w =
+  (compose_matrix (vec2rowmx v) (vec2colmx w)) 0%fin 0%fin.
+Proof.
+  rewrite compose_vec2rowmx_vec2colmx, mlookup_const.
+  done.
+Qed.
+
+#[export] Instance mx_to_fun_mor {n m} : 
+  Proper (equiv ==> eq ==> eq ==> equiv) 
+    (@mx_to_fun R n m).
+Proof.
+  intros A B HAB i _ <- j _ <-.
+  now apply mx_equiv.
+Qed.
+
+
+Lemma mlookup_to_mx_vec_prod {n m} (A : Matrix R n m) i j :
+  A i j ≡ vec_dot (e i) (mx_vec_prod A (e j)).
+Proof.
+  rewrite vec_dot_to_compose, vec2rowmx_e.
+  rewrite mx_vec_prod_to_compose, (colmx2vec2colmx _).
+  rewrite compose_matrix_E_1_l.
+  rewrite vec2colmx_e, compose_matrix_E_1_r.
+  rewrite mlookup_vec2rowmx, lookup_mx_row, mlookup_vec2colmx, lookup_mx_col.
+  done.
+Qed.
+
+
 
 End mx_vec_prod.
 

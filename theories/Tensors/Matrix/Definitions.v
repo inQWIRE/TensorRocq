@@ -7,6 +7,18 @@ Import vector.
 From TensorRocq Require Import Auxillary.Aux_stdpp.
 From TensorRocq Require Export Summable.
 
+
+(* FIXME: Move *)
+Lemma inj2_iff {A B C} {RA RB RC}
+  (f : A -> B -> C) {Hf : Inj2 RA RB RC f} {Hfprop : Proper (RA ==> RB ==> RC) f} 
+  a b a' b' :
+  RC (f a b) (f a' b') <-> RA a a' /\ RB b b'.
+Proof.
+  lazy in *.
+  naive_solver.
+Qed.
+
+
 (* FIXME: Move *)
 Definition vec_rel {A n} (R : relation A) : relation (vec A n) :=
   fun v w => Vector.fold_right and (vzip_with R v w) True.
@@ -63,6 +75,24 @@ Qed.
 Proof.
   split; apply _.
 Qed.
+
+#[export] Instance vector_equiv {A} `{Equiv A} {n} : Equiv (vec A n) := vec_rel equiv.
+(* FIXME: Move *)
+Lemma vec_equiv `{Equiv A} {n} (v w : vec A n) :
+  v ≡ w <-> forall i, v !!! i ≡ w !!! i.
+Proof.
+  apply vec_rel_lookup.
+Qed.
+#[export] Instance vec_leibniz `{LeibnizEquiv A} {n} : LeibnizEquiv (vec A n).
+Proof.
+  intros v w Heq.
+  rewrite vec_equiv in Heq.
+  apply vec_eq.
+  intros i.
+  apply leibniz_equiv.
+  auto.
+Qed.
+
 
 #[export] Instance vmap_mor {A B RA RB n} (f : A -> B) (Hf : Proper (RA ==> RB) f) :
   Proper (vec_rel RA ==> vec_rel RB) (vmap (n:=n) f).
@@ -133,6 +163,29 @@ Proof.
   done.
 Qed.
 
+#[export] Instance vmap_mor_equiv `{Equiv A, Equiv B} {n} (f : A -> B) 
+  (Hf : Proper (equiv ==> equiv) f) :
+  Proper (equiv ==> equiv) (vmap (n:=n) f) := _.
+
+#[export] Instance vzip_with_mor_equiv `{Equiv A, Equiv B, Equiv C} {n} (f : A -> B -> C)
+  (Hf : Proper (equiv ==> equiv ==> equiv) f) :
+  Proper (equiv ==> equiv ==> equiv) (vzip_with (n:=n) f) := _.
+
+#[export] Instance vcons_mor_equiv `{Equiv A} {n} :
+  Proper (equiv ==> equiv ==> equiv) (fun a v => @vcons A a n v) := _.
+
+#[export] Instance vapp_mor_equiv `{Equiv A} {n m} :
+  Proper (equiv ==> equiv ==> equiv) (@vapp A n m) := _.
+
+#[export] Instance vlookup_mor_equiv `{Equiv A} {n} :
+  Proper (eq ==> (≡@{vec A n}) ==> equiv) lookup_total := _.
+
+#[export] Instance vsplitl_mor_equiv `{Equiv A} {n m} :
+  Proper (equiv ==> equiv) (@vsplitl A n m) := _.
+
+#[export] Instance vsplitr_mor_equiv `{Equiv A} {n m} :
+  Proper (equiv ==> equiv) (@vsplitr A n m) := _.
+
 
 
 
@@ -162,6 +215,9 @@ Definition vec_dot `{SR : SemiRing R rO rI radd rmul req}
   {n} (v w : vec R n) : R :=
   Rlist_sum (vzip_with rmul v w).
 
+Definition e `{SR : SemiRing R rO rI radd rmul req} 
+  {n} (i : fin n) : vec R n :=
+  fun_to_vec (λ j, if decide (j = i) then rI else rO).
 
 
 End VectorOps.
@@ -186,10 +242,18 @@ Section MatrixOps.
   Definition id_matrix `{SR : SemiRing R rO rI radd rmul req}
     (n : nat) : Matrix n n :=
     fun_to_mx (λ i j, if decide (i = j) then rI else rO).
+  
+  Definition swap_matrix `{SR : SemiRing R rO rI radd rmul req}
+    n m : Matrix (n + m) (m + n) :=
+    fun_to_mx (fun i j => if decide (fin_add_comm i = j) then rI else rO).
 
   Definition J_matrix `{SR : SemiRing R rO rI radd rmul req}
     (n m : nat) : Matrix n m :=
     const_matrix rI.
+
+  Definition E_matrix `{SR : SemiRing R rO rI radd rmul req}
+    {n m : nat} (i : fin n) (j : fin m) : Matrix n m :=
+    fun_to_mx (fun i' j' => if decide (i' = i /\ j' = j) then rI else rO).
 
   Definition zero_matrix `{SR : SemiRing R rO rI radd rmul req}
     (n m : nat) : Matrix n m :=
@@ -219,6 +283,10 @@ Section MatrixOps.
 
   Definition mx_vblock {n n' m} (A : Matrix n m) (B : Matrix n' m) : Matrix (n + n') m :=
     A +++ B.
+
+  Definition stack_matrix `{SR : SemiRing R rO rI radd rmul req}
+    {n m o p} (A : Matrix n m) (B : Matrix o p) : Matrix (n + o) (m + p) :=
+    mx_hblock (mx_vblock A (zero_matrix _ _)) (mx_vblock (zero_matrix _ _) B).
 
   (* Definition cup_tensor `{SA : Summable A, EqA : EqDecision A,
     SR : SemiRing R rO rI radd rmul req} {n} :
@@ -388,5 +456,7 @@ Bind Scope Matrix_scope with Matrix.
 Notation "'I'" := id_matrix (at level 1) : Matrix_scope.
 Notation "'J'" := J_matrix (at level 1) : Matrix_scope.
 Notation "'Zero'" := zero_matrix (at level 1) : Matrix_scope.
+Notation "'E' i j" := (E_matrix i%fin j%fin) (at level 1, i at level 0, j at level 0) : Matrix_scope.
+
 
 #[global] Coercion mx_to_fun : Matrix >-> Funclass.
