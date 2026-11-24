@@ -21,16 +21,17 @@ Module GeneratorNotations.
 
 Notation "'const' a" := (Some (inr a)) (a at level 10, only printing, at level 1).
 
-Notation "'Z' a" := (Some (inl (false, a))) (a at level 10, only printing, at level 1).
+Notation "'Z' a" := (Some (inl (false, a))) (a at level 200, only printing, at level 1).
 Notation "'Z'" := (Some (inl (false, IZR 0))) (only printing, at level 1).
 
-Notation "'X' a" := (Some (inl (true, a))) (a at level 10, only printing, at level 1).
+Notation "'X' a" := (Some (inl (true, a))) (a at level 200, only printing, at level 1).
 Notation "'X'" := (Some (inl (true, IZR 0))) (only printing, at level 1).
 
 Notation "'H'" := ((None :> ZXCVERT)) (only printing, at level 1).
 
 End GeneratorNotations.
 
+Import GeneratorNotations.
 
 (* #[local] Coercion Nat.b2n : bool >-> nat. *)
 
